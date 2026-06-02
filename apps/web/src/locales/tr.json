@@ -595,7 +595,7 @@
   "enter_password": "Lütfen şifreni gir.",
   "invalid_email_or_username": "Geçersiz e-posta veya kullanıcı adı.",
   "user_profile_not_found": "Kullanıcı profili bulunamadı.",
-  "invalid_email_or_password": "Geçersiz e-posta veya şifre.",
+  "invalid_email_or_password": "Geçersiz e-posta/kullanıcı adı veya şifre.",
   "no_account_signup_first": "Hesap bulunamadı. Lütfen önce kayıt ol.",
   "too_many_login_attempts": "Çok fazla deneme. Lütfen daha sonra tekrar dene.",
   "signin_failed_retry": "Giriş başarısız. Lütfen tekrar dene.",

@@ -4,6 +4,8 @@ import { createAdapter } from '@socket.io/redis-adapter'
 import { Redis } from 'ioredis'
 import { corsOrigins, env } from '../config/env.js'
 import { verifyIdToken } from '../modules/auth/authService.js'
+import { getMessageKeyAccess, getReelmChannel, getUserPublicProfile, isReelmMember } from '../modules/reelms/access.js'
+import { getDoc, reelmPk } from '../modules/store/docStore.js'
 import { logger } from '../lib/logger.js'
 
 type ReelmsSocket = Socket & { uid?: string; _vcRoom?: string | null; _vcReelmId?: string | null; _vcChannelId?: string | null }
@@ -25,80 +27,156 @@ export function attachSocketServer(httpServer: HttpServer) {
   io.use(async (socket: ReelmsSocket, next) => {
     try {
       const token = socket.handshake.auth?.token
-      if (token) { socket.uid = await verifyIdToken(String(token)); return next() }
+      if (token) {
+        socket.uid = await verifyIdToken(String(token))
+        socket.data.uid = socket.uid
+        return next()
+      }
       if (process.env.NODE_ENV !== 'production' && process.env.REELMS_DEV_UID && socket.handshake.auth?.devUid === process.env.REELMS_DEV_UID) {
         socket.uid = process.env.REELMS_DEV_UID
+        socket.data.uid = socket.uid
         return next()
       }
       return next(new Error('unauthorized'))
     } catch { return next(new Error('unauthorized')) }
   })
 
+  const getRoomCount = async (room: string) => (await io.in(room).fetchSockets()).length
+
+  const emitVcCount = async (reelmId: string, channelId: string, room: string) => {
+    const count = await getRoomCount(room)
+    io.to(`reelm:${reelmId}`).emit('vc:count', { channelId, count })
+  }
+
+  const getVoiceChannelIds = async (reelmId: string): Promise<string[]> => {
+    const structure = await getDoc<any>(reelmPk(reelmId), 'structure').catch(() => null)
+    const categories = Array.isArray(structure?.categories) ? structure.categories : []
+    return categories.flatMap((category: any) => Array.isArray(category?.channels) ? category.channels : [])
+      .filter((channel: any) => String(channel?.type || '') === 'voice' && channel?.id)
+      .map((channel: any) => String(channel.id))
+  }
+
+  const leaveCurrentVc = async (socket: ReelmsSocket) => {
+    if (!socket._vcRoom) return
+    const room = socket._vcRoom
+    const reelmId = socket._vcReelmId
+    const channelId = socket._vcChannelId
+    socket.to(room).emit('vc:event', { type: 'leave', from: socket.uid })
+    socket.leave(room)
+    socket._vcRoom = null
+    socket._vcReelmId = null
+    socket._vcChannelId = null
+    if (reelmId && channelId) await emitVcCount(reelmId, channelId, room).catch((err) => logger.warn('vc:count emit failed', err))
+  }
+
   io.on('connection', (rawSocket) => {
     const socket = rawSocket as ReelmsSocket
     if (!socket.uid) { socket.disconnect(); return }
+    socket.data.uid = socket.uid
     logger.info('socket connected', socket.id, 'uid', socket.uid)
     socket.join(`u:${socket.uid}`)
     socket.join('app')
 
-    socket.on('joinReelm', (reelmId) => { if (typeof reelmId === 'string' && reelmId) socket.join(`reelm:${reelmId}`) })
+    socket.on('joinReelm', async (reelmId) => {
+      try {
+        if (typeof reelmId !== 'string' || !reelmId) return
+        if (!await isReelmMember(String(socket.uid), reelmId)) return
+        socket.join(`reelm:${reelmId}`)
+      } catch (err) { logger.warn('joinReelm denied', err) }
+    })
+
     socket.on('leaveReelm', (reelmId) => { if (typeof reelmId === 'string') socket.leave(`reelm:${reelmId}`) })
-    socket.on('joinChannel', (msgKey) => { if (typeof msgKey === 'string' && msgKey) socket.join(`chan:${msgKey}`) })
+
+    socket.on('joinChannel', async (msgKey) => {
+      try {
+        if (typeof msgKey !== 'string' || !msgKey) return
+        const access = await getMessageKeyAccess(String(socket.uid), msgKey)
+        if (!access.ok) return
+        socket.join(`chan:${msgKey}`)
+      } catch (err) { logger.warn('joinChannel denied', err) }
+    })
+
     socket.on('leaveChannel', (msgKey) => { if (typeof msgKey === 'string') socket.leave(`chan:${msgKey}`) })
 
     socket.on('voicePosition', ({ reelmId, channelId, x, y }) => {
       if (typeof reelmId !== 'string' || typeof channelId !== 'string') return
       if (typeof x !== 'number' || typeof y !== 'number') return
+      if (socket._vcReelmId !== reelmId || socket._vcChannelId !== channelId) return
       const msgKey = `${reelmId}_vc_${channelId}`
       io.to(`chan:${msgKey}`).emit('voicePosition', { userId: socket.uid, reelmId, channelId, x, y })
     })
 
-    socket.on('vc:join', ({ reelmId, channelId, userName, userPhoto }) => {
+    socket.on('vc:join', async ({ reelmId, channelId }) => {
+      try {
+        if (typeof reelmId !== 'string' || typeof channelId !== 'string') return
+        if (!await isReelmMember(String(socket.uid), reelmId)) return
+        const channel = await getReelmChannel(reelmId, channelId)
+        if (!channel || String(channel.type || '') !== 'voice') return
+
+        const room = `vc:${reelmId}_${channelId}`
+        if (socket._vcRoom && socket._vcRoom !== room) await leaveCurrentVc(socket)
+        if (socket._vcRoom === room) return
+
+        const capacity = Number(channel.capacity || 0)
+        const current = await getRoomCount(room)
+        if (capacity > 0 && current >= capacity) {
+          socket.emit('vc:error', { reelmId, channelId, error: 'channel_full' })
+          return
+        }
+
+        const profile = await getUserPublicProfile(String(socket.uid))
+        socket.join(room)
+        socket._vcRoom = room
+        socket._vcReelmId = reelmId
+        socket._vcChannelId = channelId
+        socket.to(room).emit('vc:event', { type: 'join', from: socket.uid, userName: profile.name || profile.username || 'Member', userPhoto: profile.photo || null })
+        await emitVcCount(reelmId, channelId, room)
+      } catch (err) { logger.warn('vc:join denied', err) }
+    })
+
+    socket.on('vc:leave', async ({ reelmId, channelId }) => {
       if (typeof reelmId !== 'string' || typeof channelId !== 'string') return
-      const room = `vc:${reelmId}_${channelId}`
-      socket.to(room).emit('vc:event', { type: 'join', from: socket.uid, userName, userPhoto })
-      socket.join(room)
-      socket._vcRoom = room; socket._vcReelmId = reelmId; socket._vcChannelId = channelId
-      const count = io.sockets.adapter.rooms.get(room)?.size || 0
-      io.to(`reelm:${reelmId}`).emit('vc:count', { channelId, count })
+      if (socket._vcReelmId !== reelmId || socket._vcChannelId !== channelId) return
+      await leaveCurrentVc(socket)
     })
 
-    socket.on('vc:leave', ({ reelmId, channelId }) => {
-      if (typeof reelmId !== 'string' || typeof channelId !== 'string') return
-      const room = `vc:${reelmId}_${channelId}`
-      socket.to(room).emit('vc:event', { type: 'leave', from: socket.uid })
-      socket.leave(room)
-      socket._vcRoom = null
-      const count = io.sockets.adapter.rooms.get(room)?.size || 0
-      io.to(`reelm:${reelmId}`).emit('vc:count', { channelId, count })
-      socket._vcReelmId = null; socket._vcChannelId = null
+    socket.on('vc:counts', async ({ reelmId }) => {
+      try {
+        if (typeof reelmId !== 'string') return
+        if (!await isReelmMember(String(socket.uid), reelmId)) return
+        const voiceChannelIds = await getVoiceChannelIds(reelmId)
+        const counts: Record<string, number> = {}
+        await Promise.all(voiceChannelIds.map(async (channelId) => {
+          counts[channelId] = await getRoomCount(`vc:${reelmId}_${channelId}`)
+        }))
+        socket.emit('vc:counts', { reelmId, counts })
+      } catch (err) { logger.warn('vc:counts denied', err) }
     })
 
-    socket.on('vc:counts', ({ reelmId }) => {
-      if (typeof reelmId !== 'string') return
-      const prefix = `vc:${reelmId}_`
-      const counts: Record<string, number> = {}
-      for (const [roomName, room] of io.sockets.adapter.rooms) {
-        if (roomName.startsWith(prefix)) counts[roomName.slice(prefix.length)] = room.size
-      }
-      socket.emit('vc:counts', { reelmId, counts })
-    })
-
-    socket.on('vc:signal', ({ to, payload }) => {
-      if (typeof to !== 'string' || !payload || typeof payload !== 'object') return
-      io.to(`u:${to}`).emit('vc:event', { ...payload, from: socket.uid })
+    socket.on('vc:signal', async ({ to, payload }) => {
+      try {
+        if (typeof to !== 'string' || !payload || typeof payload !== 'object') return
+        if (!socket._vcRoom) return
+        const peers = await io.in(socket._vcRoom).fetchSockets()
+        if (!peers.some((peer) => String(peer.data?.uid || '') === to)) return
+        io.to(`u:${to}`).emit('vc:event', { ...payload, from: socket.uid })
+      } catch (err) { logger.warn('vc:signal denied', err) }
     })
 
     socket.on('vc:broadcast', ({ reelmId, channelId, payload }) => {
       if (typeof reelmId !== 'string' || typeof channelId !== 'string' || !payload || typeof payload !== 'object') return
-      socket.to(`vc:${reelmId}_${channelId}`).emit('vc:event', { ...payload, from: socket.uid })
+      const room = `vc:${reelmId}_${channelId}`
+      if (socket._vcRoom !== room) return
+      socket.to(room).emit('vc:event', { ...payload, from: socket.uid })
+    })
+
+    socket.on('disconnecting', () => {
+      if (socket._vcRoom) socket.to(socket._vcRoom).emit('vc:event', { type: 'leave', from: socket.uid })
     })
 
     socket.on('disconnect', () => {
-      if (socket._vcRoom) {
-        socket.to(socket._vcRoom).emit('vc:event', { type: 'leave', from: socket.uid })
-        const count = Math.max(0, (io.sockets.adapter.rooms.get(socket._vcRoom)?.size || 1) - 1)
-        if (socket._vcReelmId && socket._vcChannelId) io.to(`reelm:${socket._vcReelmId}`).emit('vc:count', { channelId: socket._vcChannelId, count })
+      if (socket._vcRoom && socket._vcReelmId && socket._vcChannelId) {
+        void emitVcCount(socket._vcReelmId, socket._vcChannelId, socket._vcRoom).catch((err) => logger.warn('vc:disconnect count failed', err))
       }
       logger.info('socket disconnected', socket.id)
     })

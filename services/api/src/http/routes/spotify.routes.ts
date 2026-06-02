@@ -1,31 +1,47 @@
 import { Router } from 'express'
 import { env } from '../../config/env.js'
-import { putDoc, userPk } from '../../modules/store/docStore.js'
+import { getDoc, putDoc, userPk } from '../../modules/store/docStore.js'
+import { authenticate } from '../middleware/authenticate.js'
 import type { Server } from 'socket.io'
 
 type SpotifyToken = { accessToken: string; refreshToken?: string; expiresAt: number }
 const spotifyTokens = new Map<string, SpotifyToken>()
+const spotifyStates = new Map<string, { uid: string; expiresAt: number }>()
 
 export function createSpotifyRouter(io: Server) {
   const router = Router()
 
-  router.get('/spotify/login', (req, res) => {
-    const uid = String(req.query.uid || '')
-    if (!uid) return res.status(400).send('uid required')
-    if (!env.SPOTIFY_CLIENT_ID || !env.SPOTIFY_REDIRECT_URI) return res.status(503).send('Spotify not configured')
+  function createSpotifyAuthUrl(uid: string) {
+    if (!env.SPOTIFY_CLIENT_ID || !env.SPOTIFY_REDIRECT_URI) return null
+    const state = `${Date.now()}_${Math.random().toString(36).slice(2, 12)}`
+    spotifyStates.set(state, { uid, expiresAt: Date.now() + 10 * 60 * 1000 })
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: env.SPOTIFY_CLIENT_ID,
       scope: 'user-read-currently-playing user-read-playback-state',
       redirect_uri: env.SPOTIFY_REDIRECT_URI,
-      state: uid
+      state
     })
-    res.redirect(`https://accounts.spotify.com/authorize?${params}`)
+    return `https://accounts.spotify.com/authorize?${params}`
+  }
+
+  router.post('/spotify/start', authenticate, (req, res) => {
+    const url = createSpotifyAuthUrl(String(req.userId || ''))
+    if (!url) return res.status(503).json({ error: 'spotify_not_configured' })
+    res.json({ url })
+  })
+
+  router.get('/spotify/login', (_req, res) => {
+    res.status(401).send('Use authenticated POST /spotify/start')
   })
 
   router.get('/callback/spotify', async (req, res) => {
-    const { code, state: uid, error } = req.query
-    if (error || !code || !uid) return res.redirect(`${env.PUBLIC_WEB_URL}/?spotify=error`)
+    const { code, state, error } = req.query
+    const stateKey = String(state || '')
+    const storedState = spotifyStates.get(stateKey)
+    spotifyStates.delete(stateKey)
+    if (error || !code || !storedState || storedState.expiresAt < Date.now()) return res.redirect(`${env.PUBLIC_WEB_URL}/?spotify=error`)
+    const uid = storedState.uid
     try {
       const tokenRes = await fetch('https://accounts.spotify.com/api/token', {
         method: 'POST',
@@ -34,8 +50,8 @@ export function createSpotifyRouter(io: Server) {
       })
       const tokens = await tokenRes.json() as any
       if (!tokens.access_token) throw new Error('No access token returned')
-      spotifyTokens.set(String(uid), { accessToken: tokens.access_token, refreshToken: tokens.refresh_token, expiresAt: Date.now() + tokens.expires_in * 1000 })
-      await putDoc(userPk(String(uid)), 'spotify_connected', true).catch(() => {})
+      spotifyTokens.set(uid, { accessToken: tokens.access_token, refreshToken: tokens.refresh_token, expiresAt: Date.now() + tokens.expires_in * 1000 })
+      await putDoc(userPk(uid), 'spotify_connected', true).catch(() => {})
       io.to(`u:${uid}`).emit('reelms:doc', { scope: 'user', sk: 'spotify_connected' })
       res.redirect(`${env.PUBLIC_WEB_URL}/?spotify=connected&uid=${uid}`)
     } catch (err) {
@@ -60,8 +76,13 @@ export function createSpotifyRouter(io: Server) {
     } catch { return null }
   }
 
-  router.get('/spotify/now-playing/:uid', async (req, res) => {
-    const uid = req.params.uid
+  router.get('/spotify/now-playing/:uid', authenticate, async (req, res) => {
+    const uid = String(req.params.uid)
+    const requesterId = String(req.userId || '')
+    if (uid !== requesterId) {
+      const requesterFriends = (await getDoc<any[]>(userPk(requesterId), 'friends').catch(() => [])) || []
+      if (!requesterFriends.some((friend) => String(friend?.id) === uid)) return res.status(403).json({ error: 'forbidden' })
+    }
     const stored = spotifyTokens.get(uid)
     if (!stored) return res.json({ connected: false })
     let token = stored.accessToken
@@ -91,8 +112,9 @@ export function createSpotifyRouter(io: Server) {
     } catch { res.json({ connected: true, playing: false }) }
   })
 
-  router.post('/spotify/disconnect/:uid', (req, res) => {
-    spotifyTokens.delete(req.params.uid)
+  router.post('/spotify/disconnect/:uid', authenticate, (req, res) => {
+    if (String(req.userId) !== String(req.params.uid)) return res.status(403).json({ error: 'forbidden' })
+    spotifyTokens.delete(String(req.params.uid))
     res.json({ ok: true })
   })
 

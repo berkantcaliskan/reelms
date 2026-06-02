@@ -11,6 +11,7 @@ import { createReelmsDataRouter } from './routes/reelms-data.routes.js'
 import { createSocialRouter } from './routes/social.routes.js'
 import { moderationRouter } from './routes/moderation.routes.js'
 import { createSpotifyRouter } from './routes/spotify.routes.js'
+import { debugRouter } from './routes/debug.routes.js'
 import { requestContext } from './middleware/requestContext.js'
 import { apiRateLimit, authRateLimit } from './middleware/rateLimit.js'
 import { errorHandler, notFoundHandler } from './utils/errors.js'
@@ -40,7 +41,8 @@ export function createApp(io?: Server) {
   app.use('/health', healthRouter)
   app.use('/auth', authRateLimit, authRouter)
   app.use('/realtime', realtimeRouter)
-  app.use(moderationRouter)
+  app.use('/api/v1/debug', debugRouter)
+  app.use(apiRateLimit, moderationRouter)
 
   if (io) {
     app.use(createSpotifyRouter(io))

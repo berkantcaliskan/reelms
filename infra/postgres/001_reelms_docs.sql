@@ -1,10 +1,11 @@
-CREATE TABLE IF NOT EXISTS reelms_docs (
-  pk TEXT NOT NULL,
-  sk TEXT NOT NULL,
-  data JSONB NOT NULL DEFAULT '{}'::jsonb,
-  updated_at BIGINT NOT NULL,
-  PRIMARY KEY (pk, sk)
+create table if not exists reelms_docs (
+  pk text not null,
+  sk text not null,
+  data jsonb not null,
+  updated_at bigint not null,
+  primary key (pk, sk)
 );
 
-CREATE INDEX IF NOT EXISTS idx_reelms_docs_pk ON reelms_docs (pk);
-CREATE INDEX IF NOT EXISTS idx_reelms_docs_updated_at ON reelms_docs (updated_at DESC);
+create index if not exists reelms_docs_pk_prefix_idx on reelms_docs (pk text_pattern_ops);
+create index if not exists reelms_docs_sk_prefix_idx on reelms_docs (sk text_pattern_ops);
+create index if not exists reelms_docs_updated_at_idx on reelms_docs (updated_at desc);

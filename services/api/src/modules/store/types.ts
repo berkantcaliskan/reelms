@@ -12,6 +12,7 @@ export interface DocStoreDriver {
   init?(): Promise<void>
   getDoc<T = unknown>(pk: string, sk: string): Promise<T | null>
   putDoc<T = unknown>(pk: string, sk: string, data: T): Promise<void>
+  putDocIfAbsent?<T = unknown>(pk: string, sk: string, data: T): Promise<boolean>
   deleteDoc(pk: string, sk: string): Promise<void>
   queryDocs<T = unknown>(pk: string, skPrefix?: string): Promise<QueryResult<T>>
   scanByPkPrefix<T = unknown>(prefix: string): Promise<Array<StoreItem<T>>>

@@ -18,8 +18,8 @@ server.on('request', app)
 await initDocStore()
 await ensureDefaultReelm().catch((err) => logger.error('[DefaultReelm] startup error:', err))
 
-server.listen(env.PORT, () => {
-  logger.info(`API listening on ${env.PUBLIC_API_URL} port=${env.PORT} env=${env.NODE_ENV}`)
+server.listen(env.PORT, env.HOST, () => {
+  logger.info(`API listening on ${env.PUBLIC_API_URL} host=${env.HOST} port=${env.PORT} env=${env.NODE_ENV}`)
 })
 
 async function shutdown(signal: string) {

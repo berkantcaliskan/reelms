@@ -31,8 +31,14 @@ async function api(path, opts = {}) {
   })
   if (!r.ok) {
     if (r.status === 404 && opts.allowNotFound) return null
-    const t = await r.text()
-    throw new Error(t || r.statusText)
+    const text = await r.text()
+    let payload = null
+    try { payload = text ? JSON.parse(text) : null } catch {}
+    const err = new Error(payload?.message || payload?.error || text || r.statusText)
+    err.status = r.status
+    err.code = payload?.code || payload?.error || `http/${r.status}`
+    err.details = payload?.details || payload?.issues || null
+    throw err
   }
   if (r.status === 204) return null
   const ct = r.headers.get('content-type')
@@ -46,8 +52,14 @@ async function publicApi(path, opts = {}) {
     headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
   })
   if (!r.ok) {
-    const t = await r.text()
-    throw new Error(t || r.statusText)
+    const text = await r.text()
+    let payload = null
+    try { payload = text ? JSON.parse(text) : null } catch {}
+    const err = new Error(payload?.message || payload?.error || text || r.statusText)
+    err.status = r.status
+    err.code = payload?.code || payload?.error || `http/${r.status}`
+    err.details = payload?.details || payload?.issues || null
+    throw err
   }
   if (r.status === 204) return null
   const ct = r.headers.get('content-type')
@@ -223,7 +235,7 @@ export async function loadReelmDocuments(reelmId) {
 }
 
 export function connectReelmsSocket(handlers) {
-  const { onUserDoc, onReelmDoc, onAppDoc, onMessage, onMessageDeleted, onReaction, onVoicePosition, onVcEvent, onVcCount, onVcCounts, onConnect } = handlers
+  const { onUserDoc, onReelmDoc, onAppDoc, onMessage, onMessageDeleted, onReaction, onVoicePosition, onVcEvent, onVcError, onVcCount, onVcCounts, onConnect } = handlers
   const run = async () => {
     const token = await getIdToken()
     if (!token) return
@@ -267,6 +279,9 @@ export function connectReelmsSocket(handlers) {
     })
     socket.on('vc:event', (msg) => {
       if (msg && msg.type) onVcEvent?.(msg)
+    })
+    socket.on('vc:error', (msg) => {
+      if (msg && msg.error) onVcError?.(msg)
     })
     socket.on('vc:count', (msg) => {
       if (msg && typeof msg.channelId === 'string' && typeof msg.count === 'number') onVcCount?.(msg)
@@ -380,13 +395,15 @@ export async function userByEmail(email) {
 }
 
 export async function userCheckUsername(username) {
-  const j = await publicApi(`/api/v1/user/check-username/${encodeURIComponent(username)}`)
-  return j.available
+  const path = `/api/v1/user/check-username/${encodeURIComponent(username)}`
+  const j = await (await getIdToken() ? api(path) : publicApi(path))
+  return { available: Boolean(j?.available), exists: Boolean(j?.exists ?? !j?.available) }
 }
 
 export async function userCheckEmail(email) {
-  const j = await publicApi(`/api/v1/user/check-email/${encodeURIComponent(email)}`)
-  return j.available
+  const path = `/api/v1/user/check-email/${encodeURIComponent(email)}`
+  const j = await (await getIdToken() ? api(path) : publicApi(path))
+  return { available: Boolean(j?.available), exists: Boolean(j?.exists ?? !j?.available) }
 }
 
 export async function usersList() {
@@ -443,6 +460,22 @@ export async function reelmByCode(code) {
   } catch {
     return null
   }
+}
+
+export async function createReelmRemote(reelm) {
+  const j = await api('/api/v1/reelms/create', {
+    method: 'POST',
+    body: JSON.stringify({ reelm }),
+  })
+  return j?.data || null
+}
+
+export async function joinReelmByCode(code) {
+  const j = await api('/api/v1/reelms/join', {
+    method: 'POST',
+    body: JSON.stringify({ code }),
+  })
+  return j?.data || null
 }
 
 export async function adminAllReelms() {

@@ -37,6 +37,16 @@ export class PostgresDocStore implements DocStoreDriver {
     )
   }
 
+  async putDocIfAbsent<T = unknown>(pk: string, sk: string, data: T) {
+    const result = await this.pool.query(
+      `insert into reelms_docs (pk, sk, data, updated_at)
+       values ($1, $2, $3::jsonb, $4)
+       on conflict (pk, sk) do nothing`,
+      [pk, sk, JSON.stringify(data), Date.now()]
+    )
+    return (result.rowCount || 0) > 0
+  }
+
   async deleteDoc(pk: string, sk: string) {
     await this.pool.query('delete from reelms_docs where pk = $1 and sk = $2', [pk, sk])
   }

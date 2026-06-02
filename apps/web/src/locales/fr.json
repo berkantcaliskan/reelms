@@ -619,7 +619,7 @@
   "enter_password": "Veuillez entrer votre mot de passe.",
   "invalid_email_or_username": "E-mail ou nom d'utilisateur invalide.",
   "user_profile_not_found": "Profil utilisateur introuvable.",
-  "invalid_email_or_password": "E-mail ou mot de passe invalide.",
+  "invalid_email_or_password": "E-mail/nom d’utilisateur ou mot de passe invalide.",
   "no_account_signup_first": "Compte introuvable. Veuillez d'abord vous inscrire.",
   "too_many_login_attempts": "Trop de tentatives. Veuillez réessayer plus tard.",
   "signin_failed_retry": "Échec de la connexion. Veuillez réessayer.",

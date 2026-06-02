@@ -1,84 +1,181 @@
 import { Router } from 'express'
-import type { Server } from 'socket.io'
 import { env } from '../../config/env.js'
 import { createDesktopAuthCode, exchangeDesktopAuthCode } from '../../modules/auth/desktopCodeStore.js'
 import { generateUid, hashPassword, signToken, verifyPassword } from '../../modules/auth/authService.js'
-import { autoJoinDefaultReelm, DEFAULT_REELM_ID } from '../../modules/reelms/defaultReelm.js'
-import { getDoc, putDoc, userPk } from '../../modules/store/docStore.js'
+import { normalizeEmail, normalizeUsername } from '../../modules/reelms/access.js'
+import { autoJoinDefaultReelm } from '../../modules/reelms/defaultReelm.js'
+import { deleteDoc, getDoc, putDoc, putDocIfAbsent, userPk } from '../../modules/store/docStore.js'
 
-function buildAuthRouter(io?: Server) {
-const authRouter = Router()
+export const authRouter = Router()
 
-const emitMembersUpdated = () =>
-  io?.to(`reelm:${DEFAULT_REELM_ID}`).emit('reelms:doc', { scope: 'reelm', reelmId: DEFAULT_REELM_ID, sk: 'members' })
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+const USERNAME_RE = /^[a-z0-9._-]{3,30}$/
+
+function isValidEmail(value: string) {
+  return EMAIL_RE.test(value)
+}
+
+function validatePassword(value: unknown) {
+  const password = String(value || '')
+  if (password.length < 8) return { ok: false as const, error: 'weak_password', code: 'auth/weak-password', message: 'Password must be at least 8 characters.' }
+  return { ok: true as const, password }
+}
+
+function validateOptionalUsername(value: unknown) {
+  if (value == null || String(value).trim() === '') return { ok: true as const, username: '' }
+  const username = normalizeUsername(value)
+  if (!USERNAME_RE.test(username)) {
+    return { ok: false as const, error: 'invalid_username', code: 'auth/invalid-username', message: 'Username must be 3-30 characters and use letters, numbers, dots, dashes or underscores.' }
+  }
+  return { ok: true as const, username }
+}
+
+async function resolveLoginEmail(identifier: unknown) {
+  const raw = String(identifier || '').trim()
+  if (!raw) return null
+  const normalizedEmail = normalizeEmail(raw)
+  if (isValidEmail(normalizedEmail)) return normalizedEmail
+  const username = normalizeUsername(raw)
+  if (!username) return null
+  const uid = await getDoc<string>(`USERNAME#${username}`, 'uid').catch(() => null)
+  if (!uid) return null
+  const profile = await getDoc<any>(userPk(String(uid)), 'profile').catch(() => null)
+  const email = normalizeEmail(profile?.contact || profile?.email || '')
+  return isValidEmail(email) ? email : null
+}
 
 async function createOrGetGoogleUser(googleUser: { email: string; name?: string; picture?: string }) {
-  const email = googleUser.email.toLowerCase()
+  const email = normalizeEmail(googleUser.email)
   let creds = await getDoc<any>(`AUTH#${email}`, 'CREDS')
   let uid: string
-  if (creds) {
-    uid = creds.uid
+
+  if (creds?.uid) {
+    uid = String(creds.uid)
   } else {
     uid = generateUid()
-    await putDoc(`AUTH#${email}`, 'CREDS', { uid, googleAuth: true })
-    const profileData: Record<string, unknown> = { id: uid }
-    if (googleUser.name) profileData.displayName = googleUser.name
-    if (googleUser.picture) profileData.photoURL = googleUser.picture
-    await putDoc(userPk(uid), 'profile', profileData)
+    const created = await putDocIfAbsent(`AUTH#${email}`, 'CREDS', { uid, googleAuth: true })
+    if (!created) {
+      creds = await getDoc<any>(`AUTH#${email}`, 'CREDS')
+      if (!creds?.uid) throw new Error('google_auth_race_lost')
+      uid = String(creds.uid)
+    } else {
+      const profileData: Record<string, unknown> = { id: uid, uid, contact: email, createdAt: Date.now(), updatedAt: Date.now() }
+      if (googleUser.name) profileData.displayName = googleUser.name
+      if (googleUser.name) profileData.name = googleUser.name
+      if (googleUser.picture) profileData.photoURL = googleUser.picture
+      await putDoc(userPk(uid), 'profile', profileData)
+      await putDocIfAbsent(`EMAIL#${email}`, 'uid', uid).catch(() => {})
+    }
   }
-  const joined = await autoJoinDefaultReelm(uid, googleUser.name || '', googleUser.picture || null).catch(() => false)
-  if (joined) emitMembersUpdated()
+
+  await autoJoinDefaultReelm(uid, googleUser.name || '', googleUser.picture || null).catch(() => {})
   return { uid, email, token: signToken(uid, email) }
 }
 
 authRouter.post('/login', async (req, res) => {
-  const { email, password } = req.body || {}
-  if (!email || !password) return res.status(400).json({ error: 'missing_fields' })
+  const { email, identifier, password } = req.body || {}
+  if ((!email && !identifier) || !password) return res.status(400).json({ error: 'missing_fields', code: 'auth/missing-fields' })
   try {
-    const normalized = String(email).toLowerCase()
+    const normalized = await resolveLoginEmail(identifier || email)
+    if (!normalized) return res.status(401).json({ error: 'invalid_credentials', code: 'auth/invalid-credential' })
     const creds = await getDoc<any>(`AUTH#${normalized}`, 'CREDS')
     if (!creds?.passwordHash) return res.status(401).json({ error: 'invalid_credentials', code: 'auth/invalid-credential' })
     const ok = await verifyPassword(String(password), String(creds.passwordHash))
     if (!ok) return res.status(401).json({ error: 'invalid_credentials', code: 'auth/invalid-credential' })
     const profile = await getDoc<any>(userPk(creds.uid), 'profile').catch(() => null)
-    const joined = await autoJoinDefaultReelm(creds.uid, profile?.displayName || profile?.name || '', profile?.photoURL || profile?.photo || null).catch(() => false)
-    if (joined) emitMembersUpdated()
-    res.json({ uid: creds.uid, email: normalized, token: signToken(creds.uid, normalized) })
+    await autoJoinDefaultReelm(creds.uid, profile?.displayName || profile?.name || '', profile?.photoURL || profile?.photo || null).catch(() => {})
+    res.json({ uid: creds.uid, email: normalized, token: signToken(creds.uid, normalized), profile: profile || null })
   } catch (e) {
     console.error('/auth/login error:', e)
-    res.status(500).json({ error: 'auth_failed' })
+    res.status(500).json({ error: 'auth_failed', code: 'auth/server-error' })
   }
 })
 
 authRouter.post('/register', async (req, res) => {
-  const { email, password } = req.body || {}
-  if (!email || !password) return res.status(400).json({ error: 'missing_fields' })
-  if (String(password).length < 6) return res.status(400).json({ error: 'weak_password', code: 'auth/weak-password' })
+  const { email, password, username: rawUsername, displayName } = req.body || {}
+  if (!email || !password) return res.status(400).json({ error: 'missing_fields', code: 'auth/missing-fields' })
+  const normalized = normalizeEmail(email)
+  if (!isValidEmail(normalized)) return res.status(400).json({ error: 'invalid_email', code: 'auth/invalid-email' })
+  const passwordCheck = validatePassword(password)
+  if (!passwordCheck.ok) return res.status(400).json({ error: passwordCheck.error, code: passwordCheck.code, message: passwordCheck.message })
+  const usernameCheck = validateOptionalUsername(rawUsername)
+  if (!usernameCheck.ok) return res.status(400).json({ error: usernameCheck.error, code: usernameCheck.code, message: usernameCheck.message })
+
+  const uid = generateUid()
+  let usernameReserved = false
+  let authCreated = false
+  let emailReserved = false
   try {
-    const normalized = String(email).toLowerCase()
-    const existing = await getDoc(`AUTH#${normalized}`, 'CREDS')
-    if (existing) return res.status(409).json({ error: 'email_exists', code: 'auth/email-already-in-use' })
-    const uid = generateUid()
-    const passwordHash = await hashPassword(String(password))
-    await putDoc(`AUTH#${normalized}`, 'CREDS', { uid, passwordHash })
-    await putDoc(userPk(uid), 'profile', { id: uid, contact: normalized })
-    const joined = await autoJoinDefaultReelm(uid, '', null).catch(() => false)
-    if (joined) emitMembersUpdated()
-    res.json({ uid, email: normalized, token: signToken(uid, normalized) })
+    if (usernameCheck.username) {
+      usernameReserved = await putDocIfAbsent(`USERNAME#${usernameCheck.username}`, 'uid', uid)
+      if (!usernameReserved) return res.status(409).json({ error: 'username_taken', code: 'auth/username-taken' })
+    }
+
+    const passwordHash = await hashPassword(passwordCheck.password)
+    authCreated = await putDocIfAbsent(`AUTH#${normalized}`, 'CREDS', { uid, passwordHash })
+    if (!authCreated) {
+      if (usernameReserved) await deleteDoc(`USERNAME#${usernameCheck.username}`, 'uid').catch(() => {})
+      return res.status(409).json({ error: 'email_exists', code: 'auth/email-already-in-use' })
+    }
+
+    emailReserved = await putDocIfAbsent(`EMAIL#${normalized}`, 'uid', uid)
+    if (!emailReserved) {
+      await deleteDoc(`AUTH#${normalized}`, 'CREDS').catch(() => {})
+      if (usernameReserved) await deleteDoc(`USERNAME#${usernameCheck.username}`, 'uid').catch(() => {})
+      return res.status(409).json({ error: 'email_taken', code: 'auth/email-taken' })
+    }
+
+    const now = Date.now()
+    const profile = {
+      id: uid,
+      uid,
+      username: usernameCheck.username || undefined,
+      name: String(displayName || usernameCheck.username || '').trim() || undefined,
+      displayName: String(displayName || usernameCheck.username || '').trim() || undefined,
+      contactType: 'email',
+      contact: normalized,
+      createdAt: now,
+      updatedAt: now,
+      notifyNewDevice: true,
+      isModerator: false
+    }
+    await putDoc(userPk(uid), 'profile', profile)
+    await autoJoinDefaultReelm(uid, profile.displayName || '', null).catch(() => {})
+    res.json({ uid, email: normalized, token: signToken(uid, normalized), profile })
   } catch (e) {
+    if (emailReserved) await deleteDoc(`EMAIL#${normalized}`, 'uid').catch(() => {})
+    if (authCreated) await deleteDoc(`AUTH#${normalized}`, 'CREDS').catch(() => {})
+    if (usernameReserved) await deleteDoc(`USERNAME#${usernameCheck.username}`, 'uid').catch(() => {})
     console.error('/auth/register error:', e)
-    res.status(500).json({ error: 'registration_failed' })
+    res.status(500).json({ error: 'registration_failed', code: 'auth/server-error' })
   }
 })
 
 // Compatibility path for old web client: /google/login and new path: /auth/google/login.
-authRouter.get('/google/login', (req, res) => {
+authRouter.get('/google/login', async (req, res) => {
   const platform = String(req.query.platform ?? 'web')
   if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_REDIRECT_URI) {
     if (env.NODE_ENV !== 'production') {
       const uid = `dev-google-${platform}`
       const email = `${platform}@reelms.local`
+      const displayName = platform === 'web' ? 'web' : platform
       const token = signToken(uid, email)
+      const existingProfile = await getDoc<any>(userPk(uid), 'profile').catch(() => null)
+      if (!existingProfile) {
+        await putDoc(userPk(uid), 'profile', {
+          id: uid,
+          name: displayName,
+          username: displayName,
+          contactType: 'email',
+          contact: email,
+          createdAt: new Date().toISOString(),
+          isDevGoogleUser: true
+        })
+        await putDocIfAbsent(`USERNAME#${displayName.toLowerCase()}`, 'uid', uid).catch(() => {})
+        await putDocIfAbsent(`EMAIL#${email.toLowerCase()}`, 'uid', uid).catch(() => {})
+      }
+      await autoJoinDefaultReelm(uid, displayName, null).catch(() => {})
       if (platform === 'desktop') {
         const code = createDesktopAuthCode({ token, email, uid })
         return res.redirect(`${env.PUBLIC_DESKTOP_PROTOCOL}://auth?code=${encodeURIComponent(code)}`)

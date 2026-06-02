@@ -52,6 +52,15 @@ export class JsonDocStore implements DocStoreDriver {
     await this.persist()
   }
 
+  async putDocIfAbsent<T = unknown>(pk: string, sk: string, data: T) {
+    await this.ensureLoaded()
+    const storeKey = key(pk, sk)
+    if (this.store[storeKey]) return false
+    this.store[storeKey] = { pk, sk, data, updatedAt: Date.now() }
+    await this.persist()
+    return true
+  }
+
   async deleteDoc(pk: string, sk: string) {
     await this.ensureLoaded()
     delete this.store[key(pk, sk)]

@@ -619,7 +619,7 @@
   "enter_password": "Por favor insira sua senha.",
   "invalid_email_or_username": "E-mail ou nome de usuário inválido.",
   "user_profile_not_found": "Perfil de usuário não encontrado.",
-  "invalid_email_or_password": "E-mail ou senha inválidos.",
+  "invalid_email_or_password": "E-mail/usuário ou senha inválidos.",
   "no_account_signup_first": "Conta não encontrada. Por favor cadastre-se primeiro.",
   "too_many_login_attempts": "Muitas tentativas. Tente novamente mais tarde.",
   "signin_failed_retry": "Falha ao entrar. Tente novamente.",

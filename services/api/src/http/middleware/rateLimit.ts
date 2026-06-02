@@ -10,7 +10,7 @@ function clientKey(req: Request) {
 
 export function createRateLimit(options: { name: string; max: number; windowMs?: number }) {
   return (req: Request, res: Response, next: NextFunction) => {
-    if (env.NODE_ENV === 'test' || env.NODE_ENV === 'development') return next()
+    if (env.NODE_ENV === 'test' || env.RATE_LIMIT_DISABLED) return next()
 
     const now = Date.now()
     const windowMs = options.windowMs ?? env.RATE_LIMIT_WINDOW_MS

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react'
 import { FormField } from '../../../shared/forms/FormField.jsx'
-import { isEmail, normalizeUsername, validatePassword, validateRequired } from '../../../shared/lib/validation'
+import { isEmail, normalizeUsername, validatePassword, validateRequired, validateUsername } from '../../../shared/lib/validation'
 import { registerWithPassword, signInWithGoogleProvider } from '../services/authService'
 import { AuthProviderButtons } from './AuthProviderButtons.jsx'
 
@@ -19,7 +19,7 @@ export function SignUpForm({ onSuccess, onGoSignIn }) {
     setError('')
 
     const nameCheck = validateRequired(displayName, 'Display name')
-    const usernameCheck = validateRequired(normalizedUsername, 'Username')
+    const usernameCheck = validateUsername(normalizedUsername)
     const emailCheck = validateRequired(email, 'Email')
     const passwordCheck = validatePassword(password)
 
@@ -110,6 +110,8 @@ function toRegisterMessage(err) {
   if (err?.code === 'auth/username-taken') return 'This username is already taken.'
   if (err?.code === 'auth/email-taken') return 'This email is already registered.'
   if (err?.code === 'auth/email-already-in-use') return 'This email is already registered.'
-  if (err?.code === 'auth/weak-password') return 'Password is too weak.'
+  if (err?.code === 'auth/weak-password') return 'Password must be at least 8 characters.'
+  if (err?.code === 'auth/invalid-email') return 'Enter a valid email address.'
+  if (err?.code === 'auth/invalid-username') return 'Username must be 3-30 characters and use letters, numbers, dots, dashes or underscores.'
   return 'Account could not be created. Please try again.'
 }

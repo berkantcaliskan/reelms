@@ -50,6 +50,16 @@ export async function putDoc<T = unknown>(pk: string, sk: string, data: T): Prom
   return getDriver().putDoc<T>(pk, sk, data)
 }
 
+export async function putDocIfAbsent<T = unknown>(pk: string, sk: string, data: T): Promise<boolean> {
+  const activeDriver = getDriver()
+  if (activeDriver.putDocIfAbsent) return activeDriver.putDocIfAbsent<T>(pk, sk, data)
+
+  const existing = await activeDriver.getDoc<T>(pk, sk)
+  if (existing !== null) return false
+  await activeDriver.putDoc<T>(pk, sk, data)
+  return true
+}
+
 export async function deleteDoc(pk: string, sk: string): Promise<void> {
   return getDriver().deleteDoc(pk, sk)
 }

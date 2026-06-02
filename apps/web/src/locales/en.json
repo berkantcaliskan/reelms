@@ -620,7 +620,7 @@
   "enter_password": "Please enter your password.",
   "invalid_email_or_username": "Invalid e-mail or username.",
   "user_profile_not_found": "User profile not found.",
-  "invalid_email_or_password": "Invalid e-mail or password.",
+  "invalid_email_or_password": "Invalid e-mail/username or password.",
   "no_account_signup_first": "No account found. Please sign up first.",
   "too_many_login_attempts": "Too many attempts. Please try again later.",
   "signin_failed_retry": "Sign-in failed. Please try again.",

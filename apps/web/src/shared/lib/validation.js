@@ -25,3 +25,13 @@ export function validateRequired(value, label) {
   if (String(value || '').trim()) return { ok: true, reason: '' }
   return { ok: false, reason: `${label} is required.` }
 }
+
+
+export function validateUsername(value) {
+  const username = normalizeUsername(value)
+  if (!username) return { ok: false, reason: 'Username is required.' }
+  if (username.length < 3) return { ok: false, reason: 'Username must be at least 3 characters.' }
+  if (username.length > 30) return { ok: false, reason: 'Username must be 30 characters or less.' }
+  if (!/^[a-z0-9._-]+$/.test(username)) return { ok: false, reason: 'Username can only use letters, numbers, dots, dashes or underscores.' }
+  return { ok: true, reason: '', username }
+}

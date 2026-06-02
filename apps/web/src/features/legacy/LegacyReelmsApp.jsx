@@ -88,6 +88,8 @@ import {
   modInboxGet,
   modReportSend,
   reelmByCode,
+  createReelmRemote,
+  joinReelmByCode,
   adminAllReelms,
   userProfilePut,
   userProfilePatch,
@@ -98,6 +100,7 @@ import {
   userCheckUsername,
   userCheckEmail,
   usersList,
+  getIdToken,
   feedbackSend,
 } from '../../reelmsAwsClient'
 import { seedModerationAccount } from '../../reelmsModerationAccount'
@@ -184,17 +187,9 @@ function SignInScreen({ onGoSignUp, onSignInSuccess }) {
     try {
       const input = loginEmail.trim().toLowerCase()
 
-      // Resolve email — if input looks like a username, look up email from backend
-      let email = input
-      if (!input.includes('@')) {
-        const profile = await userByUsername(input)
-        if (!profile) { setLoginError(t('invalid_email_or_username')); setIsSigningIn(false); return }
-        email = profile.contact
-      }
-
       const cred = isElectron
-        ? await electronSignIn(email, loginPassword.trim())
-        : await webSignIn(email, loginPassword.trim())
+        ? await electronSignIn(input, loginPassword.trim())
+        : await webSignIn(input, loginPassword.trim())
       const userData = await userProfileGetById(cred.user.uid)
       if (!userData) { setLoginError(t('user_profile_not_found')); setIsSigningIn(false); return }
       try {
@@ -1236,7 +1231,7 @@ function AccountSettingsPanel({ user, onUpdate, onLogOut, profileBio, onBioChang
   const isDraggingRef = useRef(false)
   const dragStartRef = useRef(null)
 
-  const [nameInput, setNameInput] = useState(user.name || user.displayName || '')
+  const [nameInput, setNameInput] = useState(user.name || '')
   const [usernameInput, setUsernameInput] = useState(user.username || '')
   const [usernameError, setUsernameError] = useState('')
   const [usernameSaved, setUsernameSaved] = useState(false)
@@ -1349,8 +1344,8 @@ function AccountSettingsPanel({ user, onUpdate, onLogOut, profileBio, onBioChang
   const saveUsername = async () => {
     const val = usernameInput.trim()
     if (!val) return
-    const available = await userCheckUsername(val)
-    if (!available) {
+    const usernameAvailability = await userCheckUsername(val)
+    if (usernameAvailability?.exists || usernameAvailability === false) {
       setUsernameError(t('username_taken'))
       return
     }
@@ -1369,8 +1364,8 @@ function AccountSettingsPanel({ user, onUpdate, onLogOut, profileBio, onBioChang
 
   const saveContact = async () => {
     if (!contactInput.trim()) return
-    const available = await userCheckEmail(contactInput.trim())
-    if (!available) {
+    const emailAvailability = await userCheckEmail(contactInput.trim())
+    if (emailAvailability?.exists || emailAvailability === false) {
       setContactError(t('error_email_in_use'))
       return
     }
@@ -1771,23 +1766,7 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
             const file = e.target.files[0]
             if (!file) return
             const reader = new FileReader()
-            reader.onload = ev => {
-              const img = new Image()
-              img.onload = () => {
-                const SIZE = 400
-                const canvas = document.createElement('canvas')
-                canvas.width = SIZE; canvas.height = SIZE
-                const ctx = canvas.getContext('2d')
-                ctx.beginPath()
-                ctx.arc(SIZE / 2, SIZE / 2, SIZE / 2, 0, Math.PI * 2)
-                ctx.clip()
-                const scale = Math.max(SIZE / img.width, SIZE / img.height)
-                const w = img.width * scale, h = img.height * scale
-                ctx.drawImage(img, (SIZE - w) / 2, (SIZE - h) / 2, w, h)
-                onPhotoChange(canvas.toDataURL('image/jpeg', 0.92))
-              }
-              img.src = ev.target.result
-            }
+            reader.onload = ev => onPhotoChange(ev.target.result)
             reader.readAsDataURL(file)
             e.target.value = ''
           }}
@@ -1801,19 +1780,7 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
             const file = e.target.files[0]
             if (!file) return
             const reader = new FileReader()
-            reader.onload = ev => {
-              const img = new Image()
-              img.onload = () => {
-                const MAX_W = 800, MAX_H = 300
-                const scale = Math.min(MAX_W / img.width, MAX_H / img.height, 1)
-                const canvas = document.createElement('canvas')
-                canvas.width = Math.round(img.width * scale)
-                canvas.height = Math.round(img.height * scale)
-                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
-                onCoverChange(canvas.toDataURL('image/jpeg', 0.85))
-              }
-              img.src = ev.target.result
-            }
+            reader.onload = ev => onCoverChange(ev.target.result)
             reader.readAsDataURL(file)
             e.target.value = ''
           }}
@@ -4907,8 +4874,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       : webOnAuthStateChanged(setAuthUser)
   }, [])
 
-  const normalizeProfile = (p) => p ? { ...p, name: p.name || p.displayName || '' } : p
-  const [currentUser, setCurrentUser] = useState(() => normalizeProfile(authSession.profile) || null)
+  const [currentUser, setCurrentUser] = useState(() => authSession.profile || null)
   const uid = currentUser?.id || currentUser?.uid || authUser?.uid || 'guest'
 
   useEffect(() => {
@@ -4921,17 +4887,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     let cancelled = false
 
     if (authSession.profile && (authSession.profile.id || authSession.profile.uid) === authUser.uid) {
-      setCurrentUser(prev => ({ ...(prev || {}), ...normalizeProfile(authSession.profile) }))
+      setCurrentUser(authSession.profile)
     }
 
     userProfileGetById(authUser.uid).then(data => {
       if (cancelled) return
       if (data) {
-        setCurrentUser(prev => ({
-          ...(prev || {}),
-          ...data,
-          name: data.name || data.displayName || (prev || {}).name || '',
-        }))
+        setCurrentUser(data)
         return
       }
 
@@ -4947,7 +4909,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         avatar: ''
       }
 
-      setCurrentUser(prev => ({ ...(prev || {}), ...normalizeProfile(fallback) }))
+      setCurrentUser(fallback)
       pushToast?.({
         id: 'profile-fallback',
         text: 'Profil bilgisi geçici olarak doğrulanamadı; oturum korunuyor.'
@@ -4956,7 +4918,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       if (cancelled) return
       const fallback = authSession.profile || currentUser
       if (fallback) {
-        setCurrentUser(prev => ({ ...(prev || {}), ...normalizeProfile(fallback) }))
+        setCurrentUser(fallback)
         return
       }
       pushToast?.({
@@ -5360,20 +5322,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       else if (sk === 'sounds') { if (v && typeof v === 'object') setSoundSettings(s => ({ ...s, ...v })) }
       else if (sk === 'reelms') { if (Array.isArray(v)) setReelms(v) }
       else if (sk === 'chats') { if (Array.isArray(v)) { setChats(v); v.forEach(c => { if (c.id) socketJoinChannel(c.id) }) } }
-      else if (sk === 'profile') {
-        if (v && typeof v === 'object') {
-          setCurrentUser(prev => ({ ...(prev || {}), ...v, name: v.name || v.displayName || (prev || {}).name || '' }))
-        }
-      }
     }
     const off = connectReelmsSocket({
       onUserDoc: (sk) => { userGetDoc(sk).then((v) => applyUserDoc(sk, v)).catch(() => {}) },
       onReelmDoc: (reelmId, sk) => {
-        if (sk === 'members') {
-          reelmGetDoc(reelmId, 'members').then(members => {
-            if (Array.isArray(members)) {
-              setSelectedReelm(prev => prev?.id === reelmId ? { ...prev, members } : prev)
-            }
+        if (['meta', 'structure', 'roles', 'members'].includes(sk)) {
+          hydrateReelmCore(reelmId).then((updated) => {
+            if (updated) mergeReelmIntoState(updated)
           }).catch(() => {})
         } else {
           loadReelmDocuments(reelmId).then(() => setModDeleteTick((t) => t + 1)).catch(() => {})
@@ -5432,6 +5387,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         }
       },
       onVcEvent: (msg) => { vcEventHandlerRef.current?.(msg) },
+      onVcError: (msg) => {
+        if (msg?.error === 'channel_full') { showChannelFullToast(); leaveVoiceChannel() }
+        else console.warn('Voice channel error:', msg?.error || msg)
+      },
       onVcCount: ({ channelId, count }) => { setVcCounts(prev => ({ ...prev, [channelId]: count })) },
       onVcCounts: ({ counts }) => { setVcCounts(prev => ({ ...prev, ...counts })) },
       onConnect: () => {
@@ -5525,11 +5484,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     } else {
       setShowFeed(false)
     }
-    reelmGetDoc(reelm.id, 'members').then(members => {
-      if (Array.isArray(members)) {
-        setSelectedReelm(prev => prev?.id === reelm.id ? { ...prev, members } : prev)
-      }
-    }).catch(() => {})
   }
 
   useEffect(() => {
@@ -5591,7 +5545,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (!spotifyConnected) { setSpotifyNowPlaying(null); return }
     const poll = async () => {
       try {
-        const res = await fetch(`${BACKEND_URL}/spotify/now-playing/${uid}`)
+        const token = await getIdToken().catch(() => null)
+        if (!token) return
+        const res = await fetch(`${BACKEND_URL}/spotify/now-playing/${uid}`, { headers: { Authorization: `Bearer ${token}` } })
         const data = await res.json()
         if (!data.connected) {
           userPutDoc('spotify_connected', false).catch(() => {})
@@ -5621,7 +5577,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     const poll = async () => {
       try {
         const results = await Promise.allSettled(friendIds.map(async (targetUid) => {
-          const res = await fetch(`${BACKEND_URL}/spotify/now-playing/${targetUid}`)
+          const token = await getIdToken().catch(() => null)
+          if (!token) return { uid: targetUid, track: null }
+          const res = await fetch(`${BACKEND_URL}/spotify/now-playing/${targetUid}`, { headers: { Authorization: `Bearer ${token}` } })
           const data = await res.json()
           if (data?.connected && data?.playing && data?.track) return { uid: targetUid, track: data.track }
           return { uid: targetUid, track: null }
@@ -5646,17 +5604,24 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spotifyConnected, uid, selectedReelm?.id, friends])
 
-  const connectSpotify = () => {
-    const url = `${BACKEND_URL}/spotify/login?uid=${uid}`
+  const connectSpotify = async () => {
+    const token = await getIdToken().catch(() => null)
+    if (!token) return
+    const res = await fetch(`${BACKEND_URL}/spotify/start`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok || !data?.url) return
     if (window.electronAPI?.openExternal) {
-      window.electronAPI.openExternal(url)
+      window.electronAPI.openExternal(data.url)
     } else {
-      window.open(url, '_blank', 'noopener')
+      window.open(data.url, '_blank', 'noopener')
     }
   }
 
   const disconnectSpotify = async () => {
-    try { await fetch(`${BACKEND_URL}/spotify/disconnect/${uid}`, { method: 'POST' }) } catch { /* noop */ }
+    try {
+      const token = await getIdToken().catch(() => null)
+      await fetch(`${BACKEND_URL}/spotify/disconnect/${encodeURIComponent(uid)}`, { method: 'POST', headers: token ? { Authorization: `Bearer ${token}` } : {} })
+    } catch { /* noop */ }
     userPutDoc('spotify_connected', false).catch(() => {})
     setSpotifyConnected(false)
     setSpotifyNowPlaying(null)
@@ -6174,7 +6139,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       categories: prev.categories.map(c => c.id !== catId ? c : { ...c, channels: [...c.channels, newChannel] })
     })
     setReelms(prev => prev.map(r => r.id !== reelmId ? r : updater(r)))
-    setSelectedReelm(updater)
+    setSelectedReelm(prev => {
+      const next = updater(prev)
+      persistReelmCore(next)
+      return next
+    })
     setSelectedChannel(newChannel)
     const durLabel = FLYING_ROOM_DURATIONS.find(d => d.ms === durationMs)?.label || formatTimeLeft(Date.now() + durationMs)
     const annChId = reelm.announcementChannelId || reelm.categories.find(c => c.type === 'announcement')?.channels?.[0]?.id
@@ -6472,6 +6441,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     channelFullToastTimerRef.current = setTimeout(() => setChannelFullToast(false), 3000)
   }
 
+
+  const showMediaUnavailable = (kind = 'media') => {
+    const label = kind === 'screen' ? 'Ekran paylaşımı' : kind === 'camera' ? 'Kamera' : 'Sesli sohbet'
+    const message = `${label} için tarayıcıda güvenli bağlantı gerekiyor. Localhost veya HTTPS üzerinde test edin; normal HTTP bağlantısında mikrofon/kamera/ekran paylaşımı tarayıcı tarafından engellenebilir.`
+    console.warn(message)
+    if (typeof window !== 'undefined') window.alert(message)
+  }
+
   const joinVoiceChannel = async (reelmId, channelId, channelName) => {
     // If already in a different media channel, leave it first
     if (vcRoomRef.current && vcRoomRef.current.channelId !== channelId) {
@@ -6485,6 +6462,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       if (currentCount >= ch.capacity) { showChannelFullToast(); return }
     }
     try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        showMediaUnavailable('voice')
+        return
+      }
       const envDoc = await userGetDoc('environment').catch(() => ({})) || {}
       const noiseSuppression = envDoc.noiseSuppression ?? true
       const echoCancellation = envDoc.echoCancellation ?? true
@@ -6704,6 +6685,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const voiceToggleVideo = async () => {
     if (!voiceVideoOn) {
       try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { showMediaUnavailable('camera'); return }
         const vs = await navigator.mediaDevices.getUserMedia({ video: true })
         const vt = vs.getVideoTracks()[0]
         localStreamRef.current.addTrack(vt)
@@ -6728,6 +6710,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         if (!isAdmin) return
       }
       try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) { showMediaUnavailable('screen'); return }
         const ss = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
         screenStreamRef.current = ss
         const screenVideoTrackIds = ss.getVideoTracks().map(t => t.id)
@@ -6765,6 +6748,52 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       setVoiceParticipants(prev => prev.map(p => p.userId === uid ? { ...p, isScreenSharing: false, screenStream: null } : p))
       vcBroadcast({ type: 'screen', userId: uid, isScreenSharing: false })
     }
+  }
+
+  const hydrateReelmCore = async (reelmId) => {
+    if (!reelmId) return null
+    const [meta, structure, roles, members] = await Promise.all([
+      reelmGetDoc(reelmId, 'meta').catch(() => null),
+      reelmGetDoc(reelmId, 'structure').catch(() => null),
+      reelmGetDoc(reelmId, 'roles').catch(() => []),
+      reelmGetDoc(reelmId, 'members').catch(() => []),
+    ])
+    if (!meta) return null
+    return {
+      ...meta,
+      roles: Array.isArray(roles) ? roles : [],
+      members: Array.isArray(members) ? members : [],
+      categories: Array.isArray(structure?.categories) ? structure.categories : [],
+      joined: true,
+    }
+  }
+
+  const mergeReelmIntoState = (nextReelm) => {
+    if (!nextReelm?.id) return
+    setReelms(prev => {
+      const next = prev.some(r => String(r.id) === String(nextReelm.id))
+        ? prev.map(r => String(r.id) === String(nextReelm.id) ? { ...r, ...nextReelm } : r)
+        : [nextReelm, ...prev]
+      scheduleUserPersist('reelms', next)
+      return next
+    })
+    setSelectedReelm(prev => (String(prev?.id || '') === String(nextReelm.id) || !prev ? { ...(prev || {}), ...nextReelm } : prev))
+  }
+
+  const persistReelmCore = (reelm) => {
+    if (!reelm?.id) return
+    reelmPutDoc(reelm.id, 'meta', {
+      id: reelm.id,
+      name: reelm.name,
+      code: reelm.code,
+      ownerId: reelm.ownerId || null,
+      announcementChannelId: reelm.announcementChannelId || null,
+      image: reelm.image || null,
+      updatedAt: Date.now(),
+    }).catch(() => {})
+    reelmPutDoc(reelm.id, 'structure', { categories: reelm.categories || [] }).catch(() => {})
+    if (Array.isArray(reelm.roles)) reelmPutDoc(reelm.id, 'roles', reelm.roles).catch(() => {})
+    if (Array.isArray(reelm.members)) reelmPutDoc(reelm.id, 'members', reelm.members).catch(() => {})
   }
 
   const createDefaultReelm = (name, template = null, t = k => k) => {
@@ -6815,28 +6844,32 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     }
   }
 
-  const handleCreateReelm = () => {
+  const handleCreateReelm = async () => {
     const name = reelmNameInput.trim()
     if (!name) return
-    const newReelm = createDefaultReelm(name, activeTemplate, getT(language))
+    const draftReelm = createDefaultReelm(name, activeTemplate, getT(language))
+    let newReelm = draftReelm
+    try {
+      newReelm = await createReelmRemote(draftReelm) || draftReelm
+    } catch (err) {
+      console.warn('Remote reelm create failed; falling back to compatibility writes:', err)
+      persistReelmCore(draftReelm)
+    }
+
     setReelms(prev => {
-      const next = [newReelm, ...prev]
+      const next = [newReelm, ...prev.filter(r => String(r.id) !== String(newReelm.id))]
       scheduleUserPersist('reelms', next)
       return next
     })
     setSelectedReelm(newReelm)
-    // Save meta + structure to DynamoDB so mod account can discover this reelm and others can join
-    reelmPutDoc(newReelm.id, 'meta', {
-      id: newReelm.id, name: newReelm.name, code: newReelm.code,
-      ownerId: newReelm.ownerId, createdAt: Date.now(),
-    }).catch(() => {})
-    reelmPutDoc(newReelm.id, 'structure', { categories: newReelm.categories }).catch(() => {})
+    socketJoinReelm(newReelm.id)
     setSelectedChat(null)
     setReelmNameInput('')
     setSelectedTemplateId(null)
     setCreateReelmStep(null)
     setShowMenu(false)
 
+    const annChId = newReelm.announcementChannelId || newReelm.categories?.find(c => c.type === 'announcement')?.channels?.[0]?.id
     const dateStr = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
     const creationMessages = [
       `Today was the day... ${dateStr}, ${name} created. ✦`,
@@ -6846,61 +6879,58 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       `Big day. ${dateStr}. ${name} was born into this world.`,
     ]
     const msg = creationMessages[Math.floor(Math.random() * creationMessages.length)]
-    postSystemMessage(newReelm.id, 'ch-tumu', msg)
+    if (annChId) postSystemMessage(newReelm.id, annChId, msg)
   }
 
   const handleJoinReelm = async () => {
     const code = joinCodeInput.trim().toUpperCase()
     if (!code) return
-    const existing = reelms.find(r => r.code === code)
+    const existing = reelms.find(r => String(r.code || '').toUpperCase() === code)
     if (existing) {
       setSelectedReelm(existing)
+      socketJoinReelm(existing.id)
       setSelectedChat(null)
       setCreateReelmStep(null)
       setShowMenu(false)
-      reelmGetDoc(existing.id, 'members').then(members => {
-        if (Array.isArray(members)) {
-          setSelectedReelm(prev => prev?.id === existing.id ? { ...prev, members } : prev)
-        }
-      }).catch(() => {})
       return
     }
     setJoining(true)
     setJoinError('')
     try {
-      const meta = await reelmByCode(code)
-      if (!meta) { setJoinError('Reelm not found. Check the code and try again.'); setJoining(false); return }
-      let categories = null
+      let newReelm = null
       try {
-        const structure = await reelmGetDoc(meta.id, 'structure')
-        if (structure?.categories) categories = structure.categories
-      } catch { /* noop */ }
-      const newReelm = {
-        id: meta.id,
-        name: meta.name,
-        code: meta.code,
-        ownerId: meta.ownerId,
-        image: meta.image || null,
-        joined: true,
-        categories: categories || [
-          { id: 'cat-general', name: 'General', type: 'text', channels: [{ id: 'ch-general', name: 'general', type: 'text' }] },
-        ],
+        newReelm = await joinReelmByCode(code)
+      } catch (err) {
+        // Backward compatible fallback for older local APIs.
+        const meta = await reelmByCode(code)
+        if (meta?.id) {
+          const [structure, roles, members] = await Promise.all([
+            reelmGetDoc(meta.id, 'structure').catch(() => null),
+            reelmGetDoc(meta.id, 'roles').catch(() => []),
+            reelmGetDoc(meta.id, 'members').catch(() => []),
+          ])
+          newReelm = {
+            ...meta,
+            roles: Array.isArray(roles) ? roles : [],
+            members: Array.isArray(members) ? members : [],
+            joined: true,
+            categories: structure?.categories || meta.categories || [
+              { id: 'cat-general', name: 'General', type: 'text', channels: [{ id: 'ch-general', name: 'general', type: 'text' }] },
+            ],
+          }
+        }
       }
+      if (!newReelm) { setJoinError('Reelm not found. Check the code and try again.'); setJoining(false); return }
       setReelms(prev => {
-        if (prev.some(r => r.id === newReelm.id)) return prev
-        const next = [...prev, newReelm]
+        const next = [newReelm, ...prev.filter(r => String(r.id) !== String(newReelm.id))]
         scheduleUserPersist('reelms', next)
         return next
       })
       setSelectedReelm(newReelm)
+      socketJoinReelm(newReelm.id)
       setSelectedChat(null)
       setCreateReelmStep(null)
       setShowMenu(false)
-      reelmGetDoc(newReelm.id, 'members').then(members => {
-        if (Array.isArray(members)) {
-          setSelectedReelm(prev => prev?.id === newReelm.id ? { ...prev, members } : prev)
-        }
-      }).catch(() => {})
     } catch {
       setJoinError('Something went wrong. Please try again.')
     }
@@ -6941,10 +6971,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       scheduleUserPersist('reelms', next)
       return next
     })
-    setSelectedReelm(prev => ({
-      ...prev,
-      categories: prev.categories.map(c => c.id !== catId ? c : { ...c, channels: [...c.channels, newChannel] })
-    }))
+    const updatedSelected = selectedReelm ? {
+      ...selectedReelm,
+      categories: selectedReelm.categories.map(c => c.id !== catId ? c : { ...c, channels: [...c.channels, newChannel] })
+    } : null
+    if (updatedSelected) {
+      setSelectedReelm(updatedSelected)
+      persistReelmCore(updatedSelected)
+    }
     setEditingChannelId(newChannel.id)
     setEditingChannelName('')
     if (cat.type === 'voice') setNewVoiceChannelId(newChannel.id)
@@ -6965,7 +6999,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       scheduleUserPersist('reelms', next)
       return next
     })
-    setSelectedReelm(updater)
+    setSelectedReelm(prev => {
+      const next = updater(prev)
+      persistReelmCore(next)
+      return next
+    })
     setEditingChannelId(null)
   }
 
@@ -6982,7 +7020,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       scheduleUserPersist('reelms', next)
       return next
     })
-    setSelectedReelm(updater)
+    setSelectedReelm(prev => {
+      const next = updater(prev)
+      persistReelmCore(next)
+      return next
+    })
   }
 
   const deleteChannel = (reelmId, catId, chId) => {
@@ -6997,7 +7039,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       scheduleUserPersist('reelms', next)
       return next
     })
-    setSelectedReelm(updater)
+    setSelectedReelm(prev => {
+      const next = updater(prev)
+      persistReelmCore(next)
+      return next
+    })
     if (selectedChannel?.id === chId) setSelectedChannel(null)
   }
 
@@ -7008,7 +7054,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       scheduleUserPersist('reelms', next)
       return next
     })
-    setSelectedReelm(prev => updater(prev))
+    setSelectedReelm(prev => {
+      const next = updater(prev)
+      persistReelmCore(next)
+      return next
+    })
   }
 
   const leaveReelm = (reelmId) => {
@@ -7028,6 +7078,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       return next
     })
     setSelectedReelm(updatedReelm)
+    persistReelmCore(updatedReelm)
   }
 
   const handleMenuItemClick = (action) => {
@@ -9695,10 +9746,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     onClick={() => { if (mostRecentReelm) handleSelectReelm(mostRecentReelm) }}
                   >
                     <div>
-                      <span className="welcome-card-title" style={{ fontFamily: "'Dela Gothic One', sans-serif" }}>{t('home_reelms_recently')}</span>
+                      <span className="welcome-card-title" style={{ fontFamily: "'Dela Gothic One', sans-serif" }}>Your Reelms, recently</span>
                       {totalReelmMsgs > 0
                         ? <span className="welcome-card-summary">{totalReelmMsgs} message{totalReelmMsgs !== 1 ? 's' : ''} from {reelmsWithUpdates.length} reelm{reelmsWithUpdates.length !== 1 ? 's' : ''}</span>
-                        : <span className="welcome-card-empty">{t('home_all_caught_up')}</span>
+                        : <span className="welcome-card-empty">You're all caught up.</span>
                       }
                     </div>
                     <div className="welcome-card-reelm-photos">
@@ -9720,10 +9771,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       onClick={() => { setShowChatList(true); setChatListFilter('all') }}
                     >
                       <div>
-                        <span className="welcome-card-title" style={{ fontFamily: "'Dela Gothic One', sans-serif" }}>{t('home_recent_chats')}</span>
+                        <span className="welcome-card-title" style={{ fontFamily: "'Dela Gothic One', sans-serif" }}>Recent chats</span>
                         {totalChatMsgs > 0
                           ? <span className="welcome-card-summary">{totalChatMsgs} message{totalChatMsgs !== 1 ? 's' : ''} from {chatsWithUpdates.length} chat{chatsWithUpdates.length !== 1 ? 's' : ''}</span>
-                          : <span className="welcome-card-empty">{t('home_all_caught_up')}</span>
+                          : <span className="welcome-card-empty">You're all caught up.</span>
                         }
                       </div>
                       <img src={newdmIcon} alt="Messages" className="welcome-card-icon" />
@@ -9734,10 +9785,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       onClick={() => { if (notifications.length > 0) toggleNotifPopup() }}
                     >
                       <div>
-                        <span className="welcome-card-title" style={{ fontFamily: "'Dela Gothic One', sans-serif" }}>{t('home_updates')}</span>
+                        <span className="welcome-card-title" style={{ fontFamily: "'Dela Gothic One', sans-serif" }}>Updates</span>
                         {notifications.length > 0
                           ? <span className="welcome-card-summary">{notifications.length} notification{notifications.length !== 1 ? 's' : ''}</span>
-                          : <span className="welcome-card-empty">{t('home_all_caught_up')}</span>
+                          : <span className="welcome-card-empty">You're all caught up.</span>
                         }
                       </div>
                       <img src={notificationIcon} alt="Notifications" className="welcome-card-icon" />
@@ -10459,8 +10510,8 @@ function SignUpScreen({ onSignUpComplete, onGoBack }) {
       setPasswordError('Please enter a password.')
       return
     }
-    if (password.length < 6) {
-      setPasswordError('Password must be at least 6 characters long.')
+    if (password.length < 8) {
+      setPasswordError('Password must be at least 8 characters long.')
       return
     }
 
@@ -10469,17 +10520,22 @@ function SignUpScreen({ onSignUpComplete, onGoBack }) {
 
     try {
       const cred = isElectron
-        ? await electronRegister(contact.trim(), password)
-        : await webRegister(contact.trim(), password)
+        ? await electronRegister(contact.trim(), password, { username: username.trim(), displayName: name.trim(), name: name.trim() })
+        : await webRegister(contact.trim(), password, { username: username.trim(), displayName: name.trim(), name: name.trim() })
 
       const userData = {
+        ...(cred.profile || {}),
         id: cred.user.uid,
+        uid: cred.user.uid,
         name: name.trim(),
+        displayName: name.trim(),
         username: username.trim(),
         birthDate: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
         contactType,
         contact: contact.trim(),
-        createdAt: new Date().toISOString()
+        createdAt: cred.profile?.createdAt || new Date().toISOString(),
+        updatedAt: Date.now(),
+        notifyNewDevice: cred.profile?.notifyNewDevice ?? true
       }
 
       await userProfilePut(userData)
@@ -10490,8 +10546,16 @@ function SignUpScreen({ onSignUpComplete, onGoBack }) {
       setIsCreating(false)
       onSignUpComplete()
     } catch (err) {
-      if (err.code === 'auth/email-already-in-use') {
+      if (err.code === 'auth/email-already-in-use' || err.code === 'auth/email-taken') {
         setPasswordError('This e-mail is already in use.')
+      } else if (err.code === 'auth/username-taken') {
+        setPasswordError('This username is already taken. Please go back and choose another username.')
+      } else if (err.code === 'auth/weak-password') {
+        setPasswordError('Password must be at least 8 characters long.')
+      } else if (err.code === 'auth/invalid-email') {
+        setPasswordError('Please enter a valid e-mail address.')
+      } else if (err.code === 'auth/invalid-username') {
+        setPasswordError('Username must be 3-30 characters and use letters, numbers, dots, dashes or underscores.')
       } else {
         setPasswordError('Account creation failed. Please try again.')
       }
@@ -10520,8 +10584,8 @@ function SignUpScreen({ onSignUpComplete, onGoBack }) {
         }
         setIsChecking(true)
         try {
-          const available = await userCheckEmail(contact.trim())
-          if (!available) { setInputError('This e-mail is already in use.'); setIsChecking(false); return }
+          const result = await userCheckEmail(contact.trim())
+          if (result?.exists || result === false) { setInputError('This e-mail is already in use.'); setIsChecking(false); return }
         } catch { /* sunucuya ulaşılamazsa devam et */ }
         setIsChecking(false)
       }
@@ -10534,8 +10598,8 @@ function SignUpScreen({ onSignUpComplete, onGoBack }) {
         }
         setIsChecking(true)
         try {
-          const available = await userCheckUsername(username.trim())
-          if (!available) { setUsernameError('This username is already taken.'); setIsChecking(false); return }
+          const result = await userCheckUsername(username.trim())
+          if (result?.exists || result === false) { setUsernameError('This username is already taken.'); setIsChecking(false); return }
         } catch { /* sunucuya ulaşılamazsa devam et */ }
         setIsChecking(false)
       }

@@ -43,11 +43,11 @@ export function electronOnAuthStateChanged(cb) {
   }
 }
 
-export async function electronSignIn(email, password) {
+export async function electronSignIn(identifier, password) {
   const res = await fetch(`${BACKEND}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ identifier, password }),
   })
   const data = await res.json()
   if (!res.ok) {
@@ -58,14 +58,14 @@ export async function electronSignIn(email, password) {
   _raw = { uid: data.uid, email: data.email, token: data.token }
   localStorage.setItem('_ea', JSON.stringify(_raw))
   _notify(_raw)
-  return { user: _makeUser(_raw) }
+  return { user: _makeUser(_raw), profile: data.profile || null }
 }
 
-export async function electronRegister(email, password) {
+export async function electronRegister(email, password, profile = {}) {
   const res = await fetch(`${BACKEND}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, username: profile.username, displayName: profile.displayName || profile.name }),
   })
   const data = await res.json()
   if (!res.ok) {
@@ -76,7 +76,7 @@ export async function electronRegister(email, password) {
   _raw = { uid: data.uid, email: data.email, token: data.token }
   localStorage.setItem('_ea', JSON.stringify(_raw))
   _notify(_raw)
-  return { user: _makeUser(_raw) }
+  return { user: _makeUser(_raw), profile: data.profile || null }
 }
 
 export function electronSignOut() {

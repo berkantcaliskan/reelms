@@ -6,8 +6,10 @@ This source tree is prepared for a GitHub repository. It intentionally does not 
 
 ```powershell
 npm install
+npm run typecheck
 npm run build:web
 npm run build:api
+npm run test:local:e2e
 npm run build:desktop
 ```
 
@@ -49,5 +51,7 @@ API health: `http://127.0.0.1:5000/health`
 - Web deploy uses `apps/web/dist` after `npm run build:web`.
 - API deploy uses `services/api/dist` after `npm run build:api`.
 - Local development can use JSON storage.
-- Staging/production should use `REELMS_STORAGE_DRIVER=postgres` and `DATABASE_URL`.
+- Staging/production should use `REELMS_STORAGE_DRIVER=supabase` with `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY`, or `REELMS_STORAGE_DRIVER=postgres` with `DATABASE_URL`.
 - Redis is optional locally, required once Socket.io is horizontally scaled.
+- Use a strong production `JWT_SECRET`; never use the development default outside local testing.
+- See `docs/BETA_HARDENING_REPORT.md` and `docs/BETA_DEPLOYMENT_READINESS.md` for beta hardening, hosted deployment requirements and remaining limitations.

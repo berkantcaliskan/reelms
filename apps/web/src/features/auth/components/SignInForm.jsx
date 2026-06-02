@@ -78,7 +78,7 @@ export function SignInForm({ onSuccess, onGoSignUp }) {
 function toAuthMessage(err) {
   if (err?.code === 'auth/invalid-identifier') return 'Invalid email or username.'
   if (err?.code === 'auth/profile-not-found') return 'Profile could not be loaded.'
-  if (err?.code === 'auth/invalid-credential' || err?.code === 'auth/wrong-password') return 'Invalid email or password.'
+  if (err?.code === 'auth/invalid-credential' || err?.code === 'auth/wrong-password') return 'Invalid email/username or password.'
   if (err?.code === 'auth/user-not-found') return 'No account found. Please sign up first.'
   if (err?.code === 'auth/too-many-requests') return 'Too many attempts. Please try again later.'
   return 'Sign in failed. Please try again.'

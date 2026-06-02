@@ -4,7 +4,7 @@ import { moderateText, pushModEvent } from '../../modules/moderation/moderationS
 
 export const moderationRouter = Router()
 
-moderationRouter.post('/moderate', async (req, res) => {
+moderationRouter.post('/moderate', authenticate, async (req, res) => {
   const { text, ageRating } = req.body || {}
   res.json(await moderateText(String(text || ''), ageRating))
 })

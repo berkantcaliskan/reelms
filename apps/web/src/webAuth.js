@@ -55,11 +55,11 @@ export function webOnAuthStateChanged(cb) {
   }
 }
 
-export async function webSignIn(email, password) {
+export async function webSignIn(identifier, password) {
   const res = await fetch(`${BACKEND}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ identifier, password }),
   })
   const data = await res.json()
   if (!res.ok) {
@@ -70,14 +70,14 @@ export async function webSignIn(email, password) {
   _raw = { uid: data.uid, email: data.email, token: data.token }
   localStorage.setItem('_wa', JSON.stringify(_raw))
   _notify(_raw)
-  return { user: _makeUser(_raw) }
+  return { user: _makeUser(_raw), profile: data.profile || null }
 }
 
-export async function webRegister(email, password) {
+export async function webRegister(email, password, profile = {}) {
   const res = await fetch(`${BACKEND}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password }),
+    body: JSON.stringify({ email, password, username: profile.username, displayName: profile.displayName || profile.name }),
   })
   const data = await res.json()
   if (!res.ok) {
@@ -88,7 +88,7 @@ export async function webRegister(email, password) {
   _raw = { uid: data.uid, email: data.email, token: data.token }
   localStorage.setItem('_wa', JSON.stringify(_raw))
   _notify(_raw)
-  return { user: _makeUser(_raw) }
+  return { user: _makeUser(_raw), profile: data.profile || null }
 }
 
 export function webSignOut() {

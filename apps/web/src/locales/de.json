@@ -593,7 +593,7 @@
   "enter_password": "Bitte Passwort eingeben.",
   "invalid_email_or_username": "Ungültige E-Mail oder Benutzername.",
   "user_profile_not_found": "Benutzerprofil nicht gefunden.",
-  "invalid_email_or_password": "Ungültige E-Mail oder Passwort.",
+  "invalid_email_or_password": "Ungültige E-Mail/Benutzername oder Passwort.",
   "no_account_signup_first": "Kein Konto gefunden. Bitte zuerst registrieren.",
   "too_many_login_attempts": "Zu viele Versuche. Bitte später erneut versuchen.",
   "signin_failed_retry": "Anmeldung fehlgeschlagen. Bitte erneut versuchen.",
