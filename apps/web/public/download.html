@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Download Reelms</title>
+  <meta name="description" content="Download the Reelms desktop app for Windows, macOS, or Linux." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bej: #b99887;
+      --green: #68c586;
+      --bg: #07060f;
+      --bg2: #0e0c1a;
+      --surface: rgba(185,152,135,0.06);
+      --border: rgba(185,152,135,0.12);
+      --text: #e8ddd6;
+      --muted: rgba(232,221,214,0.45);
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Nav ── */
+    nav {
+      position: fixed;
+      top: 0; left: 0; right: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 48px;
+      height: 64px;
+      background: rgba(7,6,15,0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .nav-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      text-decoration: none;
+    }
+
+    .nav-logo-name {
+      font-size: 1.05rem;
+      font-weight: 700;
+      color: var(--bej);
+    }
+
+    .nav-back {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .nav-back:hover { color: var(--text); }
+
+    /* ── Page ── */
+    .page {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 100px 24px 60px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .page::before {
+      content: '';
+      position: absolute;
+      top: 10%;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 700px;
+      height: 400px;
+      background: radial-gradient(ellipse, rgba(185,152,135,0.07) 0%, transparent 70%);
+      pointer-events: none;
+    }
+
+    .page-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--bej);
+      margin-bottom: 16px;
+    }
+
+    .page-title {
+      font-size: clamp(2rem, 5vw, 3.5rem);
+      font-weight: 800;
+      text-align: center;
+      letter-spacing: -0.02em;
+      margin-bottom: 16px;
+      line-height: 1.1;
+    }
+
+    .page-sub {
+      font-size: 1rem;
+      color: var(--muted);
+      text-align: center;
+      max-width: 460px;
+      line-height: 1.65;
+      margin-bottom: 60px;
+    }
+
+    /* ── Platform cards ── */
+    .platforms {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      width: 100%;
+      max-width: 860px;
+      margin-bottom: 40px;
+    }
+
+    .platform-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 36px 28px 32px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 0;
+      transition: border-color 0.2s, background 0.2s, transform 0.15s;
+      position: relative;
+    }
+
+    .platform-card:hover {
+      border-color: rgba(185,152,135,0.3);
+      background: rgba(185,152,135,0.08);
+      transform: translateY(-3px);
+    }
+
+    .platform-card.featured {
+      border-color: rgba(185,152,135,0.3);
+      background: rgba(185,152,135,0.08);
+    }
+
+    .platform-badge {
+      position: absolute;
+      top: -10px;
+      left: 50%;
+      transform: translateX(-50%);
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #07060f;
+      background: var(--bej);
+      border-radius: 20px;
+      padding: 3px 10px;
+      white-space: nowrap;
+    }
+
+    .platform-icon {
+      width: 56px;
+      height: 56px;
+      margin-bottom: 20px;
+      color: var(--bej);
+    }
+
+    .platform-name {
+      font-size: 1.1rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+    }
+
+    .platform-version {
+      font-size: 0.75rem;
+      color: var(--muted);
+      margin-bottom: 24px;
+    }
+
+    .btn-download {
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: #07060f;
+      background: var(--bej);
+      border: none;
+      border-radius: 10px;
+      padding: 12px 24px;
+      cursor: pointer;
+      text-decoration: none;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      transition: opacity 0.2s;
+    }
+
+    .btn-download:hover { opacity: 0.85; }
+
+    .btn-download-outline {
+      font-family: inherit;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--bej);
+      background: none;
+      border: 1px solid rgba(185,152,135,0.25);
+      border-radius: 10px;
+      padding: 12px 24px;
+      cursor: pointer;
+      text-decoration: none;
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      transition: background 0.2s, border-color 0.2s;
+    }
+
+    .btn-download-outline:hover {
+      background: rgba(185,152,135,0.08);
+      border-color: rgba(185,152,135,0.4);
+    }
+
+    /* ── Note ── */
+    .note {
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-align: center;
+      max-width: 500px;
+      line-height: 1.6;
+    }
+
+    .note a {
+      color: var(--bej);
+      text-decoration: none;
+    }
+
+    .note a:hover { text-decoration: underline; }
+
+    /* ── System req ── */
+    .sysreq {
+      width: 100%;
+      max-width: 860px;
+      margin-top: 64px;
+      border-top: 1px solid var(--border);
+      padding-top: 40px;
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+
+    .sysreq-col h4 {
+      font-size: 0.78rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--bej);
+      margin-bottom: 12px;
+    }
+
+    .sysreq-col ul {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .sysreq-col li {
+      font-size: 0.78rem;
+      color: var(--muted);
+      display: flex;
+      align-items: flex-start;
+      gap: 6px;
+    }
+
+    .sysreq-col li::before {
+      content: '·';
+      color: rgba(185,152,135,0.4);
+      flex-shrink: 0;
+    }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 28px 48px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .footer-copy {
+      font-size: 0.72rem;
+      color: rgba(232,221,214,0.25);
+    }
+
+    .footer-link {
+      font-size: 0.78rem;
+      color: var(--muted);
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .footer-link:hover { color: var(--text); }
+
+    @media (max-width: 700px) {
+      nav { padding: 0 20px; }
+      .platforms { grid-template-columns: 1fr; max-width: 360px; }
+      .sysreq { grid-template-columns: 1fr; }
+      footer { padding: 24px 20px; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ── Nav ── -->
+  <nav>
+    <a href="/" class="nav-logo">
+      <span class="nav-logo-name">Reelms</span>
+    </a>
+    <a href="/" class="nav-back">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+        <path d="M19 12H5M12 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Back to Home
+    </a>
+  </nav>
+
+  <!-- ── Main ── -->
+  <main class="page">
+    <div class="page-label">Get Started</div>
+    <h1 class="page-title">Download Reelms</h1>
+    <p class="page-sub">Available for Windows, macOS, and Linux. Free — always.</p>
+
+    <div class="platforms">
+
+      <!-- Windows -->
+      <div class="platform-card featured">
+        <div class="platform-badge">Recommended</div>
+        <svg class="platform-icon" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801"/>
+        </svg>
+        <div class="platform-name">Windows</div>
+        <div class="platform-version">Beta 1.0 · 64-bit · NSIS Installer</div>
+        <a href="#" class="btn-download">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Download .exe
+        </a>
+      </div>
+
+      <!-- macOS -->
+      <div class="platform-card">
+        <svg class="platform-icon" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/>
+        </svg>
+        <div class="platform-name">macOS</div>
+        <div class="platform-version">Beta 1.0 · Universal (Intel + Apple Silicon)</div>
+        <a href="#" class="btn-download-outline">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Download .dmg
+        </a>
+      </div>
+
+      <!-- Linux -->
+      <div class="platform-card">
+        <svg class="platform-icon" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12.504 0c-.155 0-.315.008-.48.021-4.226.333-3.105 4.807-3.17 6.298-.076 1.092-.3 1.953-1.05 3.02-.885 1.051-2.127 2.75-2.716 4.521-.278.832-.41 1.684-.287 2.489a.424.424 0 00-.11.135c-.26.268-.45.6-.663.839-.199.199-.485.267-.797.4-.313.136-.658.269-.864.68-.09.189-.136.394-.132.602 0 .199.027.4.055.536.058.399.116.728.04.97-.249.68-.28 1.145-.106 1.484.174.334.535.47.94.601.81.2 1.91.135 2.774.6.926.466 1.866.67 2.616.47.526-.123.9-.49 1.022-.9.129-.41.057-.823-.053-1.172-.063-.civilized-.13-.564-.141-.694-.014-.18.0-.327.04-.497.15.045.325.065.534.071-.049.127-.154.236-.196.338-.03.062-.024.127-.024.196 0 .168.09.344.216.459.264.232.714.294 1.025.158.246-.107.384-.335.42-.59.015-.12.003-.23-.007-.336-.034-.375-.056-.665-.037-.898.03-.403.114-.666.147-1.003.014-.199.02-.432-.064-.614-.08-.173-.24-.258-.408-.305-.167-.045-.34-.062-.494-.115-.16-.056-.308-.145-.43-.25-.135-.107-.262-.22-.392-.31-.215-.149-.458-.24-.7-.193-.253.048-.498.192-.694.411-.103.12-.186.264-.24.418-.034.1-.07.198-.078.305.17.063.31.148.415.276.086.109.13.23.162.348.032.12.063.236.107.336.043.1.08.18.073.244-.07.624-.22 1.128-.193 1.608.028.48.185.925.544 1.309.362.386.95.668 1.674.816 1.35.267 3.197-.128 4.51.33.683.236 1.07.75 1.295 1.365.228.62.295 1.353.28 2.083-.014.731-.11 1.473-.216 2.203-.107.735-.228 1.479-.337 2.196-.11.717-.197 1.403-.16 2.037.034.637.178 1.18.514 1.518.336.337.788.512 1.376.571.298.03.638.038.995.02.35-.017.722-.054 1.08-.097.715-.086 1.393-.197 1.875-.2 1.07-.007 1.79.463 2.33 1.143.53.682.808 1.523.96 2.353.163.834.2 1.672.276 2.46.037.39.084.762.167 1.08.083.317.2.58.393.75a.73.73 0 00.498.193c.266 0 .558-.1.83-.246.55-.294 1.06-.78 1.507-1.258.45-.48.832-1.015 1.236-1.528 1.36-1.742 2.64-3.38 3.65-4.34a7.617 7.617 0 012.11-1.5c.765-.37 1.607-.592 2.448-.753 1.634-.315 3.28-.4 4.43-1.17 1.185-.8 1.544-2.39.976-3.6-.283-.6-.778-1.07-1.393-1.294-.614-.224-1.34-.2-1.978.104-.64.304-1.177.9-1.447 1.6-.275.71-.215 1.541-.09 2.158-.032-.035-.065-.077-.098-.116-.386-.455-.74-.944-1.138-1.432-.38-.47-.783-.94-1.25-1.36-.45-.406-.952-.765-1.5-1.04-.545-.275-1.143-.466-1.793-.513-.65-.046-1.35.042-2.064.26-.357.108-.716.245-1.078.393-.362.148-.724.307-1.088.45-.36.142-.725.27-1.078.347-.356.077-.702.1-1.025.077-.65-.047-1.24-.27-1.73-.592a5.26 5.26 0 01-1.154-1.136c-.284-.406-.48-.875-.573-1.374-.092-.498-.082-1.012.005-1.538.174-1.053.65-2.14.962-3.23.153-.547.26-1.097.245-1.626-.014-.54-.16-1.077-.47-1.558-.277-.444-.714-.844-1.264-1.128-.55-.286-1.214-.47-1.915-.527-.69-.056-1.425.01-2.156.156-.73.145-1.47.38-2.154.67-.693.29-1.352.634-1.92 1.03-.57.397-1.055.852-1.383 1.367-.327.516-.488 1.102-.44 1.718.048.615.287 1.25.65 1.84.363.592.85 1.135 1.37 1.62.53.487 1.107.915 1.636 1.293.53.378 1.006.705 1.372.998.183.147.34.287.46.408.122.122.205.23.24.322.035.092.02.172-.035.26-.107.178-.32.34-.596.48-.277.143-.614.266-.98.38-.736.226-1.554.406-2.22.71-.665.302-1.18.737-1.32 1.38-.136.64.066 1.48.504 2.28.44.8 1.095 1.584 1.73 2.26.315.338.635.658.934.962.3.304.574.59.794.863.218.27.38.53.45.778.067.25.048.49-.07.77-.228.548-.724 1.04-1.288 1.477-.568.436-1.21.81-1.817 1.17-.608.36-1.19.706-1.66 1.073-.473.367-.834.764-.986 1.19-.153.428-.096.89.128 1.34.45.9 1.5 1.697 2.565 2.117 1.065.42 2.14.47 2.965.104.824-.367 1.396-1.15 1.71-2.04.315-.89.37-1.884.426-2.833.057-.95.113-1.854.32-2.6.207-.748.565-1.34 1.03-1.785.468-.447 1.047-.748 1.69-.95 1.29-.4 2.77-.457 4.19-.607 1.42-.15 2.793-.39 4.04-.927 1.245-.538 2.372-1.373 3.07-2.77.696-1.4.97-3.47.275-5.254-.694-1.782-2.37-3.183-4.37-3.85-.998-.332-2.072-.486-3.14-.493-.534-.004-1.064.025-1.578.077-.514.052-1.015.128-1.49.23-.952.203-1.82.54-2.563.99-.745.45-1.38 1.01-1.906 1.65-.528.64-.964 1.37-1.3 2.14-.335.77-.57 1.58-.7 2.4-.128.82-.154 1.65-.095 2.46.12 1.62.616 3.16 1.38 4.44.382.64.827 1.22 1.32 1.73.49.51 1.03.95 1.6 1.33.28.19.567.36.86.52a9.8 9.8 0 00.9.39c.308.118.62.224.93.32.308.098.615.187.91.27.59.168 1.17.327 1.673.524.502.196.923.43 1.224.728.3.296.476.655.483 1.04.006.382-.15.784-.44 1.12-.293.338-.717.612-1.186.81-.47.197-.985.315-1.484.346-.2.012-.395.012-.582 0a4.27 4.27 0 01-.556-.084c-.374-.085-.746-.23-1.087-.415-.34-.186-.65-.41-.93-.655-.28-.244-.524-.51-.742-.79-.436-.558-.78-1.15-1.073-1.742-.292-.59-.545-1.183-.802-1.777-.512-1.19-1.045-2.4-1.7-3.506-.654-1.106-1.43-2.112-2.308-2.962-.878-.85-1.855-1.545-2.867-2.09-1.012-.545-2.057-.934-3.066-1.25-2.015-.63-3.932-.92-5.34-1.53-.703-.305-1.263-.72-1.652-1.28-.389-.562-.613-1.27-.66-2.11"/>
+        </svg>
+        <div class="platform-name">Linux</div>
+        <div class="platform-version">Beta 1.0 · AppImage</div>
+        <a href="#" class="btn-download-outline">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Download .AppImage
+        </a>
+      </div>
+
+    </div>
+
+    <p class="note">
+      No account required to download. &nbsp;·&nbsp;
+      Prefer the browser? <a href="/app/">Open Reelms Web</a>
+    </p>
+
+    <!-- System requirements -->
+    <div class="sysreq">
+      <div class="sysreq-col">
+        <h4>Windows</h4>
+        <ul>
+          <li>Windows 10 or later (64-bit)</li>
+          <li>4 GB RAM minimum</li>
+          <li>300 MB disk space</li>
+          <li>Microphone for voice</li>
+        </ul>
+      </div>
+      <div class="sysreq-col">
+        <h4>macOS</h4>
+        <ul>
+          <li>macOS 11 (Big Sur) or later</li>
+          <li>Intel or Apple Silicon</li>
+          <li>4 GB RAM minimum</li>
+          <li>300 MB disk space</li>
+        </ul>
+      </div>
+      <div class="sysreq-col">
+        <h4>Linux</h4>
+        <ul>
+          <li>Ubuntu 20.04+ or equivalent</li>
+          <li>x86_64 architecture</li>
+          <li>4 GB RAM minimum</li>
+          <li>FUSE for AppImage</li>
+        </ul>
+      </div>
+    </div>
+  </main>
+
+  <!-- ── Footer ── -->
+  <footer>
+    <a href="/" class="footer-link">← Back to Reelms</a>
+    <span class="footer-copy">&copy; 2025 Reelms · Beta 1.0/1732026</span>
+  </footer>
+
+</body>
+</html>

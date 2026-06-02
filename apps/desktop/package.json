@@ -1,0 +1,84 @@
+{
+  "name": "reelms-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reelms Desktop Client",
+  "type": "module",
+  "main": "electron/main.cjs",
+  "scripts": {
+    "dev": "concurrently -k -n VITE,ELECTRON -c green,blue \"vite --host 127.0.0.1 --port 3105\" \"wait-on http://127.0.0.1:3105 && electron .\"",
+    "prebuild": "npm -w @reelms/shared run build && npm -w @reelms/config run build",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "dist:win": "npm run build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win --publish never",
+    "release:win": "npm run build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win --publish always"
+  },
+  "dependencies": {
+    "@reelms/shared": "0.1.0",
+    "electron-store": "8.2.0",
+    "electron-updater": "6.3.9",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "socket.io-client": "4.8.1"
+  },
+  "devDependencies": {
+    "@types/node": "22.10.7",
+    "@types/react": "18.3.18",
+    "@types/react-dom": "18.3.5",
+    "@vitejs/plugin-react": "4.3.4",
+    "concurrently": "9.2.1",
+    "cross-env": "7.0.3",
+    "electron": "41.7.1",
+    "electron-builder": "26.8.1",
+    "typescript": "5.7.3",
+    "vite": "6.4.2",
+    "wait-on": "8.0.1"
+  },
+  "build": {
+    "appId": "io.reelms.desktop",
+    "productName": "Reelms",
+    "artifactName": "Reelms-Setup-${version}.${ext}",
+    "directories": {
+      "output": "dist-electron"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "extraResources": [],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.ico",
+      "artifactName": "Reelms-Setup-${version}.${ext}",
+      "verifyUpdateCodeSignature": false,
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowElevation": false,
+      "allowToChangeInstallationDirectory": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Reelms",
+      "uninstallDisplayName": "Reelms",
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": true
+    },
+    "publish": [
+      {
+        "provider": "generic",
+        "url": "https://download.reelms.io/win/"
+      }
+    ]
+  },
+  "author": "Reelms"
+}

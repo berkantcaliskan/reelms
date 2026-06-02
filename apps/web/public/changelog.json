@@ -1,0 +1,19 @@
+{
+  "current": "0.1.0",
+  "releases": [
+    {
+      "version": "0.1.0",
+      "date": "2026-03-17",
+      "highlights": "First stable release",
+      "notes": [
+        "Create, edit, and discover reelms",
+        "Real-time messaging and group chats",
+        "Feed and post system",
+        "Friends list and invite system",
+        "Notification center",
+        "Theme and customization options",
+        "Message requests and privacy settings"
+      ]
+    }
+  ]
+}

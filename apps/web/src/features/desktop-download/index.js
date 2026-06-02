@@ -1,0 +1,6 @@
+export { DesktopDownloadButton } from './components/DesktopDownloadButton.jsx'
+export { DesktopDownloadCard } from './components/DesktopDownloadCard.jsx'
+export { DesktopDownloadPage } from './components/DesktopDownloadPage.jsx'
+export { DesktopDownloadSettingsPanel } from './components/DesktopDownloadSettingsPanel.jsx'
+export { FloatingDesktopDownloadButton } from './components/FloatingDesktopDownloadButton.jsx'
+export { getDesktopDownloadInfo, openDesktopDownload } from './services/downloadConfig.js'

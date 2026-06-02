@@ -1,0 +1,52 @@
+# dependencies
+node_modules/
+**/node_modules/
+
+# environment / secrets
+.env
+.env.*
+!.env.example
+
+# build outputs
+dist/
+**/dist/
+dist-electron/
+**/dist-electron/
+win-unpacked/
+**/win-unpacked/
+
+# desktop release artifacts
+*.exe
+*.dmg
+*.AppImage
+*.msi
+*.blockmap
+latest.yml
+
+# local api data / generated runtime state
+services/api/data/*.json
+services/api/data/*.sqlite
+services/api/data/*.db
+!services/api/data/.gitkeep
+!services/api/data/README.md
+apps/desktop/media/
+media/
+uploads/
+
+# logs / cache
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.vite/
+.cache/
+coverage/
+
+# OS/editor
+.DS_Store
+Thumbs.db
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.example.json
+.idea/

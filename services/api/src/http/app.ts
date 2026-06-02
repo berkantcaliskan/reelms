@@ -1,0 +1,64 @@
+import cors from 'cors'
+import express from 'express'
+import helmet from 'helmet'
+import morgan from 'morgan'
+import type { Server } from 'socket.io'
+import { corsOrigins, env } from '../config/env.js'
+import { healthRouter } from './routes/health.routes.js'
+import { authRouter } from './routes/auth.routes.js'
+import { realtimeRouter } from './routes/realtime.routes.js'
+import { createReelmsDataRouter } from './routes/reelms-data.routes.js'
+import { createSocialRouter } from './routes/social.routes.js'
+import { moderationRouter } from './routes/moderation.routes.js'
+import { createSpotifyRouter } from './routes/spotify.routes.js'
+import { requestContext } from './middleware/requestContext.js'
+import { apiRateLimit, authRateLimit } from './middleware/rateLimit.js'
+import { errorHandler, notFoundHandler } from './utils/errors.js'
+
+export function createApp(io?: Server) {
+  const app = express()
+
+  app.set('trust proxy', 1)
+  app.disable('x-powered-by')
+  app.use(requestContext)
+  app.use(helmet({
+    crossOriginResourcePolicy: false,
+    contentSecurityPolicy: env.NODE_ENV === 'production' ? undefined : false
+  }))
+  app.use(express.json({ limit: env.JSON_BODY_LIMIT }))
+  app.use(express.urlencoded({ extended: true, limit: env.JSON_BODY_LIMIT }))
+  app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'))
+  app.use(cors({
+    origin(origin, callback) {
+      if (!origin) return callback(null, true)
+      if (corsOrigins.includes(origin)) return callback(null, true)
+      return callback(new Error(`CORS blocked origin: ${origin}`))
+    },
+    credentials: true
+  }))
+
+  app.use('/health', healthRouter)
+  app.use('/auth', authRateLimit, authRouter)
+  app.use('/realtime', realtimeRouter)
+  app.use(moderationRouter)
+
+  if (io) {
+    app.use(createSpotifyRouter(io))
+    app.use('/api/v1/social', apiRateLimit, createSocialRouter(io))
+    app.use('/api/v1', apiRateLimit, createReelmsDataRouter(io))
+  }
+
+  // Compatibility: old web client calls /google/login and /callback/google.
+  // Must come AFTER Spotify/API routers — those respond and stop the chain,
+  // so /spotify/* and /api/v1/* never reach authRateLimit here.
+  app.use(authRateLimit, authRouter)
+
+  app.get('/', (_req, res) => {
+    res.json({ ok: true, service: 'Reelms API', message: 'Reelms Server Ready' })
+  })
+
+  app.use(notFoundHandler)
+  app.use(errorHandler)
+
+  return app
+}

@@ -1,0 +1,28 @@
+name: Release Desktop
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm install
+      - run: npm run release:win
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reelms-windows-release
+          path: |
+            apps/desktop/dist-electron/*.exe
+            apps/desktop/dist-electron/*.blockmap
+            apps/desktop/dist-electron/latest.yml
