@@ -10,13 +10,21 @@ export function SignUpForm({ onSuccess, onGoSignIn }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const normalizedUsername = useMemo(() => normalizeUsername(username), [username])
 
+  function focusNextField(event, nextId) {
+    if (event.key !== 'Enter') return
+    event.preventDefault()
+    document.getElementById(nextId)?.focus()
+  }
+
   async function handleSubmit(event) {
     event.preventDefault()
     setError('')
+    setSuccess('')
 
     const nameCheck = validateRequired(displayName, 'Display name')
     const usernameCheck = validateUsername(normalizedUsername)
@@ -36,6 +44,10 @@ export function SignUpForm({ onSuccess, onGoSignIn }) {
         email,
         password
       })
+      if (result.emailVerificationRequired) {
+        setSuccess('Account created. Check your e-mail to verify your account before signing in.')
+        return
+      }
       onSuccess?.(result)
     } catch (err) {
       setError(toRegisterMessage(err))
@@ -49,6 +61,7 @@ export function SignUpForm({ onSuccess, onGoSignIn }) {
       <AuthProviderButtons onGoogle={signInWithGoogleProvider} disabled={isSubmitting} />
 
       <div className="auth-divider"><span>or create with email</span></div>
+      <p className="auth-keyboard-hint">Press Enter to move forward, Tab to navigate fields.</p>
 
       <FormField
         id="signup-display-name"
@@ -57,6 +70,8 @@ export function SignUpForm({ onSuccess, onGoSignIn }) {
         onChange={setDisplayName}
         placeholder="Cem"
         autoComplete="name"
+        autoFocus
+        onKeyDown={(event) => focusNextField(event, 'signup-username')}
       />
 
       <FormField
@@ -66,6 +81,7 @@ export function SignUpForm({ onSuccess, onGoSignIn }) {
         onChange={setUsername}
         placeholder="cem"
         autoComplete="username"
+        onKeyDown={(event) => focusNextField(event, 'signup-email')}
       />
 
       {username && normalizedUsername !== username ? (
@@ -80,6 +96,7 @@ export function SignUpForm({ onSuccess, onGoSignIn }) {
         onChange={setEmail}
         placeholder="cem@reelms.io"
         autoComplete="email"
+        onKeyDown={(event) => focusNextField(event, 'signup-password')}
       />
 
       <FormField
@@ -90,9 +107,11 @@ export function SignUpForm({ onSuccess, onGoSignIn }) {
         onChange={setPassword}
         placeholder="At least 8 characters"
         autoComplete="new-password"
+        onKeyDown={(event) => { if (event.key === 'Enter') handleSubmit(event) }}
       />
 
       {error ? <p className="auth-form-error" role="alert">{error}</p> : null}
+      {success ? <p className="auth-form-success" role="status">{success}</p> : null}
 
       <button className="auth-primary-button" type="submit" disabled={isSubmitting}>
         {isSubmitting ? 'Creating account…' : 'Create account'}

@@ -6,12 +6,13 @@ import { getDoc, putDoc, userPk } from '../../modules/store/docStore.js'
 import { getUserPublicProfile } from '../../modules/reelms/access.js'
 
 function nid() { return `${Date.now()}_${Math.random().toString(36).slice(2, 11)}` }
+const getProfilePhoto = (profile: any = {}) => profile.photo || profile.profilePhoto || profile.photoURL || profile.avatar || profile.image || profile.imageUrl || profile.userPhoto || null
 
 const compactFriend = (profile: any) => ({
   id: String(profile.id || profile.uid || ''),
   name: profile.name || profile.displayName || profile.username || 'Member',
   username: profile.username || '',
-  photo: profile.photo || null
+  photo: getProfilePhoto(profile)
 })
 
 async function userExists(uid: string) {
@@ -29,15 +30,16 @@ export function createSocialRouter(io: Server) {
   router.use(authenticate)
 
   const emit = (uid: string, sk: string) => io.to(`u:${uid}`).emit('reelms:doc', { scope: 'user', sk })
+  const isSystemInboxUid = (uid: string) => String(uid || '') === String(env.REELMS_MODERATION_UID || '')
 
   router.post('/notify', async (req, res) => {
     try {
-      const { targetUid, text } = req.body
+      const { targetUid, text, link } = req.body
       if (!targetUid || !text || targetUid === req.userId) return res.status(400).json({ error: 'bad_body' })
       if (!await userExists(String(targetUid))) return res.status(404).json({ error: 'user_not_found' })
       const pk = userPk(String(targetUid))
       const notifs = (await getDoc<any[]>(pk, 'notifications')) || []
-      notifs.unshift({ id: nid(), text: String(text).slice(0, 500), time: Date.now() })
+      notifs.unshift({ id: nid(), text: String(text).slice(0, 500), time: Date.now(), link: link && typeof link === 'object' ? link : null })
       await putDoc(pk, 'notifications', notifs.slice(0, 100))
       emit(String(targetUid), 'notifications')
       res.json({ ok: true })
@@ -54,14 +56,17 @@ export function createSocialRouter(io: Server) {
 
       const myPk = userPk(me)
       const targetPk = userPk(toUid)
-      const [meProfile, myFriends, targetFriends, myPending, targetPending] = await Promise.all([
+      const [meProfile, myFriends, targetFriends, myPending, targetPending, myBlocked, targetBlocked] = await Promise.all([
         getUserPublicProfile(me),
         getDoc<any[]>(myPk, 'friends').catch(() => []),
         getDoc<any[]>(targetPk, 'friends').catch(() => []),
         getDoc<any[]>(myPk, 'friend_requests').catch(() => []),
-        getDoc<any[]>(targetPk, 'friend_requests').catch(() => [])
+        getDoc<any[]>(targetPk, 'friend_requests').catch(() => []),
+        getDoc<any[]>(myPk, 'blocked').catch(() => []),
+        getDoc<any[]>(targetPk, 'blocked').catch(() => [])
       ])
 
+      if ((myBlocked || []).some((b) => String(b?.id) === toUid) || (targetBlocked || []).some((b) => String(b?.id) === me)) return res.status(403).json({ error: 'blocked' })
       if (hasFriend(myFriends || [], toUid) || hasFriend(targetFriends || [], me)) return res.json({ ok: true, alreadyFriends: true })
 
       // If the target already requested the current user, accepting is the cleanest symmetric outcome.
@@ -92,7 +97,7 @@ export function createSocialRouter(io: Server) {
       const notifs = (await getDoc<any[]>(targetPk, 'notifications').catch(() => [])) || []
       const alreadyNotified = notifs.slice(0, 20).some((n) => String(n?.text || '').includes(from.name) && String(n?.text || '').includes('friend request'))
       if (!alreadyNotified) {
-        notifs.unshift({ id: nid(), text: `${from.name} sent you a friend request.`, time: Date.now() })
+        notifs.unshift({ id: nid(), text: `${from.name} sent you a friend request.`, time: Date.now(), link: { type: 'friends' } })
         await putDoc(targetPk, 'notifications', notifs.slice(0, 100))
         emit(toUid, 'notifications')
       }
@@ -140,7 +145,7 @@ export function createSocialRouter(io: Server) {
       ;['friend_requests_out', 'friends'].forEach((sk) => emit(requesterId, sk))
 
       const requesterNotifs = (await getDoc<any[]>(requesterPk, 'notifications').catch(() => [])) || []
-      requesterNotifs.unshift({ id: nid(), text: `${compactFriend(meProfile).name} accepted your friend request.`, time: Date.now() })
+      requesterNotifs.unshift({ id: nid(), text: `${compactFriend(meProfile).name} accepted your friend request.`, time: Date.now(), link: { type: 'friends' } })
       await putDoc(requesterPk, 'notifications', requesterNotifs.slice(0, 100)); emit(requesterId, 'notifications')
       res.json({ ok: true })
     } catch { res.status(500).json({ error: 'failed' }) }
@@ -167,6 +172,7 @@ export function createSocialRouter(io: Server) {
     try {
       const friendId = String(req.body?.friendId || '')
       if (!friendId || friendId === String(req.userId)) return res.status(400).json({ error: 'bad_body' })
+      if (isSystemInboxUid(friendId)) return res.status(403).json({ error: 'system_inbox_locked', code: 'system/inbox-locked' })
       const me = String(req.userId)
       const myPk = userPk(me)
       let friends = (await getDoc<any[]>(myPk, 'friends')) || []
@@ -186,24 +192,89 @@ export function createSocialRouter(io: Server) {
     } catch { res.status(500).json({ error: 'failed' }) }
   })
 
+  router.post('/block', async (req, res) => {
+    try {
+      const me = String(req.userId)
+      const targetUid = String(req.body?.targetUid || '')
+      if (!targetUid || targetUid === me) return res.status(400).json({ error: 'bad_body' })
+      if (isSystemInboxUid(targetUid)) return res.status(403).json({ error: 'system_inbox_locked', code: 'system/inbox-locked' })
+      if (!await userExists(targetUid)) return res.status(404).json({ error: 'user_not_found' })
+
+      const myPk = userPk(me)
+      const targetPk = userPk(targetUid)
+      const targetProfile = compactFriend(await getUserPublicProfile(targetUid))
+
+      const blocked = ((await getDoc<any[]>(myPk, 'blocked').catch(() => [])) || [])
+        .filter((b) => String(b?.id) !== targetUid)
+      blocked.unshift({ ...targetProfile, blockedAt: Date.now() })
+
+      const cleanMyFriends = ((await getDoc<any[]>(myPk, 'friends').catch(() => [])) || []).filter((f) => String(f?.id) !== targetUid)
+      const cleanTargetFriends = ((await getDoc<any[]>(targetPk, 'friends').catch(() => [])) || []).filter((f) => String(f?.id) !== me)
+      const cleanMyReqs = ((await getDoc<any[]>(myPk, 'friend_requests').catch(() => [])) || []).filter((r) => String(r?.id) !== targetUid)
+      const cleanTargetReqs = ((await getDoc<any[]>(targetPk, 'friend_requests').catch(() => [])) || []).filter((r) => String(r?.id) !== me)
+      const cleanMyOut = ((await getDoc<string[]>(myPk, 'friend_requests_out').catch(() => [])) || []).filter((id) => String(id) !== targetUid)
+      const cleanTargetOut = ((await getDoc<string[]>(targetPk, 'friend_requests_out').catch(() => [])) || []).filter((id) => String(id) !== me)
+      const cleanMyMsgOut = ((await getDoc<string[]>(myPk, 'message_requests_out').catch(() => [])) || []).filter((id) => String(id) !== targetUid)
+      const cleanTargetMsgOut = ((await getDoc<string[]>(targetPk, 'message_requests_out').catch(() => [])) || []).filter((id) => String(id) !== me)
+      const cleanMyMsgReqs = ((await getDoc<any[]>(myPk, 'message_requests').catch(() => [])) || []).filter((r) => String(r?.fromId || r?.id) !== targetUid)
+      const cleanTargetMsgReqs = ((await getDoc<any[]>(targetPk, 'message_requests').catch(() => [])) || []).filter((r) => String(r?.fromId || r?.id) !== me)
+
+      await Promise.all([
+        putDoc(myPk, 'blocked', blocked),
+        putDoc(myPk, 'friends', cleanMyFriends),
+        putDoc(targetPk, 'friends', cleanTargetFriends),
+        putDoc(myPk, 'friend_requests', cleanMyReqs),
+        putDoc(targetPk, 'friend_requests', cleanTargetReqs),
+        putDoc(myPk, 'friend_requests_out', cleanMyOut),
+        putDoc(targetPk, 'friend_requests_out', cleanTargetOut),
+        putDoc(myPk, 'message_requests_out', cleanMyMsgOut),
+        putDoc(targetPk, 'message_requests_out', cleanTargetMsgOut),
+        putDoc(myPk, 'message_requests', cleanMyMsgReqs),
+        putDoc(targetPk, 'message_requests', cleanTargetMsgReqs)
+      ])
+      ;['blocked', 'friends', 'friend_requests', 'friend_requests_out', 'message_requests', 'message_requests_out'].forEach((sk) => emit(me, sk))
+      ;['friends', 'friend_requests', 'friend_requests_out', 'message_requests', 'message_requests_out'].forEach((sk) => emit(targetUid, sk))
+      res.json({ ok: true })
+    } catch { res.status(500).json({ error: 'failed' }) }
+  })
+
+  router.post('/unblock', async (req, res) => {
+    try {
+      const me = String(req.userId)
+      const targetUid = String(req.body?.targetUid || '')
+      if (!targetUid || targetUid === me) return res.status(400).json({ error: 'bad_body' })
+      const myPk = userPk(me)
+      const blocked = ((await getDoc<any[]>(myPk, 'blocked').catch(() => [])) || []).filter((b) => String(b?.id) !== targetUid)
+      await putDoc(myPk, 'blocked', blocked)
+      emit(me, 'blocked')
+      res.json({ ok: true })
+    } catch { res.status(500).json({ error: 'failed' }) }
+  })
+
   router.post('/message-request', async (req, res) => {
     try {
       const me = String(req.userId)
       const toUid = String(req.body?.toUid || '')
       if (!toUid || toUid === me) return res.status(400).json({ error: 'bad_body' })
+      if (isSystemInboxUid(toUid)) return res.status(403).json({ error: 'system_inbox_locked', code: 'system/inbox-locked' })
       if (!await userExists(toUid)) return res.status(404).json({ error: 'user_not_found' })
 
       const from = compactFriend(await getUserPublicProfile(me))
+      const myPk = userPk(me)
       const targetPk = userPk(toUid)
+      const [myBlocked, targetBlocked] = await Promise.all([
+        getDoc<any[]>(myPk, 'blocked').catch(() => []),
+        getDoc<any[]>(targetPk, 'blocked').catch(() => [])
+      ])
+      if ((myBlocked || []).some((b) => String(b?.id) === toUid) || (targetBlocked || []).some((b) => String(b?.id) === me)) return res.status(403).json({ error: 'blocked' })
       let reqs = (await getDoc<any[]>(targetPk, 'message_requests')) || []
       if (!reqs.some((r) => String(r.fromId) === me)) {
         reqs.unshift({ id: nid(), fromId: me, fromName: from.name, fromUsername: from.username, fromPhoto: from.photo || null, preview: String(req.body?.preview || '').slice(0, 300), sentAt: Date.now() })
         await putDoc(targetPk, 'message_requests', reqs.slice(0, 100)); emit(toUid, 'message_requests')
       }
       const notifs = (await getDoc<any[]>(targetPk, 'notifications')) || []
-      notifs.unshift({ id: nid(), text: `${from.name} sent you a message request.`, time: Date.now() })
+      notifs.unshift({ id: nid(), text: `${from.name} sent you a message request.`, time: Date.now(), link: { type: 'message_requests' } })
       await putDoc(targetPk, 'notifications', notifs.slice(0, 100)); emit(toUid, 'notifications')
-      const myPk = userPk(me)
       let out = (await getDoc<string[]>(myPk, 'message_requests_out')) || []
       if (!out.map(String).includes(toUid)) out = [...out, toUid]
       await putDoc(myPk, 'message_requests_out', out); emit(me, 'message_requests_out')

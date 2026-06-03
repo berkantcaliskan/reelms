@@ -7,7 +7,10 @@ export function FormField({
   placeholder,
   autoComplete,
   error,
-  rightSlot
+  rightSlot,
+  autoFocus = false,
+  inputMode,
+  onKeyDown
 }) {
   return (
     <label className="reelms-form-field" htmlFor={id}>
@@ -21,6 +24,9 @@ export function FormField({
           onChange={(event) => onChange(event.target.value)}
           placeholder={placeholder}
           autoComplete={autoComplete}
+          autoFocus={autoFocus}
+          inputMode={inputMode}
+          onKeyDown={onKeyDown}
         />
         {rightSlot ? <span className="reelms-form-right-slot">{rightSlot}</span> : null}
       </span>

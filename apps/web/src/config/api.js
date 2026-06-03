@@ -25,3 +25,13 @@ export function hasPublicWindowsDownloadUrl() {
   const url = import.meta.env.VITE_WINDOWS_DOWNLOAD_URL
   return Boolean(url && /^https?:\/\//i.test(url))
 }
+
+
+export function getPublicWebUrl() {
+  const fallback = typeof window !== 'undefined' && window.location?.origin ? window.location.origin : 'https://reelms.io'
+  return (
+    import.meta.env.VITE_PUBLIC_WEB_URL ||
+    import.meta.env.VITE_WEB_BASE_URL ||
+    fallback
+  ).replace(/\/$/, '')
+}

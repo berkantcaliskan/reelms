@@ -1,5 +1,7 @@
 import { env } from '../../config/env.js'
-import { getDoc, reelmPk, userPk } from '../store/docStore.js'
+import { getDoc, putDoc, reelmPk, userPk } from '../store/docStore.js'
+import { DEFAULT_REELM_ID, autoJoinDefaultReelm, hasLeftDefaultReelm } from './defaultReelm.js'
+import { isCommunityAdminUid } from './communityAdmins.js'
 
 export type MessageKeyAccess =
   | { ok: true; kind: 'dm'; participants: string[] }
@@ -20,13 +22,28 @@ export function normalizeEmail(value: unknown) {
 }
 
 export function publicProfileFromStored(uid: string, profile: any = {}) {
+  const photo = profile.photo || profile.profilePhoto || profile.photoURL || profile.avatar || profile.image || profile.imageUrl || profile.userPhoto || null
+  const cover = profile.cover || profile.coverImage || profile.coverUrl || profile.headerImage || profile.banner || profile.bannerImage || profile.backgroundCover || null
   return {
     id: uid,
     uid,
     name: profile.name || profile.displayName || profile.username || 'Member',
     displayName: profile.displayName || profile.name || profile.username || 'Member',
     username: profile.username || '',
-    photo: profile.photo || profile.photoURL || profile.avatar || null
+    photo,
+    profilePhoto: photo,
+    photoURL: photo,
+    avatar: photo,
+    image: photo,
+    userPhoto: photo,
+    cover,
+    coverImage: cover,
+    coverUrl: cover,
+    headerImage: cover,
+    bio: profile.bio || '',
+    activity: profile.activity || null,
+    sociallinks: profile.sociallinks || {},
+    socialorder: Array.isArray(profile.socialorder) ? profile.socialorder : []
   }
 }
 
@@ -35,21 +52,60 @@ export async function getUserPublicProfile(uid: string) {
   return publicProfileFromStored(uid, profile)
 }
 
+async function isBannedFromReelm(uid: string, reelmId: string) {
+  if (!uid || !reelmId) return false
+  const banList = (await getDoc<any[]>(reelmPk(reelmId), 'ban_list').catch(() => [])) || []
+  return banList.some((entry) => String(entry?.userId || entry?.id || '') === uid)
+}
+
+
+export async function getActiveReelmTimeout(uid: string, reelmId: string) {
+  if (!uid || !reelmId) return null
+  const now = Date.now()
+  const list = (await getDoc<any[]>(reelmPk(reelmId), 'timeout_list').catch(() => [])) || []
+  const active = list.filter((entry) => {
+    const targetUid = String(entry?.userId || entry?.id || '')
+    const expiresAt = Number(entry?.expiresAt || 0)
+    return targetUid && expiresAt > now
+  })
+  if (active.length !== list.length) await putDoc(reelmPk(reelmId), 'timeout_list', active).catch(() => {})
+  return active.find((entry) => String(entry?.userId || entry?.id || '') === uid) || null
+}
+
 export async function isReelmMember(uid: string, reelmId: string) {
   if (!uid || !reelmId) return false
   if (uid === env.REELMS_MODERATION_UID) return true
+  if (await isBannedFromReelm(uid, reelmId).catch(() => false)) return false
+
+  if (reelmId === DEFAULT_REELM_ID && await isCommunityAdminUid(uid).catch(() => false)) return true
+  if (reelmId === DEFAULT_REELM_ID && await hasLeftDefaultReelm(uid).catch(() => false)) return false
 
   const pk = reelmPk(reelmId)
   const meta = await getDoc<any>(pk, 'meta').catch(() => null)
   if (String(meta?.ownerId || '') === uid) return true
 
   const members = (await getDoc<any[]>(pk, 'members').catch(() => [])) || []
-  return members.some((member) => String(member?.userId) === uid)
+  if (members.some((member) => String(member?.userId) === uid)) return true
+
+  // Reelms Community is the global default community. If an older/local account
+  // does not have its membership copy yet, heal it server-side instead of
+  // denying sockets/messages until the user refreshes or logs in again.
+  if (reelmId === DEFAULT_REELM_ID) {
+    await autoJoinDefaultReelm(uid).catch(() => {})
+    const healedMembers = (await getDoc<any[]>(pk, 'members').catch(() => [])) || []
+    return healedMembers.some((member) => String(member?.userId) === uid)
+  }
+
+  return false
 }
 
 export async function canManageReelm(uid: string, reelmId: string) {
   if (!uid || !reelmId) return false
   if (uid === env.REELMS_MODERATION_UID) return true
+  if (await isBannedFromReelm(uid, reelmId).catch(() => false)) return false
+
+  if (reelmId === DEFAULT_REELM_ID && await isCommunityAdminUid(uid).catch(() => false)) return true
+  if (reelmId === DEFAULT_REELM_ID && await hasLeftDefaultReelm(uid).catch(() => false)) return false
 
   const pk = reelmPk(reelmId)
   const meta = await getDoc<any>(pk, 'meta').catch(() => null)
@@ -67,13 +123,22 @@ export async function canManageReelm(uid: string, reelmId: string) {
 }
 
 export async function getReelmChannel(reelmId: string, channelId: string) {
+  const id = String(channelId || '')
   const structure = await getDoc<any>(reelmPk(reelmId), 'structure').catch(() => null)
   const categories = Array.isArray(structure?.categories) ? structure.categories : []
   for (const category of categories) {
     const channels = Array.isArray(category?.channels) ? category.channels : []
-    const channel = channels.find((item: any) => String(item?.id) === String(channelId))
+    const channel = channels.find((item: any) => String(item?.id) === id)
     if (channel) return channel
   }
+
+  // Backward compatibility for older local beta data. Earlier community copies
+  // used `ch-tumu` while the server default now uses `ch-rc-welcome`. Treat the
+  // old id as a valid announcement channel so existing users do not get 400s.
+  if (reelmId === DEFAULT_REELM_ID && ['ch-tumu', 'ch-general', 'general'].includes(id)) {
+    return { id, name: 'general', type: 'announcement' }
+  }
+
   return null
 }
 

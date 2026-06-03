@@ -319,3 +319,41 @@
   .desktop-download-page h1 { font-size: clamp(38px, 12vw, 54px); }
   .desktop-download-card { grid-template-columns: 1fr; }
 }
+
+/* Download page polish: calmer labels, clearer actions. */
+.desktop-download-page {
+  color: rgba(244, 247, 255, 0.92);
+  background:
+    radial-gradient(circle at 14% 0%, rgba(118, 126, 255, 0.18), transparent 34%),
+    radial-gradient(circle at 84% 16%, rgba(77, 224, 255, 0.11), transparent 30%),
+    linear-gradient(145deg, #060711, #0a0d1c 54%, #060711);
+}
+.desktop-download-page__eyebrow,
+.desktop-download-settings-panel__eyebrow {
+  color: rgba(136, 229, 255, 0.72);
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-weight: 760;
+}
+.desktop-download-page h1 {
+  color: rgba(250, 250, 255, 0.94);
+  line-height: 1.04;
+  letter-spacing: -0.048em;
+  text-shadow: 0 24px 80px rgba(77, 224, 255, 0.10);
+}
+.desktop-download-page__lead,
+.desktop-download-page__grid ol,
+.desktop-download-page__grid ul,
+.desktop-download-card p {
+  color: rgba(214, 220, 242, 0.66);
+}
+.desktop-download-page__secondary::before { content: '←'; margin-right: 8px; }
+.desktop-download-page__nav-actions a:hover,
+.desktop-download-page__secondary:hover,
+.desktop-download-page__primary-link:hover {
+  transform: translateY(-1px);
+  color: #fff;
+}
+.desktop-download-page__nav-actions a,
+.desktop-download-page__secondary,
+.desktop-download-page__primary-link { transition: transform 160ms ease, color 160ms ease, background 160ms ease; }

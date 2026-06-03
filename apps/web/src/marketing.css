@@ -347,3 +347,49 @@
   .marketing-cards article { border-radius: 24px; }
   .marketing-hero-copy { padding: 24px; }
 }
+
+/* Beta polish: calmer landing copy and less eye-straining contrast. */
+.marketing-page {
+  color: rgba(244, 247, 255, 0.92);
+  background:
+    radial-gradient(circle at 12% 0%, rgba(110, 92, 255, 0.20), transparent 30%),
+    radial-gradient(circle at 88% 14%, rgba(65, 216, 255, 0.11), transparent 28%),
+    linear-gradient(145deg, #070812 0%, #0b0d1b 52%, #060711 100%);
+}
+.marketing-eyebrow {
+  color: rgba(184, 192, 255, 0.82);
+  text-transform: none;
+  letter-spacing: 0.01em;
+  font-weight: 780;
+}
+.marketing-hero h1 {
+  color: rgba(250, 250, 255, 0.94);
+  letter-spacing: -0.048em;
+  line-height: 1.02;
+  text-shadow: 0 24px 80px rgba(78, 91, 255, 0.12);
+}
+.marketing-lead,
+.marketing-cards span,
+.preview-composer p,
+.preview-post p {
+  color: rgba(210, 216, 239, 0.66);
+}
+.marketing-hero-copy,
+.marketing-preview,
+.marketing-cards article {
+  background: rgba(255, 255, 255, 0.047);
+  border-color: rgba(255, 255, 255, 0.09);
+}
+.marketing-links button,
+.marketing-links a,
+.marketing-primary,
+.marketing-secondary,
+.marketing-nav-cta {
+  transition: transform 160ms ease, background 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+.marketing-links button:hover,
+.marketing-links a:hover,
+.marketing-primary:hover,
+.marketing-secondary:hover {
+  transform: translateY(-1px);
+}

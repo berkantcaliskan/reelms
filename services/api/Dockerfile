@@ -4,13 +4,13 @@ COPY package*.json ./
 COPY services/api/package*.json services/api/
 COPY packages/shared/package*.json packages/shared/
 COPY packages/config/package*.json packages/config/
-RUN npm install
+RUN npm ci
 
 FROM node:22-alpine AS build
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN npm run build:shared && npm run build:api
+RUN npm run build:packages && npm run build:api
 
 FROM node:22-alpine AS runner
 WORKDIR /app

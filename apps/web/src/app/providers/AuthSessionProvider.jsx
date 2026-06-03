@@ -33,51 +33,93 @@ function makeFallbackProfile(authUser) {
   }
 }
 
+function sameAuthUser(a, b) {
+  if (!a && !b) return true
+  if (!a || !b) return false
+  return String(a.uid || '') === String(b.uid || '') && String(a.email || '') === String(b.email || '')
+}
+
+function stableProfileKey(profile) {
+  if (!profile) return ''
+  const id = profile.id || profile.uid || ''
+  return JSON.stringify({
+    id: String(id),
+    uid: String(profile.uid || id),
+    email: String(profile.email || profile.contact || ''),
+    username: String(profile.username || ''),
+    displayName: String(profile.displayName || ''),
+    name: String(profile.name || ''),
+    photo: String(profile.photo || profile.avatar || profile.photoURL || ''),
+    fallback: Boolean(profile.isFallbackProfile)
+  })
+}
+
+function sameProfile(a, b) {
+  return stableProfileKey(a) === stableProfileKey(b)
+}
+
 export function AuthSessionProvider({ children }) {
   const mountedRef = useRef(true)
   const [authUser, setAuthUser] = useState(() => getCurrentUser())
   const [profile, setProfile] = useState(() => getCachedAuthProfile())
   const [status, setStatus] = useState(() => (getCurrentUser() ? 'hydrating' : 'guest'))
   const [lastError, setLastError] = useState(null)
+  const profileRef = useRef(profile)
+
+  useEffect(() => {
+    profileRef.current = profile
+  }, [profile])
 
   const hydrateProfile = useCallback(async (nextAuthUser = getCurrentUser(), options = {}) => {
     if (!nextAuthUser?.uid) {
       clearCachedAuthProfile()
       if (!mountedRef.current) return null
-      setAuthUser(null)
-      setProfile(null)
-      setStatus('guest')
+      setAuthUser((prev) => (prev == null ? prev : null))
+      setProfile((prev) => {
+        if (prev == null) return prev
+        profileRef.current = null
+        return null
+      })
+      setStatus((prev) => (prev === 'guest' ? prev : 'guest'))
       return null
     }
 
     if (!mountedRef.current) return null
 
-    setAuthUser(nextAuthUser)
-    if (!options.silent) setStatus('loading-profile')
+    setAuthUser((prev) => (sameAuthUser(prev, nextAuthUser) ? prev : nextAuthUser))
+    if (!options.silent) setStatus((prev) => (prev === 'loading-profile' ? prev : 'loading-profile'))
 
     try {
       const nextProfile = await userProfileGetById(nextAuthUser.uid)
-      const stableProfile = nextProfile || getCachedAuthProfile() || makeFallbackProfile(nextAuthUser)
+      const stableProfile = nextProfile || getCachedAuthProfile(nextAuthUser.uid) || makeFallbackProfile(nextAuthUser)
 
       if (!mountedRef.current) return stableProfile
 
-      setProfile(stableProfile)
+      setProfile((prev) => {
+        if (sameProfile(prev, stableProfile)) return prev
+        profileRef.current = stableProfile
+        return stableProfile
+      })
       saveCachedAuthProfile(stableProfile)
-      setStatus('authenticated')
-      setLastError(null)
+      setStatus((prev) => (prev === 'authenticated' ? prev : 'authenticated'))
+      setLastError((prev) => (prev == null ? prev : null))
       return stableProfile
     } catch (err) {
-      const fallback = getCachedAuthProfile() || profile || makeFallbackProfile(nextAuthUser)
+      const fallback = getCachedAuthProfile(nextAuthUser.uid) || (profileRef.current && String(profileRef.current.uid || profileRef.current.id || '') === String(nextAuthUser.uid) ? profileRef.current : null) || makeFallbackProfile(nextAuthUser)
 
       if (!mountedRef.current) return fallback
 
-      setProfile(fallback)
+      setProfile((prev) => {
+        if (sameProfile(prev, fallback)) return prev
+        profileRef.current = fallback
+        return fallback
+      })
       if (fallback) saveCachedAuthProfile(fallback)
-      setStatus('authenticated')
-      setLastError(err)
+      setStatus((prev) => (prev === 'authenticated' ? prev : 'authenticated'))
+      setLastError((prev) => (prev === err ? prev : err))
       return fallback
     }
-  }, [profile])
+  }, [])
 
   useEffect(() => {
     mountedRef.current = true
@@ -85,8 +127,6 @@ export function AuthSessionProvider({ children }) {
     const unsubscribe = onAuthStateChanged((nextAuthUser) => {
       hydrateProfile(nextAuthUser)
     })
-
-    hydrateProfile(getCurrentUser(), { silent: true })
 
     return () => {
       mountedRef.current = false
@@ -135,6 +175,7 @@ export function AuthSessionProvider({ children }) {
     clearCachedAuthProfile()
     if (!mountedRef.current) return
     setAuthUser(null)
+    profileRef.current = null
     setProfile(null)
     setStatus('guest')
     setLastError(null)
@@ -162,8 +203,49 @@ export function AuthSessionProvider({ children }) {
   )
 }
 
+let warnedMissingAuthProvider = false
+
+function makeDetachedAuthSession() {
+  const authUser = getCurrentUser()
+  const profile = getCachedAuthProfile(authUser?.uid) || makeFallbackProfile(authUser)
+
+  if (import.meta.env?.DEV && !warnedMissingAuthProvider) {
+    warnedMissingAuthProvider = true
+    console.warn('[Reelms Web] AuthSessionProvider was not found; using detached auth session fallback.')
+  }
+
+  return {
+    authUser,
+    user: profile,
+    profile,
+    uid: profile?.id || profile?.uid || authUser?.uid || null,
+    status: authUser?.uid ? 'authenticated' : 'guest',
+    lastError: null,
+    isAuthenticated: Boolean(authUser?.uid),
+    signIn: async (payload) => {
+      const result = await signInWithPassword(payload)
+      const nextAuthUser = result?.credential?.user || getCurrentUser()
+      const nextProfile = result?.profile || makeFallbackProfile(nextAuthUser)
+      if (nextProfile) saveCachedAuthProfile(nextProfile)
+      return { ...result, authUser: nextAuthUser, profile: nextProfile }
+    },
+    register: async (payload) => {
+      const result = await registerWithPassword(payload)
+      const nextAuthUser = result?.credential?.user || getCurrentUser()
+      const nextProfile = result?.profile || makeFallbackProfile(nextAuthUser)
+      if (nextProfile) saveCachedAuthProfile(nextProfile)
+      return { ...result, authUser: nextAuthUser, profile: nextProfile }
+    },
+    signOut: async () => {
+      await signOutCurrentUser()
+      clearCachedAuthProfile()
+    },
+    refreshSession: async () => profile,
+    signInWithGoogle: signInWithGoogleProvider
+  }
+}
+
 export function useAuthSession() {
   const value = useContext(AuthSessionContext)
-  if (!value) throw new Error('useAuthSession must be used inside AuthSessionProvider')
-  return value
+  return value || makeDetachedAuthSession()
 }

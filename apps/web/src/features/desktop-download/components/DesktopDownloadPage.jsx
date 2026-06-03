@@ -23,33 +23,32 @@ export function DesktopDownloadPage() {
   return (
     <main className="desktop-download-page">
       <nav className="desktop-download-page__nav">
-        <a className="desktop-download-page__brand" href="#/landing" aria-label="Reelms landing sayfasına dön">
+        <a className="desktop-download-page__brand" href="#/landing" aria-label="Reelms ana sayfasına dön">
           <img src={reelmsLogo} alt="" />
           <span>Reelms</span>
         </a>
         <div className="desktop-download-page__nav-actions">
           <a href="#/signin">Web beta</a>
-          <a href="#/landing">Landing</a>
+          <a href="#/landing">Ana sayfa</a>
         </div>
       </nav>
 
       <section className="desktop-download-page__hero">
         <div>
-          <p className="desktop-download-page__eyebrow">{info.channel} desktop</p>
-          <h1>Reelms Windows uygulaması.</h1>
+          <p className="desktop-download-page__eyebrow">Desktop hazırlık alanı · {info.channel}</p>
+          <h1>Reelms desktop deneyimi hazırlanıyor.</h1>
           <p className="desktop-download-page__lead">
-            Reelms şu an web beta olarak geliştiriliyor. Desktop sürüm; native açılış, update ekranı,
-            bildirimler ve ileride ses/ekran paylaşımı için hazırlanıyor.
+            Reelms şu an web beta üzerinden test ediliyor. Windows uygulaması; daha net açılış, native bildirimler, güncelleme akışı ve daha güçlü medya deneyimi için hazırlanıyor.
           </p>
 
           <div className="desktop-download-page__actions">
             {info.hasPublicUrl ? (
               <DesktopDownloadButton>Windows setup indir</DesktopDownloadButton>
             ) : (
-              <span className="desktop-download-page__status-pill">Desktop sürüm hazırlanıyor</span>
+              <span className="desktop-download-page__status-pill">Desktop paketi hazırlanıyor</span>
             )}
-            <a className="desktop-download-page__primary-link" href="#/signin">Web betayı aç</a>
-            <a className="desktop-download-page__secondary" href="#/landing">Landing’e dön</a>
+            <a className="desktop-download-page__primary-link" href="#/signin">Web betaya devam et</a>
+            <a className="desktop-download-page__secondary" href="#/landing">Ana sayfaya dön</a>
           </div>
         </div>
 

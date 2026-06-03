@@ -472,6 +472,17 @@
   box-shadow: 0 23px 58px rgba(76, 102, 255, 0.44);
 }
 
+.auth-form-success {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 16px;
+  color: #d9ffe1;
+  background: rgba(91, 211, 137, 0.10);
+  border: 1px solid rgba(91, 211, 137, 0.22);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
 .auth-form-error {
   margin: 0;
   padding: 10px 12px;
@@ -678,4 +689,12 @@
 .reelms-form-error {
   color: #ffd4d4;
   font-size: 12px;
+}
+
+.auth-keyboard-hint {
+  margin: -2px 0 2px;
+  color: rgba(231, 235, 255, 0.46);
+  text-align: center;
+  font-size: 11px;
+  line-height: 1.35;
 }

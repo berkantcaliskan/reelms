@@ -1,3 +1,5 @@
+import { io } from 'socket.io-client'
+
 const api = process.env.REELMS_E2E_API || 'http://127.0.0.1:5000'
 const stamp = Date.now()
 
@@ -42,15 +44,73 @@ function assert(condition, message) {
   if (!condition) throw new Error(message)
 }
 
+function waitForSocketEvent(socket, event, predicate = () => true, timeoutMs = 4000) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      socket.off(event, handler)
+      reject(new Error(`Timed out waiting for socket event ${event}`))
+    }, timeoutMs)
+    const handler = (payload) => {
+      if (!predicate(payload)) return
+      clearTimeout(timer)
+      socket.off(event, handler)
+      resolve(payload)
+    }
+    socket.on(event, handler)
+  })
+}
+
+function connectSocket(token, label) {
+  return new Promise((resolve, reject) => {
+    const socket = io(api, {
+      path: '/socket.io',
+      auth: { token },
+      transports: ['polling', 'websocket'],
+      timeout: 4000,
+      reconnection: false
+    })
+    const timer = setTimeout(() => {
+      socket.disconnect()
+      reject(new Error(`${label} socket did not connect`))
+    }, 5000)
+    socket.once('connect', () => {
+      clearTimeout(timer)
+      resolve(socket)
+    })
+    socket.once('connect_error', (err) => {
+      clearTimeout(timer)
+      socket.disconnect()
+      reject(new Error(`${label} socket connect_error: ${err?.message || err}`))
+    })
+  })
+}
+
+async function joinSocketRoom(socket, reelmId, msgKey) {
+  socket.emit('joinReelm', reelmId)
+  socket.emit('joinChannel', msgKey)
+  await new Promise((resolve) => setTimeout(resolve, 250))
+}
+
 async function main() {
   await request('/health')
 
   await request('/auth/register', { method: 'POST', body: JSON.stringify({ email: 'bad-email', password: 'testpass123' }) }, null, 400)
   await request('/auth/register', { method: 'POST', body: JSON.stringify({ email: `weak-${stamp}@reelms.local`, password: 'short' }) }, null, 400)
 
+  const googleGuard = await fetch(`${api}/google/login?platform=web`, { redirect: 'manual' })
+  assert([302, 303].includes(googleGuard.status), 'Google login guard should redirect instead of creating a dev user when Google is not configured')
+  assert(String(googleGuard.headers.get('location') || '').includes('google=not_configured'), 'Google login guard should mark Google as not configured')
+
   const a = await register('alpha')
   const b = await register('beta')
   const outsider = await register('outsider')
+
+  const [bootA, bootB] = await Promise.all([
+    request('/api/v1/user/bootstrap', {}, a.token),
+    request('/api/v1/user/bootstrap', {}, b.token)
+  ])
+  assert(Array.isArray(bootA.data?.reelms) && bootA.data.reelms.some((r) => r.id === 'reelms-community'), 'default Reelms Community missing from first user')
+  assert(Array.isArray(bootB.data?.reelms) && bootB.data.reelms.some((r) => r.id === 'reelms-community'), 'default Reelms Community missing from second user')
 
   await request('/auth/register', {
     method: 'POST',
@@ -66,10 +126,19 @@ async function main() {
     body: JSON.stringify({ identifier: a.username, password: a.password })
   })
   assert(loginByUsername.uid === a.uid, 'username login did not resolve to the registered user')
+  a.token = loginByUsername.token
   await request('/auth/login', {
     method: 'POST',
     body: JSON.stringify({ identifier: a.username, password: 'wrong-password' })
   }, null, 401)
+
+  const staleToken = a.token
+  const relogin = await request('/auth/login', {
+    method: 'POST',
+    body: JSON.stringify({ identifier: a.username, password: a.password })
+  })
+  await request('/api/v1/user/bootstrap', {}, staleToken, 401)
+  a.token = relogin.token
 
   const ownUsernameCheck = await request(`/api/v1/user/check-username/${encodeURIComponent(a.username)}`, {}, a.token)
   assert(ownUsernameCheck.available === true, 'own username should be available to the current owner')
@@ -120,6 +189,32 @@ async function main() {
 
   const messages = await request(`/api/v1/messages/${encodeURIComponent(msgKey)}`, {}, b.token)
   assert(Array.isArray(messages.data) && messages.data.some((m) => String(m.text) === String(message.text)), 'E2E message was not readable by second reelm member')
+
+  const socketA = await connectSocket(a.token, 'alpha')
+  const socketB = await connectSocket(b.token, 'beta')
+  try {
+    await Promise.all([joinSocketRoom(socketA, created.data.id, msgKey), joinSocketRoom(socketB, created.data.id, msgKey)])
+    const liveText = `live-message-${stamp}`
+    const livePromise = waitForSocketEvent(socketB, 'reelms:message', (payload) => payload?.msgKey === msgKey && payload?.message?.text === liveText)
+    await request(`/api/v1/messages/${encodeURIComponent(msgKey)}`, {
+      method: 'POST',
+      body: JSON.stringify({ message: { id: `${stamp}-live`, text: liveText, time: Date.now() } })
+    }, a.token)
+    await livePromise
+
+    const voiceChannelId = 'ch-voice'
+    const countPromise = waitForSocketEvent(socketB, 'vc:count', (payload) => payload?.reelmId === created.data.id && payload?.channelId === voiceChannelId && payload?.count === 1)
+    socketA.emit('vc:join', { reelmId: created.data.id, channelId: voiceChannelId })
+    await countPromise
+
+    const fullPromise = waitForSocketEvent(socketB, 'vc:error', (payload) => payload?.reelmId === created.data.id && payload?.channelId === voiceChannelId && payload?.error === 'channel_full')
+    socketB.emit('vc:join', { reelmId: created.data.id, channelId: voiceChannelId })
+    await fullPromise
+  } finally {
+    socketA.disconnect()
+    socketB.disconnect()
+  }
+
   await request(`/api/v1/messages/${encodeURIComponent(msgKey)}`, {}, outsider.token, 403)
   await request(`/api/v1/reelm/${encodeURIComponent(created.data.id)}/doc/structure`, {}, outsider.token, 403)
 
@@ -147,7 +242,7 @@ async function main() {
     reelm: { id: created.data.id, code: created.data.code },
     joined: joined.data.id,
     messageCount: messages.data.length,
-    securityChecks: ['duplicate credentials', 'friend spoof', 'message spoof', 'reaction spoof', 'non-member access', 'moderation auth']
+    securityChecks: ['duplicate credentials', 'friend spoof', 'message spoof', 'reaction spoof', 'non-member access', 'moderation auth', 'socket live message', 'voice counts/capacity']
   }, null, 2))
 }
 

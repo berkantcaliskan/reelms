@@ -1,6 +1,6 @@
 import { io } from 'socket.io-client'
-import { isElectron, getElectronToken } from './electronAuth'
-import { getWebToken } from './webAuth'
+import { isElectron, getElectronToken, getElectronClientId } from './electronAuth'
+import { getWebToken, getWebClientId, claimWebClient } from './webAuth'
 import { getApiBaseUrl } from './config/api'
 
 const BASE = getApiBaseUrl()
@@ -12,10 +12,16 @@ let socketUid = null
 // Pending sets: track which rooms should be active so we can re-join after reconnect
 const _pendingChannels = new Set()
 const _pendingReelms = new Set()
+let _presenceStatus = 'online'
 
 export async function getIdToken() {
   if (isElectron) return getElectronToken()
   return getWebToken()
+}
+
+export function getClientId() {
+  if (isElectron) return getElectronClientId()
+  return getWebClientId()
 }
 
 async function api(path, opts = {}) {
@@ -27,6 +33,7 @@ async function api(path, opts = {}) {
       'Content-Type': 'application/json',
       ...(opts.headers || {}),
       Authorization: `Bearer ${token}`,
+      'X-Reelms-Client-Id': getClientId(),
     },
   })
   if (!r.ok) {
@@ -38,6 +45,10 @@ async function api(path, opts = {}) {
     err.status = r.status
     err.code = payload?.code || payload?.error || `http/${r.status}`
     err.details = payload?.details || payload?.issues || null
+    err.payload = payload
+    if (r.status === 401 && (err.code === 'auth/session-replaced' || err.code === 'session_replaced' || err.message === 'session_replaced')) {
+      try { window.dispatchEvent(new CustomEvent('reelms:session-invalid', { detail: { code: err.code } })) } catch {}
+    }
     throw err
   }
   if (r.status === 204) return null
@@ -68,6 +79,7 @@ async function publicApi(path, opts = {}) {
 }
 
 export async function userBootstrap() {
+  if (!isElectron) await claimWebClient().catch(() => null)
   const j = await api('/api/v1/user/bootstrap')
   return j.data || {}
 }
@@ -110,8 +122,8 @@ export async function appPutDoc(sk, data) {
   })
 }
 
-export async function socialNotify(targetUid, text) {
-  await api('/api/v1/social/notify', { method: 'POST', body: JSON.stringify({ targetUid, text }) })
+export async function socialNotify(targetUid, text, link = null) {
+  await api('/api/v1/social/notify', { method: 'POST', body: JSON.stringify({ targetUid, text, link }) })
 }
 
 export async function socialFriendRequest(toUid, from) {
@@ -128,6 +140,14 @@ export async function socialFriendReject(requesterId) {
 
 export async function socialRemoveFriend(friendId) {
   await api('/api/v1/social/remove-friend', { method: 'POST', body: JSON.stringify({ friendId }) })
+}
+
+export async function socialBlockUser(targetUid) {
+  await api('/api/v1/social/block', { method: 'POST', body: JSON.stringify({ targetUid }) })
+}
+
+export async function socialUnblockUser(targetUid) {
+  await api('/api/v1/social/unblock', { method: 'POST', body: JSON.stringify({ targetUid }) })
 }
 
 export async function socialMessageRequest(toUid, from, preview) {
@@ -235,7 +255,7 @@ export async function loadReelmDocuments(reelmId) {
 }
 
 export function connectReelmsSocket(handlers) {
-  const { onUserDoc, onReelmDoc, onAppDoc, onMessage, onMessageDeleted, onReaction, onVoicePosition, onVcEvent, onVcError, onVcCount, onVcCounts, onConnect } = handlers
+  const { onUserDoc, onReelmDoc, onReelmManagerDoc, onAppDoc, onMessage, onMessageDeleted, onMessagesCleared, onReaction, onVoicePosition, onVcEvent, onVcError, onVcCount, onVcCounts, onVcState, onPresence, onProfileUpdated, onReelmAccessRevoked, onJoinRequestRejected, onJoinRequestApproved, onReelmTimeout, onReelmTimeoutRemoved, onReelmBanned, onConnect } = handlers
   const run = async () => {
     const token = await getIdToken()
     if (!token) return
@@ -245,12 +265,13 @@ export function connectReelmsSocket(handlers) {
     }
     socket = io(BASE, {
       path: '/socket.io',
-      auth: { token },
+      auth: { token, clientId: getClientId() },
       transports: ['polling', 'websocket'],
     })
     // On every (re)connect: re-join all tracked rooms so server-side memberships are restored
     socket.on('connect', () => {
       _pendingChannels.forEach(key => socket.emit('joinChannel', key))
+      socket.emit('presence:setStatus', { status: _presenceStatus })
       _pendingReelms.forEach(id => {
         socket.emit('joinReelm', id)
         socket.emit('vc:counts', { reelmId: id })
@@ -260,8 +281,11 @@ export function connectReelmsSocket(handlers) {
     socket.on('reelms:doc', (msg) => {
       if (!msg || !msg.scope) return
       if (msg.scope === 'user' && msg.sk) onUserDoc?.(msg.sk)
-      if (msg.scope === 'reelm' && msg.sk) onReelmDoc?.(msg.reelmId, msg.sk)
+      if (msg.scope === 'reelm' && msg.sk) onReelmDoc?.(msg.reelmId, msg.sk, msg.data)
       if (msg.scope === 'app' && msg.sk) onAppDoc?.(msg.sk)
+    })
+    socket.on('reelms:manager-doc', (msg) => {
+      if (msg?.reelmId && msg?.sk) onReelmManagerDoc?.(msg.reelmId, msg.sk, msg.data)
     })
     socket.on('reelms:message', (msg) => {
       if (msg?.msgKey && msg?.message) onMessage?.(msg.msgKey, msg.message)
@@ -269,8 +293,32 @@ export function connectReelmsSocket(handlers) {
     socket.on('reelms:message-deleted', (msg) => {
       if (msg?.msgKey && msg?.msgId) onMessageDeleted?.(msg.msgKey, msg.msgId)
     })
+    socket.on('reelms:messages-cleared', (msg) => {
+      if (msg?.msgKey) onMessagesCleared?.(msg.msgKey)
+    })
     socket.on('reelms:reaction', (msg) => {
       if (msg?.msgKey && msg?.msgId && msg?.emoji) onReaction?.(msg)
+    })
+    socket.on('reelms:profile-updated', (msg) => {
+      if (msg?.profile?.id || msg?.profile?.uid) onProfileUpdated?.(msg.profile)
+    })
+    socket.on('reelm:access-revoked', (msg) => {
+      if (msg?.reelmId) onReelmAccessRevoked?.(msg)
+    })
+    socket.on('reelm:join-request-rejected', (msg) => {
+      if (msg?.reelmId) onJoinRequestRejected?.(msg)
+    })
+    socket.on('reelm:join-request-approved', (msg) => {
+      if (msg?.reelmId) onJoinRequestApproved?.(msg)
+    })
+    socket.on('reelm:timeout', (msg) => {
+      if (msg?.reelmId) onReelmTimeout?.(msg)
+    })
+    socket.on('reelm:timeout-removed', (msg) => {
+      if (msg?.reelmId) onReelmTimeoutRemoved?.(msg)
+    })
+    socket.on('reelm:banned', (msg) => {
+      if (msg?.reelmId) onReelmBanned?.(msg)
     })
     socket.on('voicePosition', (msg) => {
       if (msg?.userId && typeof msg.x === 'number' && typeof msg.y === 'number') {
@@ -289,7 +337,25 @@ export function connectReelmsSocket(handlers) {
     socket.on('vc:counts', (msg) => {
       if (msg && typeof msg.reelmId === 'string' && msg.counts) onVcCounts?.(msg)
     })
-    socket.on('connect_error', () => {})
+    socket.on('vc:state', (msg) => {
+      if (msg && typeof msg.reelmId === 'string' && typeof msg.channelId === 'string') onVcState?.(msg)
+    })
+    socket.on('reelms:presence', (msg) => {
+      if (msg?.reelmId && Array.isArray(msg.users)) onPresence?.(msg)
+    })
+    socket.on('reelms:presence:update', (msg) => {
+      if (msg?.reelmId && Array.isArray(msg.users)) onPresence?.(msg)
+    })
+    socket.on('auth:session-replaced', (msg) => {
+      const code = msg?.code || 'auth/session-replaced'
+      try { window.dispatchEvent(new CustomEvent('reelms:session-invalid', { detail: { code } })) } catch {}
+    })
+    socket.on('connect_error', (err) => {
+      const code = err?.data?.code || err?.message || ''
+      if (code === 'auth/session-replaced' || code === 'session_replaced') {
+        try { window.dispatchEvent(new CustomEvent('reelms:session-invalid', { detail: { code } })) } catch {}
+      }
+    })
   }
   run()
   return () => {
@@ -324,6 +390,12 @@ export function socketLeaveChannel(msgKey) {
   if (!msgKey) return
   _pendingChannels.delete(msgKey)
   if (socket?.connected) socket.emit('leaveChannel', msgKey)
+}
+
+export function socketSetPresenceStatus(status) {
+  const allowed = new Set(['online', 'idle', 'busy', 'invisible', 'offline'])
+  _presenceStatus = allowed.has(status) ? status : 'online'
+  if (socket?.connected) socket.emit('presence:setStatus', { status: _presenceStatus })
 }
 
 export function socketEmitVoicePosition(reelmId, channelId, x, y) {
@@ -431,6 +503,12 @@ export async function messageDelete(msgKey, msgId) {
   })
 }
 
+export async function messageDeleteConversation(msgKey) {
+  await api(`/api/v1/messages/${encodeURIComponent(msgKey)}`, {
+    method: 'DELETE',
+  })
+}
+
 export async function reactionsGet(msgKey) {
   const res = await api(`/api/v1/reactions/${encodeURIComponent(msgKey)}`, { allowNotFound: true })
   return res || { data: {} }
@@ -483,9 +561,114 @@ export async function adminAllReelms() {
   return j.data || []
 }
 
+export async function discoverReelms(query = '') {
+  const q = encodeURIComponent(String(query || '').trim())
+  const j = await api(`/api/v1/reelms/discover${q ? `?q=${q}` : ''}`)
+  return j?.data || []
+}
+
+export async function requestJoinReelm(reelmId) {
+  const j = await api(`/api/v1/reelms/${encodeURIComponent(reelmId)}/request-join`, { method: 'POST' })
+  return j?.data || null
+}
+
+
+export async function leaveReelmRemote(reelmId) {
+  const j = await api(`/api/v1/reelms/${encodeURIComponent(reelmId)}/leave`, { method: 'POST' })
+  return j?.data || null
+}
+
+export async function approveJoinReelm(reelmId, requesterId) {
+  const j = await api(`/api/v1/reelms/${encodeURIComponent(reelmId)}/approve-join`, {
+    method: 'POST',
+    body: JSON.stringify({ requesterId }),
+  })
+  return j?.data || null
+}
+
+export async function rejectJoinReelm(reelmId, requesterId) {
+  const j = await api(`/api/v1/reelms/${encodeURIComponent(reelmId)}/reject-join`, {
+    method: 'POST',
+    body: JSON.stringify({ requesterId }),
+  })
+  return j?.data || null
+}
+
+export async function inviteReelmFriend(reelmId, targetUid) {
+  const j = await api(`/api/v1/reelms/${encodeURIComponent(reelmId)}/invite`, {
+    method: 'POST',
+    body: JSON.stringify({ targetUid }),
+  })
+  return j?.data || null
+}
+
+export async function banReelmMember(reelmId, targetUid, reason = '') {
+  const j = await api(`/api/v1/reelms/${encodeURIComponent(reelmId)}/ban`, {
+    method: 'POST',
+    body: JSON.stringify({ targetUid, reason }),
+  })
+  return j?.data || null
+}
+
+export async function timeoutReelmMember(reelmId, targetUid, minutes = 10, reason = '') {
+  const j = await api(`/api/v1/reelms/${encodeURIComponent(reelmId)}/timeout`, {
+    method: 'POST',
+    body: JSON.stringify({ targetUid, minutes, reason }),
+  })
+  return j?.data || null
+}
+
+export async function untimeoutReelmMember(reelmId, targetUid) {
+  const j = await api(`/api/v1/reelms/${encodeURIComponent(reelmId)}/untimeout`, {
+    method: 'POST',
+    body: JSON.stringify({ targetUid }),
+  })
+  return j?.data || null
+}
+
+export async function unbanReelmMember(reelmId, targetUid) {
+  const j = await api(`/api/v1/reelms/${encodeURIComponent(reelmId)}/unban`, {
+    method: 'POST',
+    body: JSON.stringify({ targetUid }),
+  })
+  return j?.data || null
+}
+
 // ── Media / Local Storage Sync ────────────────────────────────────────────────
 
 // Register file metadata in AWS (after uploading to local storage)
+export async function getVoiceIceServers() {
+  const j = await publicApi('/realtime/ice-servers')
+  return j?.data?.iceServers || []
+}
+
+export async function mediaCreateUploadUrl(fileName, fileSize, mimeType) {
+  const j = await api('/api/v1/media/upload-url', {
+    method: 'POST',
+    body: JSON.stringify({ fileName, fileSize, mimeType }),
+  })
+  return j.data
+}
+
+export async function mediaCompleteUpload(mediaId, etag = null) {
+  const j = await api(`/api/v1/media/${encodeURIComponent(mediaId)}/complete`, {
+    method: 'POST',
+    body: JSON.stringify({ etag }),
+  })
+  return j.data
+}
+
+export async function mediaUploadToS3(file) {
+  const upload = await mediaCreateUploadUrl(file.name, file.size, file.type || 'application/octet-stream')
+  const res = await fetch(upload.upload.uploadUrl, {
+    method: upload.upload.method || 'PUT',
+    headers: upload.upload.headers || { 'Content-Type': file.type || 'application/octet-stream' },
+    body: file,
+  })
+  if (!res.ok) throw new Error(`Upload failed (${res.status})`)
+  return mediaCompleteUpload(upload.id, res.headers.get('etag'))
+}
+
 export async function mediaUploadMetadata(fileName, fileSize, mimeType, localFileId) {
   const j = await api('/api/v1/media/upload', {
     method: 'POST',

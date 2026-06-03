@@ -28,14 +28,14 @@ export function AuthShell({ title, subtitle, children, mode = 'signin' }) {
       </div>
 
       <nav className="reelms-auth-topbar" aria-label="Authentication navigation">
-        <a className="reelms-auth-brand" href="#/landing" aria-label="Go to Reelms landing">
+        <a className="reelms-auth-brand" href="#/landing" aria-label="Go to Reelms home">
           <img src={reelmsLogo} alt="" />
           <span>Reelms</span>
         </a>
 
         <div className="reelms-auth-topbar-actions">
-          <a href="#/landing">Landing</a>
-          <a href="#/download">Download</a>
+          <a href="#/landing">Ana sayfa</a>
+          <a href="#/download">Desktop</a>
           <a className="reelms-auth-open-beta" href="#/">Open web beta</a>
         </div>
       </nav>

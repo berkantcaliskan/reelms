@@ -38,6 +38,37 @@ export async function resolveLoginIdentifier(identifier) {
   return isEmail(raw) ? normalizeEmail(raw) : normalizeUsername(raw)
 }
 
+async function publicAuthFetch(path, body) {
+  const res = await fetch(`${getApiBaseUrl()}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body || {}),
+  })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    const err = new Error(data.message || data.error || 'Request failed')
+    err.code = data.code || 'auth/unknown'
+    throw err
+  }
+  return data
+}
+
+export function requestPasswordReset(identifier) {
+  return publicAuthFetch('/auth/password-reset/request', { identifier })
+}
+
+export function confirmPasswordReset(token, password) {
+  return publicAuthFetch('/auth/password-reset/confirm', { token, password })
+}
+
+export function verifyEmailToken(token) {
+  return publicAuthFetch('/auth/verify-email', { token })
+}
+
+export function resendVerificationEmail(identifier) {
+  return publicAuthFetch('/auth/email/verification/resend', { identifier })
+}
+
 export async function signInWithPassword({ identifier, password }) {
   const cleanIdentifier = await resolveLoginIdentifier(identifier)
   if (!cleanIdentifier) {
@@ -105,6 +136,10 @@ export async function registerWithPassword({ email, password, username, displayN
     : await webRegister(cleanEmail, password, registerProfile)
 
   const now = Date.now()
+  if (credential.emailVerificationRequired) {
+    return { credential, profile: credential.profile || null, emailVerificationRequired: true }
+  }
+
   const profile = credential.profile || {
     uid: credential.user.uid,
     id: credential.user.uid,
@@ -123,7 +158,7 @@ export async function registerWithPassword({ email, password, username, displayN
   if (!credential.profile) await userProfilePut(profile)
   await safeRecordUserSession(profile)
 
-  return { credential, profile }
+  return { credential, profile, emailVerificationRequired: false }
 }
 
 export function signInWithGoogleProvider() {

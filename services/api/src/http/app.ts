@@ -1,7 +1,6 @@
 import cors from 'cors'
 import express from 'express'
 import helmet from 'helmet'
-import morgan from 'morgan'
 import type { Server } from 'socket.io'
 import { corsOrigins, env } from '../config/env.js'
 import { healthRouter } from './routes/health.routes.js'
@@ -13,6 +12,7 @@ import { moderationRouter } from './routes/moderation.routes.js'
 import { createSpotifyRouter } from './routes/spotify.routes.js'
 import { debugRouter } from './routes/debug.routes.js'
 import { requestContext } from './middleware/requestContext.js'
+import { requestLogger } from './middleware/requestLogger.js'
 import { apiRateLimit, authRateLimit } from './middleware/rateLimit.js'
 import { errorHandler, notFoundHandler } from './utils/errors.js'
 
@@ -22,13 +22,13 @@ export function createApp(io?: Server) {
   app.set('trust proxy', 1)
   app.disable('x-powered-by')
   app.use(requestContext)
+  app.use(requestLogger)
   app.use(helmet({
     crossOriginResourcePolicy: false,
     contentSecurityPolicy: env.NODE_ENV === 'production' ? undefined : false
   }))
   app.use(express.json({ limit: env.JSON_BODY_LIMIT }))
   app.use(express.urlencoded({ extended: true, limit: env.JSON_BODY_LIMIT }))
-  app.use(morgan(env.NODE_ENV === 'production' ? 'combined' : 'dev'))
   app.use(cors({
     origin(origin, callback) {
       if (!origin) return callback(null, true)

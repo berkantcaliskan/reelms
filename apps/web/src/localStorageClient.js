@@ -146,13 +146,19 @@ export async function syncFileToAws(fileId, options = {}) {
   try {
     const { data, metadata } = await readFileLocally(fileId)
 
-    // Register metadata in AWS (always do this)
-    const awsMetadata = await AwsClient.mediaUploadMetadata(
-      metadata.name,
-      metadata.size,
-      metadata.mimeType || 'application/octet-stream',
-      fileId
-    )
+    let awsMetadata
+    if (options.uploadBinary) {
+      const blob = data instanceof Blob ? data : new Blob([data], { type: metadata.mimeType || 'application/octet-stream' })
+      const file = new File([blob], metadata.name || fileId, { type: metadata.mimeType || 'application/octet-stream' })
+      awsMetadata = await AwsClient.mediaUploadToS3(file)
+    } else {
+      awsMetadata = await AwsClient.mediaUploadMetadata(
+        metadata.name,
+        metadata.size,
+        metadata.mimeType || 'application/octet-stream',
+        fileId
+      )
+    }
 
     // Mark as synced in local store
     if (awsMetadata?.id) {

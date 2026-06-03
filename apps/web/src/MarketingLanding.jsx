@@ -33,29 +33,29 @@ export default function MarketingLanding() {
         </a>
 
         <div className="marketing-links">
-          <button type="button" onClick={() => scrollToSection('features')}>Özellikler</button>
-          <a href="#/download">İndir</a>
+          <button type="button" onClick={() => scrollToSection('features')}>Neler var?</button>
+          <a href="#/download">Desktop</a>
           <a className="marketing-nav-cta" href="#/signin">Web beta</a>
         </div>
       </nav>
 
       <section className="marketing-hero">
         <div className="marketing-hero-copy">
-          <p className="marketing-eyebrow">Web beta şimdi, desktop sonra</p>
-          <h1>Arkadaşlar, topluluklar ve canlı odalar için özel bir Reelms alanı.</h1>
+          <p className="marketing-eyebrow">Web beta açık · Desktop hazırlanıyor</p>
+          <h1>Arkadaşların, odaların ve toplulukların tek sakin alanı.</h1>
           <p className="marketing-lead">
-            Reelms önce web’de hızlı gelişir. Aynı hesap, aynı reelm’ler ve aynı realtime altyapı daha sonra desktop uygulamasına taşınır.
+            Reelms; mesaj, sesli oda, arkadaşlık, profil ve topluluk akışlarını sade bir arayüzde toplar. Web beta ile dene, desktop hazır olduğunda aynı hesapla devam et.
           </p>
           <div className="marketing-actions">
-            <a className="marketing-primary" href="#/signin">Web betayı aç</a>
-            <DesktopDownloadButton variant="secondary">Windows uygulaması</DesktopDownloadButton>
+            <a className="marketing-primary" href="#/signin">Web betaya gir</a>
+            <DesktopDownloadButton variant="secondary">Desktop durumunu gör</DesktopDownloadButton>
           </div>
         </div>
 
         <div className="marketing-preview" aria-label="Reelms uygulama önizlemesi">
           <div className="preview-topbar">
             <span></span><span></span><span></span>
-            <strong>Reelms Preview</strong>
+            <strong>Reelms web beta</strong>
           </div>
 
           <div className="preview-grid">
@@ -71,8 +71,8 @@ export default function MarketingLanding() {
               <article className="preview-composer">
                 <span className="preview-avatar"></span>
                 <div>
-                  <b>Bugün neler oluyor?</b>
-                  <p>Topluluğa bir düşünce bırak...</p>
+                  <b>Bir şey paylaş</b>
+                  <p>Topluluğa bir not bırak...</p>
                 </div>
               </article>
 

@@ -8,6 +8,7 @@ export const isElectron = typeof window !== 'undefined' && typeof window.electro
 // ── Internal state ───────────────────────────────────────────────────────────
 let _raw = null  // { uid, email, token }
 const _listeners = []
+const ELECTRON_CLIENT_ID = `electron_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
 
 try {
   const s = localStorage.getItem('_ea')
@@ -34,6 +35,19 @@ export function getElectronToken() {
   return _raw?.token || null
 }
 
+export function getElectronClientId() {
+  return ELECTRON_CLIENT_ID
+}
+
+async function claimElectronClient(raw = _raw) {
+  if (!raw?.token) return null
+  return fetch(`${BACKEND}/auth/client/claim`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${raw.token}`, 'X-Reelms-Client-Id': ELECTRON_CLIENT_ID },
+    body: JSON.stringify({ clientId: ELECTRON_CLIENT_ID, platform: 'electron' }),
+  }).catch(() => null)
+}
+
 export function electronOnAuthStateChanged(cb) {
   _listeners.push(cb)
   Promise.resolve().then(() => cb(_makeUser(_raw)))
@@ -46,17 +60,19 @@ export function electronOnAuthStateChanged(cb) {
 export async function electronSignIn(identifier, password) {
   const res = await fetch(`${BACKEND}/auth/login`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ identifier, password }),
+    headers: { 'Content-Type': 'application/json', 'X-Reelms-Client-Id': ELECTRON_CLIENT_ID },
+    body: JSON.stringify({ identifier, password, clientId: ELECTRON_CLIENT_ID, platform: 'electron' }),
   })
   const data = await res.json()
   if (!res.ok) {
-    const err = new Error(data.error || 'Sign in failed')
+    const err = new Error(data.message || data.error || 'Sign in failed')
     err.code = data.code || 'auth/unknown'
+    err.reason = data.reason
     throw err
   }
   _raw = { uid: data.uid, email: data.email, token: data.token }
   localStorage.setItem('_ea', JSON.stringify(_raw))
+  await claimElectronClient(_raw)
   _notify(_raw)
   return { user: _makeUser(_raw), profile: data.profile || null }
 }
@@ -64,19 +80,24 @@ export async function electronSignIn(identifier, password) {
 export async function electronRegister(email, password, profile = {}) {
   const res = await fetch(`${BACKEND}/auth/register`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password, username: profile.username, displayName: profile.displayName || profile.name }),
+    headers: { 'Content-Type': 'application/json', 'X-Reelms-Client-Id': ELECTRON_CLIENT_ID },
+    body: JSON.stringify({ email, password, username: profile.username, displayName: profile.displayName || profile.name, clientId: ELECTRON_CLIENT_ID, platform: 'electron' }),
   })
   const data = await res.json()
   if (!res.ok) {
-    const err = new Error(data.error || 'Registration failed')
+    const err = new Error(data.message || data.error || 'Registration failed')
     err.code = data.code || 'auth/unknown'
+    err.reason = data.reason
     throw err
   }
-  _raw = { uid: data.uid, email: data.email, token: data.token }
-  localStorage.setItem('_ea', JSON.stringify(_raw))
-  _notify(_raw)
-  return { user: _makeUser(_raw), profile: data.profile || null }
+  if (data.token) {
+    _raw = { uid: data.uid, email: data.email, token: data.token }
+    localStorage.setItem('_ea', JSON.stringify(_raw))
+    await claimElectronClient(_raw)
+    _notify(_raw)
+    return { user: _makeUser(_raw), profile: data.profile || null, emailVerificationRequired: Boolean(data.emailVerificationRequired) }
+  }
+  return { user: { uid: data.uid, email: data.email }, profile: data.profile || null, emailVerificationRequired: Boolean(data.emailVerificationRequired) }
 }
 
 export function electronSignOut() {
@@ -89,8 +110,9 @@ export function electronSignInWithGoogle() {
   if (window.electronAPI?.openGoogleAuth) window.electronAPI.openGoogleAuth()
 }
 
-export function electronCompleteGoogleAuth({ token, uid, email }) {
+export async function electronCompleteGoogleAuth({ token, uid, email }) {
   _raw = { uid, email, token }
   localStorage.setItem('_ea', JSON.stringify(_raw))
+  await claimElectronClient(_raw)
   _notify(_raw)
 }
