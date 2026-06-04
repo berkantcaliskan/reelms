@@ -460,6 +460,8 @@ export function createReelmsDataRouter(io: Server) {
   const memberUserIds = (members: any[] = []) => Array.from(new Set((Array.isArray(members) ? members : []).map(memberUserId).filter(Boolean)))
 
   const ROLE_COLOR_RE = /^#[0-9a-fA-F]{6}$/
+  const DEFAULT_ADMIN_ROLE_ID = 'role-admin-rc'
+  const DEFAULT_CITIZEN_ROLE_ID = 'role-citizen-rc'
   const REELM_ELEVATED_ROLE_RE = /admin|owner|founder|moderator/i
   const REELM_PERMISSION_KEYS = [
     'viewSettings',
@@ -488,6 +490,8 @@ export function createReelmsDataRouter(io: Server) {
   }
   const isManagerRole = (role: any) => role?.permissions?.manageReelm === true
   const isProtectedRole = (role: any) => isManagerRole(role)
+  const getDefaultManagerRole = (roles: any[] = []) => (roles || []).find((role: any) => String(role?.id || '') === DEFAULT_ADMIN_ROLE_ID) || (roles || []).find(isManagerRole) || (roles || [])[0]
+  const getDefaultMemberRole = (roles: any[] = []) => (roles || []).find((role: any) => String(role?.id || '') === DEFAULT_CITIZEN_ROLE_ID) || (roles || []).find((role: any) => String(role?.id || '').includes('member')) || (roles || []).find((role: any) => !isManagerRole(role)) || (roles || [])[0]
 
   const sanitizePermissions = (permissions: any = {}, options: { allowManageReelm?: boolean; forceManager?: boolean } = {}) => {
     const src = permissions && typeof permissions === 'object' ? permissions : {}
@@ -524,8 +528,16 @@ export function createReelmsDataRouter(io: Server) {
     const seen = new Set<string>()
     const roles = (Array.isArray(rolesInput) ? rolesInput : [])
       .map((role: any, index: number) => {
-        const id = String(role?.id || '')
-        const existing = existingById.get(id) || null
+        let id = String(role?.id || '')
+        let existing = existingById.get(id) || null
+        const defaultAdminExisting = existingById.get(DEFAULT_ADMIN_ROLE_ID) || null
+        // If a manager/admin role arrives without the stable id, treat it as an
+        // edit of the stable admin role instead of creating a duplicate role.
+        if (!existing && actorCanManageFullRoles && defaultAdminExisting && (role?.permissions?.manageReelm === true || /admin|owner|founder|moderator|community/i.test(String(role?.name || '')))) {
+          id = DEFAULT_ADMIN_ROLE_ID
+          existing = defaultAdminExisting
+          role = { ...(role || {}), id }
+        }
         if (existing && protectedExistingIds.has(id) && !actorCanManageFullRoles) return existing
         const merged = { ...(existing || {}), ...(role || {}) }
         if (!actorCanManageFullRoles) merged.permissions = existing?.permissions || {}
@@ -534,6 +546,11 @@ export function createReelmsDataRouter(io: Server) {
       .filter((role: any) => {
         if (!role.id || seen.has(role.id)) return false
         seen.add(role.id)
+        return true
+      })
+      .filter((role: any) => {
+        if (String(role?.id || '') === DEFAULT_ADMIN_ROLE_ID) return true
+        if (role?.permissions?.manageReelm === true && seen.has(DEFAULT_ADMIN_ROLE_ID)) return false
         return true
       })
       .slice(0, 12)
@@ -545,10 +562,10 @@ export function createReelmsDataRouter(io: Server) {
       }
     }
     if (!roles.some(isManagerRole)) {
-      roles.unshift({ id: 'role-admin', name: 'Admin', color: '#f87171', position: 0, permissions: { ...FULL_MANAGER_PERMISSIONS } })
+      roles.unshift({ id: DEFAULT_ADMIN_ROLE_ID, name: 'Admin', color: '#f87171', position: 0, permissions: { ...FULL_MANAGER_PERMISSIONS } })
     }
-    if (!roles.some((role: any) => String(role?.name || '').toLowerCase() === 'member')) {
-      roles.push({ id: 'role-member', name: 'Member', color: '#60a5fa', position: roles.length, permissions: {} })
+    if (!roles.some((role: any) => !isManagerRole(role))) {
+      roles.push({ id: DEFAULT_CITIZEN_ROLE_ID, name: 'Citizen', color: '#b99887', position: roles.length, permissions: {} })
     }
     return roles.slice(0, 12)
   }
@@ -670,7 +687,7 @@ export function createReelmsDataRouter(io: Server) {
     const inviteCanAutoJoin = pendingInvite?.bypassApproval === true
     const canJoinNow = meta.joinMode === 'open' || meta.autoJoinOnInvite === true || inviteCanAutoJoin
     if (canJoinNow) {
-      const memberRole = roles.find((r: any) => String(r.name).toLowerCase() === 'member') || roles[0]
+      const memberRole = getDefaultMemberRole(roles)
       const members = await ensureMember(reelmId, uid, memberRole?.id ? [memberRole.id] : [])
       const full = toClientReelm(meta, structure, roles, members)
       await upsertUserReelm(uid, full)
@@ -1126,7 +1143,7 @@ export function createReelmsDataRouter(io: Server) {
       const pendingInvite = await getPendingInvite(reelmId, uid).catch(() => null)
       const inviteCanAutoJoin = pendingInvite?.bypassApproval === true
       if (joinMode === 'open' || meta.autoJoinOnInvite === true || inviteCanAutoJoin) {
-        const memberRole = roles.find((r: any) => String(r.name).toLowerCase() === 'member') || roles[0]
+        const memberRole = getDefaultMemberRole(roles)
         const members = await ensureMember(reelmId, uid, memberRole?.id ? [memberRole.id] : [])
         const full = toClientReelm(meta, structure, roles, members)
         await upsertUserReelm(uid, full)
@@ -1165,7 +1182,7 @@ export function createReelmsDataRouter(io: Server) {
       if (!meta?.id) return res.status(404).json({ error: 'reelm_not_found' })
       if (await isBannedFromReelm(reelmId, requesterId).catch(() => false)) return res.status(403).json({ error: 'reelm_banned', code: 'reelm/banned', ban: await getBanEntry(reelmId, requesterId).catch(() => null) })
       const roles = (await getDoc<any[]>(pk, 'roles').catch(() => [])) || []
-      const memberRole = roles.find((r: any) => String(r.name).toLowerCase() === 'member') || roles[0]
+      const memberRole = getDefaultMemberRole(roles)
       const members = await ensureMember(reelmId, requesterId, memberRole?.id ? [memberRole.id] : [])
       const structure = (await getDoc<any>(pk, 'structure').catch(() => null)) || { categories: [] }
       const full = toClientReelm(meta, structure, roles, members)
@@ -1568,7 +1585,7 @@ export function createReelmsDataRouter(io: Server) {
         { id: `role-admin-${id}`, name: 'Admin', color: '#f87171', position: 0, permissions: { manageReelm: true } },
         { id: `role-member-${id}`, name: 'Member', color: '#60a5fa', position: 1, permissions: {} }
       ])
-      const adminRole = roles.find((r: any) => String(r.name).toLowerCase() === 'admin') || roles[0]
+      const adminRole = getDefaultManagerRole(roles)
       const creator = await getUserPublicProfile(uid)
       const creatorMember = {
         userId: uid,
@@ -1645,7 +1662,7 @@ export function createReelmsDataRouter(io: Server) {
         return res.json({ data: { pending: true, reelmId: meta.id, name: meta.name } })
       }
       const roles = (await getDoc<any[]>(pk, 'roles').catch(() => [])) || []
-      const memberRole = roles.find((r: any) => String(r.name).toLowerCase() === 'member') || roles[0]
+      const memberRole = getDefaultMemberRole(roles)
       const members = await ensureMember(meta.id, uid, memberRole?.id ? [memberRole.id] : [])
       const structure = (await getDoc<any>(pk, 'structure').catch(() => null)) || { categories: [] }
       const full = toClientReelm(meta, structure, roles, members)
@@ -1817,7 +1834,7 @@ export function createReelmsDataRouter(io: Server) {
 
         if (reelmId === DEFAULT_REELM_ID) {
           const roles = (await getDoc<any[]>(pk, 'roles').catch(() => [])) || []
-          const adminRole = roles.find((role: any) => String(role?.name || '').toLowerCase() === 'admin')
+          const adminRole = getDefaultManagerRole(roles)
           const adminRoleId = adminRole?.id ? String(adminRole.id) : ''
 
           for (const previousMember of previousMembers) {

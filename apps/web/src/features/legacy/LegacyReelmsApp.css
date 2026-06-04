@@ -5861,8 +5861,12 @@ h6 {
   font-family: var(--body-font);
 }
 .fpp-cover {
-  height: 72px;
+  height: 88px;
+  min-height: 88px;
   background: linear-gradient(135deg, rgba(var(--ta-rgb), 0.25), rgba(var(--ta-rgb), 0.08));
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 .fpp-identity {
   display: flex;
@@ -12653,7 +12657,11 @@ button, input, select, textarea,
   background: rgba(var(--tb-rgb), 0.72);
 }
 .friend-profile-popup--embedded .fpp-cover {
-  height: 56px;
+  height: 96px;
+  min-height: 96px;
+  background-size: cover;
+  background-position: center 42%;
+  background-repeat: no-repeat;
 }
 .friend-profile-popup--embedded .fpp-identity {
   padding: 0 12px 8px;
@@ -12797,8 +12805,13 @@ button, input, select, textarea,
   border-color: rgba(var(--fpp-theme-accent-rgb), 0.22);
   box-shadow: 0 16px 46px rgba(0,0,0,0.36), 0 0 0 1px rgba(var(--fpp-theme-accent-rgb), 0.08);
 }
-.friend-profile-popup .fpp-cover {
+.friend-profile-popup .fpp-cover:not(.fpp-cover--has-image) {
   background: linear-gradient(135deg, rgba(var(--fpp-theme-accent-rgb), 0.35), rgba(var(--fpp-theme-base-rgb), 0.38));
+}
+.friend-profile-popup .fpp-cover--has-image {
+  background-size: cover;
+  background-position: center 42%;
+  background-repeat: no-repeat;
 }
 .friend-profile-popup .fpp-avatar {
   background: rgba(var(--fpp-theme-accent-rgb), 0.18);
@@ -12877,4 +12890,24 @@ button, input, select, textarea,
 }
 .friend-profile-popup--embedded {
   overflow: hidden !important;
+}
+
+
+/* Roles/member editor save-state polish */
+.rs-save-all-btn {
+  margin-left: auto;
+  min-width: 108px;
+}
+.rs-save-all-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.rs-save-state {
+  font-size: 0.72rem;
+  color: rgba(var(--fg-rgb), 0.58);
+  margin-left: 8px;
+  white-space: nowrap;
+}
+.rs-save-state-dirty {
+  color: rgba(var(--ta-rgb), 0.95);
 }

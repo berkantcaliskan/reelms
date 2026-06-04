@@ -2994,6 +2994,19 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
   const [memberInviteMode, setMemberInviteMode] = useState(() => reelm.memberInviteMode || 'request')
   const [joinMode, setJoinMode] = useState(() => reelm.joinMode || 'request')
   const [ageRating, setAgeRating] = useState(() => reelm.ageRating || 'under18')
+  const [roleMemberDirty, setRoleMemberDirty] = useState(false)
+  const [roleMemberSaving, setRoleMemberSaving] = useState(false)
+  const [roleMemberStatus, setRoleMemberStatus] = useState('')
+
+  useEffect(() => {
+    setRoles((reelm.roles || []).map((role, i) => normalizeRoleForClient(role, `role-${i}`, true)))
+    setMembers(reelm.members || [])
+    setEditingRoleId(null)
+    setAddingRole(false)
+    setRoleMemberDirty(false)
+    setRoleMemberSaving(false)
+    setRoleMemberStatus('')
+  }, [reelm.id])
 
   const ownerAge = useMemo(() => {
     return currentUser?.birthDate
@@ -3003,8 +3016,8 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
   const canSetAgeRating = ownerAge >= 18
   const permissionSet = useMemo(() => getReelmPermissionSetClient(reelm, currentUser?.id), [reelm, currentUser?.id])
   const isOwner = String(reelm.ownerId || '') === String(currentUser?.id || '')
-  const canManageFullRoles = isOwner
   const isFullManager = permissionSet.has('manageReelm')
+  const canManageFullRoles = isOwner || isFullManager
   const canViewSettings = isFullManager || permissionSet.has('viewSettings')
   const canManageOverview = isFullManager || permissionSet.has('manageOverview')
   const canManageChannels = isFullManager || permissionSet.has('manageChannels')
@@ -3037,7 +3050,7 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
     if (availableTabs.length && !availableTabs.some(tab => tab.key === activeTab)) setActiveTab(availableTabs[0].key)
   }, [availableTabs, activeTab])
 
-  const saveAll = (updatedRoles, updatedMembers) => {
+  const normalizeRoleMemberDraft = (updatedRoles, updatedMembers) => {
     const normalizedRoles = (updatedRoles || []).map((role, i) => normalizeRoleForClient(role, `role-${i}`, canManageFullRoles)).slice(0, 12)
     const validRoleIds = new Set(normalizedRoles.map(role => String(role.id)))
     const managerRole = normalizedRoles.find(isManagerRoleClient) || normalizedRoles[0] || null
@@ -3049,9 +3062,34 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
         : Array.from(new Set(baseRoleIds))
       return { ...member, roleIds }
     })
+    return { normalizedRoles, normalizedMembers }
+  }
+
+  const saveAll = (updatedRoles, updatedMembers) => {
+    const { normalizedRoles, normalizedMembers } = normalizeRoleMemberDraft(updatedRoles, updatedMembers)
     setRoles(normalizedRoles)
     setMembers(normalizedMembers)
-    onUpdate({ ...reelm, roles: normalizedRoles, members: normalizedMembers })
+    setRoleMemberDirty(true)
+    setRoleMemberStatus('Unsaved changes')
+  }
+
+  const commitRoleMemberChanges = async () => {
+    if (!canManageRoles && !canManageMembers) return
+    const { normalizedRoles, normalizedMembers } = normalizeRoleMemberDraft(roles, members)
+    setRoleMemberSaving(true)
+    setRoleMemberStatus('Saving…')
+    setRoles(normalizedRoles)
+    setMembers(normalizedMembers)
+    try {
+      await onUpdate?.({ ...reelm, roles: normalizedRoles, members: normalizedMembers }, { scope: 'roles-members' })
+      setRoleMemberDirty(false)
+      setRoleMemberStatus('Saved')
+      window.setTimeout(() => setRoleMemberStatus(''), 1800)
+    } catch {
+      setRoleMemberStatus('Could not save')
+    } finally {
+      setRoleMemberSaving(false)
+    }
   }
 
   const addRole = () => {
@@ -3346,11 +3384,15 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
               <div className="rs-section-header">
                 <span className="rs-section-title">Roles</span>
                 <span className="rs-section-hint">{roles.length}/12</span>
+                {roleMemberStatus && <span className={`rs-save-state${roleMemberDirty ? ' rs-save-state-dirty' : ''}`}>{roleMemberStatus}</span>}
+                {(canManageRoles || canManageMembers) && (
+                  <button className="rs-save-btn rs-save-all-btn" disabled={!roleMemberDirty || roleMemberSaving} onClick={commitRoleMemberChanges}>{roleMemberSaving ? 'Saving…' : 'Save changes'}</button>
+                )}
                 {canManageRoles && roles.length < 12 && !addingRole && (
                   <button className="rs-add-btn" onClick={() => setAddingRole(true)}>+ New role</button>
                 )}
               </div>
-              <p className="rs-section-hint">Full admin roles are protected. Helper roles can receive selected permissions without being able to close the server or edit admin/owner roles.</p>
+              <p className="rs-section-hint">Edit role names, colors, order and permissions locally, then press Save changes once. Full admin roles stay protected from helpers, but the main admin can rename and recolor them without creating duplicate roles.</p>
 
               {addingRole && (
                 <div className="rs-role-editor">
@@ -3411,7 +3453,7 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
                             onKeyDown={e => { if (e.key === 'Enter') saveEditRole(); if (e.key === 'Escape') setEditingRoleId(null) }}
                             autoFocus
                           />
-                          <button className="rs-save-btn" onClick={saveEditRole}>Save</button>
+                          <button className="rs-save-btn" onClick={saveEditRole}>Apply</button>
                           <button className="rs-cancel-btn" onClick={() => setEditingRoleId(null)}>Cancel</button>
                         </div>
                       </div>
@@ -9029,26 +9071,33 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     })
   }
 
-  const persistReelmCore = (reelm) => {
+  const persistReelmCore = async (reelm, options = {}) => {
     if (!reelm?.id) return
-    reelmPutDoc(reelm.id, 'meta', {
-      id: reelm.id,
-      name: reelm.name,
-      code: reelm.code,
-      ownerId: reelm.ownerId || null,
-      announcementChannelId: reelm.announcementChannelId || null,
-      image: reelm.image || null,
-      showInDiscover: reelm.showInDiscover === true,
-      joinMode: reelm.joinMode || 'request',
-      autoJoinOnInvite: reelm.autoJoinOnInvite === true,
-      memberInvitesEnabled: reelm.memberInvitesEnabled !== false,
-      memberInviteMode: reelm.memberInviteMode === 'auto' ? 'auto' : 'request',
-      ageRating: reelm.ageRating || 'under18',
-      updatedAt: Date.now(),
-    }).catch(() => {})
-    reelmPutDoc(reelm.id, 'structure', { categories: reelm.categories || [] }).catch(() => {})
-    if (Array.isArray(reelm.roles)) reelmPutDoc(reelm.id, 'roles', reelm.roles).catch(() => {})
-    if (Array.isArray(reelm.members)) reelmPutDoc(reelm.id, 'members', reelm.members).catch(() => {})
+    const only = Array.isArray(options.only) ? new Set(options.only) : null
+    const tasks = []
+    if (!only || only.has('meta')) {
+      tasks.push(reelmPutDoc(reelm.id, 'meta', {
+        id: reelm.id,
+        name: reelm.name,
+        code: reelm.code,
+        ownerId: reelm.ownerId || null,
+        announcementChannelId: reelm.announcementChannelId || null,
+        image: reelm.image || null,
+        showInDiscover: reelm.showInDiscover === true,
+        joinMode: reelm.joinMode || 'request',
+        autoJoinOnInvite: reelm.autoJoinOnInvite === true,
+        memberInvitesEnabled: reelm.memberInvitesEnabled !== false,
+        memberInviteMode: reelm.memberInviteMode === 'auto' ? 'auto' : 'request',
+        ageRating: reelm.ageRating || 'under18',
+        updatedAt: Date.now(),
+      }))
+    }
+    if (!only || only.has('structure')) tasks.push(reelmPutDoc(reelm.id, 'structure', { categories: reelm.categories || [] }))
+    if ((!only || only.has('roles')) && Array.isArray(reelm.roles)) tasks.push(reelmPutDoc(reelm.id, 'roles', reelm.roles))
+    if ((!only || only.has('members')) && Array.isArray(reelm.members)) tasks.push(reelmPutDoc(reelm.id, 'members', reelm.members))
+    const results = await Promise.allSettled(tasks)
+    const failed = results.find((result) => result.status === 'rejected')
+    if (failed) throw failed.reason || new Error('persist_reelm_failed')
   }
 
   const createDefaultReelm = (name, template = null, t = k => k) => {
@@ -9526,14 +9575,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     }
   }
 
-  const updateReelm = (updatedReelm) => {
+  const updateReelm = async (updatedReelm, options = {}) => {
     setReelms(prev => {
       const next = prev.map(r => r.id === updatedReelm.id ? updatedReelm : r)
       scheduleUserPersist('reelms', next)
       return next
     })
     setSelectedReelm(updatedReelm)
-    persistReelmCore(updatedReelm)
+    const scope = options?.scope
+    if (scope === 'roles-members') return persistReelmCore(updatedReelm, { only: ['roles', 'members'] })
+    return persistReelmCore(updatedReelm)
   }
 
   const removeMemberFromSelectedReelm = (targetUid, reason = '') => {

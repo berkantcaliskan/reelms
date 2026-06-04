@@ -1,5 +1,11 @@
 import type { DocStoreDriver, QueryResult, StoreItem } from '../types.js'
 
+async function readMaybeJson(res: Response): Promise<any | null> {
+  const text = await res.text()
+  if (!text) return null
+  return JSON.parse(text)
+}
+
 const TABLE = 'reelms_docs'
 
 type SupabaseRow<T = unknown> = {
@@ -46,7 +52,7 @@ export class SupabaseDocStore implements DocStoreDriver {
     }
 
     if (response.status === 204) return null as T
-    return response.json() as Promise<T>
+    return readMaybeJson(response) as Promise<T>
   }
 
   async init() {

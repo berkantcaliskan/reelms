@@ -2,6 +2,11 @@ import { getDoc, putDoc, putDocIfAbsent, reelmPk, scanByPkPrefix, userPk } from 
 import { isCommunityAdminEmail, isCommunityAdminUid, isCommunityAdminUsername, resolveCommunityAdminUids } from './communityAdmins.js'
 
 export const DEFAULT_REELM_ID = 'reelms-community'
+const DEFAULT_ADMIN_ROLE_ID = 'role-admin-rc'
+const DEFAULT_CITIZEN_ROLE_ID = 'role-citizen-rc'
+let defaultReelmEnsurePromise: Promise<void> | null = null
+let defaultReelmEnsuredAt = 0
+const DEFAULT_REELM_ENSURE_TTL_MS = 30_000
 
 const defaultMeta = () => ({
   id: DEFAULT_REELM_ID,
@@ -30,9 +35,30 @@ const fullManagerPermissions = () => ({
 })
 
 const defaultRoles = () => [
-  { id: 'role-citizen-rc', name: 'Citizen', color: '#b99887', permissions: {} },
-  { id: 'role-admin-rc', name: 'Admin', color: '#f87171', position: 0, permissions: fullManagerPermissions() }
+  { id: DEFAULT_CITIZEN_ROLE_ID, name: 'Citizen', color: '#b99887', position: 1, permissions: {} },
+  { id: DEFAULT_ADMIN_ROLE_ID, name: 'Admin', color: '#f87171', position: 0, permissions: fullManagerPermissions() }
 ]
+
+function getManagerRole(roles: any[] = []) {
+  return roles.find((role) => String(role?.id || '') === DEFAULT_ADMIN_ROLE_ID)
+    || roles.find((role) => role?.permissions?.manageReelm === true)
+    || roles.find((role) => role?.permissions && Object.values(role.permissions).some((value) => value === true))
+    || roles[0]
+}
+
+function getDefaultMemberRole(roles: any[] = []) {
+  return roles.find((role) => String(role?.id || '') === DEFAULT_CITIZEN_ROLE_ID)
+    || roles.find((role) => String(role?.id || '').includes('member'))
+    || roles.find((role) => role?.permissions?.manageReelm !== true)
+    || roles[0]
+}
+
+function normalizeRoleIdsForCommunityAdmin(existingRoleIds: any[] = [], adminRoleId = '') {
+  const kept = (Array.isArray(existingRoleIds) ? existingRoleIds : [])
+    .map(String)
+    .filter((id) => id && id !== DEFAULT_CITIZEN_ROLE_ID)
+  return Array.from(new Set([...(adminRoleId ? [adminRoleId] : []), ...kept]))
+}
 
 const defaultStructure = () => ({
   categories: [
@@ -90,20 +116,41 @@ async function ensureDefaultRoles() {
 
   const roles = [...existingRoles]
   let changed = false
-  if (!roles.some((role) => String(role?.name || '').toLowerCase() === 'citizen')) {
-    roles.unshift({ id: 'role-citizen-rc', name: 'Citizen', color: '#b99887', position: 1, permissions: {} })
+  if (!roles.some((role) => String(role?.id || '') === DEFAULT_CITIZEN_ROLE_ID)) {
+    roles.unshift({ id: DEFAULT_CITIZEN_ROLE_ID, name: 'Citizen', color: '#b99887', position: 1, permissions: {} })
     changed = true
   }
-  if (!roles.some((role) => String(role?.name || '').toLowerCase() === 'admin')) {
-    roles.push({ id: 'role-admin-rc', name: 'Admin', color: '#f87171', position: 0, permissions: fullManagerPermissions() })
+  if (!roles.some((role) => String(role?.id || '') === DEFAULT_ADMIN_ROLE_ID)) {
+    roles.push({ id: DEFAULT_ADMIN_ROLE_ID, name: 'Admin', color: '#f87171', position: 0, permissions: fullManagerPermissions() })
     changed = true
   }
-  const normalizedRoles = roles.map((role, index) => {
+  const seenIds = new Set<string>()
+  const normalizedRoles = roles.filter((role) => {
+    const id = String(role?.id || '')
+    if (!id || seenIds.has(id)) {
+      changed = true
+      return false
+    }
+    seenIds.add(id)
+    return true
+  }).map((role, index) => {
+    const id = String(role?.id || '')
+    const position = Number.isFinite(Number(role?.position)) ? Number(role.position) : index
+    if (id === DEFAULT_ADMIN_ROLE_ID) {
+      const next = { ...role, position, permissions: fullManagerPermissions() }
+      if (JSON.stringify(next) !== JSON.stringify(role)) changed = true
+      return next
+    }
+    if (id === DEFAULT_CITIZEN_ROLE_ID) {
+      const next = { ...role, position, permissions: role?.permissions && typeof role.permissions === 'object' ? role.permissions : {} }
+      if (JSON.stringify(next) !== JSON.stringify(role)) changed = true
+      return next
+    }
     if (!role.permissions) {
       changed = true
-      return { ...role, position: Number.isFinite(Number(role?.position)) ? Number(role.position) : index, permissions: {} }
+      return { ...role, position, permissions: {} }
     }
-    return { ...role, position: Number.isFinite(Number(role?.position)) ? Number(role.position) : index }
+    return { ...role, position }
   })
   if (changed) await putDoc(pk, 'roles', normalizedRoles)
   return normalizedRoles
@@ -118,7 +165,7 @@ async function ensureConfiguredCommunityAdmins() {
   ])
   if (!meta) return
 
-  const adminRole = roles.find((role) => String(role?.name || '').toLowerCase() === 'admin') || roles[0]
+  const adminRole = getManagerRole(roles)
   const adminRoleId = adminRole?.id ? String(adminRole.id) : ''
   const adminUids = await resolveCommunityAdminUids()
   if (!adminUids.length) return
@@ -131,7 +178,7 @@ async function ensureConfiguredCommunityAdmins() {
     const profile = (await getDoc<any>(userPk(uid), 'profile').catch(() => null)) || {}
     const existing = nextMembers.find((member) => String(member?.userId) === String(uid))
     const existingRoleIds = Array.isArray(existing?.roleIds) ? existing.roleIds.map(String) : []
-    const roleIds = adminRoleId ? Array.from(new Set([adminRoleId, ...existingRoleIds])) : existingRoleIds
+    const roleIds = normalizeRoleIdsForCommunityAdmin(existingRoleIds, adminRoleId)
     const member = {
       ...(existing || {}),
       userId: uid,
@@ -155,7 +202,7 @@ async function ensureConfiguredCommunityAdmins() {
   }))
 }
 
-export async function ensureDefaultReelm() {
+async function ensureDefaultReelmInternal() {
   const pk = reelmPk(DEFAULT_REELM_ID)
   const existingMeta = await getDoc<any>(pk, 'meta')
   const meta = existingMeta
@@ -198,6 +245,16 @@ export async function ensureDefaultReelm() {
   await ensureConfiguredCommunityAdmins().catch(() => {})
 }
 
+export async function ensureDefaultReelm(options: { force?: boolean } = {}) {
+  const now = Date.now()
+  if (!options.force && defaultReelmEnsurePromise) return defaultReelmEnsurePromise
+  if (!options.force && defaultReelmEnsuredAt && now - defaultReelmEnsuredAt < DEFAULT_REELM_ENSURE_TTL_MS) return
+  defaultReelmEnsurePromise = ensureDefaultReelmInternal()
+    .then(() => { defaultReelmEnsuredAt = Date.now() })
+    .finally(() => { defaultReelmEnsurePromise = null })
+  return defaultReelmEnsurePromise
+}
+
 const getProfilePhoto = (profile: any = {}) => profile.photo || profile.profilePhoto || profile.photoURL || profile.avatar || profile.image || profile.imageUrl || profile.userPhoto || null
 
 
@@ -230,8 +287,8 @@ export async function autoJoinDefaultReelm(uid: string, name?: string, photo?: s
   const displayPhoto = photo ?? getProfilePhoto(profile)
 
   const members = (await getDoc<any[]>(pk, 'members')) || []
-  const citizenRole = roles.find((r) => r.name === 'Citizen')
-  const adminRole = roles.find((r) => String(r?.name || '').toLowerCase() === 'admin')
+  const citizenRole = getDefaultMemberRole(roles)
+  const adminRole = getManagerRole(roles)
   const profileEmail = profile.contact || profile.email || ''
   const profileUsername = profile.username || ''
   const shouldBeCommunityAdmin = isConfiguredAdmin || isCommunityAdminEmail(profileEmail) || isCommunityAdminUsername(profileUsername)
@@ -242,7 +299,7 @@ export async function autoJoinDefaultReelm(uid: string, name?: string, photo?: s
     userName: displayName || existing?.userName || 'Member',
     userPhoto: displayPhoto || existing?.userPhoto || null,
     roleIds: shouldBeCommunityAdmin
-      ? Array.from(new Set([...(existing?.roleIds || []), ...(adminRole?.id ? [adminRole.id] : [])].map(String)))
+      ? normalizeRoleIdsForCommunityAdmin(existing?.roleIds || [], adminRole?.id ? String(adminRole.id) : '')
       : existing?.roleIds || (citizenRole ? [citizenRole.id] : [])
   }
   const nextMembers = [member, ...members.filter((m) => String(m.userId) !== String(uid))]
@@ -253,8 +310,12 @@ export async function autoJoinDefaultReelm(uid: string, name?: string, photo?: s
   await putDoc(userPk(uid), 'reelms', [reelmEntry, ...userReelms.filter((r) => String(r?.id) !== DEFAULT_REELM_ID)])
   await putDoc(userPk(uid), 'joined_default_reelm', true)
   await putDoc(userPk(uid), 'left_default_reelm', false)
-  await syncDefaultCommunityCopies().catch(() => {})
+  // Do not sync every member copy on every login/profile refresh. That made login
+  // and normal profile changes wait on many Supabase writes and could look like
+  // a session drop. The current user's reelm copy is already updated above;
+  // full community-wide sync is reserved for explicit maintenance.
 }
+
 
 
 export async function ensureUserHasDefaultReelm(uid: string) {
