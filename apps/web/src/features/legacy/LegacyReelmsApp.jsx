@@ -11994,6 +11994,7 @@ function SignUpScreen({ onSignUpComplete, onGoBack }) {
   const [usernameError, setUsernameError] = useState('')
   const [password, setPassword] = useState('')
   const [passwordError, setPasswordError] = useState('')
+  const [successMsg, setSuccessMsg] = useState('')
   const [isCreating, setIsCreating] = useState(false)
   const [isChecking, setIsChecking] = useState(false)
   const [legalModal, setLegalModal] = useState(null) // 'terms' | 'privacy' | null
@@ -12034,6 +12035,13 @@ function SignUpScreen({ onSignUpComplete, onGoBack }) {
       const cred = isElectron
         ? await electronRegister(contact.trim(), password, { username: username.trim(), displayName: name.trim(), name: name.trim() })
         : await webRegister(contact.trim(), password, { username: username.trim(), displayName: name.trim(), name: name.trim() })
+
+      if (cred.emailVerificationRequired) {
+        setIsCreating(false)
+        setSuccessMsg('Account created! Check your e-mail to verify before signing in.')
+        setTimeout(() => onGoBack?.(), 2500)
+        return
+      }
 
       const userData = {
         ...(cred.profile || {}),
@@ -12234,6 +12242,9 @@ function SignUpScreen({ onSignUpComplete, onGoBack }) {
               </div>
               {passwordError && (
                 <p className='su-fadein input-error' style={{ animationDelay: '40ms' }}>{passwordError}</p>
+              )}
+              {successMsg && (
+                <p className='su-fadein' style={{ animationDelay: '40ms', color: '#7ecb8f', fontSize: '0.85rem', textAlign: 'center', margin: '8px 0' }}>{successMsg}</p>
               )}
               <p className='signup-hint su-fadein' style={{ animationDelay: '80ms' }}>
                 Choose a strong password.
