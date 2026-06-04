@@ -113,8 +113,14 @@ export class SupabaseDocStore implements DocStoreDriver {
   }
 
   async scanByPkPrefix<T = unknown>(prefix: string): Promise<Array<StoreItem<T>>> {
-    const url = `${this.restUrl}?select=pk,sk,data,updated_at&pk=like.${encodeURIComponent(`${prefix}%`)}&order=pk.asc,sk.asc`
-    const rows = await this.request<Array<SupabaseRow<T>>>(url)
-    return rows.map((row) => ({ pk: row.pk, sk: row.sk, data: row.data, updatedAt: Number(row.updated_at) }))
+    const pageSize = 1000
+    const allRows: Array<SupabaseRow<T>> = []
+    for (let offset = 0; offset < 20000; offset += pageSize) {
+      const url = `${this.restUrl}?select=pk,sk,data,updated_at&pk=like.${encodeURIComponent(`${prefix}%`)}&order=pk.asc,sk.asc&limit=${pageSize}&offset=${offset}`
+      const rows = await this.request<Array<SupabaseRow<T>>>(url)
+      allRows.push(...rows)
+      if (rows.length < pageSize) break
+    }
+    return allRows.map((row) => ({ pk: row.pk, sk: row.sk, data: row.data, updatedAt: Number(row.updated_at) }))
   }
 }

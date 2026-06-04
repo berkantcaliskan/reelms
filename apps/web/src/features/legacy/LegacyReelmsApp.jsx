@@ -2465,6 +2465,72 @@ function ActivitySetterModal({ current, onSet, onClose }) {
   )
 }
 
+
+const PROFILE_LOOKUP_CACHE_TTL_MS = 5 * 60 * 1000
+const PROFILE_MEDIA_CACHE_NAME = 'reelms-profile-media-v2'
+const profileMediaObjectUrlCache = new Map()
+
+function canCacheProfileMedia(src) {
+  const value = String(src || '')
+  return /^https?:\/\//i.test(value) && !value.startsWith('blob:') && !value.startsWith('data:') && !isGoogleDefaultAvatarUrl(value)
+}
+
+async function resolveCachedProfileMedia(src) {
+  const value = String(src || '')
+  if (!canCacheProfileMedia(value)) return value
+  if (profileMediaObjectUrlCache.has(value)) return profileMediaObjectUrlCache.get(value)
+  if (typeof window === 'undefined' || !window.caches || typeof fetch !== 'function') return value
+  try {
+    const cache = await window.caches.open(PROFILE_MEDIA_CACHE_NAME)
+    const request = new Request(value, { mode: 'cors', credentials: 'omit' })
+    let response = await cache.match(request).catch(() => null)
+    if (!response) {
+      const fresh = await fetch(request, { cache: 'force-cache' })
+      if (fresh?.ok) {
+        await cache.put(request, fresh.clone()).catch(() => {})
+        response = fresh
+      }
+    }
+    if (response?.ok) {
+      const blob = await response.blob()
+      const objectUrl = URL.createObjectURL(blob)
+      profileMediaObjectUrlCache.set(value, objectUrl)
+      return objectUrl
+    }
+  } catch {}
+  return value
+}
+
+function CachedProfileImage({ src, alt = '', className = '', style, fallback = null, ...props }) {
+  const [resolvedSrc, setResolvedSrc] = useState(src || '')
+  useEffect(() => {
+    let alive = true
+    setResolvedSrc(src || '')
+    if (!src) return () => { alive = false }
+    resolveCachedProfileMedia(src)
+      .then((nextSrc) => { if (alive) setResolvedSrc(nextSrc || src) })
+      .catch(() => { if (alive) setResolvedSrc(src || '') })
+    return () => { alive = false }
+  }, [src])
+  if (!resolvedSrc) return fallback
+  return <img {...props} src={resolvedSrc} alt={alt} className={className} style={style} />
+}
+
+function CachedProfileCover({ src, className = '', style = {}, ...props }) {
+  const [resolvedSrc, setResolvedSrc] = useState(src || '')
+  useEffect(() => {
+    let alive = true
+    setResolvedSrc(src || '')
+    if (!src) return () => { alive = false }
+    resolveCachedProfileMedia(src)
+      .then((nextSrc) => { if (alive) setResolvedSrc(nextSrc || src) })
+      .catch(() => { if (alive) setResolvedSrc(src || '') })
+    return () => { alive = false }
+  }, [src])
+  const backgroundStyle = resolvedSrc ? { backgroundImage: `url("${String(resolvedSrc).replace(/"/g, '\\"')}")` } : {}
+  return <div {...props} className={className} style={{ ...style, ...backgroundStyle }} />
+}
+
 function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBlock, onUnblock, onAddFriend, isFriend = true, isBlocked = false, isPending = false, nickname, onNicknameChange, canShare, onMessage, onCreateGroup, onRequestRemoteControl, voiceContext = null, moderationContext = null, roleContext = null, isSelf = false, embedded = false, canEditNickname = true }) {
   const popupRef = useRef(null)
   const [editingNickname, setEditingNickname] = useState(false)
@@ -2494,12 +2560,12 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
 
   const profileNode = (
     <div className={`friend-profile-popup${embedded ? ' friend-profile-popup--embedded' : ''}`} style={{ ...(buildProfileThemeStyle(friend) || {}), ...(embedded ? {} : { top, left, width: popupW }) }} ref={popupRef}>
-      <div className={`fpp-cover${friendCover ? ' fpp-cover--has-image' : ''}`} style={friendCover ? { backgroundImage: `url(${friendCover})` } : {}} />
+      <CachedProfileCover src={friendCover} className={`fpp-cover${friendCover ? ' fpp-cover--has-image' : ''}`} />
       {embedded && <button type="button" className="fpp-embedded-close" onClick={onClose} aria-label="Close profile">×</button>}
       <div className="fpp-identity">
         <div className="fpp-avatar">
           {getPersonPhoto(friend)
-            ? <img src={getPersonPhoto(friend)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+            ? <CachedProfileImage src={getPersonPhoto(friend)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
             : <span>{(friend.name || '?').charAt(0).toUpperCase()}</span>
           }
         </div>
@@ -2997,6 +3063,7 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
   const [roleMemberDirty, setRoleMemberDirty] = useState(false)
   const [roleMemberSaving, setRoleMemberSaving] = useState(false)
   const [roleMemberStatus, setRoleMemberStatus] = useState('')
+  const memberRemovalIntentRef = useRef(false)
 
   useEffect(() => {
     setRoles((reelm.roles || []).map((role, i) => normalizeRoleForClient(role, `role-${i}`, true)))
@@ -3006,6 +3073,7 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
     setRoleMemberDirty(false)
     setRoleMemberSaving(false)
     setRoleMemberStatus('')
+    memberRemovalIntentRef.current = false
   }, [reelm.id])
 
   const ownerAge = useMemo(() => {
@@ -3081,7 +3149,9 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
     setRoles(normalizedRoles)
     setMembers(normalizedMembers)
     try {
-      await onUpdate?.({ ...reelm, roles: normalizedRoles, members: normalizedMembers }, { scope: 'roles-members' })
+      const allowMemberRemoval = memberRemovalIntentRef.current === true
+      await onUpdate?.({ ...reelm, roles: normalizedRoles, members: normalizedMembers }, { scope: 'roles-members', allowMemberRemoval })
+      memberRemovalIntentRef.current = false
       setRoleMemberDirty(false)
       setRoleMemberStatus('Saved')
       window.setTimeout(() => setRoleMemberStatus(''), 1800)
@@ -3172,6 +3242,7 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
   const removeMember = (userId) => {
     const member = members.find(m => m.userId === userId)
     if (!canActOnMember(member)) return
+    memberRemovalIntentRef.current = true
     saveAll(roles, members.filter(m => m.userId !== userId))
   }
 
@@ -6254,8 +6325,43 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (fullscreenUiTimerRef.current) clearTimeout(fullscreenUiTimerRef.current)
     fullscreenUiTimerRef.current = setTimeout(() => setFullscreenUiVisible(false), 1800)
   }
+  const setNativeFullscreenMode = async (enabled) => {
+    try { await window.reelms?.setFullscreen?.(Boolean(enabled)) } catch {}
+    try {
+      if (enabled && !document.fullscreenElement && document.documentElement?.requestFullscreen) await document.documentElement.requestFullscreen()
+      if (!enabled && document.fullscreenElement && document.exitFullscreen) await document.exitFullscreen()
+    } catch {}
+  }
+  const toggleVoiceScreenFullscreen = () => {
+    setVideoExpandFullscreen(false)
+    setVoiceScreenFullscreen(prev => {
+      const next = !prev
+      setNativeFullscreenMode(next)
+      return next
+    })
+    showFullscreenUi()
+  }
+  const toggleVideoExpandFullscreen = () => {
+    setVoiceScreenFullscreen(false)
+    setVideoExpandFullscreen(prev => {
+      const next = !prev
+      setNativeFullscreenMode(next)
+      return next
+    })
+    showFullscreenUi()
+  }
   useEffect(() => () => {
     if (fullscreenUiTimerRef.current) clearTimeout(fullscreenUiTimerRef.current)
+  }, [])
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      if (document.fullscreenElement) return
+      setVoiceScreenFullscreen(false)
+      setVideoExpandFullscreen(false)
+      try { window.reelms?.setFullscreen?.(false)?.catch?.(() => {}) } catch {}
+    }
+    document.addEventListener('fullscreenchange', onFullscreenChange)
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange)
   }, [])
   useEffect(() => {
     if (voiceScreenFullscreen || videoExpandFullscreen) showFullscreenUi()
@@ -6342,6 +6448,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [friends, setFriends] = useState([])
   const [blocked, setBlocked] = useState([])
   const [chatProfileCache, setChatProfileCache] = useState({})
+  const profileLookupCacheRef = useRef(new Map())
   const [msgRequests, setMsgRequests] = useState([])
   const [friendRequestsOut, setFriendRequestsOut] = useState([])
   const [messageRequestsOut, setMessageRequestsOut] = useState([])
@@ -6646,6 +6753,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       if (String(uid) === pid) {
         setCurrentUser(prev => prev ? patchPerson(prev) : prev)
       }
+      profileLookupCacheRef.current.set(pid, { profile: patchPerson({ id: pid }), at: Date.now() })
       setFriends(prev => Array.isArray(prev) ? prev.map(patchPerson) : prev)
       setBlocked(prev => Array.isArray(prev) ? prev.map(patchPerson) : prev)
       setFriendRequests(prev => Array.isArray(prev) ? prev.map(patchPerson) : prev)
@@ -6717,6 +6825,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       onReelmManagerDoc: (reelmId, sk, data) => {
         applyReelmRealtimeDoc(reelmId, sk, data)
         scheduleReelmCoreHydrate(reelmId, 350)
+      },
+      onReelmMemberJoined: ({ reelmId }) => {
+        scheduleReelmCoreHydrate(reelmId, 60)
+      },
+      onReelmMemberRemoved: ({ reelmId }) => {
+        scheduleReelmCoreHydrate(reelmId, 60)
       },
       onAppDoc: (sk) => {
         if (sk === 'reports' && currentUserRef.current?.isModerator) appGetDoc('reports').then((r) => setReports(Array.isArray(r) ? r : [])).catch(() => {})
@@ -7062,7 +7176,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     }
     let cancelled = false
     Promise.all([
-      usersList().catch(() => []),
+      usersList(q).catch(() => []),
       discoverReelms(q).catch(() => []),
     ]).then(([users, publicReelms]) => {
       if (cancelled) return
@@ -7442,12 +7556,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       const tid = String(targetUser.id)
       if (!tid || tid === String(uid) || isBlocked(tid)) return
       if (friendRequestsOut.map(String).includes(tid)) return
-      await socialFriendRequest(tid, {
+      const result = await socialFriendRequest(tid, {
         id: uid,
         name: currentUser.name,
         username: currentUser.username,
         photo: getPersonPhoto(currentUser) || null,
       })
+      if (result?.alreadyFriends || result?.acceptedReverse) return
       setFriendRequestsOut((o) => [...(Array.isArray(o) ? o : []), tid])
     } catch { /* noop */ }
   }
@@ -7599,6 +7714,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setLastChannels({})
     setSessionsList([])
     setChatProfileCache({})
+    profileLookupCacheRef.current.clear()
     setChatListFilter('all')
     try { Object.keys(REELM_CACHE || {}).forEach(k => { delete REELM_CACHE[k] }) } catch {}
   }, [uid])
@@ -7613,12 +7729,20 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const openFriendProfile = (friend, e, opts = {}) => {
     if (!friend?.id) return
+    const fid = String(friend.id)
     const rect = e.currentTarget.getBoundingClientRect()
     const inServerSurface = !!(opts.serverContext || e.currentTarget.closest?.('.rp-members-panel, .reelm-channel-voice-users, .voice-participants, .voice-bar-participants'))
-    const target = { friend, anchorRect: rect, serverContext: inServerSurface ? 'reelm' : null }
+    const cached = profileLookupCacheRef.current.get(fid)
+    const cachedProfile = cached && (Date.now() - Number(cached.at || 0) < PROFILE_LOOKUP_CACHE_TTL_MS) ? cached.profile : null
+    const target = { friend: cachedProfile ? { ...friend, ...cachedProfile } : friend, anchorRect: rect, serverContext: inServerSurface ? 'reelm' : null }
     setFriendProfileTarget(target)
-    userProfileGetById(friend.id).then(data => {
-      if (data) setFriendProfileTarget({ ...target, friend: data })
+    if (cachedProfile) return
+    userProfileGetById(fid).then(data => {
+      if (!data) return
+      const merged = { ...friend, ...data, id: fid }
+      profileLookupCacheRef.current.set(fid, { profile: merged, at: Date.now() })
+      setChatProfileCache(prev => sameDocValue(prev?.[fid], merged) ? prev : { ...prev, [fid]: merged })
+      setFriendProfileTarget(prev => prev?.friend && String(prev.friend.id || prev.friend.uid || '') === fid ? { ...prev, friend: { ...prev.friend, ...merged } } : prev)
     }).catch(() => {})
   }
 
@@ -8950,6 +9074,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           setVoiceScreenSharing(false)
           setVoiceParticipants(prev => prev.map(p => String(p.userId) === String(uid) ? { ...p, isScreenSharing: false, screenStream: null } : p))
           setVoiceScreenFullscreen(false)
+          setNativeFullscreenMode(false)
           setExpandedScreenUser(null)
           vcBroadcast({ type: 'screen', userId: uid, isScreenSharing: false })
           setRemoteControlActive(prev => (prev && String(prev.sharingUserId) === String(uid) ? null : prev))
@@ -8972,6 +9097,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       setVoiceScreenSharing(false)
       setVoiceParticipants(prev => prev.map(p => p.userId === uid ? { ...p, isScreenSharing: false, screenStream: null } : p))
       setVoiceScreenFullscreen(false)
+      setNativeFullscreenMode(false)
       setExpandedScreenUser(null)
       vcBroadcast({ type: 'screen', userId: uid, isScreenSharing: false })
     }
@@ -8981,14 +9107,17 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (expandedVideoUser && !voiceParticipants.some(p => String(p.userId) === String(expandedVideoUser.userId) && p.isVideoOn && p.stream)) {
       setExpandedVideoUser(null)
       setVideoExpandFullscreen(false)
+      setNativeFullscreenMode(false)
       setBlurBg(false)
     }
     if (expandedScreenUser && !voiceParticipants.some(p => String(p.userId) === String(expandedScreenUser.userId) && p.isScreenSharing && p.screenStream)) {
       setExpandedScreenUser(null)
       setVoiceScreenFullscreen(false)
+      setNativeFullscreenMode(false)
     }
     if (voiceScreenFullscreen && !voiceParticipants.some(p => p.isScreenSharing && p.screenStream)) {
       setVoiceScreenFullscreen(false)
+      setNativeFullscreenMode(false)
     }
   }, [expandedVideoUser, expandedScreenUser, voiceParticipants, voiceScreenFullscreen])
 
@@ -9093,8 +9222,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       }))
     }
     if (!only || only.has('structure')) tasks.push(reelmPutDoc(reelm.id, 'structure', { categories: reelm.categories || [] }))
-    if ((!only || only.has('roles')) && Array.isArray(reelm.roles)) tasks.push(reelmPutDoc(reelm.id, 'roles', reelm.roles))
-    if ((!only || only.has('members')) && Array.isArray(reelm.members)) tasks.push(reelmPutDoc(reelm.id, 'members', reelm.members))
+    const includeMembership = options.includeMembership === true || !!only
+    if ((includeMembership && (!only || only.has('roles'))) && Array.isArray(reelm.roles)) tasks.push(reelmPutDoc(reelm.id, 'roles', reelm.roles))
+    if ((includeMembership && (!only || only.has('members'))) && Array.isArray(reelm.members)) tasks.push(reelmPutDoc(reelm.id, 'members', reelm.members, { allowMemberRemoval: options.allowMemberRemoval === true }))
     const results = await Promise.allSettled(tasks)
     const failed = results.find((result) => result.status === 'rejected')
     if (failed) throw failed.reason || new Error('persist_reelm_failed')
@@ -9163,7 +9293,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       newReelm = await createReelmRemote(draftReelm) || draftReelm
     } catch (err) {
       console.warn('Remote reelm create failed; falling back to compatibility writes:', err)
-      persistReelmCore(draftReelm)
+      persistReelmCore(draftReelm, { includeMembership: true }).catch(() => {})
     }
 
     setReelms(prev => {
@@ -9583,7 +9713,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     })
     setSelectedReelm(updatedReelm)
     const scope = options?.scope
-    if (scope === 'roles-members') return persistReelmCore(updatedReelm, { only: ['roles', 'members'] })
+    if (scope === 'roles-members') return persistReelmCore(updatedReelm, { only: ['roles', 'members'], allowMemberRemoval: options?.allowMemberRemoval === true })
     return persistReelmCore(updatedReelm)
   }
 
@@ -9592,7 +9722,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     const member = (selectedReelm.members || []).find(m => String(m.userId) === String(targetUid))
     if (!canActOnReelmMemberClient(selectedReelm, uid, member, 'manageMembers')) { addNotification('You cannot kick this member.'); return }
     const next = { ...selectedReelm, members: (selectedReelm.members || []).filter(m => String(m.userId) !== String(targetUid)) }
-    updateReelm(next)
+    updateReelm(next, { scope: 'roles-members', allowMemberRemoval: true })
     addNotification(reason ? `Member kicked from Reelm: ${reason}` : 'Member kicked from Reelm.')
   }
 
@@ -11794,12 +11924,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                                 <span>{isActivelyControllingPeer(expandedScreenUser.userId) ? 'In control' : 'Request control'}</span>
                                               </button>
                                             )}
-                                            <button type="button" className="voice-screen-bar-btn" onClick={() => { setVoiceScreenFullscreen(v => !v); showFullscreenUi() }} title={voiceScreenFullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
+                                            <button type="button" className="voice-screen-bar-btn" onClick={toggleVoiceScreenFullscreen} title={voiceScreenFullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
                                               <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
                                                 <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                                               </svg>
                                             </button>
-                                            <button type="button" className="voice-screen-bar-btn" onClick={() => { setExpandedScreenUser(null); setVoiceScreenFullscreen(false) }} title="Close">×</button>
+                                            <button type="button" className="voice-screen-bar-btn" onClick={() => { setExpandedScreenUser(null); setVoiceScreenFullscreen(false); setNativeFullscreenMode(false) }} title="Close">×</button>
                                           </div>
                                         </div>
                                       <video
@@ -12117,10 +12247,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 <div className="video-expand-name">{expandedVideoUser.userId === uid ? 'You' : expandedVideoUser.userName}</div>
                                 <button className="video-expand-close video-expand-fullscreen" title={videoExpandFullscreen ? 'Exit fullscreen' : 'Fullscreen'} onClick={(e) => {
                                   e.stopPropagation()
-                                  setVideoExpandFullscreen(v => !v)
-                                  showFullscreenUi()
+                                  toggleVideoExpandFullscreen()
                                 }}>{videoExpandFullscreen ? '↙' : '⛶'}</button>
-                                <button className="video-expand-close" onClick={() => { setExpandedVideoUser(null); setVideoExpandFullscreen(false); setBlurBg(false) }}>
+                                <button className="video-expand-close" onClick={() => { setExpandedVideoUser(null); setVideoExpandFullscreen(false); setNativeFullscreenMode(false); setBlurBg(false) }}>
                                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
                                     <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
                                     <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
@@ -12643,7 +12772,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     ...reelms.filter(r => r.name?.toLowerCase().includes(q)).map(r => ({ ...r, _type: 'reelm', joined: true })),
                     ...publicReelms.map(r => ({ ...r, _type: 'reelm', joined: false })),
                     ...chats.filter(c => c.name?.toLowerCase().includes(q)).map(c => ({ ...c, _type: 'chat' })),
-                    ...discoverUsers.filter(u => u.name?.toLowerCase().includes(q) || u.username?.toLowerCase().includes(q)).map(u => ({ ...u, _type: 'user' })),
+                    ...discoverUsers.map(u => ({ ...u, _type: 'user' })),
                   ] : []
                   return (
                     <>

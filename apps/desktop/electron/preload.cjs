@@ -11,6 +11,8 @@ contextBridge.exposeInMainWorld('reelms', {
   getAppInfo: () => ipcRenderer.invoke('app:get-info'),
   openExternal: (url) => ipcRenderer.invoke('shell:open-external', url),
   openGoogleAuth: () => ipcRenderer.invoke('auth:google-open'),
+  setFullscreen: (enabled) => ipcRenderer.invoke('window:set-fullscreen', Boolean(enabled)),
+  isFullscreen: () => ipcRenderer.invoke('window:is-fullscreen'),
   installUpdate: () => ipcRenderer.invoke('updates:install'),
   onUpdateAvailable: (callback) => on('updates:available', callback),
   onUpdateDownloaded: (callback) => on('updates:downloaded', callback),

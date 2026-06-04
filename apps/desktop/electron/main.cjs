@@ -193,6 +193,17 @@ function setupIpcHandlers() {
     return shell.openExternal(`${apiUrl}/auth/google/login?platform=desktop`)
   })
 
+  ipcMain.handle('window:set-fullscreen', (_event, enabled) => {
+    if (!mainWindow || mainWindow.isDestroyed()) return false
+    mainWindow.setFullScreen(Boolean(enabled))
+    return mainWindow.isFullScreen()
+  })
+
+  ipcMain.handle('window:is-fullscreen', () => {
+    if (!mainWindow || mainWindow.isDestroyed()) return false
+    return mainWindow.isFullScreen()
+  })
+
   ipcMain.handle('updates:install', () => {
     if (updateDownloaded) {
       autoUpdater.quitAndInstall(false, true)

@@ -102,11 +102,12 @@ export async function reelmGetDoc(reelmId, sk) {
   return j.data
 }
 
-export async function reelmPutDoc(reelmId, sk, data) {
+export async function reelmPutDoc(reelmId, sk, data, options = {}) {
   const id = reelmId || 'global'
+  const body = { data, ...(options && typeof options === 'object' ? options : {}) }
   await api(`/api/v1/reelm/${encodeURIComponent(id)}/doc/${encodeURIComponent(sk)}`, {
     method: 'PUT',
-    body: JSON.stringify({ data }),
+    body: JSON.stringify(body),
   })
 }
 
@@ -127,15 +128,15 @@ export async function socialNotify(targetUid, text, link = null) {
 }
 
 export async function socialFriendRequest(toUid, from) {
-  await api('/api/v1/social/friend-request', { method: 'POST', body: JSON.stringify({ toUid, from }) })
+  return api('/api/v1/social/friend-request', { method: 'POST', body: JSON.stringify({ toUid, from }) })
 }
 
 export async function socialFriendAccept(requester, meProfile) {
-  await api('/api/v1/social/friend-accept', { method: 'POST', body: JSON.stringify({ requester, meProfile }) })
+  return api('/api/v1/social/friend-accept', { method: 'POST', body: JSON.stringify({ requester, meProfile }) })
 }
 
 export async function socialFriendReject(requesterId) {
-  await api('/api/v1/social/friend-reject', { method: 'POST', body: JSON.stringify({ requesterId }) })
+  return api('/api/v1/social/friend-reject', { method: 'POST', body: JSON.stringify({ requesterId }) })
 }
 
 export async function socialRemoveFriend(friendId) {
@@ -151,7 +152,7 @@ export async function socialUnblockUser(targetUid) {
 }
 
 export async function socialMessageRequest(toUid, from, preview) {
-  await api('/api/v1/social/message-request', { method: 'POST', body: JSON.stringify({ toUid, from, preview }) })
+  return api('/api/v1/social/message-request', { method: 'POST', body: JSON.stringify({ toUid, from, preview }) })
 }
 
 const reelmTimers = {}
@@ -255,7 +256,7 @@ export async function loadReelmDocuments(reelmId) {
 }
 
 export function connectReelmsSocket(handlers) {
-  const { onUserDoc, onReelmDoc, onReelmManagerDoc, onAppDoc, onMessage, onMessageDeleted, onMessagesCleared, onReaction, onVoicePosition, onVcEvent, onVcError, onVcCount, onVcCounts, onVcParticipants, onVcState, onPresence, onProfileUpdated, onReelmAccessRevoked, onJoinRequestRejected, onJoinRequestApproved, onReelmTimeout, onReelmTimeoutRemoved, onReelmBanned, onReelmClosed, onConnect } = handlers
+  const { onUserDoc, onReelmDoc, onReelmManagerDoc, onAppDoc, onMessage, onMessageDeleted, onMessagesCleared, onReaction, onVoicePosition, onVcEvent, onVcError, onVcCount, onVcCounts, onVcParticipants, onVcState, onPresence, onProfileUpdated, onReelmAccessRevoked, onReelmMemberJoined, onReelmMemberRemoved, onJoinRequestRejected, onJoinRequestApproved, onReelmTimeout, onReelmTimeoutRemoved, onReelmBanned, onReelmClosed, onConnect } = handlers
   const run = async () => {
     const token = await getIdToken()
     if (!token) return
@@ -304,6 +305,12 @@ export function connectReelmsSocket(handlers) {
     })
     socket.on('reelm:access-revoked', (msg) => {
       if (msg?.reelmId) onReelmAccessRevoked?.(msg)
+    })
+    socket.on('reelm:member-joined', (msg) => {
+      if (msg?.reelmId) onReelmMemberJoined?.(msg)
+    })
+    socket.on('reelm:member-removed', (msg) => {
+      if (msg?.reelmId) onReelmMemberRemoved?.(msg)
     })
     socket.on('reelm:join-request-rejected', (msg) => {
       if (msg?.reelmId) onJoinRequestRejected?.(msg)
@@ -510,8 +517,9 @@ export async function userCheckEmail(email) {
   return { available: Boolean(j?.available), exists: Boolean(j?.exists ?? !j?.available) }
 }
 
-export async function usersList() {
-  const j = await api('/api/v1/users')
+export async function usersList(query = '') {
+  const q = encodeURIComponent(String(query || '').trim())
+  const j = await api(`/api/v1/users${q ? `?q=${q}` : ''}`)
   return j.data || []
 }
 
