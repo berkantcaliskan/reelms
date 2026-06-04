@@ -65,8 +65,13 @@ import {
   socketEmitVoicePosition,
   socketVcJoin,
   socketVcLeave,
+  socketVcHeartbeat,
   socketVcSignal,
   socketVcBroadcast,
+  socketVcKick,
+  socketVcMove,
+  socketVcInvite,
+  socketVcModeratorMute,
   socketRequestVcCounts,
   socketSetPresenceStatus,
   messagesGet,
@@ -100,11 +105,14 @@ import {
   approveJoinReelm,
   rejectJoinReelm,
   inviteReelmFriend,
+  acceptReelmInvite,
+  rejectReelmInvite,
   banReelmMember,
   timeoutReelmMember,
   untimeoutReelmMember,
   unbanReelmMember,
   leaveReelmRemote,
+  closeReelmRemote,
   userProfilePut,
   userProfilePatch,
   userProfileGetById,
@@ -195,9 +203,77 @@ function SignInScreen({ onGoSignUp, onSignInSuccess }) {
   const [loginEmail, setLoginEmail] = useState('')
   const [loginPassword, setLoginPassword] = useState('')
   const [loginError, setLoginError] = useState('')
+  const [loginNotice, setLoginNotice] = useState('')
+  const [authMode, setAuthMode] = useState('signin')
+  const [resetToken, setResetToken] = useState('')
+  const [resetPassword, setResetPassword] = useState('')
+  const [resetConfirm, setResetConfirm] = useState('')
+
+  const clearAuthMessages = () => {
+    setLoginError('')
+    setLoginNotice('')
+  }
+
+  async function postPublicAuth(path, body, fallbackMessage) {
+    const res = await fetch(`${BACKEND_URL}${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body || {})
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      const err = new Error(data.message || data.error || fallbackMessage || 'Request failed')
+      err.code = data.code || 'auth/unknown'
+      throw err
+    }
+    return data
+  }
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
+    const resetTokenParam = params.get('reset_password_token')
+    const verifyToken = params.get('verify_email_token')
+
+    if (resetTokenParam) {
+      setResetToken(resetTokenParam)
+      setAuthMode('reset-confirm')
+      setLoginNotice('Reset link accepted. Choose a new password.')
+      window.history.replaceState({}, '', window.location.pathname)
+      return
+    }
+
+    if (verifyToken) {
+      setLoginNotice('Verifying your e-mail…')
+      fetch(`${BACKEND_URL}/auth/verify-email`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: verifyToken })
+      }).then(async (res) => {
+        if (!res.ok) throw new Error('verify_failed')
+        return res.json().catch(() => ({}))
+      }).then(() => {
+        setLoginNotice('E-mail verified. You can sign in now.')
+      }).catch(() => {
+        setLoginNotice('')
+        setLoginError('This verification link is invalid or expired. Sign in to request a fresh one.')
+      }).finally(() => {
+        window.history.replaceState({}, '', window.location.pathname)
+      })
+      return
+    }
+
+    if (params.get('email_verified') === 'success') {
+      setLoginNotice('E-mail verified. You can sign in now.')
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+    if (params.get('email_verified') === 'invalid' || params.get('email_verified') === 'error' || params.get('email_verified') === 'missing') {
+      setLoginError('This verification link is invalid or expired. Sign in to request a fresh one.')
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+    if (params.get('password_reset') === 'success') {
+      setLoginNotice('Password updated. You can sign in now.')
+      window.history.replaceState({}, '', window.location.pathname)
+    }
     if (params.get('google_failed')) {
       setLoginError(t('google_signin_failed'))
       window.history.replaceState({}, '', window.location.pathname)
@@ -219,7 +295,7 @@ function SignInScreen({ onGoSignUp, onSignInSuccess }) {
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSignIn = async () => {
-    setLoginError('')
+    clearAuthMessages()
     if (!loginEmail.trim()) { setLoginError(t('enter_email_or_username')); return }
     if (!loginPassword.trim()) { setLoginError(t('enter_password')); return }
 
@@ -254,6 +330,8 @@ function SignInScreen({ onGoSignUp, onSignInSuccess }) {
         setLoginError('This account uses Google sign-in. Continue with Google or set a password first.')
       } else if (err.code === 'auth/invalid-credential') {
         setLoginError('No matching account was found for these sign-in details.')
+      } else if (err.code === 'auth/email-not-verified') {
+        setLoginError(err?.message || 'Verify your e-mail before signing in.')
       } else if (err.code === 'auth/too-many-requests') {
         setLoginError(t('too_many_login_attempts'))
       } else {
@@ -263,9 +341,144 @@ function SignInScreen({ onGoSignUp, onSignInSuccess }) {
     setIsSigningIn(false)
   }
 
+  const handlePasswordResetRequest = async () => {
+    clearAuthMessages()
+    const identifier = loginEmail.trim()
+    if (!identifier) {
+      setLoginError('Enter your e-mail or username first.')
+      return
+    }
+    setIsSigningIn(true)
+    try {
+      await postPublicAuth('/auth/password-reset/request', { identifier }, 'Could not send password reset e-mail.')
+      setLoginNotice('If this account exists, a password reset link has been sent. Check your inbox and spam folder.')
+    } catch (err) {
+      setLoginError(err?.message || 'Could not send password reset e-mail.')
+    }
+    setIsSigningIn(false)
+  }
+
+  const handlePasswordResetConfirm = async () => {
+    clearAuthMessages()
+    if (!resetToken) {
+      setLoginError('This reset link is missing or expired. Request a new password reset link.')
+      setAuthMode('reset-request')
+      return
+    }
+    if (resetPassword.length < 8) {
+      setLoginError('New password must be at least 8 characters.')
+      return
+    }
+    if (resetPassword !== resetConfirm) {
+      setLoginError('Passwords do not match.')
+      return
+    }
+    setIsSigningIn(true)
+    try {
+      await postPublicAuth('/auth/password-reset/confirm', { token: resetToken, password: resetPassword }, 'Password reset failed.')
+      setResetToken('')
+      setResetPassword('')
+      setResetConfirm('')
+      setAuthMode('signin')
+      setLoginPassword('')
+      setLoginNotice('Password updated. You can sign in now.')
+    } catch (err) {
+      if (err?.code === 'auth/invalid-action-code') {
+        setLoginError('This reset link is invalid or expired. Request a new password reset link.')
+      } else {
+        setLoginError(err?.message || 'Password reset failed.')
+      }
+    }
+    setIsSigningIn(false)
+  }
+
   const handleGoogleSignIn = () => {
     if (isElectron) electronSignInWithGoogle()
     else webSignInWithGoogle()
+  }
+
+  if (authMode === 'reset-request') {
+    return (
+      <div className="main-content">
+        <h1 className="welcome-text su-drop su-drop-1">Reset password</h1>
+        <div className="signin-card-border su-drop su-drop-2">
+          <div className="signin-card">
+            <p className="legacy-auth-note">Enter your e-mail or username. If the account exists, we will send a reset link.</p>
+            <input
+              type="text"
+              className="pill-input"
+              placeholder={t('email_or_username_ph')}
+              value={loginEmail}
+              onChange={e => { setLoginEmail(e.target.value); clearAuthMessages() }}
+              onKeyDown={e => e.key === 'Enter' && handlePasswordResetRequest()}
+            />
+            {loginNotice && (
+              <p className='input-error' style={{ marginTop: '8px', color: '#8bd89b' }}>{loginNotice}</p>
+            )}
+            {loginError && (
+              <p className='input-error' style={{ marginTop: '8px' }}>{loginError}</p>
+            )}
+            <button className="pill-btn-text" onClick={handlePasswordResetRequest} disabled={isSigningIn} style={{ display: 'grid', placeItems: 'center', marginTop: loginError ? '12px' : '0' }}>
+              <span style={{ opacity: isSigningIn ? 0 : 1, gridArea: '1/1' }}>Send reset link</span>
+              {isSigningIn && (
+                <div style={{ gridArea: '1/1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <img src={reelmsLogo} alt="" style={{ height: '20px', animation: 'popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }} />
+                </div>
+              )}
+            </button>
+            <button type="button" className="legacy-auth-secondary-link" onClick={() => { setAuthMode('signin'); clearAuthMessages() }}>Back to sign in</button>
+          </div>
+        </div>
+        <LegacyAuthDownloadCta />
+      </div>
+    )
+  }
+
+  if (authMode === 'reset-confirm') {
+    return (
+      <div className="main-content">
+        <h1 className="welcome-text su-drop su-drop-1">Choose new password</h1>
+        <div className="signin-card-border su-drop su-drop-2">
+          <div className="signin-card">
+            <p className="legacy-auth-note">Enter a new password for your Reelms account.</p>
+            <input
+              type="password"
+              className="pill-input"
+              placeholder="New password"
+              value={resetPassword}
+              autoComplete="new-password"
+              onChange={e => { setResetPassword(e.target.value); clearAuthMessages() }}
+              onKeyDown={e => e.key === 'Enter' && handlePasswordResetConfirm()}
+            />
+            <input
+              type="password"
+              className="pill-input"
+              placeholder="Confirm new password"
+              value={resetConfirm}
+              autoComplete="new-password"
+              onChange={e => { setResetConfirm(e.target.value); clearAuthMessages() }}
+              onKeyDown={e => e.key === 'Enter' && handlePasswordResetConfirm()}
+            />
+            {loginNotice && (
+              <p className='input-error' style={{ marginTop: '8px', color: '#8bd89b' }}>{loginNotice}</p>
+            )}
+            {loginError && (
+              <p className='input-error' style={{ marginTop: '8px' }}>{loginError}</p>
+            )}
+            <button className="pill-btn-text" onClick={handlePasswordResetConfirm} disabled={isSigningIn} style={{ display: 'grid', placeItems: 'center', marginTop: loginError ? '12px' : '0' }}>
+              <span style={{ opacity: isSigningIn ? 0 : 1, gridArea: '1/1' }}>Update password</span>
+              {isSigningIn && (
+                <div style={{ gridArea: '1/1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <img src={reelmsLogo} alt="" style={{ height: '20px', animation: 'popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275)' }} />
+                </div>
+              )}
+            </button>
+            <button type="button" className="legacy-auth-secondary-link" onClick={() => { setAuthMode('signin'); clearAuthMessages(); setResetToken('') }}>Back to sign in</button>
+          </div>
+        </div>
+        <LegacyAuthDownloadCta />
+      </div>
+    )
   }
 
   return (
@@ -278,7 +491,7 @@ function SignInScreen({ onGoSignUp, onSignInSuccess }) {
             className="pill-input"
             placeholder={t('email_or_username_ph')}
             value={loginEmail}
-            onChange={e => { setLoginEmail(e.target.value); setLoginError('') }}
+            onChange={e => { setLoginEmail(e.target.value); clearAuthMessages() }}
             onKeyDown={e => e.key === 'Enter' && handleSignIn()}
           />
           <div className="password-row">
@@ -288,7 +501,7 @@ function SignInScreen({ onGoSignUp, onSignInSuccess }) {
                 className="pill-input"
                 placeholder={t('password_placeholder')}
                 value={loginPassword}
-                onChange={e => { setLoginPassword(e.target.value); setLoginError('') }}
+                onChange={e => { setLoginPassword(e.target.value); clearAuthMessages() }}
                 onKeyDown={e => e.key === 'Enter' && handleSignIn()}
               />
               <button
@@ -300,12 +513,15 @@ function SignInScreen({ onGoSignUp, onSignInSuccess }) {
                 <EyeIcon open={showPassword} />
               </button>
             </div>
-            <span className="forgot-link">{t('forgot_password')}</span>
+            <button type="button" className="forgot-link" onClick={() => { setAuthMode('reset-request'); clearAuthMessages() }}>{t('forgot_password')}</button>
           </div>
+          {loginNotice && (
+            <p className='input-error' style={{ marginTop: '8px', color: '#8bd89b' }}>{loginNotice}</p>
+          )}
           {loginError && (
             <p className='input-error' style={{ marginTop: '8px' }}>{loginError}</p>
           )}
-          <button className="pill-btn-text" onClick={handleSignIn} style={{ display: 'grid', placeItems: 'center', marginTop: loginError ? '12px' : '0' }}>
+          <button className="pill-btn-text" onClick={handleSignIn} disabled={isSigningIn} style={{ display: 'grid', placeItems: 'center', marginTop: loginError ? '12px' : '0' }}>
             <span style={{ opacity: isSigningIn ? 0 : 1, gridArea: '1/1' }}>{t('sign_in')}</span>
             {isSigningIn && (
               <div style={{
@@ -2249,7 +2465,7 @@ function ActivitySetterModal({ current, onSet, onClose }) {
   )
 }
 
-function FriendProfilePopup({ friend, anchorRect, onClose, onRemove, onBlock, onUnblock, onAddFriend, isFriend = true, isBlocked = false, isPending = false, nickname, onNicknameChange, canShare, onMessage, onCreateGroup, onRequestRemoteControl, isSelf = false }) {
+function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBlock, onUnblock, onAddFriend, isFriend = true, isBlocked = false, isPending = false, nickname, onNicknameChange, canShare, onMessage, onCreateGroup, onRequestRemoteControl, voiceContext = null, moderationContext = null, roleContext = null, isSelf = false, embedded = false, canEditNickname = true }) {
   const popupRef = useRef(null)
   const [editingNickname, setEditingNickname] = useState(false)
   const [nicknameInput, setNicknameInput] = useState(nickname || '')
@@ -2260,23 +2476,26 @@ function FriendProfilePopup({ friend, anchorRect, onClose, onRemove, onBlock, on
   }, [nickname])
 
   useEffect(() => {
+    if (embedded) return undefined
     const handler = (e) => {
       if (popupRef.current && !popupRef.current.contains(e.target)) onClose()
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [onClose])
+  }, [onClose, embedded])
 
   const popupW = 280
-  const popupH = 380
+  const popupH = 460
   const friendCover = friend.cover || friend.coverImage || friend.coverUrl || null
-  let top = anchorRect.top - popupH - 8
-  let left = Math.min(Math.max(8, anchorRect.left), window.innerWidth - popupW - 8)
-  if (top < 8) top = anchorRect.bottom + 8
+  const safeRect = anchorRect || { top: 96, bottom: 112, left: Math.max(8, window.innerWidth - popupW - 18) }
+  let top = safeRect.top - popupH - 8
+  let left = Math.min(Math.max(8, safeRect.left), window.innerWidth - popupW - 8)
+  if (top < 8) top = safeRect.bottom + 8
 
-  return ReactDOM.createPortal(
-    <div className="friend-profile-popup" style={{ top, left, width: popupW }} ref={popupRef}>
+  const profileNode = (
+    <div className={`friend-profile-popup${embedded ? ' friend-profile-popup--embedded' : ''}`} style={{ ...(buildProfileThemeStyle(friend) || {}), ...(embedded ? {} : { top, left, width: popupW }) }} ref={popupRef}>
       <div className={`fpp-cover${friendCover ? ' fpp-cover--has-image' : ''}`} style={friendCover ? { backgroundImage: `url(${friendCover})` } : {}} />
+      {embedded && <button type="button" className="fpp-embedded-close" onClick={onClose} aria-label="Close profile">×</button>}
       <div className="fpp-identity">
         <div className="fpp-avatar">
           {getPersonPhoto(friend)
@@ -2291,30 +2510,88 @@ function FriendProfilePopup({ friend, anchorRect, onClose, onRemove, onBlock, on
         </div>
       </div>
       {friend.bio && <p className="fpp-bio">{friend.bio}</p>}
-      <div className="fpp-nickname-section">
-        <span className="fpp-section-label">NICKNAME</span>
-        {editingNickname ? (
-          <div className="fpp-nickname-edit">
-            <input
-              className="fpp-nickname-input"
-              value={nicknameInput}
-              onChange={e => setNicknameInput(e.target.value)}
-              placeholder={friend.name}
-              autoFocus
-              onKeyDown={e => {
-                if (e.key === 'Enter') { onNicknameChange(nicknameInput.trim()); setEditingNickname(false) }
-                if (e.key === 'Escape') { setNicknameInput(nickname || ''); setEditingNickname(false) }
-              }}
-            />
-            <button className="fpp-nickname-save" onClick={() => { onNicknameChange(nicknameInput.trim()); setEditingNickname(false) }}>Save</button>
-            {nickname && <button className="fpp-nickname-clear" onClick={() => { onNicknameChange(''); setNicknameInput(''); setEditingNickname(false) }}>Clear</button>}
+      {voiceContext && !isSelf && (
+        <div className="fpp-voice-section">
+          {voiceContext.userRoom ? (
+            <>
+              <span className="fpp-section-label">VOICE</span>
+              <div className="fpp-voice-row">
+                <span>{friend.name || 'Member'} is in <strong>{voiceContext.userRoom.channelName}</strong></span>
+                {!voiceContext.isInSameRoom && (
+                  <button className="fpp-action-btn fpp-action-btn--mini" onClick={() => { voiceContext.onJoinRoom?.(voiceContext.userRoom); onClose() }}>Join</button>
+                )}
+              </div>
+            </>
+          ) : voiceContext.canInviteToCurrentRoom ? (
+            <button className="fpp-action-btn" onClick={() => { voiceContext.onInviteToCurrentRoom?.(); onClose() }}>
+              Invite to {voiceContext.currentRoomName || 'voice'}
+            </button>
+          ) : null}
+        </div>
+      )}
+      {roleContext?.roles?.length > 0 && (
+        <div className="fpp-roles-section">
+          <span className="fpp-section-label">SERVER ROLES</span>
+          <div className="fpp-role-badges">
+            {roleContext.roles.slice(0, roleContext.expanded ? 12 : 3).map(role => (
+              <span key={role.id} className="rp-role-badge" style={{ color: role.color, borderColor: role.color + '55', background: role.color + '18' }}>{role.name}</span>
+            ))}
+            {roleContext.roles.length > 3 && (
+              <button type="button" className="fpp-mini-link" onClick={roleContext.onToggleExpanded}>
+                {roleContext.expanded ? 'Show less' : `+${roleContext.roles.length - 3} more`}
+              </button>
+            )}
           </div>
-        ) : (
-          <button className="fpp-nickname-btn" onClick={() => setEditingNickname(true)}>
-            {nickname ? <span>{nickname}</span> : <span className="fpp-nickname-empty">Add nickname...</span>}
-          </button>
-        )}
-      </div>
+        </div>
+      )}
+      {moderationContext?.canShow && !isSelf && (
+        <div className="fpp-mod-section">
+          <span className="fpp-section-label">SERVER ACTIONS</span>
+          <div className="fpp-mod-list">
+            {moderationContext.voiceRoom && (
+              <button type="button" className="fpp-list-action" onClick={() => { moderationContext.onJoinVoice?.(); onClose() }}>Join {moderationContext.voiceRoom.channelName || 'room'}</button>
+            )}
+            {moderationContext.canInviteVoice && (
+              <button type="button" className="fpp-list-action" onClick={() => { moderationContext.onInviteVoice?.(); onClose() }}>Invite to {moderationContext.currentRoomName || 'your room'}</button>
+            )}
+            {moderationContext.canTimeout && (
+              <button type="button" className="fpp-list-action" onClick={() => { moderationContext.onTimeout?.(); onClose() }}>Timeout member…</button>
+            )}
+            {moderationContext.canRemove && (
+              <button type="button" className="fpp-list-action fpp-list-action--danger" onClick={() => { moderationContext.onRemove?.(); onClose() }}>Kick from Reelm…</button>
+            )}
+            {moderationContext.canBan && (
+              <button type="button" className="fpp-list-action fpp-list-action--danger" onClick={() => { moderationContext.onBan?.(); onClose() }}>Ban member…</button>
+            )}
+          </div>
+        </div>
+      )}
+      {canEditNickname && (
+        <div className="fpp-nickname-section">
+          <span className="fpp-section-label">NICKNAME</span>
+          {editingNickname ? (
+            <div className="fpp-nickname-edit">
+              <input
+                className="fpp-nickname-input"
+                value={nicknameInput}
+                onChange={e => setNicknameInput(e.target.value)}
+                placeholder={friend.name}
+                autoFocus
+                onKeyDown={e => {
+                  if (e.key === 'Enter') { onNicknameChange(nicknameInput.trim()); setEditingNickname(false) }
+                  if (e.key === 'Escape') { setNicknameInput(nickname || ''); setEditingNickname(false) }
+                }}
+              />
+              <button className="fpp-nickname-save" onClick={() => { onNicknameChange(nicknameInput.trim()); setEditingNickname(false) }}>Save</button>
+              {nickname && <button className="fpp-nickname-clear" onClick={() => { onNicknameChange(''); setNicknameInput(''); setEditingNickname(false) }}>Clear</button>}
+            </div>
+          ) : (
+            <button className="fpp-nickname-btn" onClick={() => setEditingNickname(true)}>
+              {nickname ? <span>{nickname}</span> : <span className="fpp-nickname-empty">Add nickname...</span>}
+            </button>
+          )}
+        </div>
+      )}
       <div className="fpp-actions">
         {!isSelf && !isBlocked && <button className="fpp-action-btn" onClick={() => { onMessage?.(); onClose() }}>Message</button>}
         {!isSelf && !isBlocked && isFriend && onCreateGroup && <button className="fpp-action-btn" onClick={() => { onCreateGroup(friend); onClose() }}>Create group</button>}
@@ -2332,9 +2609,11 @@ function FriendProfilePopup({ friend, anchorRect, onClose, onRemove, onBlock, on
         {!isSelf && !isBlocked && isFriend && <button className="fpp-action-btn fpp-action-danger" onClick={() => { onRemove(friend.id); onClose() }}>Remove Friend</button>}
         {!isSelf && !isBlocked && onBlock && <button className="fpp-action-btn fpp-action-danger" onClick={() => { onBlock(friend); onClose() }}>Block</button>}
       </div>
-    </div>,
-    document.body
+    </div>
   )
+
+  if (embedded) return profileNode
+  return ReactDOM.createPortal(profileNode, document.body)
 }
 
 const FLYING_ROOM_DURATIONS = [
@@ -2524,6 +2803,166 @@ const ROLE_PALETTE = [
   '#c084fc','#f472b6','#e0c9bc','#94a3b8',
 ]
 
+const REELM_PERMISSION_OPTIONS = [
+  { key: 'viewSettings', label: 'View panel', note: 'Can open the management panel.' },
+  { key: 'manageOverview', label: 'Server settings', note: 'Can edit visibility, invite and basic settings.' },
+  { key: 'manageChannels', label: 'Channels', note: 'Can edit channel layout.' },
+  { key: 'manageVoice', label: 'Voice rooms', note: 'Can move/kick members from voice rooms and invite members to a room.' },
+  { key: 'manageRoles', label: 'Helper roles', note: 'Can manage non-admin roles and assign safe roles.' },
+  { key: 'manageMembers', label: 'Members', note: 'Can invite/remove regular members.' },
+  { key: 'manageInvites', label: 'Invites', note: 'Can invite even if member invites are off.' },
+  { key: 'manageJoinRequests', label: 'Join requests', note: 'Can approve or reject join requests.' },
+  { key: 'manageModeration', label: 'Moderation', note: 'Can timeout/ban regular members.' },
+  { key: 'manageReelm', label: 'Full admin', note: 'Can manage all server permissions.' },
+]
+const REELM_ELEVATED_ROLE_RE = /admin|owner|founder|moderator/i
+
+function isManagerRoleClient(role) {
+  return role?.permissions?.manageReelm === true
+}
+
+function roleHasPermissionClient(role, permission) {
+  if (!role) return false
+  if (isManagerRoleClient(role)) return true
+  const permissions = role.permissions && typeof role.permissions === 'object' ? role.permissions : {}
+  if (permission === 'viewSettings') return permissions.viewSettings === true || Object.values(permissions).some(Boolean)
+  return permissions[permission] === true
+}
+
+function normalizeRolePermissionsClient(role, allowManageReelm = true) {
+  const permissions = role?.permissions && typeof role.permissions === 'object' ? role.permissions : {}
+  if (role?.permissions?.manageReelm === true && allowManageReelm) {
+    return REELM_PERMISSION_OPTIONS.reduce((acc, opt) => ({ ...acc, [opt.key]: true }), {})
+  }
+  const next = {}
+  for (const opt of REELM_PERMISSION_OPTIONS) {
+    if (opt.key === 'manageReelm' && !allowManageReelm) continue
+    if (permissions[opt.key] === true) next[opt.key] = true
+  }
+  if (Object.values(next).some(Boolean)) next.viewSettings = true
+  return next
+}
+
+function normalizeRoleForClient(role, fallbackId = '', allowManageReelm = true) {
+  const id = String(role?.id || fallbackId || `role-${Date.now()}`).replace(/[^a-zA-Z0-9._:-]/g, '').slice(0, 80)
+  const name = String(role?.name || 'Role').trim().replace(/\s+/g, ' ').slice(0, 32) || 'Role'
+  const color = /^#[0-9a-fA-F]{6}$/.test(String(role?.color || '')) ? String(role.color) : '#60a5fa'
+  const position = Number.isFinite(Number(role?.position ?? role?.order)) ? Number(role.position ?? role.order) : 0
+  return {
+    ...role,
+    id,
+    name,
+    color,
+    position,
+    permissions: normalizeRolePermissionsClient(role, allowManageReelm)
+  }
+}
+
+
+function getRoleOrderIndex(role, index = 0) {
+  const raw = Number(role?.position ?? role?.order ?? index)
+  return Number.isFinite(raw) ? raw : index
+}
+
+function getOrderedReelmRolesClient(reelm) {
+  return (Array.isArray(reelm?.roles) ? reelm.roles : [])
+    .map((role, index) => ({ ...role, _roleOrder: getRoleOrderIndex(role, index) }))
+    .sort((a, b) => (a._roleOrder - b._roleOrder) || String(a.name || '').localeCompare(String(b.name || '')))
+}
+
+function getMemberRoleIdsClient(member) {
+  return Array.from(new Set((Array.isArray(member?.roleIds) ? member.roleIds : []).map(String).filter(Boolean)))
+}
+
+function getPrimaryRoleForMemberClient(member, roles = []) {
+  const roleIds = new Set(getMemberRoleIdsClient(member))
+  return roles.find(role => roleIds.has(String(role.id))) || null
+}
+
+function isMainAdminMemberClient(reelm, member) {
+  if (!reelm || !member) return false
+  return String(member.userId || member.id || '') === String(reelm.ownerId || '')
+}
+
+function canActOnReelmMemberClient(reelm, actorUid, targetMember, permission = 'manageMembers') {
+  if (!reelm || !actorUid || !targetMember) return false
+  if (String(actorUid) === String(targetMember.userId || targetMember.id || '')) return false
+  const actorIsOwner = String(reelm.ownerId || '') === String(actorUid)
+  if (actorIsOwner) return true
+  if (!hasReelmPermissionClient(reelm, actorUid, permission) && !hasReelmPermissionClient(reelm, actorUid, 'manageReelm')) return false
+  if (isMainAdminMemberClient(reelm, targetMember)) return false
+  const roles = Array.isArray(reelm.roles) ? reelm.roles : []
+  const protectedRoleIds = new Set(roles.filter(isManagerRoleClient).map(role => String(role.id)))
+  const targetRoleIds = getMemberRoleIdsClient(targetMember)
+  if (targetRoleIds.some(id => protectedRoleIds.has(id)) && !hasReelmPermissionClient(reelm, actorUid, 'manageReelm')) return false
+  return true
+}
+
+function buildReelmMemberGroupsClient({ reelm, members, presence, currentUser, uid, profileStatus, getPresenceForUser }) {
+  const orderedRoles = getOrderedReelmRolesClient(reelm)
+  const assigned = new Set()
+  const getMemberPresence = (m) => String(m.userId) === String(uid)
+    ? { status: profileStatus, userName: currentUser?.name, userPhoto: getPersonPhoto(currentUser) || m.userPhoto }
+    : (presence?.[String(m.userId)] || getPresenceForUser?.(m.userId) || {})
+  const getMemberStatus = (m) => getMemberPresence(m).status || 'offline'
+  const sortMembers = (list) => [...list].sort((a, b) => {
+    const aMain = isMainAdminMemberClient(reelm, a) ? -1 : 0
+    const bMain = isMainAdminMemberClient(reelm, b) ? -1 : 0
+    if (aMain !== bMain) return aMain - bMain
+    const aOnline = isActiveStatus(getMemberStatus(a)) ? 0 : 1
+    const bOnline = isActiveStatus(getMemberStatus(b)) ? 0 : 1
+    if (aOnline !== bOnline) return aOnline - bOnline
+    const an = String(getMemberPresence(a).userName || a.userName || '').toLowerCase()
+    const bn = String(getMemberPresence(b).userName || b.userName || '').toLowerCase()
+    return an.localeCompare(bn)
+  })
+  const groups = []
+  for (const role of orderedRoles) {
+    const roleMembers = sortMembers((members || []).filter(m => {
+      if (assigned.has(String(m.userId))) return false
+      const primary = getPrimaryRoleForMemberClient(m, orderedRoles)
+      return primary && String(primary.id) === String(role.id)
+    }))
+    roleMembers.forEach(m => assigned.add(String(m.userId)))
+    if (roleMembers.length) groups.push({ role, members: roleMembers })
+  }
+  const noRoleMembers = sortMembers((members || []).filter(m => !assigned.has(String(m.userId))))
+  if (noRoleMembers.length) groups.push({ role: { id: '__no_role__', name: 'No role', color: '#94a3b8' }, members: noRoleMembers, noRole: true })
+  return { groups, orderedRoles, getMemberPresence, getMemberStatus }
+}
+
+function getReelmPermissionSetClient(reelm, uid) {
+  const set = new Set()
+  if (!reelm || !uid) return set
+  if (String(reelm.ownerId || '') === String(uid)) {
+    REELM_PERMISSION_OPTIONS.forEach(opt => set.add(opt.key))
+    return set
+  }
+  const member = (Array.isArray(reelm.members) ? reelm.members : []).find(m => String(m.userId || m.id || '') === String(uid))
+  if (!member) return set
+  const roleIds = new Set((member.roleIds || []).map(String))
+  const roles = (Array.isArray(reelm.roles) ? reelm.roles : []).filter(role => roleIds.has(String(role.id)))
+  if (roles.some(isManagerRoleClient)) {
+    REELM_PERMISSION_OPTIONS.forEach(opt => set.add(opt.key))
+    return set
+  }
+  roles.forEach(role => {
+    const permissions = role.permissions && typeof role.permissions === 'object' ? role.permissions : {}
+    Object.entries(permissions).forEach(([key, value]) => { if (value === true) set.add(key) })
+    if (Object.values(permissions).some(Boolean)) set.add('viewSettings')
+  })
+  return set
+}
+
+function hasReelmPermissionClient(reelm, uid, permission) {
+  const set = getReelmPermissionSetClient(reelm, uid)
+  return set.has(permission) || set.has('manageReelm')
+}
+
+function canOpenReelmSettingsClient(reelm, uid) {
+  return hasReelmPermissionClient(reelm, uid, 'viewSettings')
+}
+
 function getReelmTemplates(t) {
   const sp = s => s.split(', ')
   return [
@@ -2538,9 +2977,9 @@ function getReelmTemplates(t) {
   ]
 }
 
-function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onAnnouncement, onApproveJoin, onRejectJoin, onInviteFriend, onBanMember, onUnbanMember, onTimeoutMember, onUntimeoutMember }) {
+function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onCloseReelm, onAnnouncement, onApproveJoin, onRejectJoin, onInviteFriend, onBanMember, onUnbanMember, onTimeoutMember, onUntimeoutMember }) {
   const [activeTab, setActiveTab] = useState('general')
-  const [roles, setRoles] = useState(() => reelm.roles || [])
+  const [roles, setRoles] = useState(() => (reelm.roles || []).map((role, i) => normalizeRoleForClient(role, `role-${i}`)))
   const [members, setMembers] = useState(() => reelm.members || [])
   const [editingRoleId, setEditingRoleId] = useState(null)
   const [editingRoleName, setEditingRoleName] = useState('')
@@ -2551,6 +2990,8 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onAnnou
   const [memberSearch, setMemberSearch] = useState('')
   const [showInDiscover, setShowInDiscover] = useState(() => reelm.showInDiscover ?? false)
   const [autoJoinOnInvite, setAutoJoinOnInvite] = useState(() => reelm.autoJoinOnInvite ?? false)
+  const [memberInvitesEnabled, setMemberInvitesEnabled] = useState(() => reelm.memberInvitesEnabled ?? true)
+  const [memberInviteMode, setMemberInviteMode] = useState(() => reelm.memberInviteMode || 'request')
   const [joinMode, setJoinMode] = useState(() => reelm.joinMode || 'request')
   const [ageRating, setAgeRating] = useState(() => reelm.ageRating || 'under18')
 
@@ -2560,16 +3001,62 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onAnnou
       : 99
   }, [currentUser?.birthDate])
   const canSetAgeRating = ownerAge >= 18
+  const permissionSet = useMemo(() => getReelmPermissionSetClient(reelm, currentUser?.id), [reelm, currentUser?.id])
+  const isOwner = String(reelm.ownerId || '') === String(currentUser?.id || '')
+  const canManageFullRoles = isOwner
+  const isFullManager = permissionSet.has('manageReelm')
+  const canViewSettings = isFullManager || permissionSet.has('viewSettings')
+  const canManageOverview = isFullManager || permissionSet.has('manageOverview')
+  const canManageChannels = isFullManager || permissionSet.has('manageChannels')
+  const canManageRoles = isFullManager || permissionSet.has('manageRoles')
+  const canManageMembers = isFullManager || permissionSet.has('manageMembers')
+  const canManageInvites = isFullManager || permissionSet.has('manageInvites')
+  const canManageJoinRequests = isFullManager || permissionSet.has('manageJoinRequests')
+  const canManageModeration = isFullManager || permissionSet.has('manageModeration')
+  const protectedRoleIds = useMemo(() => new Set((roles || []).filter(isManagerRoleClient).map(role => String(role.id))), [roles])
+  const isProtectedMember = (member) => {
+    if (!member) return false
+    if (String(member.userId || member.id || '') === String(reelm.ownerId || '')) return true
+    return Array.isArray(member.roleIds) && member.roleIds.map(String).some(id => protectedRoleIds.has(id))
+  }
+  const canEditRole = (role) => canManageRoles && (canManageFullRoles || !isManagerRoleClient(role))
+  const canDeleteRole = (role) => canEditRole(role) && !isManagerRoleClient(role)
+  const canToggleRoleForMember = (member, role) => canManageRoles && (canManageFullRoles || (!isManagerRoleClient(role) && !isProtectedMember(member)))
+  const canActOnMember = (member) => canManageMembers && String(member?.userId || '') !== String(currentUser?.id || '') && (canManageFullRoles || !isProtectedMember(member))
+  const availableTabs = useMemo(() => [
+    canViewSettings ? { key: 'general', label: 'General' } : null,
+    canManageOverview ? { key: 'visibility', label: 'Visibility' } : null,
+    (canManageRoles || canManageMembers || canManageInvites) ? { key: 'roles', label: 'Roles and members' } : null,
+    canManageChannels ? { key: 'channels', label: 'Channels' } : null,
+    canManageJoinRequests ? { key: 'join_requests', label: 'Join requests' } : null,
+    canManageModeration ? { key: 'ban_list', label: 'Ban list' } : null,
+    canManageModeration ? { key: 'timeouts', label: 'Timeouts' } : null,
+  ].filter(Boolean), [canViewSettings, canManageOverview, canManageRoles, canManageMembers, canManageInvites, canManageChannels, canManageJoinRequests, canManageModeration])
+
+  useEffect(() => {
+    if (availableTabs.length && !availableTabs.some(tab => tab.key === activeTab)) setActiveTab(availableTabs[0].key)
+  }, [availableTabs, activeTab])
 
   const saveAll = (updatedRoles, updatedMembers) => {
-    setRoles(updatedRoles)
-    setMembers(updatedMembers)
-    onUpdate({ ...reelm, roles: updatedRoles, members: updatedMembers })
+    const normalizedRoles = (updatedRoles || []).map((role, i) => normalizeRoleForClient(role, `role-${i}`, canManageFullRoles)).slice(0, 12)
+    const validRoleIds = new Set(normalizedRoles.map(role => String(role.id)))
+    const managerRole = normalizedRoles.find(isManagerRoleClient) || normalizedRoles[0] || null
+    const ownerId = String(reelm.ownerId || currentUser.id || '')
+    const normalizedMembers = (updatedMembers || []).map(member => {
+      const baseRoleIds = Array.isArray(member.roleIds) ? member.roleIds.map(String).filter(id => validRoleIds.has(id)) : []
+      const roleIds = String(member.userId) === ownerId && managerRole?.id
+        ? Array.from(new Set([...baseRoleIds, String(managerRole.id)]))
+        : Array.from(new Set(baseRoleIds))
+      return { ...member, roleIds }
+    })
+    setRoles(normalizedRoles)
+    setMembers(normalizedMembers)
+    onUpdate({ ...reelm, roles: normalizedRoles, members: normalizedMembers })
   }
 
   const addRole = () => {
-    if (!newRoleName.trim() || roles.length >= 12) return
-    const nr = { id: 'role-' + Date.now(), name: newRoleName.trim(), color: newRoleColor }
+    if (!canManageRoles || !newRoleName.trim() || roles.length >= 12) return
+    const nr = normalizeRoleForClient({ id: 'role-' + Date.now(), name: newRoleName.trim(), color: newRoleColor, permissions: { viewSettings: true } }, '', canManageFullRoles)
     saveAll([...roles, nr], members)
     setNewRoleName('')
     setNewRoleColor('#60a5fa')
@@ -2577,6 +3064,7 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onAnnou
   }
 
   const startEditRole = (role) => {
+    if (!canEditRole(role)) return
     setEditingRoleId(role.id)
     setEditingRoleName(role.name)
     setEditingRoleColor(role.color)
@@ -2584,18 +3072,54 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onAnnou
 
   const saveEditRole = () => {
     if (!editingRoleName.trim()) return
-    saveAll(roles.map(r => r.id === editingRoleId ? { ...r, name: editingRoleName.trim(), color: editingRoleColor } : r), members)
+    saveAll(roles.map(r => {
+      if (r.id !== editingRoleId) return r
+      const next = { ...r, name: editingRoleName.trim(), color: editingRoleColor }
+      return normalizeRoleForClient(next, '', canManageFullRoles)
+    }), members)
     setEditingRoleId(null)
   }
 
+  const toggleRolePermission = (roleId, permissionKey) => {
+    const role = roles.find(r => r.id === roleId)
+    if (!canEditRole(role)) return
+    if (permissionKey === 'manageReelm' && !canManageFullRoles) return
+    saveAll(roles.map(r => {
+      if (r.id !== roleId) return r
+      const permissions = { ...(r.permissions || {}) }
+      if (permissions[permissionKey]) delete permissions[permissionKey]
+      else permissions[permissionKey] = true
+      if (Object.values(permissions).some(Boolean)) permissions.viewSettings = true
+      if (!permissions.manageReelm && permissionKey === 'viewSettings' && Object.keys(permissions).length === 1) delete permissions.viewSettings
+      return normalizeRoleForClient({ ...r, permissions }, '', canManageFullRoles)
+    }), members)
+  }
+
   const deleteRole = (roleId) => {
+    const nextRoles = roles.filter(r => r.id !== roleId)
+    const role = roles.find(r => r.id === roleId)
+    if (!canDeleteRole(role)) return
+    if (!nextRoles.some(isManagerRoleClient)) return
     const updatedMembers = members.map(m => ({ ...m, roleIds: (m.roleIds || []).filter(r => r !== roleId) }))
-    saveAll(roles.filter(r => r.id !== roleId), updatedMembers)
+    saveAll(nextRoles, updatedMembers)
+  }
+
+  const moveRole = (fromIndex, toIndex) => {
+    if (!canManageRoles || fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || fromIndex >= roles.length || toIndex >= roles.length) return
+    const fromRole = roles[fromIndex]
+    const toRole = roles[toIndex]
+    if (!canEditRole(fromRole) || (!canManageFullRoles && isManagerRoleClient(toRole))) return
+    const next = [...roles]
+    const [removed] = next.splice(fromIndex, 1)
+    next.splice(toIndex, 0, removed)
+    saveAll(next.map((role, index) => ({ ...role, position: index })), members)
   }
 
   const toggleMemberRole = (userId, roleId) => {
     const updatedMembers = members.map(m => {
       if (m.userId !== userId) return m
+      const role = roles.find(r => r.id === roleId)
+      if (!canToggleRoleForMember(m, role)) return m
       const has = (m.roleIds || []).includes(roleId)
       return { ...m, roleIds: has ? m.roleIds.filter(r => r !== roleId) : [...(m.roleIds || []), roleId] }
     })
@@ -2603,12 +3127,13 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onAnnou
   }
 
   const inviteFriendToReelm = (friend) => {
-    if (!friend?.id || members.find(m => m.userId === friend.id) || bannedIds.has(String(friend.id))) return
+    if ((!canManageInvites && !canManageMembers) || !friend?.id || members.find(m => m.userId === friend.id) || bannedIds.has(String(friend.id))) return
     onInviteFriend?.(reelm.id, friend.id)
   }
 
   const removeMember = (userId) => {
-    if (userId === currentUser.id) return
+    const member = members.find(m => m.userId === userId)
+    if (!canActOnMember(member)) return
     saveAll(roles, members.filter(m => m.userId !== userId))
   }
 
@@ -2638,15 +3163,7 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onAnnou
           {reelm.name}
         </div>
         <nav className="settings-nav">
-          {[
-            { key: 'general', label: 'General' },
-            { key: 'visibility', label: 'Visibility' },
-            { key: 'roles', label: 'Roles and members' },
-            { key: 'channels', label: 'Channels' },
-            { key: 'join_requests', label: 'Join requests' },
-            { key: 'ban_list', label: 'Ban list' },
-            { key: 'timeouts', label: 'Timeouts' },
-          ].map(tab => (
+          {availableTabs.map(tab => (
             <button
               key={tab.key}
               className={`settings-nav-item${activeTab === tab.key ? ' settings-nav-item-active' : ''}`}
@@ -2665,16 +3182,32 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onAnnou
         </div>
         <div className="settings-content-panel">
 
-          {activeTab === 'general' && (
+          {activeTab === 'general' && canViewSettings && (
             <div className="rs-section">
               <div className="rs-section-header">
                 <span className="rs-section-title">Reelm info</span>
               </div>
               <p className="rs-section-hint" style={{ marginBottom: 0 }}>General settings coming soon.</p>
+              {canManageFullRoles && !reelm.isDefault && (
+                <div className="rs-danger-zone">
+                  <span className="rs-section-title">Danger zone</span>
+                  <p className="rs-section-hint">Closing a server removes it from members and disables its invite code. Type the exact server name to confirm.</p>
+                  <button
+                    type="button"
+                    className="rs-member-remove rs-danger-close"
+                    onClick={() => {
+                      const typed = window.prompt(`Type ${reelm.name} to close this server.`)
+                      if (typed === reelm.name) onCloseReelm?.(reelm.id, typed)
+                    }}
+                  >
+                    Close server
+                  </button>
+                </div>
+              )}
             </div>
           )}
 
-          {activeTab === 'visibility' && (
+          {activeTab === 'visibility' && canManageOverview && (
             <div className="rs-section">
               <div className="rs-section-header">
                 <span className="rs-section-title">Visibility</span>
@@ -2703,7 +3236,7 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onAnnou
                   onClick={() => {
                     const next = !autoJoinOnInvite
                     setAutoJoinOnInvite(next)
-                    onUpdate({ ...reelm, roles, members, autoJoinOnInvite: next })
+                    onUpdate({ ...reelm, roles, members, autoJoinOnInvite: next, memberInvitesEnabled, memberInviteMode })
                   }}
                 ><span className="cust-toggle-knob" /></button>
               </div>
@@ -2717,7 +3250,36 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onAnnou
                   onClick={() => {
                     const next = joinMode === 'open' ? 'request' : 'open'
                     setJoinMode(next)
-                    onUpdate({ ...reelm, roles, members, showInDiscover, autoJoinOnInvite, joinMode: next })
+                    onUpdate({ ...reelm, roles, members, showInDiscover, autoJoinOnInvite, memberInvitesEnabled, memberInviteMode, joinMode: next })
+                  }}
+                ><span className="cust-toggle-knob" /></button>
+              </div>
+
+              <div className="cust-toggle-row" style={{ marginTop: '18px' }}>
+                <div>
+                  <span className="cust-toggle-label">Allow members to invite friends</span>
+                  <p className="accs-note">Members can send invites. If disabled, only server managers can invite people.</p>
+                </div>
+                <button
+                  className={`cust-toggle${memberInvitesEnabled ? ' cust-toggle-on' : ''}`}
+                  onClick={() => {
+                    const next = !memberInvitesEnabled
+                    setMemberInvitesEnabled(next)
+                    onUpdate({ ...reelm, roles, members, showInDiscover, autoJoinOnInvite, memberInvitesEnabled: next, memberInviteMode, joinMode })
+                  }}
+                ><span className="cust-toggle-knob" /></button>
+              </div>
+              <div className="cust-toggle-row" style={{ marginTop: '18px' }}>
+                <div>
+                  <span className="cust-toggle-label">Member invites auto-join</span>
+                  <p className="accs-note">When off, people invited by regular members still need server approval. Manager/owner invites always bypass approval.</p>
+                </div>
+                <button
+                  className={`cust-toggle${memberInviteMode === 'auto' ? ' cust-toggle-on' : ''}`}
+                  onClick={() => {
+                    const next = memberInviteMode === 'auto' ? 'request' : 'auto'
+                    setMemberInviteMode(next)
+                    onUpdate({ ...reelm, roles, members, showInDiscover, autoJoinOnInvite, memberInvitesEnabled, memberInviteMode: next, joinMode })
                   }}
                 ><span className="cust-toggle-knob" /></button>
               </div>
@@ -2750,7 +3312,7 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onAnnou
             </div>
           )}
 
-          {activeTab === 'join_requests' && (
+          {activeTab === 'join_requests' && canManageJoinRequests && (
             <div className="rs-section">
               <div className="rs-section-header">
                 <span className="rs-section-title">Join requests</span>
@@ -2779,15 +3341,16 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onAnnou
             </div>
           )}
 
-          {activeTab === 'roles' && (
+          {activeTab === 'roles' && (canManageRoles || canManageMembers || canManageInvites) && (
             <div className="rs-section">
               <div className="rs-section-header">
                 <span className="rs-section-title">Roles</span>
                 <span className="rs-section-hint">{roles.length}/12</span>
-                {roles.length < 12 && !addingRole && (
+                {canManageRoles && roles.length < 12 && !addingRole && (
                   <button className="rs-add-btn" onClick={() => setAddingRole(true)}>+ New role</button>
                 )}
               </div>
+              <p className="rs-section-hint">Full admin roles are protected. Helper roles can receive selected permissions without being able to close the server or edit admin/owner roles.</p>
 
               {addingRole && (
                 <div className="rs-role-editor">
@@ -2818,8 +3381,15 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onAnnou
               )}
 
               <div className="rs-roles-list">
-                {roles.map(role => (
-                  <div key={role.id} className="rs-role-row">
+                {roles.map((role, roleIndex) => (
+                  <div
+                    key={role.id}
+                    className="rs-role-row"
+                    draggable={canEditRole(role)}
+                    onDragStart={e => { e.dataTransfer.setData('application/x-reelm-role-index', String(roleIndex)); e.dataTransfer.effectAllowed = 'move' }}
+                    onDragOver={e => { if (canEditRole(role)) e.preventDefault() }}
+                    onDrop={e => { const from = Number(e.dataTransfer.getData('application/x-reelm-role-index')); if (Number.isFinite(from)) moveRole(from, roleIndex) }}
+                  >
                     {editingRoleId === role.id ? (
                       <div className="rs-role-editor">
                         <div className="rs-color-row">
@@ -2846,13 +3416,37 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onAnnou
                         </div>
                       </div>
                     ) : (
-                      <>
-                        <span className="rs-role-dot" style={{ background: role.color }} />
-                        <span className="rs-role-name">{role.name}</span>
-                        <span className="rs-role-count">{members.filter(m => (m.roleIds || []).includes(role.id)).length} members</span>
-                        <button className="rs-role-edit-btn" onClick={() => startEditRole(role)}>Edit</button>
-                        <button className="rs-role-delete-btn" onClick={() => deleteRole(role.id)}>✕</button>
-                      </>
+                      <div className="rs-role-main">
+                        <div className="rs-role-head">
+                          {canEditRole(role) && (
+                            <span className="rs-role-order-controls">
+                              <button type="button" className="rs-role-order-btn" disabled={roleIndex === 0} onClick={() => moveRole(roleIndex, roleIndex - 1)}>↑</button>
+                              <button type="button" className="rs-role-order-btn" disabled={roleIndex === roles.length - 1} onClick={() => moveRole(roleIndex, roleIndex + 1)}>↓</button>
+                            </span>
+                          )}
+                          <span className="rs-role-dot" style={{ background: role.color }} />
+                          <span className="rs-role-name">{role.name}</span>
+                          {isManagerRoleClient(role) && <span className="rs-role-protected">protected</span>}
+                          <span className="rs-role-count">{members.filter(m => (m.roleIds || []).includes(role.id)).length} members</span>
+                          {canEditRole(role) && <button className="rs-role-edit-btn" onClick={() => startEditRole(role)}>Edit</button>}
+                          {canDeleteRole(role) && <button className="rs-role-delete-btn" onClick={() => deleteRole(role.id)}>✕</button>}
+                        </div>
+                        <div className="rs-role-permissions">
+                          {REELM_PERMISSION_OPTIONS.map(opt => {
+                            const active = roleHasPermissionClient(role, opt.key)
+                            const locked = !canEditRole(role) || (opt.key === 'manageReelm' && !canManageFullRoles)
+                            return (
+                              <button
+                                key={opt.key}
+                                className={`rs-perm-chip${active ? ' rs-perm-chip-active' : ''}${locked ? ' rs-perm-chip-locked' : ''}`}
+                                title={opt.note}
+                                disabled={locked}
+                                onClick={() => toggleRolePermission(role.id, opt.key)}
+                              >{opt.label}</button>
+                            )
+                          })}
+                        </div>
+                      </div>
                     )}
                   </div>
                 ))}
@@ -2861,7 +3455,7 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onAnnou
             </div>
           )}
 
-          {activeTab === 'roles' && (
+          {activeTab === 'roles' && (canManageRoles || canManageMembers || canManageInvites) && (
             <div className="rs-section">
               <div className="rs-section-header">
                 <span className="rs-section-title">Members</span>
@@ -2884,28 +3478,32 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onAnnou
                         {timedOutIds.has(String(m.userId)) && <span className="rs-member-you"> · timed out</span>}
                       </span>
                       <div className="rs-member-roles">
-                        {roles.map(role => (
-                          <button
-                            key={role.id}
-                            className={`rs-role-tag${(m.roleIds || []).includes(role.id) ? ' rs-role-tag-active' : ''}`}
-                            style={(m.roleIds || []).includes(role.id) ? { background: role.color + '33', borderColor: role.color, color: role.color } : {}}
-                            onClick={() => toggleMemberRole(m.userId, role.id)}
-                          >{role.name}</button>
-                        ))}
+                        {roles.map(role => {
+                          const canToggle = canToggleRoleForMember(m, role)
+                          return (
+                            <button
+                              key={role.id}
+                              className={`rs-role-tag${(m.roleIds || []).includes(role.id) ? ' rs-role-tag-active' : ''}${!canToggle ? ' rs-role-tag-locked' : ''}`}
+                              style={(m.roleIds || []).includes(role.id) ? { background: role.color + '33', borderColor: role.color, color: role.color } : {}}
+                              disabled={!canToggle}
+                              onClick={() => toggleMemberRole(m.userId, role.id)}
+                            >{role.name}</button>
+                          )
+                        })}
                       </div>
                     </div>
-                    {m.userId !== currentUser.id && (
+                    {m.userId !== currentUser.id && (canManageModeration || canManageMembers) && (
                       <div style={{ display: 'flex', gap: 6 }}>
-                        <button className="rs-member-remove" onClick={() => onTimeoutMember?.(reelm.id, m.userId)}>Timeout</button>
-                        <button className="rs-member-remove" onClick={() => removeMember(m.userId)}>Remove</button>
-                        <button className="rs-member-remove" onClick={() => onBanMember?.(reelm.id, m.userId)}>Ban</button>
+                        {canManageModeration && <button className="rs-member-remove" disabled={!canActOnMember(m)} onClick={() => onTimeoutMember?.(reelm.id, m.userId)}>Timeout</button>}
+                        {canManageMembers && <button className="rs-member-remove" disabled={!canActOnMember(m)} onClick={() => removeMember(m.userId)}>Remove</button>}
+                        {canManageModeration && <button className="rs-member-remove" disabled={!canActOnMember(m)} onClick={() => onBanMember?.(reelm.id, m.userId)}>Ban</button>}
                       </div>
                     )}
                   </div>
                 ))}
               </div>
 
-              {nonMembers.length > 0 && (
+              {(canManageInvites || canManageMembers) && nonMembers.length > 0 && (
                 <div className="rs-add-member-section">
                   <div className="rs-section-header" style={{ marginTop: 24 }}>
                     <span className="rs-section-title">Invite friends</span>
@@ -2935,7 +3533,7 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onAnnou
             </div>
           )}
 
-          {activeTab === 'ban_list' && (
+          {activeTab === 'ban_list' && canManageModeration && (
             <div className="rs-section">
               <div className="rs-section-header">
                 <span className="rs-section-title">Ban list</span>
@@ -2969,7 +3567,7 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onAnnou
           )}
 
 
-          {activeTab === 'timeouts' && (
+          {activeTab === 'timeouts' && canManageModeration && (
             <div className="rs-section">
               <div className="rs-section-header">
                 <span className="rs-section-title">Timeouts</span>
@@ -3003,7 +3601,7 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onAnnou
             </div>
           )}
 
-          {activeTab === 'channels' && (() => {
+          {activeTab === 'channels' && canManageChannels && (() => {
             const beginningCat = reelm.categories?.find(c => c.type === 'announcement')
             const beginningChannels = beginningCat?.channels || []
             const currentAnnId = reelm.announcementChannelId || beginningChannels[0]?.id || ''
@@ -5039,7 +5637,8 @@ function stableLegacyProfileKey(profile) {
     name: String(profile.name || profile.displayName || ''),
     photo: String(getPersonPhoto(profile) || ''),
     cover: String(getPersonCover(profile) || ''),
-    bio: String(profile.bio || '')
+    bio: String(profile.bio || ''),
+    profileTheme: JSON.stringify(profile.profileTheme || profile.customization || null)
   })
 }
 
@@ -5047,14 +5646,36 @@ function sameLegacyProfile(a, b) {
   return stableLegacyProfileKey(a) === stableLegacyProfileKey(b)
 }
 
+function isGoogleDefaultAvatarUrl(value) {
+  const url = String(value || '')
+  return /(^|\.)googleusercontent\.com\//i.test(url) || /lh3\.googleusercontent\.com/i.test(url)
+}
+
 function getPersonPhoto(person) {
   if (!person) return null
-  return person.photo || person.profilePhoto || person.photoURL || person.avatar || person.image || person.imageUrl || person.userPhoto || person.fromPhoto || null
+  const photo = person.photo || person.profilePhoto || person.photoURL || person.avatar || person.image || person.imageUrl || person.userPhoto || person.fromPhoto || null
+  return isGoogleDefaultAvatarUrl(photo) ? null : photo
 }
 
 function getPersonCover(person) {
   if (!person) return null
   return person.cover || person.coverImage || person.coverUrl || person.headerImage || person.banner || person.bannerImage || person.backgroundCover || null
+}
+
+function buildProfileThemeStyle(person) {
+  const cfg = person?.profileTheme || person?.customization || null
+  if (!cfg || typeof cfg !== 'object') return undefined
+  const theme = THEMES.find(th => th.id === cfg.themeId) || THEMES[0]
+  const accent = cfg.customAccent || theme.accent || '#b99887'
+  const base = cfg.customBase || theme.base || '#120e1e'
+  const accentRgb = hexToRgb(accent) || theme.accentRgb || [185, 152, 135]
+  const baseRgb = hexToRgb(base) || theme.baseRgb || [18, 14, 30]
+  return {
+    '--fpp-theme-accent': accent,
+    '--fpp-theme-accent-rgb': accentRgb.join(','),
+    '--fpp-theme-base': base,
+    '--fpp-theme-base-rgb': baseRgb.join(','),
+  }
 }
 
 function getReelmChannels(reelm) {
@@ -5089,7 +5710,7 @@ function canManageReelmClient(reelm, uid) {
   const member = (Array.isArray(reelm.members) ? reelm.members : []).find(m => String(m.userId || m.id || '') === String(uid))
   if (!member) return false
   const roleIds = new Set((member.roleIds || []).map(String))
-  return (Array.isArray(reelm.roles) ? reelm.roles : []).some(role => roleIds.has(String(role.id)) && /admin|moderator|founder|owner/i.test(String(role.name || '')))
+  return (Array.isArray(reelm.roles) ? reelm.roles : []).some(role => roleIds.has(String(role.id)) && isManagerRoleClient(role))
 }
 
 function ReelmsCommunityGlyph() {
@@ -5330,6 +5951,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       scheduleUserPersist('customization', toSave)
       // Keep account customization durable even if the app is closed shortly after a change.
       userPutDoc('customization', toSave).catch(() => {})
+      userProfilePatch({ profileTheme: toSave }).catch(() => {})
       if ('bgImage' in updates) {
         if (updates.bgImage) {
           scheduleUserPersist('bg_image', updates.bgImage)
@@ -5425,11 +6047,26 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const chatsRef = useRef([])
   useEffect(() => { chatsRef.current = chats }, [chats])
   const [reelms, setReelms] = useState([])
+  const reelmsLocalCacheKey = uid && uid !== 'guest' ? `reelms:member-reelms:${uid}` : null
   const [selectedReelm, setSelectedReelm] = useState(null)
   const selectedReelmRef = useRef(null)
   const selectedChannelRef = useRef(null)
   const selectedChatRef = useRef(null)
   const [reelmLoading, setReelmLoading] = useState(false)
+
+  // Instant local cache: prevents the Reelm bar/home list from looking empty while the API/bootstrap round-trip completes.
+  useEffect(() => {
+    if (!reelmsLocalCacheKey) return
+    try {
+      const cached = JSON.parse(localStorage.getItem(reelmsLocalCacheKey) || '[]')
+      if (Array.isArray(cached) && cached.length && reelmsRef.current.length === 0) setReelms(cached)
+    } catch { /* noop */ }
+  }, [reelmsLocalCacheKey])
+
+  useEffect(() => {
+    if (!reelmsLocalCacheKey || !Array.isArray(reelms) || !reelms.length) return
+    try { localStorage.setItem(reelmsLocalCacheKey, JSON.stringify(reelms.slice(0, 80))) } catch { /* noop */ }
+  }, [reelmsLocalCacheKey, reelms])
 
   // Load reelms + chats from Firestore on mount
   useEffect(() => {
@@ -5491,11 +6128,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [flyingRoomTick, setFlyingRoomTick] = useState(0)
   const [voiceChannel, setVoiceChannel] = useState(null) // { channelId, reelmId, channelName }
   const [voiceMuted, setVoiceMuted] = useState(false)
+  const [voiceDeafened, setVoiceDeafened] = useState(false)
   const [voiceVideoOn, setVoiceVideoOn] = useState(false)
   const [voiceScreenSharing, setVoiceScreenSharing] = useState(false)
   const [voiceScreenFullscreen, setVoiceScreenFullscreen] = useState(false)
+  const [fullscreenUiVisible, setFullscreenUiVisible] = useState(true)
+  const fullscreenUiTimerRef = useRef(null)
+  const [expandedScreenUser, setExpandedScreenUser] = useState(null)
   const [voiceParticipants, setVoiceParticipants] = useState([])
   const [vcCounts, setVcCounts] = useState({}) // { [channelId] and [reelmId:channelId]: number }
+  const [vcParticipantsByChannel, setVcParticipantsByChannel] = useState({}) // { [reelmId:channelId]: [{ userId, userName, userPhoto }] }
   const [channelFullToast, setChannelFullToast] = useState(false)
   const [speakingUsers, setSpeakingUsers] = useState(new Set())
   const [remoteControlActive, setRemoteControlActive] = useState(null) // { controllerId, controllerName, sharingUserId, sharingUserName }
@@ -5507,11 +6149,42 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     return (scopedKey && vcCounts[scopedKey] != null) ? vcCounts[scopedKey] : (vcCounts[channelId] ?? 0)
   }
 
+  const vcParticipantsFor = (reelmId, channelId) => {
+    const scopedKey = reelmId && channelId ? `${reelmId}:${channelId}` : null
+    if (!scopedKey) return []
+    return Array.isArray(vcParticipantsByChannel[scopedKey]) ? vcParticipantsByChannel[scopedKey] : []
+  }
+  const canManageVoiceClient = (reelm, actorUid) => hasReelmPermissionClient(reelm, actorUid, 'manageVoice') || hasReelmPermissionClient(reelm, actorUid, 'manageModeration')
+  const isStageLikeChannel = (channel) => String(channel?.type || '') === 'stage'
+  const canSpeakInStageClient = (reelm, channel, actorUid) => {
+    if (!isStageLikeChannel(channel)) return true
+    if (canManageVoiceClient(reelm, actorUid)) return true
+    return (channel.speakerIds || []).map(String).includes(String(actorUid))
+  }
+
+  const getVoiceRoomForMember = (reelm, userId) => {
+    const target = String(userId || '')
+    if (!reelm || !target) return null
+    const categories = Array.isArray(reelm.categories) ? reelm.categories : []
+    for (const category of categories) {
+      const channels = Array.isArray(category.channels) ? category.channels : []
+      for (const channel of channels) {
+        if (!['voice', 'video', 'liveaction', 'stage'].includes(channel.type)) continue
+        const participant = vcParticipantsFor(reelm.id, channel.id).find(p => String(p.userId) === target)
+        if (participant) {
+          return { reelmId: reelm.id, channelId: channel.id, channelName: channel.name || 'Voice', channelType: channel.type, participant }
+        }
+      }
+    }
+    return null
+  }
+
   const audioAnalyzersRef = useRef({})
   const localStreamRef = useRef(null)
   const screenStreamRef = useRef(null)
   const screenTrackIdsRef = useRef(new Set()) // track IDs belonging to screen share
   const peersRef = useRef({})
+  const pendingIceCandidatesRef = useRef({})
   const dataChannelsRef = useRef({})
   const vcRoomRef = useRef(null)      // { reelmId, channelId } while in voice
   const currentUserRef = useRef(null) // always-fresh currentUser for vc callbacks
@@ -5528,13 +6201,31 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [voicePositions, setVoicePositions] = useState({})
   const [showSpatialPanel, setShowSpatialPanel] = useState(false)
   const [expandedVideoUser, setExpandedVideoUser] = useState(null)
+  const [videoExpandFullscreen, setVideoExpandFullscreen] = useState(false)
   const [blurBg, setBlurBg] = useState(false)
   const blurCanvasRef = useRef(null)
   const blurHiddenVideoRef = useRef(null)
   const blurSegRef = useRef(null)
   const blurAnimFrameRef = useRef(null)
+  const showFullscreenUi = () => {
+    setFullscreenUiVisible(true)
+    if (fullscreenUiTimerRef.current) clearTimeout(fullscreenUiTimerRef.current)
+    fullscreenUiTimerRef.current = setTimeout(() => setFullscreenUiVisible(false), 1800)
+  }
+  useEffect(() => () => {
+    if (fullscreenUiTimerRef.current) clearTimeout(fullscreenUiTimerRef.current)
+  }, [])
+  useEffect(() => {
+    if (voiceScreenFullscreen || videoExpandFullscreen) showFullscreenUi()
+  }, [voiceScreenFullscreen, videoExpandFullscreen])
   const [showVoiceParticipantsPopup, setShowVoiceParticipantsPopup] = useState(false)
   const [voiceTileMenuUser, setVoiceTileMenuUser] = useState(null)
+  const [voiceRoomUserMenu, setVoiceRoomUserMenu] = useState(null) // { x, y, reelmId, channelId, userId, userName, userPhoto }
+  const [serverMemberAction, setServerMemberAction] = useState(null) // { type, reelmId, user }
+  const [serverActionReason, setServerActionReason] = useState('')
+  const [serverActionMinutes, setServerActionMinutes] = useState(10)
+  const [inviteFriendSearch, setInviteFriendSearch] = useState('')
+  const [rightPanelNoRoleSearch, setRightPanelNoRoleSearch] = useState('')
   const [changelog, setChangelog] = useState([])
   const [, setCurrentVersion] = useState(null)
   const [showMenu, setShowMenu] = useState(false)
@@ -5602,6 +6293,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [shareTarget, setShareTarget] = useState(null)
   const [showChatList, setShowChatList] = useState(false)
   const [chatListFilter, setChatListFilter] = useState('all')
+  const [chatListSearch, setChatListSearch] = useState('')
+  const [mutedReelmIds, setMutedReelmIds] = useState([])
+  const mutedReelmIdsRef = useRef([])
+  useEffect(() => { mutedReelmIdsRef.current = mutedReelmIds.map(String) }, [mutedReelmIds])
   const [friends, setFriends] = useState([])
   const [blocked, setBlocked] = useState([])
   const [chatProfileCache, setChatProfileCache] = useState({})
@@ -5694,7 +6389,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     for (const reelm of (Array.isArray(reelms) ? reelms : [])) {
       const member = (Array.isArray(reelm?.members) ? reelm.members : []).find(m => String(m.userId || m.id || '') === fid)
       if (member) {
-        fromReelm = { id: fid, name: member.userName || member.name, username: member.username, photo: member.userPhoto || member.photo || null, userPhoto: member.userPhoto || member.photo || null }
+        fromReelm = { id: fid, name: member.userName || member.name, username: member.username, photo: member.userPhoto || member.photo || null, userPhoto: member.userPhoto || member.photo || null, profileTheme: member.profileTheme || null }
         break
       }
     }
@@ -5705,7 +6400,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (!chat) return 'Unknown'
     if (chat.type === 'dm') {
       const peer = getChatPeer(chat)
-      return nicknames[chat.friendId] || peer?.name || peer?.displayName || peer?.username || chat.name || 'Unknown'
+      return (isReelmsSystemChat(chat) ? '' : nicknames[chat.friendId]) || peer?.name || peer?.displayName || peer?.username || chat.name || 'Unknown'
     }
     return chat.name || 'Group'
   }, [getChatPeer, nicknames])
@@ -5735,7 +6430,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       if (!fid || fetchedChatProfilesRef.current.has(fid)) return
       const chat = chats.find(c => String(c.friendId || '') === fid)
       const peer = getChatPeer(chat)
-      if (getPersonPhoto(peer) || getPersonPhoto(chat)) return
+      if ((getPersonPhoto(peer) || getPersonPhoto(chat)) && (peer?.profileTheme || chat?.profileTheme)) return
       fetchedChatProfilesRef.current.add(fid)
       userProfileGetById(fid).then((profile) => {
         if (!profile) return
@@ -5756,6 +6451,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           activity: profile.activity || null,
           sociallinks: profile.sociallinks || {},
           socialorder: Array.isArray(profile.socialorder) ? profile.socialorder : [],
+          profileTheme: profile.profileTheme || null,
         }
         setChatProfileCache(prev => sameDocValue(prev[fid], cached) ? prev : { ...prev, [fid]: cached })
         setChats(prev => {
@@ -5795,6 +6491,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       if (data.nicknames && typeof data.nicknames === 'object') setNicknames(data.nicknames)
       if (data.unread_counts && typeof data.unread_counts === 'object') setUnreadCounts(data.unread_counts)
       if (Array.isArray(data.pinned_items)) setPinnedItemIds(data.pinned_items)
+      if (Array.isArray(data.muted_reelms)) setMutedReelmIds(data.muted_reelms.map(String))
       if (Array.isArray(data.feed_nav) && data.feed_nav.length === ALL_FEED_NAV.length) setFeedNavOrder(data.feed_nav)
       if (typeof data.landing_view === 'string') setReelmLandingView(data.landing_view)
       if (data.lpw != null) setLeftWidth(parseInt(String(data.lpw), 10) || PANEL_DEFAULT)
@@ -5845,6 +6542,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       else if (sk === 'nicknames') setStableObject(setNicknames, v && typeof v === 'object' ? v : {})
       else if (sk === 'unread_counts') setStableObject(setUnreadCounts, v && typeof v === 'object' ? v : {})
       else if (sk === 'pinned_items') setStableArray(setPinnedItemIds, Array.isArray(v) ? v : [])
+      else if (sk === 'muted_reelms') setStableArray(setMutedReelmIds, Array.isArray(v) ? v.map(String) : [])
       else if (sk === 'spotify_connected') setSpotifyConnected(v === true || v === 'true')
       else if (sk === 'last_channels') setStableObject(setLastChannels, v && typeof v === 'object' ? v : {})
       else if (sk === 'sessions') setStableArray(setSessionsList, Array.isArray(v) ? v : [])
@@ -5899,7 +6597,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           bio: profile.bio ?? person.bio,
           activity: profile.activity ?? person.activity,
           sociallinks: profile.sociallinks ?? person.sociallinks,
-          socialorder: profile.socialorder ?? person.socialorder
+          socialorder: profile.socialorder ?? person.socialorder,
+          profileTheme: profile.profileTheme ?? person.profileTheme ?? person.customization ?? null
         }
       }
       if (String(uid) === pid) {
@@ -5910,20 +6609,28 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       setFriendRequests(prev => Array.isArray(prev) ? prev.map(patchPerson) : prev)
       setMsgRequests(prev => Array.isArray(prev) ? prev.map((req) => {
         const fromId = String(req?.fromId || req?.id || '')
-        return fromId === pid ? { ...req, fromName: profile.name || profile.displayName || req.fromName, name: profile.name || profile.displayName || req.name, username: profile.username ?? req.username, photo: getPersonPhoto(profile) ?? req.photo, fromPhoto: getPersonPhoto(profile) ?? req.fromPhoto, cover: getPersonCover(profile) ?? req.cover, coverImage: getPersonCover(profile) ?? req.coverImage, coverUrl: getPersonCover(profile) ?? req.coverUrl } : req
+        return fromId === pid ? { ...req, fromName: profile.name || profile.displayName || req.fromName, name: profile.name || profile.displayName || req.name, username: profile.username ?? req.username, photo: getPersonPhoto(profile) ?? req.photo, fromPhoto: getPersonPhoto(profile) ?? req.fromPhoto, cover: getPersonCover(profile) ?? req.cover, coverImage: getPersonCover(profile) ?? req.coverImage, coverUrl: getPersonCover(profile) ?? req.coverUrl, profileTheme: profile.profileTheme ?? req.profileTheme ?? null } : req
       }) : prev)
       setChats(prev => Array.isArray(prev) ? prev.map((chat) => {
         if (String(chat?.friendId || '') !== pid) return chat
-        return { ...chat, name: profile.name || profile.displayName || chat.name, username: profile.username ?? chat.username, photo: getPersonPhoto(profile) ?? chat.photo, image: getPersonPhoto(profile) ?? chat.image, cover: getPersonCover(profile) ?? chat.cover, coverImage: getPersonCover(profile) ?? chat.coverImage, coverUrl: getPersonCover(profile) ?? chat.coverUrl, bio: profile.bio ?? chat.bio, activity: profile.activity ?? chat.activity, sociallinks: profile.sociallinks ?? chat.sociallinks, socialorder: profile.socialorder ?? chat.socialorder }
+        return { ...chat, name: profile.name || profile.displayName || chat.name, username: profile.username ?? chat.username, photo: getPersonPhoto(profile) ?? chat.photo, image: getPersonPhoto(profile) ?? chat.image, cover: getPersonCover(profile) ?? chat.cover, coverImage: getPersonCover(profile) ?? chat.coverImage, coverUrl: getPersonCover(profile) ?? chat.coverUrl, bio: profile.bio ?? chat.bio, activity: profile.activity ?? chat.activity, sociallinks: profile.sociallinks ?? chat.sociallinks, socialorder: profile.socialorder ?? chat.socialorder, profileTheme: profile.profileTheme ?? chat.profileTheme ?? null }
       }) : prev)
-      setSelectedChat(prev => prev && String(prev.friendId || '') === pid ? { ...prev, name: profile.name || profile.displayName || prev.name, username: profile.username ?? prev.username, photo: getPersonPhoto(profile) ?? prev.photo, image: getPersonPhoto(profile) ?? prev.image, cover: getPersonCover(profile) ?? prev.cover, coverImage: getPersonCover(profile) ?? prev.coverImage, coverUrl: getPersonCover(profile) ?? prev.coverUrl, bio: profile.bio ?? prev.bio, activity: profile.activity ?? prev.activity, sociallinks: profile.sociallinks ?? prev.sociallinks, socialorder: profile.socialorder ?? prev.socialorder } : prev)
+      setSelectedChat(prev => prev && String(prev.friendId || '') === pid ? { ...prev, name: profile.name || profile.displayName || prev.name, username: profile.username ?? prev.username, photo: getPersonPhoto(profile) ?? prev.photo, image: getPersonPhoto(profile) ?? prev.image, cover: getPersonCover(profile) ?? prev.cover, coverImage: getPersonCover(profile) ?? prev.coverImage, coverUrl: getPersonCover(profile) ?? prev.coverUrl, bio: profile.bio ?? prev.bio, activity: profile.activity ?? prev.activity, sociallinks: profile.sociallinks ?? prev.sociallinks, socialorder: profile.socialorder ?? prev.socialorder, profileTheme: profile.profileTheme ?? prev.profileTheme ?? null } : prev)
+      setDmFriendProfile(prev => prev && String(prev.id || prev.uid || '') === pid ? patchPerson(prev) : prev)
+      setFriendProfileTarget(prev => prev?.friend && String(prev.friend.id || prev.friend.uid || '') === pid ? { ...prev, friend: patchPerson(prev.friend) } : prev)
+      setChatProfileCache(prev => {
+        const current = prev?.[pid]
+        if (!current) return prev
+        const nextProfile = patchPerson(current)
+        return sameDocValue(current, nextProfile) ? prev : { ...prev, [pid]: nextProfile }
+      })
       const patchReelmMembers = (reelm) => {
         if (!reelm || !Array.isArray(reelm.members)) return reelm
         let changed = false
         const members = reelm.members.map((member) => {
           if (String(member?.userId || '') !== pid) return member
           changed = true
-          return { ...member, userName: profile.name || profile.displayName || member.userName, username: profile.username ?? member.username, userPhoto: getPersonPhoto(profile) ?? member.userPhoto, photo: getPersonPhoto(profile) ?? member.photo }
+          return { ...member, userName: profile.name || profile.displayName || member.userName, username: profile.username ?? member.username, userPhoto: getPersonPhoto(profile) ?? member.userPhoto, photo: getPersonPhoto(profile) ?? member.photo, profileTheme: profile.profileTheme ?? member.profileTheme ?? null }
         })
         return changed ? { ...reelm, members } : reelm
       }
@@ -5936,7 +6643,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           const userMap = { ...(users || {}) }
           if (userMap[pid]) {
             changed = true
-            userMap[pid] = { ...userMap[pid], userName: profile.name || profile.displayName || userMap[pid].userName, userPhoto: getPersonPhoto(profile) ?? userMap[pid].userPhoto, photo: getPersonPhoto(profile) ?? userMap[pid].photo }
+            userMap[pid] = { ...userMap[pid], userName: profile.name || profile.displayName || userMap[pid].userName, userPhoto: getPersonPhoto(profile) ?? userMap[pid].userPhoto, photo: getPersonPhoto(profile) ?? userMap[pid].photo, profileTheme: profile.profileTheme ?? userMap[pid].profileTheme ?? null }
           }
           next[reelmId] = userMap
         })
@@ -5949,7 +6656,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           next[key] = Array.isArray(list) ? list.map((msg) => {
             if (String(msg?.sender?.id || msg?.userId || '') !== pid) return msg
             changed = true
-            return { ...msg, sender: { ...(msg.sender || {}), id: pid, name: profile.name || profile.displayName || msg.sender?.name, username: profile.username ?? msg.sender?.username, photo: getPersonPhoto(profile) ?? msg.sender?.photo } }
+            return { ...msg, sender: { ...(msg.sender || {}), id: pid, name: profile.name || profile.displayName || msg.sender?.name, username: profile.username ?? msg.sender?.username, photo: getPersonPhoto(profile) ?? msg.sender?.photo, profileTheme: profile.profileTheme ?? msg.sender?.profileTheme ?? null } }
           }) : list
         })
         return changed ? next : prev
@@ -6024,6 +6731,24 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         if (!id) return
         addNotification(message || 'You were banned from this Reelm.', { type: 'reelm_banned', reelmId: id })
       },
+      onReelmClosed: ({ reelmId, name }) => {
+        const id = String(reelmId || '')
+        if (!id) return
+        socketLeaveReelm(id)
+        if (vcRoomRef.current?.reelmId && String(vcRoomRef.current.reelmId) === id) leaveVoiceChannel()
+        setReelms(prev => {
+          const next = prev.filter(r => String(r.id) !== id)
+          scheduleUserPersist('reelms', next)
+          return next
+        })
+        setSelectedReelm(prev => String(prev?.id || '') === id ? null : prev)
+        if (String(selectedReelmRef.current?.id || '') === id) {
+          setSelectedChannel(null)
+          setShowReelmSettings(false)
+          setShowReelmMenu(false)
+        }
+        addNotification(`${name || 'This Reelm'} was closed.`, { type: 'reelm_closed', reelmId: id })
+      },
       onMessage: (msgKey, msg) => {
         setMessages(prev => appendUniqueMessage(prev, msgKey, msg))
         const now = Date.now()
@@ -6077,10 +6802,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           const hasMention = myUsername && msg.text && msg.text.toLowerCase().includes(`@${myUsername.toLowerCase()}`)
           const isActiveThread = msgKey === activeMsgKeyRef.current && !document.hidden
           if (hasMention) playSound.mention()
+          const mutedReelmId = !isDmKey ? reelmsRef.current.find(r => String(msgKey).startsWith(`${r.id}_`))?.id : null
+          const reelmMuted = mutedReelmId && mutedReelmIdsRef.current.includes(String(mutedReelmId))
+          if (hasMention && !reelmMuted) playSound.mention()
           else if (isActiveThread) playSound.dot()
-          else playSound.message()
-          if (!isActiveThread) bumpUnreadForMsgKey(msgKey, 1)
-          if (!isActiveThread) {
+          else if (!reelmMuted) playSound.message()
+          if (!isActiveThread && !reelmMuted) bumpUnreadForMsgKey(msgKey, 1)
+          if (!isActiveThread && !reelmMuted) {
             const chat = chatsRef.current.find(c => String(c.id) === String(msgKey))
             let link = null
             let title = ''
@@ -6142,6 +6870,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       onVcError: (msg) => {
         if (msg?.error === 'channel_full') { showChannelFullToast(); leaveVoiceChannel() }
         else if (msg?.error === 'reelm_timeout') { addNotification(msg?.timeout?.message || 'You are timed out in this Reelm.'); leaveVoiceChannel() }
+        else if (msg?.error === 'voice_stale') { addNotification('Voice room disconnected because the tab stopped responding.'); leaveVoiceChannel() }
         else console.warn('Voice channel error:', msg?.error || msg)
       },
       onVcCount: ({ reelmId, channelId, count }) => {
@@ -6155,6 +6884,21 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             if (reelmId) scoped[`${reelmId}:${channelId}`] = count
           })
           return { ...prev, ...scoped }
+        })
+      },
+      onVcParticipants: ({ reelmId, channelId, participants, channels }) => {
+        setVcParticipantsByChannel(prev => {
+          const next = { ...prev }
+          if (reelmId && channelId) {
+            const key = `${reelmId}:${channelId}`
+            next[key] = Array.isArray(participants) ? participants : []
+          }
+          if (reelmId && channels && typeof channels === 'object') {
+            Object.entries(channels).forEach(([chId, list]) => {
+              next[`${reelmId}:${chId}`] = Array.isArray(list) ? list : []
+            })
+          }
+          return next
         })
       },
       onPresence: ({ reelmId, users }) => {
@@ -6179,6 +6923,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             if (!byId.has(id)) byId.set(id, { userId: id, userName: p.userName || 'Member', userPhoto: p.userPhoto || null, isMuted: false, isVideoOn: false })
           })
           return Array.from(byId.values())
+        })
+        participants.forEach(p => {
+          const id = String(p.userId || '')
+          if (!id || id === String(uid)) return
+          createPeer(id, localStreamRef.current, shouldInitiatePeer(id))
         })
       },
       onConnect: () => {
@@ -6301,6 +7050,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     })
   }
   const goHome = () => {
+    setReelmLoading(false)
     setSelectedChat(null)
     setSelectedReelm(null)
     setShowDiscover(false)
@@ -6308,6 +7058,23 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setShowSettings(false)
     setShowChatList(false)
     setShowFeed(false)
+  }
+
+  const toggleMuteReelmById = (reelmId) => {
+    const id = String(reelmId || '')
+    if (!id) return
+    setMutedReelmIds(prev => {
+      const exists = prev.map(String).includes(id)
+      const next = exists ? prev.filter(x => String(x) !== id) : [...prev.map(String), id]
+      scheduleUserPersist('muted_reelms', next)
+      userPutDoc('muted_reelms', next).catch(() => {})
+      return next
+    })
+  }
+
+  const toggleMuteSelectedReelm = () => {
+    if (!selectedReelm?.id) return
+    toggleMuteReelmById(selectedReelm.id)
   }
 
   const handleSelectReelm = (reelm) => {
@@ -6538,7 +7305,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         setShowDiscover(false)
         if (link.channelId) {
           const ch = r.categories?.flatMap(c => c.channels || []).find(c => String(c.id) === String(link.channelId))
-          if (ch) { setSelectedChannel(ch); clearReelmChannelUnread(r.id, ch.id) }
+          if (ch) {
+            setSelectedChannel(ch)
+            clearReelmChannelUnread(r.id, ch.id)
+            if (link.inviteKind === 'voice' && ['voice', 'video', 'liveaction', 'stage'].includes(ch.type)) joinVoiceChannel(r.id, ch.id, ch.name)
+          }
         }
       }
     } else if (link.type === 'reelm_join_requests') {
@@ -6552,12 +7323,17 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         setShowReelmSettings(true)
       }
     } else if (link.type === 'reelm_invite') {
-      if (link.code) setJoinCodeInput(String(link.code).toUpperCase())
-      setCreateReelmStep('joining')
-      setShowMenu(true)
+      const r = reelmsRef.current.find(x => String(x.id) === String(link.reelmId))
+      if (r) {
+        setSelectedReelm(r)
+        setSelectedChat(null)
+        setShowChatList(false)
+        setShowFeed(false)
+        setShowDiscover(false)
+      } else {
+        addNotification('Use Accept or Decline on the invite notification.')
+      }
       setShowNotificationsPopup(false)
-      setShowDiscover(false)
-      setShowChatList(false)
     } else if (link.type === 'friends') {
       setShowFriendsPopup(true)
       setShowNotificationsPopup(false)
@@ -6572,6 +7348,33 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }
   const _pushNotifTo = (targetUid, text, link = null) => {
     void socialNotify(String(targetUid), text, link).catch(() => {})
+  }
+
+  const acceptReelmInviteNotification = async (notification) => {
+    const reelmId = notification?.link?.reelmId
+    if (!reelmId) return
+    try {
+      const result = await acceptReelmInvite(reelmId)
+      if (result?.reelm) {
+        mergeReelmIntoState(result.reelm, { persist: true })
+        setSelectedReelm(result.reelm)
+        setSelectedChat(null)
+        setShowChatList(false)
+        addNotification(`Joined ${result.reelm.name || 'Reelm'}.`)
+      } else if (result?.pending) {
+        addNotification('Invite accepted. The server owner/admin will approve your join request.')
+      }
+      deleteNotification(notification.id)
+      setShowNotificationsPopup(false)
+    } catch {
+      addNotification('Could not accept this invite. It may have expired.')
+    }
+  }
+
+  const rejectReelmInviteNotification = async (notification) => {
+    const reelmId = notification?.link?.reelmId
+    try { if (reelmId) await rejectReelmInvite(reelmId) } catch { /* noop */ }
+    deleteNotification(notification.id)
   }
 
   const isFriend = (userId) => friends.some(f => String(f.id) === String(userId))
@@ -6704,6 +7507,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     })
   }
   const [friendProfileTarget, setFriendProfileTarget] = useState(null) // { friend, anchorRect }
+  const [expandedProfileRolesUserId, setExpandedProfileRolesUserId] = useState(null)
   const [showFriendSelector, setShowFriendSelector] = useState(false)
   const [friendSelectorQuery, setFriendSelectorQuery] = useState('')
   const [dmProfileExpanded, setDmProfileExpanded] = useState(false)
@@ -6729,7 +7533,15 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (activeDataUidRef.current === uid) return
     activeDataUidRef.current = uid
     setChats([])
-    setReelms([])
+    let cachedReelmsForUid = []
+    try {
+      if (uid && uid !== 'guest') {
+        const rawCachedReelms = localStorage.getItem(`reelms:member-reelms:${uid}`)
+        const parsedCachedReelms = rawCachedReelms ? JSON.parse(rawCachedReelms) : []
+        if (Array.isArray(parsedCachedReelms)) cachedReelmsForUid = parsedCachedReelms
+      }
+    } catch { cachedReelmsForUid = [] }
+    setReelms(cachedReelmsForUid)
     setSelectedChat(null)
     setSelectedReelm(null)
     setSelectedChannel(null)
@@ -6750,18 +7562,21 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }, [uid])
 
   const saveNickname = (friendId, nick) => {
+    if (isReelmsSystemUid(friendId)) return
     const next = { ...nicknames, [friendId]: nick }
     if (!nick) delete next[friendId]
     setNicknames(next)
     scheduleUserPersist('nicknames', next)
   }
 
-  const openFriendProfile = (friend, e) => {
+  const openFriendProfile = (friend, e, opts = {}) => {
     if (!friend?.id) return
     const rect = e.currentTarget.getBoundingClientRect()
-    setFriendProfileTarget({ friend, anchorRect: rect })
+    const inServerSurface = !!(opts.serverContext || e.currentTarget.closest?.('.rp-members-panel, .reelm-channel-voice-users, .voice-participants, .voice-bar-participants'))
+    const target = { friend, anchorRect: rect, serverContext: inServerSurface ? 'reelm' : null }
+    setFriendProfileTarget(target)
     userProfileGetById(friend.id).then(data => {
-      if (data) setFriendProfileTarget({ friend: data, anchorRect: rect })
+      if (data) setFriendProfileTarget({ ...target, friend: data })
     }).catch(() => {})
   }
 
@@ -7038,9 +7853,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChat?.id, selectedReelm?.id, selectedChannel?.id])
 
-  useEffect(() => { setDmProfileExpanded(false); setDmFriendProfile(null); setDmSideTab('profile'); setGroupSideTab('members') }, [selectedChat?.id])
+  useEffect(() => { setDmProfileExpanded(false); setDmFriendProfile(null); setShowDmFriendMenu(false); setDmSideTab('profile'); setGroupSideTab('members') }, [selectedChat?.id])
   useEffect(() => {
-    if (selectedChat?.type !== 'dm' || !selectedChat.friendId) return
+    if (isReelmsSystemChat(selectedChat) && dmSideTab !== 'profile') setDmSideTab('profile')
+  }, [selectedChat?.id, dmSideTab])
+
+  useEffect(() => {
+    if (selectedChat?.type !== 'dm' || !selectedChat.friendId || isReelmsSystemChat(selectedChat)) return
     userProfileGetById(selectedChat.friendId).then(data => { if (data) setDmFriendProfile(data) }).catch(() => {})
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedChat?.friendId])
@@ -7209,7 +8028,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       remoteAudioElementsRef.current[userId] = audioEl
     }
     if (audioEl.srcObject !== stream) audioEl.srcObject = stream
-    audioEl.muted = false
+    audioEl.muted = voiceDeafened
+    audioEl.volume = voiceDeafened ? 0 : 1
     audioEl.play?.().catch(() => {})
 
     // Clean up previous nodes for this user
@@ -7364,22 +8184,64 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     }
   }
 
+  const shouldInitiatePeer = (peerId) => String(uid) < String(peerId)
+
+  const tuneSender = async (sender, { screen = false } = {}) => {
+    if (!sender || !sender.track || typeof sender.getParameters !== 'function') return
+    try {
+      const params = sender.getParameters() || {}
+      params.encodings = Array.isArray(params.encodings) && params.encodings.length ? params.encodings : [{}]
+      params.encodings[0].maxBitrate = screen ? 4_500_000 : sender.track.kind === 'video' ? 1_800_000 : 96_000
+      if (screen) params.degradationPreference = 'maintain-resolution'
+      else if (sender.track.kind === 'video') params.degradationPreference = 'balanced'
+      await sender.setParameters(params)
+    } catch { /* some browsers reject parameter tuning */ }
+  }
+
+  const addTrackToPeer = (pc, track, stream, { screen = false } = {}) => {
+    if (!pc || !track || !stream) return null
+    const alreadySending = pc.getSenders().some(sender => sender.track === track || sender.track?.id === track.id)
+    if (alreadySending) return null
+    try {
+      const sender = pc.addTrack(track, stream)
+      tuneSender(sender, { screen })
+      return sender
+    } catch { return null }
+  }
+
+  const addLocalTracksToPeer = (pc) => {
+    const local = localStreamRef.current
+    if (local) local.getTracks().forEach(track => addTrackToPeer(pc, track, local, { screen: false }))
+    const screen = screenStreamRef.current
+    if (screen) screen.getTracks().forEach(track => addTrackToPeer(pc, track, screen, { screen: true }))
+  }
+
+  const flushPendingIce = async (peerKey, pc) => {
+    const queued = pendingIceCandidatesRef.current[peerKey] || []
+    if (!queued.length || !pc?.remoteDescription) return
+    pendingIceCandidatesRef.current[peerKey] = []
+    for (const candidate of queued) {
+      try { await pc.addIceCandidate(new RTCIceCandidate(candidate)) } catch { /* noop */ }
+    }
+  }
+
   const createPeer = (targetId, stream, isInitiator) => {
     const peerKey = String(targetId)
-    if (peersRef.current[peerKey]) return peersRef.current[peerKey]
-    const pc = new RTCPeerConnection(STUN)
-    peersRef.current[peerKey] = pc
-    stream.getTracks().forEach(t => pc.addTrack(t, stream))
-    if (screenStreamRef.current) {
-      screenStreamRef.current.getTracks().forEach(t => pc.addTrack(t, screenStreamRef.current))
+    let pc = peersRef.current[peerKey]
+    if (pc) {
+      addLocalTracksToPeer(pc)
+      return pc
     }
+    pc = new RTCPeerConnection(STUN)
+    peersRef.current[peerKey] = pc
+    addLocalTracksToPeer(pc)
     // Trickle ICE — send candidates immediately as discovered
     pc.onicecandidate = e => {
       if (e.candidate) socketVcSignal(peerKey, { type: 'ice', candidate: e.candidate.toJSON() })
     }
     pc.ontrack = e => {
       const track = e.track
-      const stream = e.streams[0]
+      const stream = e.streams[0] || new MediaStream([track])
       if (track.kind === 'video') {
         // Distinguish screen vs camera by checking if the stream ID matches a known screen stream.
         // We use a data-channel message ('screen_stream_id') sent right after addTrack on the sender side.
@@ -7410,17 +8272,32 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       }
     }
     let makingOffer = false
-    const sendOffer = async () => {
+    const sendOffer = async ({ iceRestart = false } = {}) => {
       if (makingOffer || pc.signalingState !== 'stable') return
       makingOffer = true
       try {
-        const offer = await pc.createOffer({ voiceActivityDetection: false })
+        if (iceRestart && typeof pc.restartIce === 'function') pc.restartIce()
+        const offer = await pc.createOffer({ voiceActivityDetection: false, iceRestart })
         if (pc.signalingState !== 'stable') return
         await pc.setLocalDescription(offer)
         socketVcSignal(peerKey, { type: 'offer', sdp: pc.localDescription })
       } catch { /* noop */ } finally { makingOffer = false }
     }
-    pc.onnegotiationneeded = sendOffer
+    pc.onnegotiationneeded = () => sendOffer()
+    pc.oniceconnectionstatechange = () => {
+      if (['failed', 'disconnected'].includes(pc.iceConnectionState) && shouldInitiatePeer(peerKey)) {
+        window.setTimeout(() => sendOffer({ iceRestart: true }), pc.iceConnectionState === 'failed' ? 0 : 1200)
+      }
+    }
+    pc.onconnectionstatechange = () => {
+      if (['failed', 'disconnected'].includes(pc.connectionState) && shouldInitiatePeer(peerKey)) {
+        window.setTimeout(() => sendOffer({ iceRestart: true }), pc.connectionState === 'failed' ? 0 : 1500)
+      }
+      if (pc.connectionState === 'closed') {
+        delete peersRef.current[peerKey]
+        delete pendingIceCandidatesRef.current[peerKey]
+      }
+    }
     if (isInitiator) {
       const dc = pc.createDataChannel('reelms_control', { ordered: true })
       dataChannelsRef.current[peerKey] = dc
@@ -7433,6 +8310,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       pc.ondatachannel = e => {
         dataChannelsRef.current[peerKey] = e.channel
         e.channel.onmessage = ev => { try { handleControlEvent(peerKey, JSON.parse(ev.data)) } catch { /* noop */ } }
+        e.channel.onopen = () => { sendScreenStreamIdsToPeer(peerKey) }
       }
     }
     return pc
@@ -7442,15 +8320,60 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   // Stored in a ref so socket callbacks always call the latest closure.
   const handleVcEvent = (msg) => {
     const { type, from } = msg
-    if (!type || !from) return
+    if (!type) return
+    if (type === 'force_leave') {
+      const current = vcRoomRef.current
+      if (current && String(current.reelmId) === String(msg.reelmId || current.reelmId) && String(current.channelId) === String(msg.channelId || current.channelId)) {
+        addNotification('You were removed from the voice room by a moderator.')
+        leaveVoiceChannel()
+      }
+      return
+    }
+    if (type === 'force_move') {
+      if (!msg.reelmId || !msg.channelId) return
+      addNotification(`${msg.byName || 'A moderator'} moved you to ${msg.channelName || 'another voice room'}.`)
+      const current = vcRoomRef.current
+      if (current) leaveVoiceChannel()
+      window.setTimeout(() => joinVoiceChannel(String(msg.reelmId), String(msg.channelId), msg.channelName || 'Voice'), 250)
+      return
+    }
+    if (type === 'moderator_mute') {
+      localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = false })
+      setVoiceMuted(true)
+      setVoiceParticipants(prev => prev.map(p => p.userId === uid ? { ...p, isMuted: true } : p))
+      vcBroadcast({ type: 'mute', userId: uid, isMuted: true })
+      addNotification('A moderator muted your microphone. You can unmute yourself when ready.')
+      return
+    }
+    if (type === 'voice_invite') {
+      const channelName = msg.channelName || 'voice room'
+      addNotification(`${msg.senderName || 'Someone'} invited you to join ${channelName}.`, { type: 'reelm', reelmId: msg.reelmId, channelId: msg.channelId })
+      return
+    }
+    if (type === 'voice_kick_denied') {
+      addNotification(msg.message || 'Could not remove that member from voice.')
+      return
+    }
+    if (type === 'voice_move_denied') {
+      addNotification(msg.message || 'Could not move that member.')
+      return
+    }
+    if (type === 'voice_invite_denied') {
+      addNotification(msg.message || 'Could not send that voice invite.')
+      return
+    }
+    if (type === 'voice_mute_denied') {
+      addNotification(msg.message || 'Could not mute that member.')
+      return
+    }
     if (type === 'join') {
       setVoiceParticipants(prev => prev.find(p => String(p.userId) === String(from)) ? prev : [...prev, { userId: from, userName: msg.userName, userPhoto: msg.userPhoto, isMuted: false, isVideoOn: false }])
-      createPeer(from, localStreamRef.current, true)
+      createPeer(from, localStreamRef.current, shouldInitiatePeer(from))
       // Tell the newcomer we're here
       socketVcSignal(from, { type: 'here', userId: uid, userName: currentUserRef.current?.name, userPhoto: getPersonPhoto(currentUserRef.current) || null })
     } else if (type === 'here') {
       setVoiceParticipants(prev => prev.find(p => String(p.userId) === String(from)) ? prev : [...prev, { userId: from, userName: msg.userName, userPhoto: msg.userPhoto, isMuted: false, isVideoOn: false }])
-      createPeer(from, localStreamRef.current, false)
+      createPeer(from, localStreamRef.current, shouldInitiatePeer(from))
     } else if (type === 'leave') {
       const fk = String(from)
       setVoiceParticipants(prev => prev.filter(p => String(p.userId) !== fk))
@@ -7468,17 +8391,33 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       })
       setRemoteControlReq(prev => (prev && String(prev.requesterId) === fk ? null : prev))
     } else if (type === 'offer') {
-      let pc = peersRef.current[String(from)]
-      if (!pc) pc = createPeer(from, localStreamRef.current, false)
-      pc.setRemoteDescription(new RTCSessionDescription(msg.sdp))
+      const peerKey = String(from)
+      let pc = peersRef.current[peerKey]
+      if (!pc) pc = createPeer(from, localStreamRef.current, shouldInitiatePeer(from))
+      const polite = !shouldInitiatePeer(from)
+      const offerCollision = pc.signalingState !== 'stable'
+      if (offerCollision && !polite) return
+      Promise.resolve()
+        .then(() => offerCollision && pc.signalingState !== 'stable' ? pc.setLocalDescription({ type: 'rollback' }) : undefined)
+        .then(() => pc.setRemoteDescription(new RTCSessionDescription(msg.sdp)))
+        .then(() => flushPendingIce(peerKey, pc))
         .then(() => pc.createAnswer({ voiceActivityDetection: false }))
         .then(answer => pc.setLocalDescription(answer))
         .then(() => socketVcSignal(from, { type: 'answer', sdp: pc.localDescription }))
         .catch(() => {})
     } else if (type === 'answer') {
-      const pc = peersRef.current[String(from)]; if (pc) pc.setRemoteDescription(new RTCSessionDescription(msg.sdp)).catch(() => {})
+      const pc = peersRef.current[String(from)]
+      if (pc) pc.setRemoteDescription(new RTCSessionDescription(msg.sdp)).then(() => flushPendingIce(String(from), pc)).catch(() => {})
     } else if (type === 'ice') {
-      const pc = peersRef.current[String(from)]; if (pc) pc.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(() => {})
+      const peerKey = String(from)
+      const pc = peersRef.current[peerKey]
+      if (!pc) {
+        pendingIceCandidatesRef.current[peerKey] = [...(pendingIceCandidatesRef.current[peerKey] || []), msg.candidate]
+      } else if (!pc.remoteDescription) {
+        pendingIceCandidatesRef.current[peerKey] = [...(pendingIceCandidatesRef.current[peerKey] || []), msg.candidate]
+      } else {
+        pc.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(() => {})
+      }
     } else if (type === 'mute') {
       setVoiceParticipants(prev => prev.map(p => String(p.userId) === String(from) ? { ...p, isMuted: msg.isMuted } : p))
     } else if (type === 'video') {
@@ -7546,11 +8485,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         audio: { noiseSuppression, echoCancellation, autoGainControl: noiseSuppression },
         video: false,
       })
+      const shouldStartMuted = ch?.type === 'stage' && !canSpeakInStageClient(reelm, ch, uid)
+      if (shouldStartMuted) stream.getAudioTracks().forEach(t => { t.enabled = false })
       localStreamRef.current = stream
-      const myInfo = { userId: uid, userName: currentUser.name, userPhoto: currentUser.photo || null, isMuted: false, isVideoOn: false, stream }
+      const myInfo = { userId: uid, userName: currentUser.name, userPhoto: currentUser.photo || null, isMuted: shouldStartMuted, isVideoOn: false, stream }
       setVoiceParticipants([myInfo])
       setVoiceChannel({ channelId, reelmId, channelName })
-      setVoiceMuted(false); setVoiceVideoOn(false); setVoiceScreenSharing(false)
+      setVoiceMuted(shouldStartMuted); setVoiceVideoOn(false); setVoiceScreenSharing(false)
+      if (shouldStartMuted) addNotification('You joined as a listener. A moderator can make you a speaker.')
       vcRoomRef.current = { reelmId, channelId }
       // Announce join via Socket.IO — server broadcasts to room, replies come through handleVcEvent
       socketVcJoin(reelmId, channelId, currentUser.name, currentUser.photo || null)
@@ -7605,6 +8547,127 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     const analyzers = audioAnalyzersRef.current
     Object.values(analyzers).forEach(a => { try { a.context.close() } catch { /* noop */ } })
     audioAnalyzersRef.current = {}
+  }
+
+  useEffect(() => {
+    if (!voiceChannel?.reelmId || !voiceChannel?.channelId) return undefined
+    const { reelmId, channelId } = voiceChannel
+    const beat = () => socketVcHeartbeat(reelmId, channelId)
+    beat()
+    const heartbeatTimer = window.setInterval(beat, 15_000)
+    const leaveOnPageExit = () => {
+      socketVcLeave(reelmId, channelId)
+      socketLeaveChannel(`${reelmId}_vc_${channelId}`)
+    }
+    window.addEventListener('pagehide', leaveOnPageExit)
+    window.addEventListener('beforeunload', leaveOnPageExit)
+    return () => {
+      window.clearInterval(heartbeatTimer)
+      window.removeEventListener('pagehide', leaveOnPageExit)
+      window.removeEventListener('beforeunload', leaveOnPageExit)
+    }
+  }, [voiceChannel?.reelmId, voiceChannel?.channelId])
+
+
+  const updateStageSpeaker = (channelId, targetUid, shouldSpeak) => {
+    if (!selectedReelm || !channelId || !targetUid) return
+    if (!canManageVoiceClient(selectedReelm, uid)) { addNotification('You do not have permission to manage speakers.'); return }
+    const updater = (r) => ({
+      ...r,
+      categories: (r.categories || []).map(cat => ({
+        ...cat,
+        channels: (cat.channels || []).map(ch => String(ch.id) !== String(channelId) ? ch : {
+          ...ch,
+          speakerIds: shouldSpeak
+            ? Array.from(new Set([...(ch.speakerIds || []).map(String), String(targetUid)]))
+            : (ch.speakerIds || []).map(String).filter(id => id !== String(targetUid))
+        })
+      }))
+    })
+    const next = updater(selectedReelm)
+    updateReelm(next)
+    if (String(targetUid) === String(uid) && !shouldSpeak) {
+      localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = false })
+      setVoiceMuted(true)
+      setVoiceParticipants(prev => prev.map(p => p.userId === uid ? { ...p, isMuted: true } : p))
+      vcBroadcast({ type: 'mute', userId: uid, isMuted: true })
+    }
+    addNotification(shouldSpeak ? 'Member added as a speaker.' : 'Member moved back to listener.')
+  }
+
+  const kickVoiceUserFromChannel = (reelmId, channelId, participant) => {
+    if (!reelmId || !channelId || !participant?.userId || String(participant.userId) === String(uid)) return
+    if (!canManageVoiceClient(selectedReelm, uid)) { addNotification('You do not have permission to manage voice rooms.'); return }
+    socketVcKick(reelmId, channelId, participant.userId)
+    setVoiceTileMenuUser(null)
+    setVoiceRoomUserMenu(null)
+    addNotification(`${participant.userName || 'Member'} was removed from the voice room.`)
+  }
+
+  const kickVoiceParticipant = (participant) => {
+    if (!voiceChannel) return
+    kickVoiceUserFromChannel(voiceChannel.reelmId, voiceChannel.channelId, participant)
+  }
+
+  const moderatorMuteVoiceUserFromChannel = (reelmId, channelId, participant) => {
+    if (!reelmId || !channelId || !participant?.userId) return
+    if (!canManageVoiceClient(selectedReelm, uid)) { addNotification('You do not have permission to mute voice members.'); return }
+    socketVcModeratorMute(reelmId, channelId, participant.userId)
+    setVoiceRoomUserMenu(null)
+    setVoiceTileMenuUser(null)
+    addNotification(`${participant.userName || 'Member'} was muted for this voice room. They can unmute again.`)
+  }
+
+  const moderatorMuteVoiceParticipant = (participant) => {
+    if (!voiceChannel) return
+    moderatorMuteVoiceUserFromChannel(voiceChannel.reelmId, voiceChannel.channelId, participant)
+  }
+
+  const moveMemberToVoiceChannel = (reelmId, channelId, channelName, member) => {
+    const targetUid = member?.userId || member?.id
+    if (!reelmId || !channelId || !targetUid || String(targetUid) === String(uid)) return
+    const reelm = reelms.find(r => String(r.id) === String(reelmId)) || selectedReelm
+    if (!canManageVoiceClient(reelm, uid)) { addNotification('You do not have permission to move voice members.'); return }
+    const room = reelm ? getVoiceRoomForMember(reelm, targetUid) : null
+    if (room && String(room.reelmId) === String(reelmId) && String(room.channelId) === String(channelId)) {
+      addNotification(`${member.userName || member.name || 'Member'} is already in this voice room.`)
+      return
+    }
+    socketVcMove(reelmId, channelId, targetUid)
+    addNotification(room ? `${member.userName || member.name || 'Member'} is being moved to ${channelName || 'voice'}.` : `${member.userName || member.name || 'Member'} is not in a room; an invite will be sent.`)
+  }
+
+  const inviteMemberToVoiceChannel = (reelmId, channelId, channelName, member) => {
+    const targetUid = member?.userId || member?.id
+    if (!reelmId || !channelId || !targetUid || String(targetUid) === String(uid)) return
+    const reelm = reelms.find(r => String(r.id) === String(reelmId)) || selectedReelm
+    const targetName = member.userName || member.name || 'Member'
+    const room = reelm ? getVoiceRoomForMember(reelm, targetUid) : null
+    if (room && String(room.reelmId) === String(reelmId) && String(room.channelId) === String(channelId)) {
+      addNotification(`${targetName} is already in this voice room.`)
+      return
+    }
+    if (room) {
+      addNotification(`${targetName} is already in ${room.channelName}. Join their room instead.`)
+      return
+    }
+    socketVcInvite(reelmId, channelId, targetUid)
+    addNotification(`Voice invite sent to ${targetName}.`, { type: 'reelm', reelmId, channelId })
+  }
+
+  const inviteMemberToCurrentVoice = (member) => {
+    if (!voiceChannel || !member?.userId || String(member.userId) === String(uid)) return
+    const targetName = member.userName || member.name || 'Member'
+    const room = selectedReelm ? getVoiceRoomForMember(selectedReelm, member.userId) : null
+    if (room && String(room.reelmId) === String(voiceChannel.reelmId) && String(room.channelId) === String(voiceChannel.channelId)) {
+      addNotification(`${targetName} is already in this voice room.`)
+      return
+    }
+    if (room) {
+      addNotification(`${targetName} is already in ${room.channelName}. Join their room instead.`)
+      return
+    }
+    inviteMemberToVoiceChannel(voiceChannel.reelmId, voiceChannel.channelId, voiceChannel.channelName, member)
   }
 
   useEffect(() => {
@@ -7750,8 +8813,32 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const voiceToggleMute = () => {
     const next = !voiceMuted
+    if (!next && selectedChannel?.type === 'stage' && !canSpeakInStageClient(selectedReelm, selectedChannel, uid)) {
+      addNotification('Only selected speakers can unmute in this room.')
+      return
+    }
     localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = !next })
     setVoiceMuted(next)
+    setVoiceParticipants(prev => prev.map(p => p.userId === uid ? { ...p, isMuted: next } : p))
+    vcBroadcast({ type: 'mute', userId: uid, isMuted: next })
+  }
+
+  useEffect(() => {
+    Object.values(remoteAudioElementsRef.current || {}).forEach(audioEl => {
+      try { audioEl.muted = voiceDeafened; audioEl.volume = voiceDeafened ? 0 : 1 } catch { /* noop */ }
+    })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voiceDeafened])
+
+  const voiceToggleDeafen = () => {
+    setVoiceDeafened(next => !next)
+  }
+
+  const voiceToggleFullMute = () => {
+    const next = !(voiceMuted && voiceDeafened)
+    localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = !next })
+    setVoiceMuted(next)
+    setVoiceDeafened(next)
     setVoiceParticipants(prev => prev.map(p => p.userId === uid ? { ...p, isMuted: next } : p))
     vcBroadcast({ type: 'mute', userId: uid, isMuted: next })
   }
@@ -7760,16 +8847,29 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (!voiceVideoOn) {
       try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { showMediaUnavailable('camera'); return }
-        const vs = await navigator.mediaDevices.getUserMedia({ video: true })
+        const envDoc = await userGetDoc('environment').catch(() => ({})) || {}
+        const cameraQuality = envDoc.cameraQuality || 'hd'
+        const videoConstraints = cameraQuality === 'fullhd'
+          ? { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30, max: 30 } }
+          : { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 } }
+        const vs = await navigator.mediaDevices.getUserMedia({ video: videoConstraints })
         const vt = vs.getVideoTracks()[0]
-        localStreamRef.current.addTrack(vt)
-        Object.values(peersRef.current).forEach(pc => { try { pc.addTrack(vt, localStreamRef.current) } catch { /* noop */ } })
+        if (vt) {
+          try { vt.contentHint = 'motion' } catch { /* noop */ }
+          localStreamRef.current?.addTrack(vt)
+          Object.values(peersRef.current).forEach(pc => addTrackToPeer(pc, vt, localStreamRef.current, { screen: false }))
+        }
         setVoiceVideoOn(true)
         setVoiceParticipants(prev => prev.map(p => p.userId === uid ? { ...p, isVideoOn: true, stream: localStreamRef.current } : p))
         vcBroadcast({ type: 'video', userId: uid, isVideoOn: true })
       } catch (e) { console.warn('Camera error', e) }
     } else {
-      localStreamRef.current?.getVideoTracks().forEach(t => { t.stop(); try { localStreamRef.current.removeTrack(t) } catch { /* noop */ } })
+      localStreamRef.current?.getVideoTracks().forEach(t => {
+        Object.values(peersRef.current).forEach(pc => {
+          pc.getSenders().filter(s => s.track === t || s.track?.id === t.id).forEach(s => { try { pc.removeTrack(s) } catch { /* noop */ } })
+        })
+        t.stop(); try { localStreamRef.current.removeTrack(t) } catch { /* noop */ }
+      })
       setVoiceVideoOn(false)
       setVoiceParticipants(prev => prev.map(p => p.userId === uid ? { ...p, isVideoOn: false } : p))
       closeExpandedVideoForUser(uid)
@@ -7781,19 +8881,25 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (!voiceScreenSharing) {
       if (selectedChannel?.screenShareModOnly) {
         const member = selectedReelm?.members?.find(m => String(m.userId) === String(uid))
-        const isAdmin = (member?.roleIds || []).some(rid => selectedReelm?.roles?.find(r => r.id === rid)?.name === 'Admin')
+        const isAdmin = (member?.roleIds || []).some(rid => isManagerRoleClient(selectedReelm?.roles?.find(r => r.id === rid)))
         if (!isAdmin) return
       }
       try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) { showMediaUnavailable('screen'); return }
-        const ss = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: false })
+        const envDoc = await userGetDoc('environment').catch(() => ({})) || {}
+        const resolution = envDoc.screenResolution || '1080p'
+        const displayVideo = resolution === '720p'
+          ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 }, cursor: 'always' }
+          : { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30, max: 30 }, cursor: 'always' }
+        const ss = await navigator.mediaDevices.getDisplayMedia({ video: displayVideo, audio: Boolean(envDoc.screenShareAudio) })
         screenStreamRef.current = ss
         const screenVideoTrackIds = ss.getVideoTracks().map(t => t.id)
         // Register our own screen track IDs so ontrack on the other side can identify them
         screenVideoTrackIds.forEach(id => screenTrackIdsRef.current.add(id))
+        ss.getTracks().forEach(t => { try { if (t.kind === 'video') t.contentHint = 'detail' } catch { /* noop */ } })
         Object.keys(peersRef.current).forEach((peerKey) => {
           const pc = peersRef.current[peerKey]
-          ss.getTracks().forEach(t => { try { pc.addTrack(t, ss) } catch { /* noop */ } })
+          ss.getTracks().forEach(t => addTrackToPeer(pc, t, ss, { screen: true }))
           sendScreenStreamIdsToPeer(peerKey)
         })
         const stopScreen = () => {
@@ -7802,6 +8908,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           setVoiceScreenSharing(false)
           setVoiceParticipants(prev => prev.map(p => String(p.userId) === String(uid) ? { ...p, isScreenSharing: false, screenStream: null } : p))
           setVoiceScreenFullscreen(false)
+          setExpandedScreenUser(null)
           vcBroadcast({ type: 'screen', userId: uid, isScreenSharing: false })
           setRemoteControlActive(prev => (prev && String(prev.sharingUserId) === String(uid) ? null : prev))
         }
@@ -7823,6 +8930,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       setVoiceScreenSharing(false)
       setVoiceParticipants(prev => prev.map(p => p.userId === uid ? { ...p, isScreenSharing: false, screenStream: null } : p))
       setVoiceScreenFullscreen(false)
+      setExpandedScreenUser(null)
       vcBroadcast({ type: 'screen', userId: uid, isScreenSharing: false })
     }
   }
@@ -7830,12 +8938,17 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   useEffect(() => {
     if (expandedVideoUser && !voiceParticipants.some(p => String(p.userId) === String(expandedVideoUser.userId) && p.isVideoOn && p.stream)) {
       setExpandedVideoUser(null)
+      setVideoExpandFullscreen(false)
       setBlurBg(false)
+    }
+    if (expandedScreenUser && !voiceParticipants.some(p => String(p.userId) === String(expandedScreenUser.userId) && p.isScreenSharing && p.screenStream)) {
+      setExpandedScreenUser(null)
+      setVoiceScreenFullscreen(false)
     }
     if (voiceScreenFullscreen && !voiceParticipants.some(p => p.isScreenSharing && p.screenStream)) {
       setVoiceScreenFullscreen(false)
     }
-  }, [expandedVideoUser, voiceParticipants, voiceScreenFullscreen])
+  }, [expandedVideoUser, expandedScreenUser, voiceParticipants, voiceScreenFullscreen])
 
   const applyReelmRealtimeDoc = (reelmId, sk, data) => {
     const id = String(reelmId || '')
@@ -7928,6 +9041,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       showInDiscover: reelm.showInDiscover === true,
       joinMode: reelm.joinMode || 'request',
       autoJoinOnInvite: reelm.autoJoinOnInvite === true,
+      memberInvitesEnabled: reelm.memberInvitesEnabled !== false,
+      memberInviteMode: reelm.memberInviteMode === 'auto' ? 'auto' : 'request',
       ageRating: reelm.ageRating || 'under18',
       updatedAt: Date.now(),
     }).catch(() => {})
@@ -7977,11 +9092,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       showInDiscover: true,
       joinMode: 'request',
       autoJoinOnInvite: false,
+      memberInvitesEnabled: true,
+      memberInviteMode: 'request',
       ageRating: 'under18',
       announcementChannelId,
       roles: [
-        { id: 'role-admin-' + reelmId, name: 'Admin', color: '#f87171' },
-        { id: 'role-member-' + reelmId, name: 'Member', color: '#60a5fa' },
+        { id: 'role-admin-' + reelmId, name: 'Admin', color: '#f87171', position: 0, permissions: { manageReelm: true } },
+        { id: 'role-member-' + reelmId, name: 'Member', color: '#60a5fa', position: 1, permissions: {} },
       ],
       members: [{ userId: uid, userName: currentUser.name, userPhoto: currentUser.photo || null, roleIds: ['role-admin-' + reelmId] }],
       categories,
@@ -8080,18 +9197,21 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const inviteFriendToReelm = async (reelmId, targetUid) => {
     try {
-      await inviteReelmFriend(reelmId, targetUid)
-      addNotification('Invite sent.', { type: 'reelm_invite_sent', reelmId })
+      const result = await inviteReelmFriend(reelmId, targetUid)
+      if (result?.alreadyMember) addNotification('This user is already in this Reelm.', { type: 'reelm_invite_sent', reelmId })
+      else if (result?.bypassApproval) addNotification('Invite sent. They can join directly.', { type: 'reelm_invite_sent', reelmId })
+      else addNotification('Invite sent. The owner/admin will approve after they accept.', { type: 'reelm_invite_sent', reelmId })
     } catch (err) {
       if (err?.code === 'reelm/banned' || err?.message === 'reelm_banned') addNotification('This user is banned from this Reelm.')
+      else if (err?.message === 'forbidden' || err?.code === 'forbidden') addNotification('You do not have permission to invite members here.')
       else addNotification('Could not send invite.')
     }
   }
 
-  const banMemberFromReelm = async (reelmId, targetUid) => {
+  const banMemberFromReelm = async (reelmId, targetUid, providedReason = null) => {
     if (!reelmId || !targetUid) return
     const reelmName = reelmsRef.current.find(r => String(r.id) === String(reelmId))?.name || selectedReelmRef.current?.name || 'this Reelm'
-    const reason = window.prompt('Ban message shown to this user on behalf of the server:', `You were banned from ${reelmName}.`)
+    const reason = providedReason != null ? providedReason : window.prompt('Ban message shown to this user on behalf of the server:', `You were banned from ${reelmName}.`)
     if (reason == null) return
     if (!String(reason).trim()) { addNotification('Ban message is required.'); return }
     try {
@@ -8113,12 +9233,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     }
   }
 
-  const timeoutMemberInReelm = async (reelmId, targetUid) => {
+  const timeoutMemberInReelm = async (reelmId, targetUid, providedMinutes = null, providedReason = null) => {
     if (!reelmId || !targetUid) return
-    const minutesRaw = window.prompt('Timeout duration in minutes:', '10')
+    const minutesRaw = providedMinutes != null ? providedMinutes : window.prompt('Timeout duration in minutes:', '10')
     if (minutesRaw == null) return
     const minutes = Math.max(1, Math.min(40320, Math.round(Number(minutesRaw) || 10)))
-    const reason = window.prompt('Timeout message shown to this user on behalf of the server:', `You are timed out for ${minutes} minute${minutes === 1 ? '' : 's'}.`)
+    const reason = providedReason != null ? providedReason : window.prompt('Timeout message shown to this user on behalf of the server:', `You are timed out for ${minutes} minute${minutes === 1 ? '' : 's'}.`)
     if (reason == null) return
     try {
       const result = await timeoutReelmMember(reelmId, targetUid, minutes, reason)
@@ -8381,6 +9501,31 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     addNotification(`Left ${target.name || 'Reelm'}.`)
   }
 
+  const closeReelm = async (reelmId, confirmName) => {
+    const id = String(reelmId || '')
+    if (!id) return
+    const target = reelmsRef.current.find(r => String(r.id) === id) || selectedReelmRef.current
+    if (!target || isDefaultCommunity(target)) return
+    try {
+      await closeReelmRemote(id, confirmName)
+      if (voiceChannel?.reelmId && String(voiceChannel.reelmId) === id) leaveVoiceChannel()
+      socketLeaveReelm(id)
+      setReelms(prev => {
+        const next = prev.filter(r => String(r.id) !== id)
+        scheduleUserPersist('reelms', next)
+        return next
+      })
+      setSelectedReelm(null)
+      setSelectedChannel(null)
+      setShowReelmSettings(false)
+      addNotification(`${target.name || 'Reelm'} was closed.`)
+    } catch (err) {
+      if (err?.code === 'confirmation_required' || err?.message === 'confirmation_required') addNotification('Type the exact server name to close it.')
+      else if (err?.code === 'forbidden' || err?.message === 'forbidden') addNotification('Only the server owner/admin can close this server.')
+      else addNotification('Could not close this server. Please try again.')
+    }
+  }
+
   const updateReelm = (updatedReelm) => {
     setReelms(prev => {
       const next = prev.map(r => r.id === updatedReelm.id ? updatedReelm : r)
@@ -8389,6 +9534,37 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     })
     setSelectedReelm(updatedReelm)
     persistReelmCore(updatedReelm)
+  }
+
+  const removeMemberFromSelectedReelm = (targetUid, reason = '') => {
+    if (!selectedReelm || !targetUid) return
+    const member = (selectedReelm.members || []).find(m => String(m.userId) === String(targetUid))
+    if (!canActOnReelmMemberClient(selectedReelm, uid, member, 'manageMembers')) { addNotification('You cannot kick this member.'); return }
+    const next = { ...selectedReelm, members: (selectedReelm.members || []).filter(m => String(m.userId) !== String(targetUid)) }
+    updateReelm(next)
+    addNotification(reason ? `Member kicked from Reelm: ${reason}` : 'Member kicked from Reelm.')
+  }
+
+  const openServerMemberAction = (type, reelmId, user) => {
+    if (!type || !reelmId || !user?.id) return
+    setServerMemberAction({ type, reelmId, user })
+    setServerActionMinutes(10)
+    setServerActionReason(type === 'ban' ? `You were banned from ${selectedReelmRef.current?.name || 'this Reelm'}.` : type === 'timeout' ? 'Please cool down before rejoining the conversation.' : '')
+  }
+
+  const confirmServerMemberAction = async () => {
+    const action = serverMemberAction
+    if (!action?.user?.id) return
+    const targetUid = action.user.id
+    const reelmId = action.reelmId
+    const reason = String(serverActionReason || '').trim()
+    setServerMemberAction(null)
+    setServerActionReason('')
+    try {
+      if (action.type === 'ban') await banMemberFromReelm(reelmId, targetUid, reason)
+      else if (action.type === 'timeout') await timeoutMemberInReelm(reelmId, targetUid, Number(serverActionMinutes) || 10, reason)
+      else if (action.type === 'remove') removeMemberFromSelectedReelm(targetUid, reason)
+    } catch { addNotification('Could not complete server action.') }
   }
 
   const handleMenuItemClick = (action) => {
@@ -8528,6 +9704,17 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       if (member && String(member.userId) !== String(uid)) notify.add(String(member.userId))
     })
     notify.forEach(targetUid => _pushNotifTo(targetUid, `${currentUser.name} mentioned you in #${selectedChannel.name} channel`, { type: 'reelm', reelmId: selectedReelm.id, channelId: selectedChannel.id }))
+  }
+
+  const sendNudge = async (targetId, targetName = 'member') => {
+    const target = String(targetId || '')
+    if (!target || target === String(uid)) return
+    try {
+      await socialNotify(target, `${currentUser?.name || 'Someone'} nudged you!`, { type: 'dm', userId: String(uid), nudge: true })
+      addNotification(`Nudged ${targetName || 'member'}.`)
+    } catch {
+      addNotification('Could not send nudge right now.')
+    }
   }
 
   const sendMessage = async () => {
@@ -8719,6 +9906,184 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     })
   }, [])
 
+
+  const renderFriendProfileSurface = (embedded = false) => {
+    if (!friendProfileTarget) return null
+    if (embedded && friendProfileTarget.serverContext !== 'reelm') return null
+    if (!embedded && friendProfileTarget.serverContext === 'reelm') return null
+    const f = friendProfileTarget.friend
+    if (!f?.id) return null
+    const canShare = f?.allowProfileSharing !== false
+    const profileReelm = friendProfileTarget.serverContext === 'reelm' ? selectedReelm : null
+    const memberRecord = profileReelm ? (profileReelm.members || []).find(m => String(m.userId) === String(f?.id)) : null
+    const orderedRoles = profileReelm ? getOrderedReelmRolesClient(profileReelm) : []
+    const memberRoles = memberRecord ? orderedRoles.filter(r => getMemberRoleIdsClient(memberRecord).includes(String(r.id))) : []
+    const canActMembers = profileReelm && memberRecord ? canActOnReelmMemberClient(profileReelm, uid, memberRecord, 'manageMembers') : false
+    const canActModeration = profileReelm && memberRecord ? canActOnReelmMemberClient(profileReelm, uid, memberRecord, 'manageModeration') : false
+    const canActVoice = profileReelm && memberRecord ? canActOnReelmMemberClient(profileReelm, uid, memberRecord, 'manageVoice') : false
+    const userRoom = profileReelm ? getVoiceRoomForMember(profileReelm, f?.id) : null
+    const currentRoomName = voiceChannel?.channelName || null
+    const isInSameRoom = !!(userRoom && voiceChannel && String(userRoom.reelmId) === String(voiceChannel.reelmId) && String(userRoom.channelId) === String(voiceChannel.channelId))
+    const canInviteToCurrentRoom = !!(voiceChannel && profileReelm && String(voiceChannel.reelmId) === String(profileReelm.id) && !userRoom && canManageVoiceClient(profileReelm, uid))
+    const voiceContext = profileReelm ? {
+      userRoom,
+      isInSameRoom,
+      currentRoomName,
+      canInviteToCurrentRoom,
+      onJoinRoom: (room) => joinVoiceChannel(room.reelmId, room.channelId, room.channelName),
+      onInviteToCurrentRoom: () => inviteMemberToCurrentVoice({ userId: f?.id, userName: f?.name || f?.username || 'Member', userPhoto: getPersonPhoto(f) || null }),
+    } : null
+    const voiceTargets = profileReelm ? (profileReelm.categories || []).flatMap(cat => (cat.channels || [])
+      .filter(ch => ['voice', 'video', 'liveaction', 'stage'].includes(ch.type))
+      .map(ch => ({ reelmId: profileReelm.id, channelId: ch.id, channelName: ch.name || 'Voice' })))
+      .filter(room => !(userRoom && String(userRoom.channelId) === String(room.channelId))) : []
+    const moderationContext = profileReelm && memberRecord ? {
+      canShow: canActMembers || canActModeration || canActVoice,
+      voiceRoom: userRoom,
+      currentRoomName,
+      voiceTargets,
+      canInviteVoice: !!(voiceChannel && !userRoom && canActVoice),
+      canMoveVoice: canActVoice && voiceTargets.length > 0,
+      canKickVoice: canActVoice && !!userRoom,
+      canTimeout: canActModeration,
+      canRemove: canActMembers,
+      canBan: canActModeration,
+      onJoinVoice: () => userRoom && joinVoiceChannel(userRoom.reelmId, userRoom.channelId, userRoom.channelName),
+      onInviteVoice: () => inviteMemberToCurrentVoice({ userId: f?.id, userName: f?.name || f?.username || 'Member', userPhoto: getPersonPhoto(f) || null }),
+      onMoveVoice: (room) => moveMemberToVoiceChannel(room.reelmId, room.channelId, room.channelName, { userId: f?.id, userName: f?.name || f?.username || 'Member' }),
+      onKickVoice: () => userRoom && kickVoiceUserFromChannel(userRoom.reelmId, userRoom.channelId, userRoom.participant || { userId: f?.id, userName: f?.name || f?.username || 'Member' }),
+      onTimeout: () => openServerMemberAction('timeout', profileReelm.id, f),
+      onRemove: () => openServerMemberAction('remove', profileReelm.id, f),
+      onBan: () => openServerMemberAction('ban', profileReelm.id, f),
+    } : null
+    const roleContext = profileReelm && memberRoles.length ? {
+      roles: memberRoles,
+      expanded: String(expandedProfileRolesUserId || '') === String(f?.id || ''),
+      onToggleExpanded: () => setExpandedProfileRolesUserId(prev => String(prev || '') === String(f?.id || '') ? null : String(f?.id || ''))
+    } : null
+    return (
+      <FriendProfilePopup
+        friend={f}
+        anchorRect={friendProfileTarget.anchorRect}
+        onClose={() => setFriendProfileTarget(null)}
+        onRemove={removeFriend}
+        onBlock={blockUserFn}
+        onUnblock={unblockUserFn}
+        onAddFriend={sendFriendRequest}
+        isFriend={friends.some(fr => String(fr.id) === String(f.id))}
+        isBlocked={blocked.some(b => String(b.id) === String(f.id))}
+        isPending={friendRequestsOut.map(String).includes(String(f.id))}
+        nickname={nicknames[f.id] || ''}
+        onNicknameChange={(nick) => saveNickname(f.id, nick)}
+        canShare={canShare}
+        onMessage={() => {
+          const fInFriends = friends.find(fr => fr.id === f.id) || f
+          startDM(fInFriends)
+        }}
+        onCreateGroup={(friend) => {
+          setShowGroupCreator('friends')
+          setGroupSelectedFriends([friend])
+          setGroupNameInput('')
+          setGroupPhotoInput(null)
+        }}
+        onRequestRemoteControl={(friend) => requestRemoteControl(friend.id, friend.name)}
+        voiceContext={voiceContext}
+        moderationContext={moderationContext}
+        roleContext={roleContext}
+        isSelf={String(friendProfileTarget.friend?.id) === String(uid)}
+        embedded={embedded}
+        canEditNickname={!isReelmsSystemUid(f.id)}
+      />
+    )
+  }
+
+  const renderReelmMembersPanel = (panelKey = 'reelm') => {
+    if (!selectedReelm) return null
+    const members = selectedReelm.members || []
+    if (members.length === 0) return null
+    const presence = reelmPresence[selectedReelm.id] || {}
+    const { groups, getMemberPresence, getMemberStatus } = buildReelmMemberGroupsClient({
+      reelm: selectedReelm,
+      members,
+      presence,
+      currentUser,
+      uid,
+      profileStatus,
+      getPresenceForUser,
+    })
+    const orderedPanelRoles = getOrderedReelmRolesClient(selectedReelm)
+    const getPrimaryPanelRole = (m) => {
+      const roleIds = new Set(getMemberRoleIdsClient(m).map(String))
+      return orderedPanelRoles.find(role => roleIds.has(String(role.id))) || null
+    }
+    const renderMember = (m) => {
+      const info = getMemberPresence(m)
+      const status = getMemberStatus(m)
+      const isMe = String(m.userId) === String(uid)
+      const displayName = isMe ? currentUser.name : (info.userName || m.userName)
+      const displayPhoto = isMe ? (currentUser.photo || info.userPhoto || m.userPhoto) : (info.userPhoto || m.userPhoto)
+      const nowPlaying = !isMe ? spotifyFriendsNowPlaying[m.userId] : null
+      const primaryRole = getPrimaryPanelRole(m)
+      return (
+        <div
+          key={m.userId}
+          className={`rp-member-card${isActiveStatus(status) ? ' rp-member-card--active' : ''}${isMainAdminMemberClient(selectedReelm, m) ? ' rp-member-card--main-admin' : ''}`}
+          onClick={e => openFriendProfile({ id: m.userId, name: displayName, photo: displayPhoto }, e, { serverContext: true })}
+        >
+          <div className="rp-member-avatar-wrap">
+            <div className="rp-member-avatar">
+              {displayPhoto
+                ? <img src={displayPhoto} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                : (displayName || '?').charAt(0).toUpperCase()
+              }
+            </div>
+            <span className="rp-member-status-dot" style={{ background: STATUS_COLORS[status] || STATUS_COLORS.offline }} />
+          </div>
+          <div className="rp-member-info">
+            <span className={`rp-member-name${nowPlaying ? ' rp-member-name--listening' : ''}`} style={primaryRole?.color ? { '--member-role-color': primaryRole.color } : undefined}>{displayName}</span>
+            {nowPlaying && (
+              <div className="rp-member-nowplaying" aria-live="polite">
+                <span className="rp-member-nowplaying-track">{nowPlaying.name}</span>
+                <span className="rp-member-nowplaying-sep"> • </span>
+                <span className="rp-member-nowplaying-artist">{nowPlaying.artist}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      )
+    }
+    const selectedMemberDock = friendProfileTarget?.serverContext === 'reelm' ? renderFriendProfileSurface(true) : null
+    return (
+      <div className="rp-members-panel">
+        <span className="rp-members-header">In this Reelm</span>
+        {selectedMemberDock && <div className="rp-member-profile-dock">{selectedMemberDock}</div>}
+        {groups.map(group => {
+          const list = group.noRole && group.members.length > 18 && rightPanelNoRoleSearch.trim()
+            ? group.members.filter(m => String((getMemberPresence(m).userName || m.userName || '')).toLowerCase().includes(rightPanelNoRoleSearch.trim().toLowerCase()))
+            : group.members
+          return (
+            <div key={`${panelKey}-${group.role.id}`} className={`rp-role-section${group.noRole ? ' rp-role-section--no-role' : ''}`}>
+              <div className="rp-role-section-header" style={{ color: group.role.color }}>
+                <span>{group.role.name}</span>
+                <span className="rp-role-section-count">{group.members.length}</span>
+              </div>
+              {group.noRole && group.members.length > 18 && (
+                <input
+                  className="rp-no-role-search"
+                  value={rightPanelNoRoleSearch}
+                  onChange={e => setRightPanelNoRoleSearch(e.target.value)}
+                  placeholder="Search no-role members…"
+                />
+              )}
+              <div className={`rp-members-group${group.noRole ? ' rp-members-group-offline' : ''}`}>{list.map(renderMember)}</div>
+            </div>
+          )
+        })}
+      </div>
+    )
+  }
+
+
   if (!currentUser) {
     if (!authUser?.uid) return null
     return (
@@ -8827,7 +10192,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         <div
                           key={item.id}
                           data-bar-id={item.id}
-                          className={'bar-item bar-item--' + item.itemType + (isDefaultCommunity(item) ? ' bar-item--community-root' : '') + (item.itemType === 'chat' && item.type === 'dm' && isUserActive(item.friendId) ? ' bar-item--online' : '') + ((item.itemType === 'reelm' ? selectedReelm?.id : selectedChat?.id) === item.id ? ' bar-item-active' : '')}
+                          className={'bar-item bar-item--' + item.itemType + (isDefaultCommunity(item) ? ' bar-item--community-root' : '') + (item.itemType === 'reelm' && mutedReelmIds.map(String).includes(String(item.id)) ? ' bar-item--muted' : '') + (item.itemType === 'chat' && item.type === 'dm' && isUserActive(item.friendId) ? ' bar-item--online' : '') + ((item.itemType === 'reelm' ? selectedReelm?.id : selectedChat?.id) === item.id ? ' bar-item-active' : '')}
                           onClick={() => {
                             if (item.itemType !== 'reelm') clearUnread(item.id)
                             if (item.itemType === 'reelm') { setSelectedReelm(item); setSelectedChat(null); setShowDiscover(false); setShowFriendsPanel(false); setShowSettings(false); setReelmLoading(true); setTimeout(() => setReelmLoading(false), 350) }
@@ -8850,6 +10215,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               <span className="bar-item-badge">{capBadge(unreadCounts[item.id])}</span>
                             )}
                             {pinnedItemIds.includes(item.id) && <span className="bar-item-pin-dot" />}
+                            {item.itemType === 'reelm' && mutedReelmIds.map(String).includes(String(item.id)) && <span className="bar-item-muted-dot" title="Muted" />}
                             {item.itemType === 'chat' && item.type === 'dm' && (
                               <span className="bar-item-status-dot" style={{ background: STATUS_COLORS[getUserStatus(item.friendId)] || STATUS_COLORS.offline }} />
                             )}
@@ -8935,6 +10301,20 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   {pinnedItemIds.length >= 5 ? 'Pin (max. 5)' : 'Pin'}
                 </button>
               )}
+              {barCtxMenu.item.itemType === 'reelm' && (
+                <button
+                  type="button"
+                  className="bar-ctx-menu-item"
+                  onClick={(e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    const item = barCtxMenu.item
+                    setBarCtxMenu(null)
+                    toggleMuteReelmById(item.id)
+                  }}
+                >
+                  {mutedReelmIds.map(String).includes(String(barCtxMenu.item.id)) ? 'Turn notifications on' : 'Mute notifications'}
+                </button>
+              )}
               {barCtxMenu.item.itemType === 'chat' && (
                 <button
                   type="button"
@@ -8985,7 +10365,106 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     {copiedLink ? 'Copied!' : 'Copy'}
                   </button>
                 </div>
+                <div className="invite-modal-link-label">Reelms friends</div>
+                <input
+                  className="invite-modal-search"
+                  value={inviteFriendSearch}
+                  onChange={e => setInviteFriendSearch(e.target.value)}
+                  placeholder="Search friends to invite..."
+                />
+                <div className="invite-modal-friend-list">
+                  {friends
+                    .filter(f => f?.id && !(selectedReelm.members || []).some(m => String(m.userId) === String(f.id)))
+                    .filter(f => {
+                      const q = inviteFriendSearch.trim().toLowerCase()
+                      if (!q) return true
+                      return String(f.name || '').toLowerCase().includes(q) || String(f.username || '').toLowerCase().includes(q)
+                    })
+                    .slice(0, 20)
+                    .map(f => (
+                      <div key={f.id} className="invite-modal-friend-row">
+                        <div className="invite-modal-friend-info">
+                          <img src={getPersonPhoto(f) || avatarUIcon} alt="" className="invite-modal-friend-avatar" />
+                          <span>{f.name || f.username || 'Friend'}</span>
+                        </div>
+                        <button className="invite-modal-copy-btn" onClick={() => inviteFriendToReelm(selectedReelm.id, f.id)}>Invite</button>
+                      </div>
+                    ))}
+                  {friends.filter(f => f?.id && !(selectedReelm.members || []).some(m => String(m.userId) === String(f.id))).length === 0 && (
+                    <div className="invite-modal-empty">No friends available to invite.</div>
+                  )}
+                </div>
                 <button className="invite-modal-close" onClick={() => setShowInviteModal(false)}>Close</button>
+              </div>
+            </div>
+          )}
+
+          {serverMemberAction && (
+            <div className="server-action-modal-backdrop" onClick={() => setServerMemberAction(null)}>
+              <div className="server-action-modal" onClick={e => e.stopPropagation()}>
+                <div className="server-action-title">{serverMemberAction.type === 'ban' ? 'Ban member' : serverMemberAction.type === 'timeout' ? 'Timeout member' : 'Kick from Reelm'}</div>
+                <div className="server-action-target">{serverMemberAction.user?.name || serverMemberAction.user?.username || 'Member'}</div>
+                {serverMemberAction.type === 'timeout' && (
+                  <label className="server-action-label">
+                    Duration, minutes
+                    <input className="server-action-input" type="number" min="1" max="40320" value={serverActionMinutes} onChange={e => setServerActionMinutes(e.target.value)} />
+                  </label>
+                )}
+                <label className="server-action-label">
+                  Reason / message
+                  <textarea className="server-action-textarea" value={serverActionReason} onChange={e => setServerActionReason(e.target.value)} placeholder="Write the reason shown to the member or kept for moderation notes…" />
+                </label>
+                <div className="server-action-actions">
+                  <button className="server-action-cancel" onClick={() => setServerMemberAction(null)}>Cancel</button>
+                  <button className={`server-action-confirm${serverMemberAction.type !== 'timeout' ? ' server-action-confirm--danger' : ''}`} onClick={confirmServerMemberAction}>
+                    {serverMemberAction.type === 'ban' ? 'Ban' : serverMemberAction.type === 'timeout' ? 'Apply timeout' : 'Kick'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {voiceRoomUserMenu && (
+            <div className="voice-room-user-menu-backdrop" onClick={() => setVoiceRoomUserMenu(null)}>
+              <div
+                className="voice-room-user-menu"
+                style={{ left: voiceRoomUserMenu.x, top: voiceRoomUserMenu.y }}
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="voice-room-user-menu-head">
+                  <span className="voice-room-user-menu-avatar">
+                    {voiceRoomUserMenu.userPhoto ? <img src={voiceRoomUserMenu.userPhoto} alt="" /> : <span>{(voiceRoomUserMenu.userName || '?').charAt(0).toUpperCase()}</span>}
+                  </span>
+                  <span className="voice-room-user-menu-name">{voiceRoomUserMenu.userName || 'Member'}</span>
+                </div>
+                {(() => {
+                  const menuRoom = selectedReelm?.categories?.flatMap(c => c.channels || []).find(ch => String(ch.id) === String(voiceRoomUserMenu.channelId))
+                  const isSpeaker = (menuRoom?.speakerIds || []).map(String).includes(String(voiceRoomUserMenu.userId))
+                  if (!menuRoom || menuRoom.type !== 'stage' || !canManageVoiceClient(selectedReelm, uid)) return null
+                  return (
+                    <button
+                      type="button"
+                      className="voice-room-user-menu-action"
+                      onClick={() => { updateStageSpeaker(voiceRoomUserMenu.channelId, voiceRoomUserMenu.userId, !isSpeaker); setVoiceRoomUserMenu(null) }}
+                    >
+                      {isSpeaker ? 'Move to listener' : 'Make speaker'}
+                    </button>
+                  )
+                })()}
+                <button
+                  type="button"
+                  className="voice-room-user-menu-action"
+                  onClick={() => moderatorMuteVoiceUserFromChannel(voiceRoomUserMenu.reelmId, voiceRoomUserMenu.channelId, voiceRoomUserMenu)}
+                >
+                  Mute microphone
+                </button>
+                <button
+                  type="button"
+                  className="voice-room-user-menu-action voice-room-user-menu-action-danger"
+                  onClick={() => kickVoiceUserFromChannel(voiceRoomUserMenu.reelmId, voiceRoomUserMenu.channelId, voiceRoomUserMenu)}
+                >
+                  Kick from room
+                </button>
               </div>
             </div>
           )}
@@ -9006,6 +10485,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                 onUnbanMember={unbanMemberFromReelm}
                 onTimeoutMember={timeoutMemberInReelm}
                 onUntimeoutMember={untimeoutMemberInReelm}
+                onCloseReelm={closeReelm}
                 onAnnouncement={({ type, userName }) => {
                   const annChId = selectedReelm.announcementChannelId
                     || selectedReelm.categories?.find(c => c.type === 'announcement')?.channels?.[0]?.id
@@ -9318,7 +10798,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         <span className="reelm-sidebar-name" onClick={() => setShowReelmMenu(v => !v)}>{selectedReelm.name}</span>
                         {showReelmMenu && (
                           <div className="reelm-name-menu">
-                            {canManageReelmClient(selectedReelm, uid) && (
+                            {canOpenReelmSettingsClient(selectedReelm, uid) && (
                               <button className="reelm-name-menu-item" onClick={() => { setShowReelmSettings(true); setShowReelmMenu(false) }}>{t('reelm_settings_menu')}</button>
                             )}
                             <button className="reelm-name-menu-item" onClick={() => { setShowInviteModal(true); setShowReelmMenu(false) }}>{t('invite_friends_menu')}</button>
@@ -9386,73 +10866,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   onMouseDown={(e) => { e.preventDefault(); dragState.current = { side: 'right', startX: e.clientX, startWidth: rightWidth } }}
                 />
                 <div className="panel panel-right" style={{ flex: `0 0 ${rightWidth}px` }}>
-                  {(() => {
-                    const members = selectedReelm.members || []
-                    if (members.length === 0) return null
-                    const presence = reelmPresence[selectedReelm.id] || {}
-                    const getMemberPresence = (m) => String(m.userId) === String(uid)
-                      ? { status: profileStatus, userName: currentUser.name, userPhoto: getPersonPhoto(currentUser) || m.userPhoto }
-                      : (presence[String(m.userId)] || getPresenceForUser(m.userId) || {})
-                    const getMemberStatus = (m) => getMemberPresence(m).status || 'offline'
-                    const online = members.filter(m => isActiveStatus(getMemberStatus(m)))
-                    const offline = members.filter(m => !isActiveStatus(getMemberStatus(m)))
-                    const roles = selectedReelm.roles || []
-                    const renderMember = (m) => {
-                      const info = getMemberPresence(m)
-                      const status = getMemberStatus(m)
-                      const isMe = String(m.userId) === String(uid)
-                      const displayName = isMe ? currentUser.name : (info.userName || m.userName)
-                      const displayPhoto = isMe ? (currentUser.photo || info.userPhoto || m.userPhoto) : (info.userPhoto || m.userPhoto)
-                      const nowPlaying = !isMe ? spotifyFriendsNowPlaying[m.userId] : null
-                      const memberRoles = roles.filter(r => (m.roleIds || []).includes(r.id))
-                      return (
-                        <div key={m.userId} className={`rp-member-card${isActiveStatus(status) ? ' rp-member-card--active' : ''}`} onClick={e => openFriendProfile({ id: m.userId, name: displayName, photo: displayPhoto }, e)}>
-                          <div className="rp-member-avatar-wrap">
-                            <div className="rp-member-avatar">
-                              {displayPhoto
-                                ? <img src={displayPhoto} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-                                : (displayName || '?').charAt(0).toUpperCase()
-                              }
-                            </div>
-                            <span className="rp-member-status-dot" style={{ background: STATUS_COLORS[status] || STATUS_COLORS.offline }} />
-                          </div>
-                          <div className="rp-member-info">
-                            <span className={`rp-member-name${nowPlaying ? ' rp-member-name--listening' : ''}`}>{displayName}</span>
-                            {nowPlaying && (
-                              <div className="rp-member-nowplaying" aria-live="polite">
-                                <span className="rp-member-nowplaying-track">{nowPlaying.name}</span>
-                                <span className="rp-member-nowplaying-sep"> • </span>
-                                <span className="rp-member-nowplaying-artist">{nowPlaying.artist}</span>
-                              </div>
-                            )}
-                            {memberRoles.length > 0 && (
-                              <div className="rp-member-roles">
-                                {memberRoles.map(r => (
-                                  <span key={r.id} className="rp-role-badge" style={{ color: r.color, borderColor: r.color + '55', background: r.color + '18' }}>{r.name}</span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    }
-                    return (
-                      <div className="rp-members-panel">
-                        <span className="rp-members-header">In this Reelm</span>
-                        {online.length > 0 && (
-                          <div className="rp-members-group">
-                            {online.map(renderMember)}
-                          </div>
-                        )}
-                        {online.length > 0 && offline.length > 0 && <div className="rp-members-divider" />}
-                        {offline.length > 0 && (
-                          <div className="rp-members-group rp-members-group-offline">
-                            {offline.map(renderMember)}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })()}
+                  {renderReelmMembersPanel('right-1')}
                 </div>
               </>
             ) : ((isMod ? false : (showChatList || selectedChat)) || selectedReelm) ? (
@@ -9469,6 +10883,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               { key: 'all', label: t('all_filter'), count: chats.reduce((sum, c) => sum + getChatUnreadCount(c), 0) },
                               { key: 'unread', label: t('unread_filter'), count: chats.filter(c => getChatUnreadCount(c) > 0).length },
                               { key: 'groups', label: t('groups_filter'), count: chats.filter(c => c.type === 'group').reduce((sum, c) => sum + getChatUnreadCount(c), 0) },
+                              { key: 'friends', label: 'Friends', count: friends.length },
                               { key: 'blocked', label: 'Blocked', count: Math.max(blocked.length, chats.filter(c => c.type === 'dm' && blockedIds.has(String(c.friendId || ''))).length) },
                             ]
                             return filters.map(cat => (
@@ -9483,6 +10898,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             ))
                           })()}
                         </div>
+                        <input
+                          className="chat-list-search"
+                          value={chatListSearch}
+                          onChange={e => setChatListSearch(e.target.value)}
+                          placeholder={chatListFilter === 'friends' ? 'Search friends…' : (chatListFilter === 'groups' ? 'Search groups…' : (chatListFilter === 'blocked' ? 'Search blocked users…' : 'Search conversations…'))}
+                        />
                       </div>
                       <div className="chat-list-sidebar-items">
                         {(() => {
@@ -9491,10 +10912,41 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             const existing = chats.find(c => c.type === 'dm' && String(c.friendId || '') === String(b.id || b.userId || ''))
                             return existing || { id: dmConvId(uid, b.id || b.userId), convId: dmConvId(uid, b.id || b.userId), friendId: b.id || b.userId, type: 'dm', name: b.name || b.username || 'Blocked user', username: b.username, photo: b.photo || b.avatar || null, blockedOnly: true }
                           })
+                          const q = chatListSearch.trim().toLowerCase()
+                          if (chatListFilter === 'friends') {
+                            const friendRows = (friends || []).filter(f => {
+                              const label = String(nicknames[f.id] || f.name || f.username || '').toLowerCase()
+                              const uname = String(f.username || '').toLowerCase()
+                              return !q || label.includes(q) || uname.includes(q)
+                            })
+                            if (!friendRows.length) return <p className="chat-list-empty">No friends found.</p>
+                            return friendRows.map(f => {
+                              const displayName = nicknames[f.id] || f.name || f.username || 'Friend'
+                              const avatarSrc = getPersonPhoto(f) || null
+                              return (
+                                <div key={f.id} className="chat-list-row" onClick={() => { startDM(f); setShowChatList(false) }}>
+                                  <div className="chat-list-avatar-wrap">
+                                    <div className="discover-result-avatar" style={{ width: 36, height: 36, fontSize: '0.9rem', flexShrink: 0 }}>
+                                      {avatarSrc ? <img src={avatarSrc} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : (displayName || '?').charAt(0).toUpperCase()}
+                                    </div>
+                                    <span className="chat-list-status-dot" style={{ background: STATUS_COLORS[getUserStatus(f.id)] || STATUS_COLORS.offline }} />
+                                  </div>
+                                  <div className="discover-result-info">
+                                    <span className="discover-result-name">{displayName}</span>
+                                    <span className="discover-result-meta">Click to message</span>
+                                  </div>
+                                </div>
+                              )
+                            })
+                          }
                           let filtered = [...chats]
                           if (chatListFilter === 'unread') filtered = filtered.filter(c => getChatUnreadCount(c) > 0)
                           if (chatListFilter === 'groups') filtered = chats.filter(c => c.type === 'group')
                           if (chatListFilter === 'blocked') filtered = blockedRows
+                          if (q) filtered = filtered.filter(c => {
+                            const peer = getChatPeer(c) || {}
+                            return [getChatDisplayName(c), c.name, c.username, peer.username, c.lastMessage].some(value => String(value || '').toLowerCase().includes(q))
+                          })
                           if (filtered.length === 0) return <p className="chat-list-empty">{chatListFilter === 'blocked' ? 'No blocked users.' : t('no_chats_yet')}</p>
                           return filtered.map(c => {
                             const blockedRow = c.type === 'dm' && blockedIds.has(String(c.friendId || ''))
@@ -9731,36 +11183,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 : displayName.charAt(0).toUpperCase()
                               }
                             </div>
-                            <span className="dm-friend-name" onClick={e => { e.stopPropagation(); setShowDmFriendMenu(v => !v) }}>{displayName}</span>
+                            <span className="dm-friend-name">{displayName}</span>
                             <svg className={`dm-profile-chevron${dmProfileExpanded ? ' dm-profile-chevron--open' : ''}`} width="14" height="14" viewBox="0 0 24 24" fill="none">
                               <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                             </svg>
                           </div>
-                          {showDmFriendMenu && (
-                            <div className="dm-friend-ctx-menu">
-                              {fp?.allowProfileSharing !== false && (
-                                <button className="reelm-name-menu-item" onClick={() => { navigator.clipboard?.writeText(`${getPublicWebUrl()}/u/${fp?.username || dmPeerId || fp?.id}`); setShowDmFriendMenu(false) }}>{t('share_profile')}</button>
-                              )}
-                              {!isReelmsSystemChat(selectedChat) && !dmIsSelf && <div className="reelm-name-menu-divider" />}
-                              {!isReelmsSystemChat(selectedChat) && !dmIsSelf && dmIsBlocked && (
-                                <button className="reelm-name-menu-item" onClick={() => { unblockUserFn(dmPeerId); setShowDmFriendMenu(false) }}>Unblock</button>
-                              )}
-                              {!isReelmsSystemChat(selectedChat) && !dmIsSelf && !dmIsBlocked && dmIsFriend && (
-                                <button className="reelm-name-menu-item reelm-name-menu-leave" onClick={() => { removeFriend(dmPeerId); setShowDmFriendMenu(false) }}>{t('remove_friend')}</button>
-                              )}
-                              {!isReelmsSystemChat(selectedChat) && !dmIsSelf && !dmIsBlocked && !dmIsFriend && (
-                                dmHasPendingRequest
-                                  ? <button className="reelm-name-menu-item" disabled>Friend request sent</button>
-                                  : <button className="reelm-name-menu-item" onClick={() => { sendFriendRequest(fp || { id: dmPeerId, name: displayName }); setShowDmFriendMenu(false) }}>Add Friend</button>
-                              )}
-                              {!isReelmsSystemChat(selectedChat) && !dmIsSelf && !dmIsBlocked && fp && (
-                                <button className="reelm-name-menu-item reelm-name-menu-leave" onClick={() => { blockUserFn(fp); setShowDmFriendMenu(false) }}>{t('block')}</button>
-                              )}
-                              {!isReelmsSystemChat(selectedChat) && <div className="reelm-name-menu-divider" />}
-                              {!isReelmsSystemChat(selectedChat) && <button type="button" className="reelm-name-menu-item reelm-name-menu-leave" onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteConversation(selectedChat.id); setShowDmFriendMenu(false) }}>Delete conversation</button>}
-                              {isReelmsSystemChat(selectedChat) && <button className="reelm-name-menu-item" disabled>System inbox is always available</button>}
-                            </div>
-                          )}
                         </div>
                         {isReelmsSystemChat(selectedChat) && (
                           <div className="dm-blocked-banner">
@@ -9784,6 +11211,28 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             {fp?.username && (
                               <span className="dm-profile-username">@{fp.username.startsWith('@') ? fp.username.slice(1) : fp.username}</span>
                             )}
+                            <div className="dm-profile-inline-actions">
+                              {fp?.allowProfileSharing !== false && !isReelmsSystemChat(selectedChat) && (
+                                <button type="button" className="dm-profile-inline-action" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(`${getPublicWebUrl()}/u/${fp?.username || dmPeerId || fp?.id}`) }}>{t('share_profile')}</button>
+                              )}
+                              {!isReelmsSystemChat(selectedChat) && !dmIsSelf && dmIsBlocked && (
+                                <button type="button" className="dm-profile-inline-action" onClick={(e) => { e.stopPropagation(); unblockUserFn(dmPeerId) }}>Unblock</button>
+                              )}
+                              {!isReelmsSystemChat(selectedChat) && !dmIsSelf && !dmIsBlocked && dmIsFriend && (
+                                <button type="button" className="dm-profile-inline-action dm-profile-inline-action--danger" onClick={(e) => { e.stopPropagation(); removeFriend(dmPeerId) }}>{t('remove_friend')}</button>
+                              )}
+                              {!isReelmsSystemChat(selectedChat) && !dmIsSelf && !dmIsBlocked && !dmIsFriend && (
+                                dmHasPendingRequest
+                                  ? <button type="button" className="dm-profile-inline-action" disabled>Friend request sent</button>
+                                  : <button type="button" className="dm-profile-inline-action" onClick={(e) => { e.stopPropagation(); sendFriendRequest(fp || { id: dmPeerId, name: displayName }) }}>Add Friend</button>
+                              )}
+                              {!isReelmsSystemChat(selectedChat) && !dmIsSelf && !dmIsBlocked && fp && (
+                                <button type="button" className="dm-profile-inline-action dm-profile-inline-action--danger" onClick={(e) => { e.stopPropagation(); blockUserFn(fp) }}>{t('block')}</button>
+                              )}
+                              {!isReelmsSystemChat(selectedChat) && (
+                                <button type="button" className="dm-profile-inline-action dm-profile-inline-action--danger" onClick={(e) => { e.stopPropagation(); deleteConversation(selectedChat.id) }}>Delete conversation</button>
+                              )}
+                            </div>
                             {fp?.activity?.name && <ActivityBadge activity={fp.activity} />}
                             {fp?.bio && <p className="dm-profile-bio">{fp.bio}</p>}
                             {friendNowPlaying && (
@@ -9819,7 +11268,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           </div>
                         </div>
                         <div className="chat-side-tabs">
-                          {['profile', 'vapor'].map(tab => (
+                          {(isReelmsSystemChat(selectedChat) ? ['profile'] : ['profile', 'vapor']).map(tab => (
                             <button key={tab} className={`chat-side-tab${dmSideTab === tab ? ' chat-side-tab--active' : ''}`} onClick={() => setDmSideTab(tab)}>
                               {tab === 'vapor' ? `✦ ${t('vapor_tab')}` : t('profile_tab')}
                             </button>
@@ -9827,19 +11276,21 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         </div>
                         {dmSideTab === 'profile' && (
                           <div className="dm-profile-panel">
-                            <div className="dm-profile-nickname">
-                              <span className="fpp-section-label">{t('nickname_label')}</span>
-                              <input
-                                className="fpp-nickname-input"
-                                style={{ width: '100%' }}
-                                value={nicknames[selectedChat.friendId] || ''}
-                                onChange={e => saveNickname(selectedChat.friendId, e.target.value)}
-                                placeholder={displayName}
-                              />
-                            </div>
+                            {!isReelmsSystemChat(selectedChat) && (
+                              <div className="dm-profile-nickname">
+                                <span className="fpp-section-label">{t('nickname_label')}</span>
+                                <input
+                                  className="fpp-nickname-input"
+                                  style={{ width: '100%' }}
+                                  value={nicknames[selectedChat.friendId] || ''}
+                                  onChange={e => saveNickname(selectedChat.friendId, e.target.value)}
+                                  placeholder={displayName}
+                                />
+                              </div>
+                            )}
                           </div>
                         )}
-                        {dmSideTab === 'vapor' && (() => {
+                        {!isReelmsSystemChat(selectedChat) && dmSideTab === 'vapor' && (() => {
                           const dmVapor = vaporDurations[selectedChat.id]
                           const DM_VAPOR_OPTS = [
                             { labelKey: 'vapor_after_read', value: 'read' },
@@ -9873,7 +11324,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   })()}
                   {selectedReelm && (
                     <div className="reelm-sidebar">
-                      <div className={`reelm-cover-wrap${selectedReelm.image ? ' reelm-cover-wrap--has-image' : ''}${isDefaultCommunity(selectedReelm) ? ' reelm-cover-wrap--community' : ''}`} onClick={() => { if (!isDefaultCommunity(selectedReelm) || canManageReelmClient(selectedReelm, uid)) reelmImageInputRef.current?.click() }}>
+                      <div className={`reelm-cover-wrap${selectedReelm.image ? ' reelm-cover-wrap--has-image' : ''}${isDefaultCommunity(selectedReelm) ? ' reelm-cover-wrap--community' : ''}`} onClick={() => { if ((!isDefaultCommunity(selectedReelm) && hasReelmPermissionClient(selectedReelm, uid, 'manageOverview')) || canManageReelmClient(selectedReelm, uid)) reelmImageInputRef.current?.click() }}>
                         {selectedReelm.image
                           ? <img src={selectedReelm.image} alt="cover" className="reelm-cover-img" />
                           : isDefaultCommunity(selectedReelm)
@@ -9888,7 +11339,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               {(() => {
                                 const _mm = selectedReelm.members?.find(m => m.userId === uid)
                                 const _mr = (selectedReelm.roles || []).filter(r => (_mm?.roleIds || []).includes(r.id))
-                                const _ia = canManageReelmClient(selectedReelm, uid) || _mr.some(r => /admin|moderator|founder|owner/i.test(r.name))
+                                const _ia = canManageReelmClient(selectedReelm, uid) || _mr.some(isManagerRoleClient)
                                 return _ia ? (<>
                                   <div className="reelm-name-menu-item reelm-name-menu-insights">
                                     <svg className="reelm-insights-icon" width="12" height="11" viewBox="0 0 12 11" fill="currentColor"><rect x="0" y="6" width="2.5" height="5" rx="1"/><rect x="4.75" y="0" width="2.5" height="11" rx="1"/><rect x="9.5" y="3.5" width="2.5" height="7.5" rx="1"/></svg>
@@ -9898,7 +11349,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                   <div className="reelm-name-menu-divider" />
                                 </>) : null
                               })()}
-                              {canManageReelmClient(selectedReelm, uid) && (
+                              {canOpenReelmSettingsClient(selectedReelm, uid) && (
                                 <button className="reelm-name-menu-item" onClick={() => { setShowReelmSettings(true); setShowReelmMenu(false) }}>{t('reelm_settings_menu')}</button>
                               )}
                               <button className="reelm-name-menu-item" onClick={() => { setShowInviteModal(true); setShowReelmMenu(false) }}>{t('invite_friends_menu')}</button>
@@ -9978,15 +11429,27 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               {cat.channels.map(ch => (
                                 <div key={ch.id} className={`reelm-channel${ch.isFlyingRoom ? ' reelm-channel-flying' : ''}${(unreadCounts[`${selectedReelm.id}_${ch.id}`] || 0) > 0 ? ' reelm-channel--unread' : ''}`} onClick={() => {
                                     setChannelCtxMenu(null); setSelectedChannel(ch); clearReelmChannelUnread(selectedReelm.id, ch.id)
-                                    if (ch.type === 'voice' && (selectedReelm.autoJoinVoice !== false) && voiceChannel?.channelId !== ch.id) {
+                                    if (['voice', 'video', 'liveaction', 'stage'].includes(ch.type) && (selectedReelm.autoJoinVoice !== false) && voiceChannel?.channelId !== ch.id) {
                                       joinVoiceChannel(selectedReelm.id, ch.id, ch.name)
                                     }
+                                  }}
+                                  onDragOver={e => { if (['voice', 'video', 'liveaction', 'stage'].includes(ch.type) && canManageVoiceClient(selectedReelm, uid)) e.preventDefault() }}
+                                  onDrop={e => {
+                                    if (!['voice', 'video', 'liveaction', 'stage'].includes(ch.type) || !canManageVoiceClient(selectedReelm, uid)) return
+                                    e.preventDefault(); e.stopPropagation()
+                                    let payload = e.dataTransfer.getData('application/x-reelms-member') || e.dataTransfer.getData('text/plain')
+                                    try {
+                                      const member = JSON.parse(payload)
+                                      if ((member?.type === 'voice-participant' || member?.type === 'reelm-member') && String(member.reelmId) === String(selectedReelm.id)) {
+                                        moveMemberToVoiceChannel(selectedReelm.id, ch.id, ch.name, { userId: member.userId, userName: member.userName, userPhoto: member.userPhoto })
+                                      }
+                                    } catch { /* noop */ }
                                   }}
                                   onContextMenu={e => {
                                     e.preventDefault()
                                     const myMember = selectedReelm.members?.find(m => m.userId === uid)
                                     const myRoles = (selectedReelm.roles || []).filter(r => (myMember?.roleIds || []).includes(r.id))
-                                    const isAuthorized = canManageReelmClient(selectedReelm, uid) || myRoles.some(r => /admin|moderator|founder|owner/i.test(r.name))
+                                    const isAuthorized = canManageReelmClient(selectedReelm, uid) || myRoles.some(isManagerRoleClient)
                                     if (!isAuthorized) return
                                     setChannelCtxMenu({ x: e.clientX, y: e.clientY, catId: cat.id, chId: ch.id, chType: ch.type, catChannelCount: cat.channels.length })
                                   }}
@@ -10005,7 +11468,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                           if (e.key === 'Escape') setEditingChannelId(null)
                                         }}
                                         onBlur={() => saveChannelName(selectedReelm.id, cat.id, ch.id)}
-                                        placeholder={ch.type === 'voice' ? 'Room name' : 'channel-name'}
+                                        placeholder={['voice', 'video', 'liveaction', 'stage'].includes(ch.type) ? 'Room name' : 'channel-name'}
                                         autoFocus
                                       />
                                     ) : (
@@ -10015,9 +11478,50 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                       <span className="reelm-channel-unread-badge">{capBadge(unreadCounts[`${selectedReelm.id}_${ch.id}`])}</span>
                                     )}
                                   </span>
-                                  {ch.type === 'voice' && editingChannelId !== ch.id && newVoiceChannelId !== ch.id && (
-                                    <span className={`reelm-channel-capacity${vcCountFor(selectedReelm.id, ch.id) > 0 ? ' reelm-channel-capacity--active' : ''}`}>{vcCountFor(selectedReelm.id, ch.id)}/{ch.capacity == null || ch.capacity === 0 ? '+' : ch.capacity}</span>
-                                  )}
+                                  {['voice', 'video', 'liveaction', 'stage'].includes(ch.type) && editingChannelId !== ch.id && newVoiceChannelId !== ch.id && (() => {
+                                    const participants = vcParticipantsFor(selectedReelm.id, ch.id)
+                                    const count = participants.length || vcCountFor(selectedReelm.id, ch.id)
+                                    return (
+                                      <div className={`reelm-channel-voice-meta${count > 0 ? ' reelm-channel-voice-meta--active' : ''}`}>
+                                        <span className="reelm-channel-capacity">{count}/{ch.capacity == null || ch.capacity === 0 ? '+' : ch.capacity}</span>
+                                        {participants.length > 0 && (
+                                          <div className="reelm-channel-voice-users" title={participants.map(p => p.userName || 'Member').join(', ')}>
+                                            {participants.slice(0, 3).map(p => (
+                                              <span
+                                                key={p.userId}
+                                                className="reelm-channel-voice-user"
+                                                draggable={String(p.userId) !== String(uid) && canManageVoiceClient(selectedReelm, uid)}
+                                                onDragStart={(e) => {
+                                                  const payload = JSON.stringify({ type: 'voice-participant', reelmId: selectedReelm.id, channelId: ch.id, userId: p.userId, userName: p.userName, userPhoto: p.userPhoto })
+                                                  e.dataTransfer.setData('application/x-reelms-member', payload)
+                                                  e.dataTransfer.setData('text/plain', payload)
+                                                  e.dataTransfer.effectAllowed = 'move'
+                                                }}
+                                                onClick={(e) => {
+                                                  if (String(p.userId) === String(uid) || !canManageVoiceClient(selectedReelm, uid)) return
+                                                  e.stopPropagation()
+                                                  const rect = e.currentTarget.getBoundingClientRect()
+                                                  setVoiceRoomUserMenu({ x: rect.left + 8, y: rect.bottom + 4, reelmId: selectedReelm.id, channelId: ch.id, userId: p.userId, userName: p.userName, userPhoto: p.userPhoto })
+                                                }}
+                                                onContextMenu={(e) => {
+                                                  e.preventDefault()
+                                                  e.stopPropagation()
+                                                  if (String(p.userId) === String(uid) || !canManageVoiceClient(selectedReelm, uid)) return
+                                                  setVoiceRoomUserMenu({ x: e.clientX, y: e.clientY, reelmId: selectedReelm.id, channelId: ch.id, userId: p.userId, userName: p.userName, userPhoto: p.userPhoto })
+                                                }}
+                                              >
+                                                <span className="reelm-channel-voice-avatar">
+                                                  {p.userPhoto ? <img src={p.userPhoto} alt="" /> : <span>{(p.userName || '?').charAt(0).toUpperCase()}</span>}
+                                                </span>
+                                                <span className="reelm-channel-voice-name">{p.userName || 'Member'}</span>
+                                              </span>
+                                            ))}
+                                            {participants.length > 3 && <span className="reelm-channel-voice-more">+{participants.length - 3}</span>}
+                                          </div>
+                                        )}
+                                      </div>
+                                    )
+                                  })()}
                                   {ch.isFlyingRoom && editingChannelId !== ch.id && (
                                     <span className="reelm-flying-badge" title={`Expires in ${formatTimeLeft(ch.expiresAt)}`}>
                                       {flyingRoomTick >= 0 && formatTimeLeft(ch.expiresAt)}
@@ -10077,6 +11581,20 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                           </svg>
                         )}
+                      </button>
+                      <button
+                        className={`vmb-btn${voiceDeafened ? ' vmb-btn-muted' : ''}`}
+                        onClick={voiceToggleDeafen}
+                        title={voiceDeafened ? 'Undeafen' : 'Deafen'}
+                      >
+                        🎧
+                      </button>
+                      <button
+                        className={`vmb-btn${voiceMuted && voiceDeafened ? ' vmb-btn-muted' : ''}`}
+                        onClick={voiceToggleFullMute}
+                        title={voiceMuted && voiceDeafened ? 'Unsilence' : 'Silent'}
+                      >
+                        🔇
                       </button>
                       <button className="vmb-btn vmb-btn-leave" onClick={leaveVoiceChannel} title="Leave">
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
@@ -10202,59 +11720,50 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           )}
                           {!isLive && (() => {
                             const isScreenSharingActive = voiceParticipants.some(p => p.isScreenSharing)
-                            const isCardView = !isScreenSharingActive && voiceParticipants.length > 8
+                            const isCardView = voiceParticipants.length > 8
                             return (
                               <>
-                                {isScreenSharingActive && (
-                                  <div className={`voice-screen-area${voiceScreenFullscreen ? ' voice-screen-fullscreen' : ''}`}>
-                                    {voiceParticipants.filter(p => p.isScreenSharing).map(p => (
-                                      <div key={p.userId} className="voice-screen-tile">
-                                        {!voiceScreenFullscreen && (
-                                          <div className="voice-screen-bar">
-                                            <span className="voice-screen-bar-name">{String(p.userId) === String(uid) ? 'Your screen' : p.userName}</span>
-                                            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                              {String(p.userId) !== String(uid) && p.screenStream && (
-                                                <button
-                                                  type="button"
-                                                  className={`live-remote-ctrl-btn${isActivelyControllingPeer(p.userId) ? ' live-remote-ctrl-btn--active' : ''}`}
-                                                  onClick={() => requestRemoteControl(p.userId, p.userName)}
-                                                  title="Request remote control"
-                                                >
-                                                  <img src={channelLiveactionIcon} alt="" width="14" height="14" style={{ filter: 'brightness(0.8)', opacity: 0.85 }} />
-                                                  <span>{isActivelyControllingPeer(p.userId) ? 'In control' : 'Request control'}</span>
-                                                </button>
-                                              )}
-                                              <button type="button" className="voice-screen-bar-btn" onClick={() => setVoiceScreenFullscreen(true)} title="Fullscreen">
-                                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
-                                                  <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                                                </svg>
+                                {expandedScreenUser && expandedScreenUser.screenStream && (
+                                  <div
+                                    className={`voice-screen-area${voiceScreenFullscreen ? ' voice-screen-fullscreen' : ''}${fullscreenUiVisible ? ' voice-fullscreen-ui-visible' : ' voice-fullscreen-ui-idle'}`}
+                                    onMouseMove={voiceScreenFullscreen ? showFullscreenUi : undefined}
+                                  >
+                                    <div className="voice-screen-tile">
+                                        <div className="voice-screen-bar">
+                                          <span className="voice-screen-bar-name">{String(expandedScreenUser.userId) === String(uid) ? 'Your screen' : `${expandedScreenUser.userName || 'Member'}'s screen`}</span>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                            {String(expandedScreenUser.userId) !== String(uid) && expandedScreenUser.screenStream && (
+                                              <button
+                                                type="button"
+                                                className={`live-remote-ctrl-btn${isActivelyControllingPeer(expandedScreenUser.userId) ? ' live-remote-ctrl-btn--active' : ''}`}
+                                                onClick={() => requestRemoteControl(expandedScreenUser.userId, expandedScreenUser.userName)}
+                                                title="Request remote control"
+                                              >
+                                                <img src={channelLiveactionIcon} alt="" width="14" height="14" style={{ filter: 'brightness(0.8)', opacity: 0.85 }} />
+                                                <span>{isActivelyControllingPeer(expandedScreenUser.userId) ? 'In control' : 'Request control'}</span>
                                               </button>
-                                            </div>
+                                            )}
+                                            <button type="button" className="voice-screen-bar-btn" onClick={() => { setVoiceScreenFullscreen(v => !v); showFullscreenUi() }} title={voiceScreenFullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
+                                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                                                <path d="M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                              </svg>
+                                            </button>
+                                            <button type="button" className="voice-screen-bar-btn" onClick={() => { setExpandedScreenUser(null); setVoiceScreenFullscreen(false) }} title="Close">×</button>
                                           </div>
-                                        )}
-                                        {p.screenStream ? (
-                                          <video
-                                            key={`screen-bar-${p.userId}`}
-                                            data-screen-user={p.userId}
-                                            className="voice-screen-video"
-                                            autoPlay playsInline muted
-                                            ref={el => { if (el && p.screenStream && el.srcObject !== p.screenStream) el.srcObject = p.screenStream }}
-                                            onClick={voiceScreenFullscreen && !isActivelyControllingPeer(p.userId) ? () => setVoiceScreenFullscreen(false) : undefined}
-                                            {...getScreenControlHandlers(p.userId)}
-                                          />
-                                        ) : (
-                                          <div className="live-screen-mock">
-                                            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" opacity="0.2">
-                                              <rect x="2" y="3" width="20" height="14" rx="2" stroke="currentColor" strokeWidth="1.5"/>
-                                              <path d="M8 21h8M12 17v4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
-                                            </svg>
-                                          </div>
-                                        )}
-                                      </div>
-                                    ))}
+                                        </div>
+                                      <video
+                                        key={`screen-expand-${expandedScreenUser.userId}`}
+                                        data-screen-user={expandedScreenUser.userId}
+                                        className="voice-screen-video"
+                                        autoPlay playsInline muted={String(expandedScreenUser.userId) === String(uid)}
+                                        ref={el => { if (el && expandedScreenUser.screenStream && el.srcObject !== expandedScreenUser.screenStream) el.srcObject = expandedScreenUser.screenStream }}
+                                        onClick={voiceScreenFullscreen ? showFullscreenUi : undefined}
+                                        {...getScreenControlHandlers(expandedScreenUser.userId)}
+                                      />
+                                    </div>
                                   </div>
                                 )}
-                                {!isScreenSharingActive && !isCardView && (
+                                {!isCardView && (
                                   <div className="voice-participants">
                                   {voiceParticipants.map(p => {
                                     const isBlockedParticipant = blocked.some(b => b.id === p.userId)
@@ -10263,23 +11772,36 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                       key={p.userId}
                                       className={`voice-tile${(p.isMuted || isBlockedParticipant) ? ' voice-tile-muted' : ''}${p.userId === uid ? ' voice-tile-self' : ''}${speakingUsers.has(p.userId) && !p.isMuted && !isBlockedParticipant ? ' voice-tile-speaking' : ''}${isBlockedParticipant ? ' voice-tile-blocked' : ''}`}
                                       onClick={() => {
+                                        if (p.isScreenSharing && p.screenStream) { setExpandedScreenUser(p); setVoiceScreenFullscreen(false); return }
                                         if (p.isVideoOn && p.stream) { setExpandedVideoUser(p); return }
                                         if (p.userId !== uid) setVoiceTileMenuUser({ userId: p.userId, userName: p.userName, userPhoto: p.userPhoto })
                                       }}
+                                      onContextMenu={(e) => {
+                                        e.preventDefault()
+                                        if (p.userId !== uid) setVoiceTileMenuUser({ userId: p.userId, userName: p.userName, userPhoto: p.userPhoto, context: true })
+                                      }}
                                     >
                                       <div className="voice-tile-media">
-                                        {p.isVideoOn && p.stream ? (
-                                          <video key={`vid-${p.userId}`} className="voice-tile-video" autoPlay playsInline muted={p.userId === uid}
+                                        {p.isScreenSharing && p.screenStream ? (
+                                          <video
+                                            className="voice-tile-video"
+                                            autoPlay playsInline muted
+                                            ref={el => { if (el && p.screenStream && el.srcObject !== p.screenStream) el.srcObject = p.screenStream }}
+                                          />
+                                        ) : p.isVideoOn && p.stream ? (
+                                          <video
+                                            className="voice-tile-video"
+                                            autoPlay playsInline muted={p.userId === uid}
                                             style={p.userId === uid && v('mirrorCamera', true) ? { transform: 'scaleX(-1)' } : undefined}
-                                            ref={el => { if (el && p.stream && el.srcObject !== p.stream) el.srcObject = p.stream }} />
-                                        ) : (
-                                          <div className="voice-tile-avatar">
-                                            {p.userPhoto
-                                              ? <img src={p.userPhoto} alt="" />
-                                              : <span>{(p.userName || '?').charAt(0).toUpperCase()}</span>
-                                            }
-                                          </div>
-                                        )}
+                                            ref={el => { if (el && p.stream && el.srcObject !== p.stream) el.srcObject = p.stream }}
+                                          />
+                                        ) : null}
+                                        <div className={`voice-tile-avatar${(p.isVideoOn || p.isScreenSharing) ? ' voice-tile-avatar--overlay' : ''}`}>
+                                          {p.userPhoto
+                                            ? <img src={p.userPhoto} alt="" />
+                                            : <span>{(p.userName || '?').charAt(0).toUpperCase()}</span>
+                                          }
+                                        </div>
                                         {p.isMuted && (
                                           <div className="voice-tile-mute-badge">
                                             <svg width="11" height="11" viewBox="0 0 24 24" fill="none">
@@ -10346,6 +11868,24 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                         }
                                       </div>
                                       <span className="voice-tile-menu-name">{voiceTileMenuUser.userName}</span>
+                                      {canManageVoiceClient(selectedReelm, uid) && voiceTileMenuUser.userId !== uid && (
+                                        <>
+                                          {selectedChannel?.type === 'stage' && (() => {
+                                            const isSpeaker = (selectedChannel.speakerIds || []).map(String).includes(String(voiceTileMenuUser.userId))
+                                            return (
+                                              <button className="voice-tile-menu-action" onClick={() => { updateStageSpeaker(selectedChannel.id, voiceTileMenuUser.userId, !isSpeaker); setVoiceTileMenuUser(null) }}>
+                                                {isSpeaker ? 'Move to listener' : 'Make speaker'}
+                                              </button>
+                                            )
+                                          })()}
+                                          <button className="voice-tile-menu-action" onClick={() => moderatorMuteVoiceParticipant(voiceTileMenuUser)}>
+                                            Mute microphone
+                                          </button>
+                                          <button className="voice-tile-menu-action voice-tile-menu-action-danger" onClick={() => kickVoiceParticipant(voiceTileMenuUser)}>
+                                            Kick from room
+                                          </button>
+                                        </>
+                                      )}
                                       <button className="voice-tile-menu-close" onClick={() => setVoiceTileMenuUser(null)}>
                                         <svg width="10" height="10" viewBox="0 0 24 24" fill="none">
                                           <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
@@ -10396,6 +11936,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 </span>
                                 <span className="voice-ctrl-label">{voiceMuted ? 'Unmute' : 'Mute'}</span>
                               </button>
+                              <button className={`voice-ctrl-btn${voiceDeafened ? ' voice-ctrl-on' : ''}`} onClick={voiceToggleDeafen} title={voiceDeafened ? 'Undeafen' : 'Deafen'}>
+                                <span className="voice-ctrl-icon">🎧</span>
+                                <span className="voice-ctrl-label">{voiceDeafened ? 'Hear' : 'Deafen'}</span>
+                              </button>
+                              <button className={`voice-ctrl-btn${voiceMuted && voiceDeafened ? ' voice-ctrl-on' : ''}`} onClick={voiceToggleFullMute} title="Mute mic and audio">
+                                <span className="voice-ctrl-icon">🔇</span>
+                                <span className="voice-ctrl-label">Silent</span>
+                              </button>
                               <button className={`voice-ctrl-btn${voiceVideoOn ? ' voice-ctrl-on' : ''}`} onClick={voiceToggleVideo} title="Camera">
                                 <span className="voice-ctrl-icon">
                                   {voiceVideoOn ? (
@@ -10415,7 +11963,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               {(() => {
                                 const canShare = !selectedChannel?.screenShareModOnly || (() => {
                                   const mem = selectedReelm?.members?.find(m => String(m.userId) === String(uid))
-                                  return (mem?.roleIds || []).some(rid => selectedReelm?.roles?.find(r => r.id === rid)?.name === 'Admin')
+                                  return (mem?.roleIds || []).some(rid => isManagerRoleClient(selectedReelm?.roles?.find(r => r.id === rid)))
                                 })()
                                 return (
                                   <button
@@ -10485,8 +12033,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             </div>
                           </div>
                           {expandedVideoUser && (
-                            <div className="video-expand-overlay" onClick={() => { setExpandedVideoUser(null); setBlurBg(false) }}>
-                              <div className="video-expand-popup" onClick={e => e.stopPropagation()}>
+                            <div
+                              className={`video-expand-overlay${videoExpandFullscreen ? ' video-expand-overlay--fullscreen' : ''}${fullscreenUiVisible ? ' video-expand-ui-visible' : ' video-expand-ui-idle'}`}
+                              onMouseMove={videoExpandFullscreen ? showFullscreenUi : undefined}
+                              onClick={() => { if (!videoExpandFullscreen) { setExpandedVideoUser(null); setBlurBg(false) } else showFullscreenUi() }}
+                            >
+                              <div className={`video-expand-popup${videoExpandFullscreen ? ' video-expand-popup--fullscreen' : ''}`} onClick={e => { e.stopPropagation(); if (videoExpandFullscreen) showFullscreenUi() }}>
                                 {expandedVideoUser.userId === uid && blurBg ? (
                                   <>
                                     <video
@@ -10512,7 +12064,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                   />
                                 )}
                                 <div className="video-expand-name">{expandedVideoUser.userId === uid ? 'You' : expandedVideoUser.userName}</div>
-                                <button className="video-expand-close" onClick={() => { setExpandedVideoUser(null); setBlurBg(false) }}>
+                                <button className="video-expand-close video-expand-fullscreen" title={videoExpandFullscreen ? 'Exit fullscreen' : 'Fullscreen'} onClick={(e) => {
+                                  e.stopPropagation()
+                                  setVideoExpandFullscreen(v => !v)
+                                  showFullscreenUi()
+                                }}>{videoExpandFullscreen ? '↙' : '⛶'}</button>
+                                <button className="video-expand-close" onClick={() => { setExpandedVideoUser(null); setVideoExpandFullscreen(false); setBlurBg(false) }}>
                                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
                                     <line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
                                     <line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
@@ -10546,7 +12103,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     const myRoles = (selectedReelm?.roles || []).filter(r => (myMember?.roleIds || []).includes(r.id))
                     const selectedChatBlockedEntry = selectedChat?.type === 'dm' ? getBlockedEntry(selectedChat.friendId) : null
                     const selectedChatSystemLocked = isReelmsSystemChat(selectedChat)
-                    const canPost = selectedChat ? (!selectedChatBlockedEntry && !selectedChatSystemLocked) : (!isAnnouncement || selectedReelm?.ownerId === uid || myRoles.some(r => /admin|moderator|founder|owner/i.test(r.name)))
+                    const canPost = selectedChat ? (!selectedChatBlockedEntry && !selectedChatSystemLocked) : (!isAnnouncement || selectedReelm?.ownerId === uid || myRoles.some(isManagerRoleClient))
                     const msgKey = selectedChat ? selectedChat.id : composeReelmMsgKey(selectedReelm, selectedChannel)
                     const msgs = dedupeMessagesForRender(messages[msgKey] || [])
                     const channelTitle = selectedChat
@@ -10981,64 +12538,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         </div>
                       </div>
                     )
-                  })() : selectedReelm && (() => {
-                    const members = selectedReelm.members || []
-                    if (members.length === 0) return null
-                    const presence = reelmPresence[selectedReelm.id] || {}
-                    const getMemberPresence = (m) => String(m.userId) === String(uid)
-                      ? { status: profileStatus, userName: currentUser.name, userPhoto: getPersonPhoto(currentUser) || m.userPhoto }
-                      : (presence[String(m.userId)] || getPresenceForUser(m.userId) || {})
-                    const getMemberStatus = (m) => getMemberPresence(m).status || 'offline'
-                    const online = members.filter(m => isActiveStatus(getMemberStatus(m)))
-                    const offline = members.filter(m => !isActiveStatus(getMemberStatus(m)))
-                    const roles = selectedReelm.roles || []
-                    const renderMember = (m) => {
-                      const memberRoles = roles.filter(r => (m.roleIds || []).includes(r.id))
-                      const info = getMemberPresence(m)
-                      const displayName = String(m.userId) === String(uid) ? currentUser.name : (info.userName || m.userName)
-                      const displayPhoto = String(m.userId) === String(uid) ? (currentUser.photo || info.userPhoto || m.userPhoto) : (info.userPhoto || m.userPhoto)
-                      const status = getMemberStatus(m)
-                      return (
-                        <div key={m.userId} className={`rp-member-card${isActiveStatus(status) ? ' rp-member-card--active' : ''}`} onClick={e => openFriendProfile({ id: m.userId, name: displayName, photo: displayPhoto }, e)}>
-                          <div className="rp-member-avatar-wrap">
-                            <div className="rp-member-avatar">
-                              {displayPhoto
-                                ? <img src={displayPhoto} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-                                : (displayName || '?').charAt(0).toUpperCase()
-                              }
-                            </div>
-                            <span className="rp-member-status-dot" style={{ background: STATUS_COLORS[status] || STATUS_COLORS.offline }} />
-                          </div>
-                          <div className="rp-member-info">
-                            <span className="rp-member-name">{displayName}</span>
-                            {memberRoles.length > 0 && (
-                              <div className="rp-member-roles">
-                                {memberRoles.map(r => (
-                                  <span key={r.id} className="rp-role-badge" style={{ color: r.color, borderColor: r.color + '55', background: r.color + '18' }}>{r.name}</span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )
-                    }
-                    return (
-                      <div className="rp-members-panel">
-                        <span className="rp-members-header">In this Reelm</span>
-                        {online.length > 0 && (
-                          <div className="rp-members-group">
-                            {online.map(renderMember)}
-                          </div>
-                        )}
-                        {online.length > 0 && offline.length > 0 && <div className="rp-members-divider" />}
-                        {offline.length > 0 && (
-                          <div className="rp-members-group rp-members-group-offline">
-                            {offline.map(renderMember)}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })()}
+                  })() : selectedReelm && renderReelmMembersPanel('right-2')}
                 </div>
               </>
             ) : showMsgRequests ? (
@@ -11352,39 +12852,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               onActivityChange={setActivity}
             />
           )}
-          {friendProfileTarget && (() => {
-            const f = friendProfileTarget.friend
-            const canShare = f?.allowProfileSharing !== false
-            return (
-              <FriendProfilePopup
-                friend={f}
-                anchorRect={friendProfileTarget.anchorRect}
-                onClose={() => setFriendProfileTarget(null)}
-                onRemove={removeFriend}
-                onBlock={blockUserFn}
-                onUnblock={unblockUserFn}
-                onAddFriend={sendFriendRequest}
-                isFriend={friends.some(fr => String(fr.id) === String(f.id))}
-                isBlocked={blocked.some(b => String(b.id) === String(f.id))}
-                isPending={friendRequestsOut.map(String).includes(String(f.id))}
-                nickname={nicknames[f.id] || ''}
-                onNicknameChange={(nick) => saveNickname(f.id, nick)}
-                canShare={canShare}
-                onMessage={() => {
-                  const fInFriends = friends.find(fr => fr.id === f.id) || f
-                  startDM(fInFriends)
-                }}
-                onCreateGroup={(friend) => {
-                  setShowGroupCreator('friends')
-                  setGroupSelectedFriends([friend])
-                  setGroupNameInput('')
-                  setGroupPhotoInput(null)
-                }}
-                onRequestRemoteControl={(friend) => requestRemoteControl(friend.id, friend.name)}
-                isSelf={String(friendProfileTarget.friend?.id) === String(uid)}
-              />
-            )
-          })()}
+          {renderFriendProfileSurface(false)}
         </div>
         {showMenu && (
           <div className="menu-backdrop" onClick={() => { setShowMenu(false); setCreateReelmStep(null); setSelectedTemplateId(null) }}>
@@ -11718,20 +13186,30 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             <div className="hpopup-content">
               {notifications.length === 0
                 ? <p className="hpopup-empty">{t('no_notifications')}</p>
-                : notifications.map((n) => (
-                    <div
-                      key={n.id}
-                      className="hpopup-row"
-                      onClick={() => {
-                        navigateToNotificationLink(n.link)
-                        deleteNotification(n.id)
-                        setShowNotificationsPopup(false)
-                      }}
-                    >
-                      <span className="hpopup-name" style={{ flex: 1 }}>{n.text}</span>
-                      <button className="notif-delete-btn" onClick={e => { e.stopPropagation(); deleteNotification(n.id) }}>✕</button>
-                    </div>
-                  ))
+                : notifications.map((n) => {
+                    const isReelmInvite = n.link?.type === 'reelm_invite'
+                    return (
+                      <div
+                        key={n.id}
+                        className={`hpopup-row${isReelmInvite ? ' hpopup-row--invite' : ''}`}
+                        onClick={() => {
+                          if (isReelmInvite) return
+                          navigateToNotificationLink(n.link)
+                          deleteNotification(n.id)
+                          setShowNotificationsPopup(false)
+                        }}
+                      >
+                        <span className="hpopup-name" style={{ flex: 1 }}>{n.text}</span>
+                        {isReelmInvite && (
+                          <div className="notif-invite-actions">
+                            <button className="notif-invite-btn notif-invite-accept" onClick={e => { e.stopPropagation(); acceptReelmInviteNotification(n) }}>Accept</button>
+                            <button className="notif-invite-btn" onClick={e => { e.stopPropagation(); rejectReelmInviteNotification(n) }}>Decline</button>
+                          </div>
+                        )}
+                        <button className="notif-delete-btn" onClick={e => { e.stopPropagation(); deleteNotification(n.id) }}>✕</button>
+                      </div>
+                    )
+                  })
               }
             </div>
             {notifications.length > 0 && (

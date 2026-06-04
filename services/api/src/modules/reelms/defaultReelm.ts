@@ -16,16 +16,29 @@ const defaultMeta = () => ({
   communityArtLocked: true
 })
 
+const fullManagerPermissions = () => ({
+  viewSettings: true,
+  manageOverview: true,
+  manageChannels: true,
+  manageVoice: true,
+  manageRoles: true,
+  manageMembers: true,
+  manageInvites: true,
+  manageJoinRequests: true,
+  manageModeration: true,
+  manageReelm: true
+})
+
 const defaultRoles = () => [
-  { id: 'role-citizen-rc', name: 'Citizen', color: '#b99887' },
-  { id: 'role-admin-rc', name: 'Admin', color: '#f87171' }
+  { id: 'role-citizen-rc', name: 'Citizen', color: '#b99887', permissions: {} },
+  { id: 'role-admin-rc', name: 'Admin', color: '#f87171', position: 0, permissions: fullManagerPermissions() }
 ]
 
 const defaultStructure = () => ({
   categories: [
     { id: 'cat-rc-start', name: 'Start', type: 'announcement', icon: 'general', collapsed: false, channels: [{ id: 'ch-rc-welcome', name: 'welcome', type: 'announcement' }] },
     { id: 'cat-rc-general', name: 'General', type: 'text', icon: 'text', collapsed: false, channels: [{ id: 'ch-rc-chat', name: 'chat', type: 'text' }] },
-    { id: 'cat-rc-voice', name: 'Voice & Video', type: 'voice', icon: 'multimedia', collapsed: false, channels: [{ id: 'ch-rc-lounge', name: 'Lounge', type: 'voice', capacity: 20, current: 0 }] }
+    { id: 'cat-rc-voice', name: 'Voice & Video', type: 'voice', icon: 'multimedia', collapsed: false, channels: [{ id: 'ch-rc-lounge', name: 'Lounge', type: 'voice', capacity: 20, current: 0 }, { id: 'ch-rc-stage', name: 'Stage', type: 'stage', capacity: 120, current: 0, speakerIds: [] }] }
   ]
 })
 
@@ -78,15 +91,22 @@ async function ensureDefaultRoles() {
   const roles = [...existingRoles]
   let changed = false
   if (!roles.some((role) => String(role?.name || '').toLowerCase() === 'citizen')) {
-    roles.unshift({ id: 'role-citizen-rc', name: 'Citizen', color: '#b99887' })
+    roles.unshift({ id: 'role-citizen-rc', name: 'Citizen', color: '#b99887', position: 1, permissions: {} })
     changed = true
   }
   if (!roles.some((role) => String(role?.name || '').toLowerCase() === 'admin')) {
-    roles.push({ id: 'role-admin-rc', name: 'Admin', color: '#f87171' })
+    roles.push({ id: 'role-admin-rc', name: 'Admin', color: '#f87171', position: 0, permissions: fullManagerPermissions() })
     changed = true
   }
-  if (changed) await putDoc(pk, 'roles', roles)
-  return roles
+  const normalizedRoles = roles.map((role, index) => {
+    if (!role.permissions) {
+      changed = true
+      return { ...role, position: Number.isFinite(Number(role?.position)) ? Number(role.position) : index, permissions: {} }
+    }
+    return { ...role, position: Number.isFinite(Number(role?.position)) ? Number(role.position) : index }
+  })
+  if (changed) await putDoc(pk, 'roles', normalizedRoles)
+  return normalizedRoles
 }
 
 async function ensureConfiguredCommunityAdmins() {
@@ -157,7 +177,20 @@ export async function ensureDefaultReelm() {
   await ensureDefaultRoles()
 
   const existingStructure = await getDoc<any>(pk, 'structure').catch(() => null)
-  if (!existingStructure?.categories?.length) await putDoc(pk, 'structure', defaultStructure())
+  if (!existingStructure?.categories?.length) {
+    await putDoc(pk, 'structure', defaultStructure())
+  } else {
+    const hasStage = existingStructure.categories?.some((cat: any) => (cat.channels || []).some((ch: any) => String(ch?.id) === 'ch-rc-stage' || String(ch?.type) === 'stage'))
+    if (!hasStage) {
+      const nextStructure = {
+        ...existingStructure,
+        categories: existingStructure.categories.map((cat: any) => String(cat?.id) === 'cat-rc-voice'
+          ? { ...cat, channels: [...(cat.channels || []), { id: 'ch-rc-stage', name: 'Stage', type: 'stage', capacity: 120, current: 0, speakerIds: [] }] }
+          : cat)
+      }
+      await putDoc(pk, 'structure', nextStructure)
+    }
+  }
 
   const existingMembers = await getDoc<any[]>(pk, 'members').catch(() => null)
   if (!Array.isArray(existingMembers)) await putDoc(pk, 'members', [])

@@ -33,11 +33,19 @@ function requestClientId(req: any) {
 }
 
 const AUTH_TOKEN_PK = 'AUTH_TOKENS'
+const VERIFICATION_EMAIL_COOLDOWN_MS = 2 * 60 * 1000
+const PASSWORD_RESET_EMAIL_COOLDOWN_MS = 2 * 60 * 1000
 
 type AuthTokenPurpose = 'verify_email' | 'password_reset'
 
 function webUrl(path = '/', params: Record<string, string> = {}) {
   const url = new URL(path, env.PUBLIC_WEB_URL)
+  Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value))
+  return url.toString()
+}
+
+function apiUrl(path = '/', params: Record<string, string> = {}) {
+  const url = new URL(path, env.PUBLIC_API_URL)
   Object.entries(params).forEach(([key, value]) => url.searchParams.set(key, value))
   return url.toString()
 }
@@ -69,27 +77,66 @@ async function consumeAuthActionToken(token: string, purpose: AuthTokenPurpose) 
   return doc as { uid: string; email: string; purpose: AuthTokenPurpose }
 }
 
-async function sendVerificationEmail(uid: string, email: string) {
-  const token = await createAuthActionToken(uid, email, 'verify_email', env.AUTH_TOKEN_TTL_MS)
-  const url = webUrl('/', { verify_email_token: token })
+async function sendVerificationEmail(uid: string, email: string, options: { force?: boolean } = {}) {
+  const normalized = normalizeEmail(email)
+  const creds = await getDoc<any>(`AUTH#${normalized}`, 'CREDS').catch(() => null)
+
+  if (creds?.uid && String(creds.uid) !== String(uid)) throw new Error('verification_uid_mismatch')
+  if (creds?.emailVerified === true) return { sent: false, reason: 'already_verified' as const }
+
+  const now = Date.now()
+  const lastSentAt = Number(creds?.lastVerificationEmailSentAt || 0)
+  if (!options.force && lastSentAt && now - lastSentAt < VERIFICATION_EMAIL_COOLDOWN_MS) {
+    return { sent: false, reason: 'cooldown' as const }
+  }
+
+  const token = await createAuthActionToken(uid, normalized, 'verify_email', env.AUTH_TOKEN_TTL_MS)
+  // Send users to the API verification endpoint first. It updates the DB, then redirects
+  // back to the web app. This keeps e-mail verification working even when the active
+  // frontend route is the legacy app and does not process verify_email_token itself.
+  const url = apiUrl('/auth/verify-email', { token })
   await sendEmail({
-    to: email,
+    to: normalized,
     subject: 'Verify your Reelms e-mail',
     text: `Verify your Reelms account: ${url}`,
     html: buttonEmailHtml('Verify your Reelms e-mail', 'Confirm this e-mail address to secure your Reelms account.', 'Verify e-mail', url)
   })
+
+  if (creds?.uid) {
+    await putDoc(`AUTH#${normalized}`, 'CREDS', { ...creds, lastVerificationEmailSentAt: now }).catch(() => {})
+  }
+
   return { sent: true }
 }
 
-async function sendPasswordResetEmail(uid: string, email: string) {
-  const token = await createAuthActionToken(uid, email, 'password_reset', env.PASSWORD_RESET_TTL_MS)
+async function sendPasswordResetEmail(uid: string, email: string, options: { force?: boolean } = {}) {
+  const normalized = normalizeEmail(email)
+  const creds = await getDoc<any>(`AUTH#${normalized}`, 'CREDS').catch(() => null)
+
+  if (creds?.uid && String(creds.uid) !== String(uid)) throw new Error('password_reset_uid_mismatch')
+
+  const now = Date.now()
+  const lastSentAt = Number(creds?.lastPasswordResetEmailSentAt || 0)
+  if (!options.force && lastSentAt && now - lastSentAt < PASSWORD_RESET_EMAIL_COOLDOWN_MS) {
+    return { sent: false, reason: 'cooldown' as const }
+  }
+
+  const token = await createAuthActionToken(uid, normalized, 'password_reset', env.PASSWORD_RESET_TTL_MS)
+  // The production app is mounted at '/', so send reset links there and let the
+  // legacy auth screen render the new-password form. /auth-next still supports
+  // the same token, but root links avoid dead/experimental route surprises.
   const url = webUrl('/', { reset_password_token: token })
   await sendEmail({
-    to: email,
+    to: normalized,
     subject: 'Reset your Reelms password',
     text: `Reset your Reelms password: ${url}`,
     html: buttonEmailHtml('Reset your Reelms password', 'Use this link to set a new password for your Reelms account. The link expires soon.', 'Reset password', url)
   })
+
+  if (creds?.uid) {
+    await putDoc(`AUTH#${normalized}`, 'CREDS', { ...creds, lastPasswordResetEmailSentAt: now }).catch(() => {})
+  }
+
   return { sent: true }
 }
 
@@ -150,13 +197,12 @@ async function createOrGetGoogleUser(googleUser: { email: string; name?: string;
       const profileData: Record<string, unknown> = { id: uid, uid, contact: email, emailVerified: true, createdAt: Date.now(), updatedAt: Date.now() }
       if (googleUser.name) profileData.displayName = googleUser.name
       if (googleUser.name) profileData.name = googleUser.name
-      if (googleUser.picture) profileData.photoURL = googleUser.picture
       await putDoc(userPk(uid), 'profile', profileData)
       await putDocIfAbsent(`EMAIL#${email}`, 'uid', uid).catch(() => {})
     }
   }
 
-  await autoJoinDefaultReelm(uid, googleUser.name || '', googleUser.picture || null).catch(() => {})
+  await autoJoinDefaultReelm(uid, googleUser.name || '', null).catch(() => {})
   return { uid, email, token: await issueAuthSession(uid, email, 'google', clientId) }
 }
 
@@ -183,10 +229,10 @@ authRouter.post('/login', async (req, res) => {
     if (!ok) return res.status(401).json({ error: 'wrong_password', code: 'auth/wrong-password', message: 'The password is incorrect.' })
     if (env.REELMS_REQUIRE_EMAIL_VERIFICATION && !creds.emailVerified) {
       await sendVerificationEmail(String(creds.uid), normalized).catch((err) => console.warn('/auth/login verification resend failed:', err))
-      return res.status(403).json({ error: 'email_not_verified', code: 'auth/email-not-verified', message: 'Verify your e-mail before signing in. A fresh verification link was sent.' })
+      return res.status(403).json({ error: 'email_not_verified', code: 'auth/email-not-verified', message: 'Verify your e-mail before signing in. A verification link was sent recently.' })
     }
     const profile = await getDoc<any>(userPk(creds.uid), 'profile').catch(() => null)
-    await autoJoinDefaultReelm(creds.uid, profile?.displayName || profile?.name || '', profile?.photoURL || profile?.photo || null).catch(() => {})
+    await autoJoinDefaultReelm(creds.uid, profile?.displayName || profile?.name || '', null).catch(() => {})
     res.json({ uid: creds.uid, email: normalized, token: await issueAuthSession(creds.uid, normalized, 'password', requestClientId(req)), profile: profile || null })
   } catch (e) {
     console.error('/auth/login error:', e)
@@ -245,7 +291,7 @@ authRouter.post('/register', async (req, res) => {
     }
     await putDoc(userPk(uid), 'profile', profile)
     await autoJoinDefaultReelm(uid, profile.displayName || '', null).catch(() => {})
-    await sendVerificationEmail(uid, normalized).catch((err) => console.warn('/auth/register verification send failed:', err))
+    await sendVerificationEmail(uid, normalized, { force: true }).catch((err) => console.warn('/auth/register verification send failed:', err))
     const token = env.REELMS_REQUIRE_EMAIL_VERIFICATION ? null : await issueAuthSession(uid, normalized, 'register', requestClientId(req))
     res.json({ uid, email: normalized, token, emailVerificationRequired: env.REELMS_REQUIRE_EMAIL_VERIFICATION, profile })
   } catch (e) {
@@ -264,7 +310,7 @@ authRouter.post('/email/verification/resend', async (req, res) => {
   if (!resolved.email) return res.json({ ok: true })
   try {
     const creds = await getDoc<any>(`AUTH#${resolved.email}`, 'CREDS').catch(() => null)
-    if (creds?.uid && !creds.emailVerified) await sendVerificationEmail(String(creds.uid), resolved.email)
+    if (creds?.uid && !creds.emailVerified) await sendVerificationEmail(String(creds.uid), resolved.email, { force: true })
     return res.json({ ok: true })
   } catch (e) {
     console.error('/auth/email/verification/resend error:', e)
@@ -278,10 +324,10 @@ authRouter.get('/verify-email', async (req, res) => {
   try {
     const action = await consumeAuthActionToken(token, 'verify_email')
     if (!action?.uid || !action.email) return res.redirect(webUrl('/', { email_verified: 'invalid' }))
-    const creds = await getDoc<any>(`AUTH#${normalizeEmail(action.email)}`, 'CREDS').catch(() => null)
-    if (creds?.uid && String(creds.uid) === String(action.uid)) {
-      await putDoc(`AUTH#${normalizeEmail(action.email)}`, 'CREDS', { ...creds, emailVerified: true, emailVerifiedAt: Date.now() })
-    }
+    const email = normalizeEmail(action.email)
+    const creds = await getDoc<any>(`AUTH#${email}`, 'CREDS').catch(() => null)
+    if (!creds?.uid || String(creds.uid) !== String(action.uid)) return res.redirect(webUrl('/', { email_verified: 'invalid' }))
+    await putDoc(`AUTH#${email}`, 'CREDS', { ...creds, emailVerified: true, emailVerifiedAt: Date.now(), lastVerificationEmailSentAt: null })
     const profile = await getDoc<any>(userPk(String(action.uid)), 'profile').catch(() => null)
     if (profile) await putDoc(userPk(String(action.uid)), 'profile', { ...profile, emailVerified: true, updatedAt: Date.now() }).catch(() => {})
     return res.redirect(webUrl('/', { email_verified: 'success' }))
@@ -299,9 +345,10 @@ authRouter.post('/verify-email', async (req, res) => {
     if (!action?.uid || !action.email) return res.status(400).json({ error: 'invalid_or_expired_token', code: 'auth/invalid-action-code' })
     const email = normalizeEmail(action.email)
     const creds = await getDoc<any>(`AUTH#${email}`, 'CREDS').catch(() => null)
-    if (creds?.uid && String(creds.uid) === String(action.uid)) {
-      await putDoc(`AUTH#${email}`, 'CREDS', { ...creds, emailVerified: true, emailVerifiedAt: Date.now() })
+    if (!creds?.uid || String(creds.uid) !== String(action.uid)) {
+      return res.status(400).json({ error: 'invalid_or_expired_token', code: 'auth/invalid-action-code' })
     }
+    await putDoc(`AUTH#${email}`, 'CREDS', { ...creds, emailVerified: true, emailVerifiedAt: Date.now(), lastVerificationEmailSentAt: null })
     const profile = await getDoc<any>(userPk(String(action.uid)), 'profile').catch(() => null)
     if (profile) await putDoc(userPk(String(action.uid)), 'profile', { ...profile, emailVerified: true, updatedAt: Date.now() }).catch(() => {})
     return res.json({ ok: true })
@@ -338,7 +385,7 @@ authRouter.post('/password-reset/confirm', async (req, res) => {
     const creds = await getDoc<any>(`AUTH#${email}`, 'CREDS').catch(() => null)
     if (!creds?.uid || String(creds.uid) !== String(action.uid)) return res.status(400).json({ error: 'invalid_or_expired_token', code: 'auth/invalid-action-code' })
     const passwordHash = await hashPassword(passwordCheck.password)
-    await putDoc(`AUTH#${email}`, 'CREDS', { ...creds, passwordHash, emailVerified: true, emailVerifiedAt: creds.emailVerifiedAt || Date.now(), passwordResetAt: Date.now() })
+    await putDoc(`AUTH#${email}`, 'CREDS', { ...creds, passwordHash, emailVerified: true, emailVerifiedAt: creds.emailVerifiedAt || Date.now(), passwordResetAt: Date.now(), lastPasswordResetEmailSentAt: null })
     const profile = await getDoc<any>(userPk(String(action.uid)), 'profile').catch(() => null)
     if (profile) await putDoc(userPk(String(action.uid)), 'profile', { ...profile, emailVerified: true, updatedAt: Date.now() }).catch(() => {})
     return res.json({ ok: true })

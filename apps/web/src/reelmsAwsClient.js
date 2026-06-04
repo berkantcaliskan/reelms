@@ -255,7 +255,7 @@ export async function loadReelmDocuments(reelmId) {
 }
 
 export function connectReelmsSocket(handlers) {
-  const { onUserDoc, onReelmDoc, onReelmManagerDoc, onAppDoc, onMessage, onMessageDeleted, onMessagesCleared, onReaction, onVoicePosition, onVcEvent, onVcError, onVcCount, onVcCounts, onVcState, onPresence, onProfileUpdated, onReelmAccessRevoked, onJoinRequestRejected, onJoinRequestApproved, onReelmTimeout, onReelmTimeoutRemoved, onReelmBanned, onConnect } = handlers
+  const { onUserDoc, onReelmDoc, onReelmManagerDoc, onAppDoc, onMessage, onMessageDeleted, onMessagesCleared, onReaction, onVoicePosition, onVcEvent, onVcError, onVcCount, onVcCounts, onVcParticipants, onVcState, onPresence, onProfileUpdated, onReelmAccessRevoked, onJoinRequestRejected, onJoinRequestApproved, onReelmTimeout, onReelmTimeoutRemoved, onReelmBanned, onReelmClosed, onConnect } = handlers
   const run = async () => {
     const token = await getIdToken()
     if (!token) return
@@ -320,6 +320,9 @@ export function connectReelmsSocket(handlers) {
     socket.on('reelm:banned', (msg) => {
       if (msg?.reelmId) onReelmBanned?.(msg)
     })
+    socket.on('reelm:closed', (msg) => {
+      if (msg?.reelmId) onReelmClosed?.(msg)
+    })
     socket.on('voicePosition', (msg) => {
       if (msg?.userId && typeof msg.x === 'number' && typeof msg.y === 'number') {
         onVoicePosition?.(msg)
@@ -339,6 +342,9 @@ export function connectReelmsSocket(handlers) {
     })
     socket.on('vc:state', (msg) => {
       if (msg && typeof msg.reelmId === 'string' && typeof msg.channelId === 'string') onVcState?.(msg)
+    })
+    socket.on('vc:participants', (msg) => {
+      if (msg && typeof msg.reelmId === 'string') onVcParticipants?.(msg)
     })
     socket.on('reelms:presence', (msg) => {
       if (msg?.reelmId && Array.isArray(msg.users)) onPresence?.(msg)
@@ -420,10 +426,36 @@ export function socketVcLeave(reelmId, channelId) {
   socket.emit('vc:leave', { reelmId, channelId })
 }
 
+export function socketVcHeartbeat(reelmId, channelId) {
+  if (!socket || !reelmId || !channelId) return
+  socket.emit('vc:heartbeat', { reelmId, channelId })
+}
+
 // Send to a specific user (offer / answer / ice / here / remote_ctrl_*)
 export function socketVcSignal(toUid, payload) {
   if (!socket || !toUid || !payload) return
   socket.emit('vc:signal', { to: toUid, payload })
+}
+
+
+export function socketVcKick(reelmId, channelId, targetUid) {
+  if (!socket || !reelmId || !channelId || !targetUid) return
+  socket.emit('vc:kick', { reelmId, channelId, targetUid })
+}
+
+export function socketVcMove(reelmId, channelId, targetUid) {
+  if (!socket || !reelmId || !channelId || !targetUid) return
+  socket.emit('vc:move', { reelmId, channelId, targetUid })
+}
+
+export function socketVcInvite(reelmId, channelId, targetUid) {
+  if (!socket || !reelmId || !channelId || !targetUid) return
+  socket.emit('vc:invite', { reelmId, channelId, targetUid })
+}
+
+export function socketVcModeratorMute(reelmId, channelId, targetUid) {
+  if (!socket || !reelmId || !channelId || !targetUid) return
+  socket.emit('vc:moderator-mute', { reelmId, channelId, targetUid })
 }
 
 // Broadcast to all in the vc room except sender (mute / video / screen)
@@ -578,6 +610,14 @@ export async function leaveReelmRemote(reelmId) {
   return j?.data || null
 }
 
+export async function closeReelmRemote(reelmId, confirmName) {
+  const j = await api(`/api/v1/reelms/${encodeURIComponent(reelmId)}/close`, {
+    method: 'POST',
+    body: JSON.stringify({ confirmName }),
+  })
+  return j?.data || null
+}
+
 export async function approveJoinReelm(reelmId, requesterId) {
   const j = await api(`/api/v1/reelms/${encodeURIComponent(reelmId)}/approve-join`, {
     method: 'POST',
@@ -591,6 +631,17 @@ export async function rejectJoinReelm(reelmId, requesterId) {
     method: 'POST',
     body: JSON.stringify({ requesterId }),
   })
+  return j?.data || null
+}
+
+
+export async function acceptReelmInvite(reelmId) {
+  const j = await api(`/api/v1/reelms/${encodeURIComponent(reelmId)}/accept-invite`, { method: 'POST' })
+  return j?.data || null
+}
+
+export async function rejectReelmInvite(reelmId) {
+  const j = await api(`/api/v1/reelms/${encodeURIComponent(reelmId)}/reject-invite`, { method: 'POST' })
   return j?.data || null
 }
 

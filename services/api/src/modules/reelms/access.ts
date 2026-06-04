@@ -21,8 +21,14 @@ export function normalizeEmail(value: unknown) {
   return String(value || '').trim().toLowerCase()
 }
 
+const isGoogleDefaultAvatarUrl = (value: unknown) => {
+  const url = String(value || '')
+  return /(^|\.)googleusercontent\.com\//i.test(url) || /lh3\.googleusercontent\.com/i.test(url)
+}
+
 export function publicProfileFromStored(uid: string, profile: any = {}) {
-  const photo = profile.photo || profile.profilePhoto || profile.photoURL || profile.avatar || profile.image || profile.imageUrl || profile.userPhoto || null
+  const rawPhoto = profile.photo || profile.profilePhoto || profile.photoURL || profile.avatar || profile.image || profile.imageUrl || profile.userPhoto || null
+  const photo = isGoogleDefaultAvatarUrl(rawPhoto) ? null : rawPhoto
   const cover = profile.cover || profile.coverImage || profile.coverUrl || profile.headerImage || profile.banner || profile.bannerImage || profile.backgroundCover || null
   return {
     id: uid,
@@ -43,13 +49,66 @@ export function publicProfileFromStored(uid: string, profile: any = {}) {
     bio: profile.bio || '',
     activity: profile.activity || null,
     sociallinks: profile.sociallinks || {},
-    socialorder: Array.isArray(profile.socialorder) ? profile.socialorder : []
+    socialorder: Array.isArray(profile.socialorder) ? profile.socialorder : [],
+    profileTheme: profile.profileTheme && typeof profile.profileTheme === 'object' ? profile.profileTheme : null
   }
 }
 
+
+export type ReelmPermissionKey =
+  | 'viewSettings'
+  | 'manageOverview'
+  | 'manageChannels'
+  | 'manageVoice'
+  | 'manageRoles'
+  | 'manageMembers'
+  | 'manageInvites'
+  | 'manageJoinRequests'
+  | 'manageModeration'
+  | 'manageReelm'
+
+const REELM_ELEVATED_ROLE_RE = /admin|owner|founder|moderator/i
+
+export function isElevatedReelmRole(role: any) {
+  return role?.permissions?.manageReelm === true
+}
+
+export function roleHasReelmPermission(role: any, permission: ReelmPermissionKey) {
+  if (!role) return false
+  if (isElevatedReelmRole(role)) return true
+  if (permission === 'viewSettings') return role?.permissions?.viewSettings === true || Object.values(role?.permissions || {}).some((value) => value === true)
+  return role?.permissions?.[permission] === true
+}
+
+export async function canUseReelmPermission(uid: string, reelmId: string, permission: ReelmPermissionKey) {
+  if (!uid || !reelmId) return false
+  if (uid === env.REELMS_MODERATION_UID) return true
+  if (await isBannedFromReelm(uid, reelmId).catch(() => false)) return false
+
+  if (reelmId === DEFAULT_REELM_ID && await isCommunityAdminUid(uid).catch(() => false)) return true
+  if (reelmId === DEFAULT_REELM_ID && await hasLeftDefaultReelm(uid).catch(() => false)) return false
+
+  const pk = reelmPk(reelmId)
+  const meta = await getDoc<any>(pk, 'meta').catch(() => null)
+  if (String(meta?.ownerId || '') === uid) return true
+
+  const [members, roles] = await Promise.all([
+    getDoc<any[]>(pk, 'members').catch(() => []),
+    getDoc<any[]>(pk, 'roles').catch(() => [])
+  ])
+  const member = (members || []).find((item) => String(item?.userId || item?.id || '') === uid)
+  if (!member) return false
+
+  const roleIds = new Set((member.roleIds || []).map(String))
+  return (roles || []).some((role) => roleIds.has(String(role?.id || '')) && roleHasReelmPermission(role, permission))
+}
+
 export async function getUserPublicProfile(uid: string) {
-  const profile = (await getDoc<any>(userPk(uid), 'profile').catch(() => null)) || {}
-  return publicProfileFromStored(uid, profile)
+  const [profile, customization] = await Promise.all([
+    getDoc<any>(userPk(uid), 'profile').catch(() => null),
+    getDoc<any>(userPk(uid), 'customization').catch(() => null)
+  ])
+  return publicProfileFromStored(uid, { ...(profile || {}), profileTheme: (profile as any)?.profileTheme || customization || null })
 }
 
 async function isBannedFromReelm(uid: string, reelmId: string) {
@@ -119,7 +178,7 @@ export async function canManageReelm(uid: string, reelmId: string) {
   if (!member) return false
 
   const roleIds = new Set((member.roleIds || []).map(String))
-  return (roles || []).some((role) => roleIds.has(String(role?.id)) && /admin|owner|founder|moderator/i.test(String(role?.name || '')))
+  return (roles || []).some((role) => roleIds.has(String(role?.id || '')) && isElevatedReelmRole(role))
 }
 
 export async function getReelmChannel(reelmId: string, channelId: string) {

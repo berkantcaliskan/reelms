@@ -4,18 +4,27 @@ import { createAdapter } from '@socket.io/redis-adapter'
 import { Redis } from 'ioredis'
 import { corsOrigins, env } from '../config/env.js'
 import { claimActiveClient, verifyIdToken } from '../modules/auth/authService.js'
-import { getActiveReelmTimeout, getMessageKeyAccess, getReelmChannel, getUserPublicProfile, isReelmMember } from '../modules/reelms/access.js'
-import { getDoc, reelmPk } from '../modules/store/docStore.js'
+import { canUseReelmPermission, getActiveReelmTimeout, getMessageKeyAccess, getReelmChannel, getUserPublicProfile, isElevatedReelmRole, isReelmMember } from '../modules/reelms/access.js'
+import { getDoc, putDoc, reelmPk, userPk } from '../modules/store/docStore.js'
 import { logger } from '../lib/logger.js'
 
-type ReelmsSocket = Socket & { uid?: string; clientId?: string | null; _vcRoom?: string | null; _vcReelmId?: string | null; _vcChannelId?: string | null; _vcUserName?: string | null; _vcUserPhoto?: string | null }
+type ReelmsSocket = Socket & { uid?: string; clientId?: string | null; _vcRoom?: string | null; _vcReelmId?: string | null; _vcChannelId?: string | null; _vcUserName?: string | null; _vcUserPhoto?: string | null; _vcLastSeenAt?: number | null }
 
 const STATUS_VALUES = new Set(['online', 'idle', 'busy', 'invisible', 'offline'])
+const VOICE_HEARTBEAT_TIMEOUT_MS = 45_000
+const VOICE_SWEEP_INTERVAL_MS = 15_000
+const VOICE_INVITE_COOLDOWN_MS = 30_000
+const voiceInviteCooldowns = new Map<string, number>()
 
 export function attachSocketServer(httpServer?: HttpServer) {
   const io = new Server({
     cors: { origin: corsOrigins, credentials: true, methods: ['GET', 'POST'] },
-    path: '/socket.io'
+    path: '/socket.io',
+    // Discord-like realtime behavior: dead tabs are detected by Socket.IO, and
+    // voice membership has its own shorter heartbeat so users cannot remain in
+    // a voice room forever after a tab/browser crash or network drop.
+    pingInterval: 25_000,
+    pingTimeout: 20_000
   })
   if (httpServer) io.attach(httpServer)
 
@@ -57,6 +66,19 @@ export function attachSocketServer(httpServer?: HttpServer) {
 
   const getRoomCount = async (room: string) => (await io.in(room).fetchSockets()).length
 
+
+  const canSendVoiceInviteNow = (actorUid: string, targetUid: string, reelmId: string, channelId: string) => {
+    const key = `${actorUid}:${targetUid}:${reelmId}:${channelId}`
+    const now = Date.now()
+    const last = voiceInviteCooldowns.get(key) || 0
+    if (now - last < VOICE_INVITE_COOLDOWN_MS) return false
+    voiceInviteCooldowns.set(key, now)
+    if (voiceInviteCooldowns.size > 5000) {
+      for (const [itemKey, ts] of voiceInviteCooldowns) if (now - ts > VOICE_INVITE_COOLDOWN_MS * 4) voiceInviteCooldowns.delete(itemKey)
+    }
+    return true
+  }
+
   const getVoiceCounts = async (reelmId: string) => {
     const voiceChannelIds = await getVoiceChannelIds(reelmId)
     const counts: Record<string, number> = {}
@@ -66,15 +88,51 @@ export function attachSocketServer(httpServer?: HttpServer) {
     return counts
   }
 
+  const getVoiceParticipants = async (reelmId: string, channelId: string) => {
+    const peers = await io.in(`vc:${reelmId}_${channelId}`).fetchSockets()
+    const byUser = new Map<string, { userId: string; userName: string; userPhoto: any }>()
+    for (const peer of peers) {
+      const userId = String(peer.data?.uid || '')
+      if (!userId || byUser.has(userId)) continue
+      byUser.set(userId, {
+        userId,
+        userName: String(peer.data?.userName || (peer as any)._vcUserName || 'Member'),
+        userPhoto: peer.data?.userPhoto || (peer as any)._vcUserPhoto || null
+      })
+    }
+    return Array.from(byUser.values())
+  }
+
+  const getVoiceParticipantsByChannel = async (reelmId: string) => {
+    const voiceChannelIds = await getVoiceChannelIds(reelmId)
+    const channels: Record<string, { userId: string; userName: string; userPhoto: any }[]> = {}
+    await Promise.all(voiceChannelIds.map(async (channelId) => {
+      channels[channelId] = await getVoiceParticipants(reelmId, channelId)
+    }))
+    return channels
+  }
+
+  const emitVcParticipants = async (reelmId: string, channelId: string, target?: ReelmsSocket) => {
+    const payload = { reelmId, channelId, participants: await getVoiceParticipants(reelmId, channelId) }
+    io.to(`reelm:${reelmId}`).emit('vc:participants', payload)
+    target?.emit('vc:participants', payload)
+  }
+
+  const emitVcParticipantsForReelm = async (socket: ReelmsSocket, reelmId: string) => {
+    socket.emit('vc:participants', { reelmId, channels: await getVoiceParticipantsByChannel(reelmId) })
+  }
+
   const emitVcCount = async (reelmId: string, channelId: string, room: string, target?: ReelmsSocket) => {
     const count = await getRoomCount(room)
     const payload = { reelmId, channelId, count }
     io.to(`reelm:${reelmId}`).emit('vc:count', payload)
     target?.emit('vc:count', payload)
+    await emitVcParticipants(reelmId, channelId, target).catch((err) => logger.warn('vc:participants emit failed', err))
   }
 
   const emitVcCounts = async (socket: ReelmsSocket, reelmId: string) => {
     socket.emit('vc:counts', { reelmId, counts: await getVoiceCounts(reelmId) })
+    await emitVcParticipantsForReelm(socket, reelmId).catch((err) => logger.warn('vc:participants state failed', err))
   }
 
   const getReelmPresence = async (reelmId: string) => {
@@ -108,28 +166,70 @@ export function attachSocketServer(httpServer?: HttpServer) {
     setTimeout(() => { void emitPresence(reelmId).catch((err) => logger.warn('presence emit failed', err)) }, 0)
   }
 
+
+  const pushUserNotification = async (uid: string, text: string, link: any = null) => {
+    if (!uid) return
+    const pk = userPk(uid)
+    const current = (await getDoc<any[]>(pk, 'notifications').catch(() => [])) || []
+    const next = [{ id: `${Date.now()}_${Math.random().toString(36).slice(2, 11)}`, text, time: Date.now(), link }, ...current].slice(0, 80)
+    await putDoc(pk, 'notifications', next)
+    io.to(`u:${uid}`).emit('reelms:doc', { scope: 'user', sk: 'notifications' })
+  }
+
+  const isProtectedVoiceTarget = async (reelmId: string, targetUid: string) => {
+    const pk = reelmPk(reelmId)
+    const [meta, members, roles] = await Promise.all([
+      getDoc<any>(pk, 'meta').catch(() => null),
+      getDoc<any[]>(pk, 'members').catch(() => []),
+      getDoc<any[]>(pk, 'roles').catch(() => [])
+    ])
+    if (String(meta?.ownerId || '') === String(targetUid)) return true
+    const targetMember = (members || []).find((member: any) => String(member?.userId || member?.id || '') === String(targetUid))
+    const targetRoleIds = new Set((targetMember?.roleIds || []).map(String))
+    return (roles || []).some((role: any) => targetRoleIds.has(String(role?.id || '')) && isElevatedReelmRole(role))
+  }
+
   const getVoiceChannelIds = async (reelmId: string): Promise<string[]> => {
     const structure = await getDoc<any>(reelmPk(reelmId), 'structure').catch(() => null)
     const categories = Array.isArray(structure?.categories) ? structure.categories : []
     return categories.flatMap((category: any) => Array.isArray(category?.channels) ? category.channels : [])
-      .filter((channel: any) => String(channel?.type || '') === 'voice' && channel?.id)
+      .filter((channel: any) => ['voice', 'video', 'liveaction', 'stage'].includes(String(channel?.type || '')) && channel?.id)
       .map((channel: any) => String(channel.id))
   }
 
-  const leaveCurrentVc = async (socket: ReelmsSocket) => {
+  const leaveCurrentVc = async (socket: ReelmsSocket, reason = 'left') => {
     if (!socket._vcRoom) return
     const room = socket._vcRoom
     const reelmId = socket._vcReelmId
     const channelId = socket._vcChannelId
-    socket.to(room).emit('vc:event', { type: 'leave', from: socket.uid })
+    socket.to(room).emit('vc:event', { type: 'leave', from: socket.uid, reason })
     socket.leave(room)
+    if (reelmId && channelId) socket.leave(`chan:${reelmId}_vc_${channelId}`)
     socket._vcRoom = null
     socket._vcReelmId = null
     socket._vcChannelId = null
     socket._vcUserName = null
     socket._vcUserPhoto = null
+    socket._vcLastSeenAt = null
     if (reelmId && channelId) await emitVcCount(reelmId, channelId, room).catch((err) => logger.warn('vc:count emit failed', err))
   }
+
+  const sweepStaleVoiceSockets = () => {
+    const now = Date.now()
+    for (const raw of io.of('/').sockets.values()) {
+      const peer = raw as ReelmsSocket
+      if (!peer._vcRoom) continue
+      const lastSeen = Number(peer._vcLastSeenAt || 0)
+      if (lastSeen && now - lastSeen <= VOICE_HEARTBEAT_TIMEOUT_MS) continue
+      const staleReelmId = peer._vcReelmId || null
+      const staleChannelId = peer._vcChannelId || null
+      void leaveCurrentVc(peer, 'stale').catch((err) => logger.warn('stale voice cleanup failed', err))
+      peer.emit('vc:error', { reelmId: staleReelmId, channelId: staleChannelId, error: 'voice_stale' })
+    }
+  }
+
+  const voiceSweepTimer = setInterval(sweepStaleVoiceSockets, VOICE_SWEEP_INTERVAL_MS)
+  if (typeof (voiceSweepTimer as any).unref === 'function') (voiceSweepTimer as any).unref()
 
   io.on('connection', (rawSocket) => {
     const socket = rawSocket as ReelmsSocket
@@ -214,11 +314,14 @@ export function attachSocketServer(httpServer?: HttpServer) {
           return
         }
         const channel = await getReelmChannel(reelmId, channelId)
-        if (!channel || String(channel.type || '') !== 'voice') return
+        if (!channel || !['voice', 'video', 'liveaction', 'stage'].includes(String(channel.type || ''))) return
 
         const room = `vc:${reelmId}_${channelId}`
-        if (socket._vcRoom && socket._vcRoom !== room) await leaveCurrentVc(socket)
-        if (socket._vcRoom === room) return
+        if (socket._vcRoom && socket._vcRoom !== room) await leaveCurrentVc(socket, 'switch')
+        if (socket._vcRoom === room) {
+          socket._vcLastSeenAt = Date.now()
+          return
+        }
 
         const capacity = Number(channel.capacity || 0)
         const current = await getRoomCount(room)
@@ -238,6 +341,7 @@ export function attachSocketServer(httpServer?: HttpServer) {
         socket._vcChannelId = channelId
         socket._vcUserName = displayName
         socket._vcUserPhoto = displayPhoto
+        socket._vcLastSeenAt = Date.now()
         socket.data.userName = displayName
         socket.data.userPhoto = displayPhoto
         socket.to(room).emit('vc:event', { type: 'join', from: socket.uid, userName: displayName, userPhoto: displayPhoto })
@@ -258,7 +362,13 @@ export function attachSocketServer(httpServer?: HttpServer) {
     socket.on('vc:leave', async ({ reelmId, channelId }) => {
       if (typeof reelmId !== 'string' || typeof channelId !== 'string') return
       if (socket._vcReelmId !== reelmId || socket._vcChannelId !== channelId) return
-      await leaveCurrentVc(socket)
+      await leaveCurrentVc(socket, 'left')
+    })
+
+    socket.on('vc:heartbeat', ({ reelmId, channelId }) => {
+      if (typeof reelmId !== 'string' || typeof channelId !== 'string') return
+      if (socket._vcReelmId !== reelmId || socket._vcChannelId !== channelId || !socket._vcRoom) return
+      socket._vcLastSeenAt = Date.now()
     })
 
     socket.on('vc:counts', async ({ reelmId }) => {
@@ -274,9 +384,170 @@ export function attachSocketServer(httpServer?: HttpServer) {
         if (typeof to !== 'string' || !payload || typeof payload !== 'object') return
         if (!socket._vcRoom) return
         const peers = await io.in(socket._vcRoom).fetchSockets()
-        if (!peers.some((peer) => String(peer.data?.uid || '') === to)) return
-        io.to(`u:${to}`).emit('vc:event', { ...payload, from: socket.uid })
+        const targetSockets = peers.filter((peer) => String(peer.data?.uid || '') === to)
+        if (!targetSockets.length) return
+        for (const peer of targetSockets) peer.emit('vc:event', { ...payload, from: socket.uid })
       } catch (err) { logger.warn('vc:signal denied', err) }
+    })
+
+    socket.on('vc:kick', async ({ reelmId, channelId, targetUid }) => {
+      try {
+        if (typeof reelmId !== 'string' || typeof channelId !== 'string' || typeof targetUid !== 'string') return
+        if (String(targetUid) === String(socket.uid)) return
+        const channel = await getReelmChannel(reelmId, channelId)
+        if (!channel || !['voice', 'video', 'liveaction', 'stage'].includes(String(channel.type || ''))) return
+        const actorCanVoice = await canUseReelmPermission(String(socket.uid), reelmId, 'manageVoice').catch(() => false)
+        const actorCanModerate = actorCanVoice || await canUseReelmPermission(String(socket.uid), reelmId, 'manageModeration').catch(() => false)
+        const actorIsFull = await canUseReelmPermission(String(socket.uid), reelmId, 'manageReelm').catch(() => false)
+        if (!actorCanModerate) {
+          socket.emit('vc:event', { type: 'voice_kick_denied', message: 'You do not have permission to manage voice rooms.' })
+          return
+        }
+        if (!actorIsFull && await isProtectedVoiceTarget(reelmId, targetUid).catch(() => true)) {
+          socket.emit('vc:event', { type: 'voice_kick_denied', message: 'You cannot remove a protected admin from voice.' })
+          return
+        }
+        const room = `vc:${reelmId}_${channelId}`
+        const targets = Array.from(io.of('/').sockets.values())
+          .map((raw) => raw as ReelmsSocket)
+          .filter((peer) => peer._vcRoom === room && String(peer.data?.uid || peer.uid || '') === String(targetUid))
+        if (!targets.length) {
+          socket.emit('vc:event', { type: 'voice_kick_denied', message: 'That member is no longer in this voice room.' })
+          return
+        }
+        for (const peer of targets) {
+          peer.emit('vc:event', { type: 'force_leave', reelmId, channelId, by: socket.uid, reason: 'kicked' })
+          await leaveCurrentVc(peer, 'kicked')
+        }
+        await emitVcCount(reelmId, channelId, room).catch((err) => logger.warn('vc:kick count failed', err))
+      } catch (err) { logger.warn('vc:kick denied', err) }
+    })
+
+    socket.on('vc:moderator-mute', async ({ reelmId, channelId, targetUid }) => {
+      try {
+        if (typeof reelmId !== 'string' || typeof channelId !== 'string' || typeof targetUid !== 'string') return
+        if (String(targetUid) === String(socket.uid)) return
+        const channel = await getReelmChannel(reelmId, channelId)
+        if (!channel || !['voice', 'video', 'liveaction', 'stage'].includes(String(channel.type || ''))) return
+        const actorCanVoice = await canUseReelmPermission(String(socket.uid), reelmId, 'manageVoice').catch(() => false)
+        const actorCanModerate = actorCanVoice || await canUseReelmPermission(String(socket.uid), reelmId, 'manageModeration').catch(() => false)
+        const actorIsFull = await canUseReelmPermission(String(socket.uid), reelmId, 'manageReelm').catch(() => false)
+        if (!actorCanModerate) {
+          socket.emit('vc:event', { type: 'voice_mute_denied', message: 'You do not have permission to mute voice members.' })
+          return
+        }
+        if (!actorIsFull && await isProtectedVoiceTarget(reelmId, targetUid).catch(() => true)) {
+          socket.emit('vc:event', { type: 'voice_mute_denied', message: 'You cannot mute a protected admin.' })
+          return
+        }
+        const room = `vc:${reelmId}_${channelId}`
+        const targets = Array.from(io.of('/').sockets.values())
+          .map((raw) => raw as ReelmsSocket)
+          .filter((peer) => peer._vcRoom === room && String(peer.data?.uid || peer.uid || '') === String(targetUid))
+        for (const peer of targets) peer.emit('vc:event', { type: 'moderator_mute', reelmId, channelId, by: socket.uid })
+      } catch (err) { logger.warn('vc:moderator-mute denied', err) }
+    })
+
+    socket.on('vc:move', async ({ reelmId, channelId, targetUid }) => {
+      try {
+        if (typeof reelmId !== 'string' || typeof channelId !== 'string' || typeof targetUid !== 'string') return
+        if (String(targetUid) === String(socket.uid)) return
+        const channel = await getReelmChannel(reelmId, channelId)
+        if (!channel || !['voice', 'video', 'liveaction', 'stage'].includes(String(channel.type || ''))) return
+        const actorCanVoice = await canUseReelmPermission(String(socket.uid), reelmId, 'manageVoice').catch(() => false)
+        const actorCanModerate = actorCanVoice || await canUseReelmPermission(String(socket.uid), reelmId, 'manageModeration').catch(() => false)
+        const actorIsFull = await canUseReelmPermission(String(socket.uid), reelmId, 'manageReelm').catch(() => false)
+        if (!actorCanModerate) {
+          socket.emit('vc:event', { type: 'voice_move_denied', message: 'You do not have permission to move voice members.' })
+          return
+        }
+        if (!actorIsFull && await isProtectedVoiceTarget(reelmId, targetUid).catch(() => true)) {
+          socket.emit('vc:event', { type: 'voice_move_denied', message: 'You cannot move a protected admin.' })
+          return
+        }
+        if (!await isReelmMember(String(targetUid), reelmId).catch(() => false)) {
+          socket.emit('vc:event', { type: 'voice_move_denied', message: 'That member is not in this Reelm.' })
+          return
+        }
+        const targetRoom = `vc:${reelmId}_${channelId}`
+        const targetSockets = Array.from(io.of('/').sockets.values())
+          .map((raw) => raw as ReelmsSocket)
+          .filter((peer) => String(peer.data?.uid || peer.uid || '') === String(targetUid))
+        const sameRoom = targetSockets.some((peer) => peer._vcRoom === targetRoom)
+        if (sameRoom) {
+          socket.emit('vc:event', { type: 'voice_move_denied', message: 'That member is already in this voice room.' })
+          return
+        }
+        const actor = await getUserPublicProfile(String(socket.uid)).catch(() => null)
+        const onlineVoiceTargets = targetSockets.filter((peer) => peer._vcRoom)
+        if (!onlineVoiceTargets.length) {
+          if (!canSendVoiceInviteNow(String(socket.uid), targetUid, reelmId, channelId)) {
+            socket.emit('vc:event', { type: 'voice_move_denied', message: 'Voice invite was already sent recently.' })
+            return
+          }
+          const meta = await getDoc<any>(reelmPk(reelmId), 'meta').catch(() => null)
+          const text = `${actor?.name || actor?.username || 'Someone'} invited you to ${meta?.name ? `${meta.name} / ` : ''}${String(channel.name || 'a voice room')}.`
+          await pushUserNotification(targetUid, text, { type: 'reelm', reelmId, channelId, inviteKind: 'voice' }).catch((err) => logger.warn('voice move fallback invite failed', err))
+          io.to(`u:${targetUid}`).emit('vc:event', { type: 'voice_invite', reelmId, channelId, channelName: String(channel.name || 'Voice'), senderId: socket.uid, senderName: actor?.name || actor?.username || 'Someone' })
+          socket.emit('vc:event', { type: 'voice_move_denied', message: 'Member is not in a voice room, so an invite was sent instead.' })
+          return
+        }
+        const capacity = Number((channel as any).capacity || 0)
+        const current = await getRoomCount(targetRoom)
+        if (capacity > 0 && current >= capacity) {
+          socket.emit('vc:event', { type: 'voice_move_denied', message: 'Target voice room is full.' })
+          return
+        }
+        for (const peer of onlineVoiceTargets) {
+          peer.emit('vc:event', {
+            type: 'force_move',
+            reelmId,
+            channelId,
+            channelName: String(channel.name || 'Voice'),
+            by: socket.uid,
+            byName: actor?.name || actor?.username || 'Someone'
+          })
+        }
+      } catch (err) { logger.warn('vc:move denied', err) }
+    })
+
+    socket.on('vc:invite', async ({ reelmId, channelId, targetUid }) => {
+      try {
+        if (typeof reelmId !== 'string' || typeof channelId !== 'string' || typeof targetUid !== 'string') return
+        if (String(targetUid) === String(socket.uid)) return
+        if (!await isReelmMember(String(socket.uid), reelmId)) return
+        if (!await isReelmMember(String(targetUid), reelmId)) {
+          socket.emit('vc:event', { type: 'voice_invite_denied', message: 'That member is not in this Reelm.' })
+          return
+        }
+        const channel = await getReelmChannel(reelmId, channelId)
+        if (!channel || !['voice', 'video', 'liveaction', 'stage'].includes(String(channel.type || ''))) return
+        const room = `vc:${reelmId}_${channelId}`
+        const targetsInSameRoom = Array.from(io.of('/').sockets.values())
+          .map((raw) => raw as ReelmsSocket)
+          .some((peer) => peer._vcRoom === room && String(peer.data?.uid || peer.uid || '') === String(targetUid))
+        if (targetsInSameRoom) {
+          socket.emit('vc:event', { type: 'voice_invite_denied', message: 'That member is already in this voice room.' })
+          return
+        }
+        if (!canSendVoiceInviteNow(String(socket.uid), targetUid, reelmId, channelId)) {
+          socket.emit('vc:event', { type: 'voice_invite_denied', message: 'Voice invite already sent recently.' })
+          return
+        }
+        const actor = await getUserPublicProfile(String(socket.uid)).catch(() => null)
+        const meta = await getDoc<any>(reelmPk(reelmId), 'meta').catch(() => null)
+        const text = `${actor?.name || actor?.username || 'Someone'} invited you to ${meta?.name ? `${meta.name} / ` : ''}${String(channel.name || 'a voice room')}.`
+        const link = { type: 'reelm', reelmId, channelId, inviteKind: 'voice' }
+        await pushUserNotification(targetUid, text, link).catch((err) => logger.warn('voice invite notification failed', err))
+        io.to(`u:${targetUid}`).emit('vc:event', {
+          type: 'voice_invite',
+          reelmId,
+          channelId,
+          channelName: String(channel.name || 'Voice'),
+          senderId: socket.uid,
+          senderName: actor?.name || actor?.username || 'Someone'
+        })
+      } catch (err) { logger.warn('vc:invite denied', err) }
     })
 
     socket.on('vc:broadcast', ({ reelmId, channelId, payload }) => {
@@ -287,7 +558,15 @@ export function attachSocketServer(httpServer?: HttpServer) {
     })
 
     socket.on('disconnecting', () => {
-      if (socket._vcRoom) socket.to(socket._vcRoom).emit('vc:event', { type: 'leave', from: socket.uid })
+      if (socket._vcRoom) {
+        const room = socket._vcRoom
+        const reelmId = socket._vcReelmId
+        const channelId = socket._vcChannelId
+        socket.to(room).emit('vc:event', { type: 'leave', from: socket.uid, reason: 'disconnect' })
+        if (reelmId && channelId) {
+          setTimeout(() => { void emitVcCount(reelmId, channelId, room).catch((err) => logger.warn('vc:disconnecting count failed', err)) }, 0)
+        }
+      }
     })
 
     socket.on('disconnect', () => {
