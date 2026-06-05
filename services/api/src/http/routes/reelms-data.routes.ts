@@ -16,7 +16,7 @@ const USER_BOOTSTRAP_KEYS = [
   'friends', 'friend_requests', 'friend_requests_out', 'notifications', 'message_requests', 'message_requests_out',
   'blocked', 'nicknames', 'unread_counts', 'customization', 'bg_image', 'feed_nav', 'landing_view', 'lpw', 'rpw',
   'sociallinks', 'socialorder', 'spotify_connected', 'sessions', 'environment', 'last_channels', 'reelms', 'chats',
-  'pinned_items', 'sounds', 'body_font'
+  'pinned_items', 'bar_order', 'sounds', 'body_font'
 ]
 
 const PUBLIC_PATHS = [/^\/user\/check-username\//, /^\/user\/check-email\//, /^\/sounds\/list$/]
@@ -371,6 +371,7 @@ export function createReelmsDataRouter(io: Server) {
       const safeBanList = Array.isArray(rawBanList) ? rawBanList : []
       const safeMembers = filterMembersForClient(members || [], safeBanList)
       const normalized = normalizeReelmCoreForClient(id, roles || [], safeMembers)
+      normalized.members = await hydrateMembersForClient(normalized.members)
       const managerDocs = options.includeManagerDocs ? await Promise.all([
         getDoc<any[]>(pk, 'join_requests').catch(() => []),
         Promise.resolve(safeBanList),
@@ -788,6 +789,34 @@ export function createReelmsDataRouter(io: Server) {
 
   const getUserPublicProfile = getStoredPublicProfile
 
+  async function hydrateMembersForClient(members: any[] = []) {
+    const safeMembers = Array.isArray(members) ? members : []
+    return Promise.all(safeMembers.map(async (member: any) => {
+      const id = memberUserId(member)
+      if (!id) return member
+      const alreadyRich = member?.profileTheme && (member?.username || member?.userName) && (member?.cover || member?.coverImage || member?.coverUrl || member?.bio || member?.activity)
+      if (alreadyRich) return member
+      const profile = await withDeadline(getUserPublicProfile(id).catch(() => null), 750, null)
+      if (!profile) return member
+      const photo = getProfilePhoto(profile) || member?.userPhoto || member?.photo || null
+      const cover = getProfileCover(profile) || member?.cover || member?.coverImage || member?.coverUrl || null
+      return {
+        ...member,
+        userId: id,
+        userName: profile.name || profile.displayName || member?.userName || member?.name || profile.username || 'Member',
+        username: profile.username || member?.username || '',
+        userPhoto: photo,
+        photo,
+        cover,
+        coverImage: cover,
+        coverUrl: cover,
+        bio: profile.bio || member?.bio || '',
+        activity: profile.activity || member?.activity || null,
+        profileTheme: (profile.profileTheme && typeof profile.profileTheme === 'object') ? profile.profileTheme : (member?.profileTheme || null)
+      }
+    }))
+  }
+
   const toClientReelm = (meta: any, structure: any, roles: any[], members: any[], extra: Record<string, unknown> = {}) => {
     const normalizedCore = normalizeReelmCoreForClient(meta?.id, roles, members)
     return {
@@ -856,7 +885,15 @@ export function createReelmsDataRouter(io: Server) {
       ...(existing || {}),
       userId: uid,
       userName: existing?.userName || profile.name || profile.username || 'Member',
+      username: existing?.username || profile.username || '',
       userPhoto: profile.photo || existing?.userPhoto || null,
+      photo: profile.photo || existing?.photo || null,
+      cover: profile.cover || existing?.cover || null,
+      coverImage: profile.coverImage || profile.cover || existing?.coverImage || existing?.cover || null,
+      coverUrl: profile.coverUrl || profile.cover || existing?.coverUrl || existing?.cover || null,
+      bio: profile.bio || existing?.bio || '',
+      activity: profile.activity || existing?.activity || null,
+      profileTheme: profile.profileTheme || existing?.profileTheme || null,
       roleIds: existingRoleIds.length ? existingRoleIds : fallbackRoleIds
     }
     const next = [member, ...members.filter((m) => String(m.userId) !== String(uid))]
@@ -903,8 +940,21 @@ export function createReelmsDataRouter(io: Server) {
   const isProtectedRole = (role: any) => isManagerRole(role)
 
   const roleNameKey = (role: any) => String(role?.name || '').trim().toLowerCase().replace(/\s+/g, ' ')
-  const isAdminLikeRole = (role: any) => isManagerRole(role) || /admin|owner|founder|moderator|community admin/i.test(String(role?.name || ''))
-  const isDefaultMemberLikeRole = (role: any) => /^(members|member|citizen|user|regular)$/i.test(String(role?.name || '').trim()) || /role-(members|member|citizen)/i.test(String(role?.id || ''))
+  const isStableAdminRoleId = (role: any) => {
+    const rawId = String(role?.id || '')
+    return rawId === DEFAULT_ADMIN_ROLE_ID || rawId === CUSTOM_ADMIN_ROLE_ID || /^role-admin-/i.test(rawId)
+  }
+  const isStableMemberRoleId = (role: any) => {
+    const rawId = String(role?.id || '')
+    return rawId === DEFAULT_CITIZEN_ROLE_ID || rawId === CUSTOM_MEMBERS_ROLE_ID || /^role-(members|member|citizen)-/i.test(rawId)
+  }
+  // A role name is user-editable and must not decide whether the role is an
+  // admin/member role. Earlier builds used names such as Admin/Members/Citizen
+  // as identifiers, so name matching is now only used as a legacy fallback when
+  // no stable id/permission exists at all.
+  const isLegacyAdminNameLikeRole = (role: any) => REELM_ELEVATED_ROLE_RE.test(String(role?.name || '')) || /community admin/i.test(String(role?.name || ''))
+  const isAdminLikeRole = (role: any) => isManagerRole(role) || isStableAdminRoleId(role)
+  const isDefaultMemberLikeRole = (role: any) => isStableMemberRoleId(role) || /^(members|member|citizen|user|regular)$/i.test(String(role?.name || '').trim())
 
   const normalizeRoleIdListForClient = (roleIds: any[] = [], roleIdMap: Map<string, string>, validRoleIds: Set<string>, fallbackRoleId = '') => {
     const next = Array.from(new Set((Array.isArray(roleIds) ? roleIds : [])
@@ -1131,7 +1181,7 @@ export function createReelmsDataRouter(io: Server) {
         const defaultAdminExisting = existingById.get(fallbackAdminRoleId) || null
         // If a manager/admin role arrives without the stable id, treat it as an
         // edit of the stable admin role instead of creating a duplicate role.
-        if (!existing && actorCanManageFullRoles && defaultAdminExisting && (role?.permissions?.manageReelm === true || /admin|owner|founder|moderator|community/i.test(String(role?.name || '')))) {
+        if (!existing && actorCanManageFullRoles && defaultAdminExisting && (role?.permissions?.manageReelm === true || isStableAdminRoleId(role))) {
           id = fallbackAdminRoleId
           existing = defaultAdminExisting
           role = { ...(role || {}), id }
@@ -2488,6 +2538,7 @@ export function createReelmsDataRouter(io: Server) {
       const safeBanList = Array.isArray(rawBanList) ? rawBanList : []
       const visibleMembers = filterMembersForClient(actorState?.members || [], safeBanList)
       const normalized = normalizeReelmCoreForClient(reelmId, actorState?.roles || [], visibleMembers)
+      normalized.members = await hydrateMembersForClient(normalized.members)
       res.json({
         data: toClientReelm(meta, structure, normalized.roles, normalized.members, {
           joinRequests: Array.isArray(joinRequests) ? joinRequests : [],
@@ -2521,6 +2572,7 @@ export function createReelmsDataRouter(io: Server) {
           const rawBanList = await getDoc<any[]>(pk, 'ban_list').catch(() => [])
           const visibleMembers = filterMembersForClient(actorState?.members || [], Array.isArray(rawBanList) ? rawBanList : [])
           const normalized = normalizeReelmCoreForClient(reelmId, actorState?.roles || [], visibleMembers)
+          if (sk === 'members') normalized.members = await hydrateMembersForClient(normalized.members)
           return res.json({ data: sk === 'roles' ? normalized.roles : normalized.members })
         }
         return res.json({ data: await getDoc(pk, sk) })
@@ -2728,16 +2780,37 @@ export function createReelmsDataRouter(io: Server) {
         }
       }
       const emittedCoreKeys = [] as string[]
-      if (sk === 'roles' || sk === 'members') {
-        const rolesForCore = sk === 'roles' ? incomingData : ((actorState?.roles || await getDoc<any[]>(pk, 'roles').catch(() => [])) || [])
-        const membersForCore = sk === 'members' ? incomingData : ((actorState?.members || await getDoc<any[]>(pk, 'members').catch(() => [])) || [])
-        const normalizedCore = normalizeReelmCoreForClient(reelmId, rolesForCore, membersForCore)
-        await Promise.all([
-          putDoc(pk, 'roles', normalizedCore.roles),
-          putDoc(pk, 'members', normalizedCore.members)
-        ])
-        incomingData = sk === 'roles' ? normalizedCore.roles : normalizedCore.members
-        emittedCoreKeys.push('roles', 'members')
+      if (sk === 'roles') {
+        // Roles are edited by id. Never let a concurrent/stale members PUT write
+        // an older roles document back over the freshly edited role names/colors.
+        // Existing roles are read fresh from the store because actorState is
+        // intentionally short-cached for fast permission checks.
+        const existingRolesForWrite = (await getDoc<any[]>(pk, 'roles').catch(() => [])) || []
+        const existingMembersForWrite = (await getDoc<any[]>(pk, 'members').catch(() => [])) || []
+        const sanitizedRoles = sanitizeRoles(Array.isArray(incomingData) ? incomingData : [], existingRolesForWrite, {
+          actorCanManageFullRoles: actorState?.canManageFullRoles === true,
+          reelmId
+        })
+        const normalizedCore = normalizeReelmCoreForClient(reelmId, sanitizedRoles, existingMembersForWrite)
+        await putDoc(pk, 'roles', normalizedCore.roles)
+        incomingData = normalizedCore.roles
+        emittedCoreKeys.push('roles')
+        // Only migrate member roleIds when the canonical ids actually changed.
+        // This keeps member writes separate from role edits while still repairing
+        // old role ids such as role-admin-<id> or role-member-<id> safely.
+        if (JSON.stringify(existingMembersForWrite || []) !== JSON.stringify(normalizedCore.members || [])) {
+          await putDoc(pk, 'members', normalizedCore.members)
+          emittedCoreKeys.push('members')
+        }
+      } else if (sk === 'members') {
+        // Member changes must not rewrite roles. That old cross-write was the
+        // source of “role name/color saves then returns to old value” when the
+        // client saved roles and members close together.
+        const freshRolesForMembers = (await getDoc<any[]>(pk, 'roles').catch(() => [])) || []
+        const normalizedCore = normalizeReelmCoreForClient(reelmId, freshRolesForMembers, Array.isArray(incomingData) ? incomingData : [])
+        await putDoc(pk, 'members', normalizedCore.members)
+        incomingData = normalizedCore.members
+        emittedCoreKeys.push('members')
       } else {
         await putDoc(pk, sk, incomingData)
       }

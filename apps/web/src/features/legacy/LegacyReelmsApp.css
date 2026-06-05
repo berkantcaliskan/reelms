@@ -12964,3 +12964,17 @@ button, input, select, textarea,
 .rs-save-state-dirty {
   color: rgba(var(--ta-rgb), 0.95);
 }
+
+/* Drag reordering for the horizontal Reelm bar */
+.bar-item--reelm[draggable="true"] {
+  cursor: grab;
+}
+.bar-item--reelm[draggable="true"]:active {
+  cursor: grabbing;
+}
+.bar-item--reelm[draggable="true"] .bar-item-avatar--server {
+  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+}
+.bar-item--reelm[draggable="true"]:hover .bar-item-avatar--server {
+  box-shadow: 0 0 0 1px rgba(var(--ta-rgb), 0.26), 0 10px 24px rgba(0,0,0,0.18);
+}

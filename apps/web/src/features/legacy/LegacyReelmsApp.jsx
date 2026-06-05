@@ -5842,17 +5842,21 @@ function normalizeFriendProfileTarget(friend = {}) {
 
 function buildProfileThemeStyle(person) {
   const cfg = person?.profileTheme || person?.customization || null
-  if (!cfg || typeof cfg !== 'object') return undefined
-  const theme = THEMES.find(th => th.id === cfg.themeId) || THEMES[0]
-  const accent = cfg.customAccent || theme.accent || '#b99887'
-  const base = cfg.customBase || theme.base || '#120e1e'
-  const accentRgb = hexToRgb(accent) || theme.accentRgb || [185, 152, 135]
-  const baseRgb = hexToRgb(base) || theme.baseRgb || [18, 14, 30]
+  const theme = (cfg && typeof cfg === 'object' && THEMES.find(th => th.id === cfg.themeId)) || THEMES[0]
+  const accent = (cfg && typeof cfg === 'object' && cfg.customAccent) || theme.accent || '#b99887'
+  const base = (cfg && typeof cfg === 'object' && cfg.customBase) || theme.base || '#120e1e'
+  const toRgbCss = (value, fallback) => {
+    if (Array.isArray(value)) return value.join(',')
+    const text = String(value || '').trim()
+    if (/^#[0-9a-fA-F]{6}$/.test(text)) return hexToRgb(text)
+    if (/^\d+\s*,\s*\d+\s*,\s*\d+$/.test(text)) return text
+    return fallback
+  }
   return {
-    '--fpp-theme-accent': accent,
-    '--fpp-theme-accent-rgb': accentRgb.join(','),
-    '--fpp-theme-base': base,
-    '--fpp-theme-base-rgb': baseRgb.join(','),
+    '--fpp-theme-accent': /^#[0-9a-fA-F]{6}$/.test(String(accent || '')) ? accent : '#b99887',
+    '--fpp-theme-accent-rgb': toRgbCss(accent, toRgbCss(theme.accentRgb, '185,152,135')),
+    '--fpp-theme-base': /^#[0-9a-fA-F]{6}$/.test(String(base || '')) ? base : '#120e1e',
+    '--fpp-theme-base-rgb': toRgbCss(base, toRgbCss(theme.baseRgb, '18,14,30')),
   }
 }
 
@@ -5958,7 +5962,13 @@ function mergeReelmListsPreserveOrder(prevList = [], incomingList = [], options 
     const fresh = incomingById.get(id)
     if (fresh) {
       used.add(id)
-      merged.push({ ...old, ...fresh })
+      const item = { ...old, ...fresh }
+      const localImagePending = Number(old?.__localImagePendingAt || 0)
+      if (localImagePending && Date.now() - localImagePending < 45_000 && old?.image && String(old.image) !== String(fresh?.image || '')) {
+        item.image = old.image
+        item.__localImagePendingAt = localImagePending
+      }
+      merged.push(item)
     } else if (!options.removeMissing) {
       merged.push(old)
     }
@@ -6792,6 +6802,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       if (data.nicknames && typeof data.nicknames === 'object') setNicknames(data.nicknames)
       if (data.unread_counts && typeof data.unread_counts === 'object') setUnreadCounts(data.unread_counts)
       if (Array.isArray(data.pinned_items)) setPinnedItemIds(data.pinned_items)
+      if (Array.isArray(data.bar_order)) setBarOrderIds(data.bar_order.map(String))
       if (Array.isArray(data.muted_reelms)) setMutedReelmIds(data.muted_reelms.map(String))
       if (Array.isArray(data.feed_nav) && data.feed_nav.length === ALL_FEED_NAV.length) setFeedNavOrder(data.feed_nav)
       if (typeof data.landing_view === 'string') setReelmLandingView(data.landing_view)
@@ -6867,6 +6878,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       else if (sk === 'nicknames') setStableObject(setNicknames, v && typeof v === 'object' ? v : {})
       else if (sk === 'unread_counts') setStableObject(setUnreadCounts, v && typeof v === 'object' ? v : {})
       else if (sk === 'pinned_items') setStableArray(setPinnedItemIds, Array.isArray(v) ? v : [])
+      else if (sk === 'bar_order') setStableArray(setBarOrderIds, Array.isArray(v) ? v.map(String) : [])
       else if (sk === 'muted_reelms') setStableArray(setMutedReelmIds, Array.isArray(v) ? v.map(String) : [])
       else if (sk === 'spotify_connected') setSpotifyConnected(v === true || v === 'true')
       else if (sk === 'last_channels') setStableObject(setLastChannels, v && typeof v === 'object' ? v : {})
@@ -8138,6 +8150,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [rightWidth, setRightWidth] = useState(PANEL_DEFAULT)
   const dragState = useRef(null)
   const barScrollRef = useRef(null)
+  const barDragReelmIdRef = useRef(null)
+  const barDragClickSuppressRef = useRef(false)
   const barPositionsRef = useRef({})
   const panelWidthsPersistReadyRef = useRef({ uid: null, left: false, right: false })
   useEffect(() => {
@@ -8163,6 +8177,25 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (!state.right) { state.right = true; return }
     scheduleUserPersist('rpw', String(rightWidth), 900)
   }, [rightWidth, uid])
+
+  const reorderBarReelms = (sourceId, targetId) => {
+    const fromId = String(sourceId || '')
+    const toId = String(targetId || '')
+    if (!fromId || !toId || fromId === toId) return
+    const currentReelmIds = (Array.isArray(reelmsRef.current) ? reelmsRef.current : []).map(r => String(r.id || '')).filter(Boolean)
+    const currentSet = new Set(currentReelmIds)
+    const base = (Array.isArray(barOrderIds) ? barOrderIds : []).map(String).filter(id => currentSet.has(id))
+    for (const id of currentReelmIds) if (!base.includes(id)) base.push(id)
+    const fromIndex = base.indexOf(fromId)
+    const toIndex = base.indexOf(toId)
+    if (fromIndex < 0 || toIndex < 0) return
+    const next = [...base]
+    const [moved] = next.splice(fromIndex, 1)
+    next.splice(toIndex, 0, moved)
+    setBarOrderIds(next)
+    scheduleUserPersist('bar_order', next, 500)
+  }
+
   const barInitializedRef = useRef(false)
   const barPrevIdSetRef = useRef(null)
   useLayoutEffect(() => {
@@ -9500,7 +9533,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         ? prev.map(r => {
             if (String(r.id) !== String(nextReelm.id)) return r
             const merged = { ...r, ...nextReelm }
-            if ((nextReelm.image == null || nextReelm.image === '') && r.image) merged.image = r.image
+            const localImagePending = Number(r?.__localImagePendingAt || 0)
+            if (localImagePending && Date.now() - localImagePending < 45_000 && r.image && String(r.image) !== String(nextReelm.image || '')) {
+              merged.image = r.image
+              merged.__localImagePendingAt = localImagePending
+            } else if ((nextReelm.image == null || nextReelm.image === '') && r.image) merged.image = r.image
             if (!Array.isArray(nextReelm.joinRequests) && Array.isArray(r.joinRequests)) merged.joinRequests = r.joinRequests
             if (!Array.isArray(nextReelm.banList) && Array.isArray(r.banList)) merged.banList = r.banList
             if (!Array.isArray(nextReelm.timeoutList) && Array.isArray(r.timeoutList)) merged.timeoutList = r.timeoutList
@@ -9513,7 +9550,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setSelectedReelm(prev => {
       if (String(prev?.id || '') !== String(nextReelm.id) && prev) return prev
       const merged = { ...(prev || {}), ...nextReelm }
-      if ((nextReelm.image == null || nextReelm.image === '') && prev?.image) merged.image = prev.image
+      const localImagePending = Number(prev?.__localImagePendingAt || 0)
+      if (localImagePending && Date.now() - localImagePending < 45_000 && prev?.image && String(prev.image) !== String(nextReelm.image || '')) {
+        merged.image = prev.image
+        merged.__localImagePendingAt = localImagePending
+      } else if ((nextReelm.image == null || nextReelm.image === '') && prev?.image) merged.image = prev.image
       if (prev && !Array.isArray(nextReelm.joinRequests) && Array.isArray(prev.joinRequests)) merged.joinRequests = prev.joinRequests
       if (prev && !Array.isArray(nextReelm.banList) && Array.isArray(prev.banList)) merged.banList = prev.banList
       if (prev && !Array.isArray(nextReelm.timeoutList) && Array.isArray(prev.timeoutList)) merged.timeoutList = prev.timeoutList
@@ -9544,11 +9585,17 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     }
     if (!only || only.has('structure')) tasks.push(reelmPutDoc(reelm.id, 'structure', { categories: reelm.categories || [] }))
     const includeMembership = options.includeMembership === true || !!only
-    if ((includeMembership && (!only || only.has('roles'))) && Array.isArray(reelm.roles)) tasks.push(reelmPutDoc(reelm.id, 'roles', reelm.roles))
-    if ((includeMembership && (!only || only.has('members'))) && Array.isArray(reelm.members)) tasks.push(reelmPutDoc(reelm.id, 'members', reelm.members, { allowMemberRemoval: options.allowMemberRemoval === true }))
+    const shouldPersistRoles = (includeMembership && (!only || only.has('roles'))) && Array.isArray(reelm.roles)
+    const shouldPersistMembers = (includeMembership && (!only || only.has('members'))) && Array.isArray(reelm.members)
     const results = await Promise.allSettled(tasks)
     const failed = results.find((result) => result.status === 'rejected')
     if (failed) throw failed.reason || new Error('persist_reelm_failed')
+
+    // Role and member saves are deliberately sequential. If they run in
+    // parallel, a stale members save can arrive after the roles save and make
+    // edited role names/colors appear to revert on the next core refresh.
+    if (shouldPersistRoles) await reelmPutDoc(reelm.id, 'roles', reelm.roles)
+    if (shouldPersistMembers) await reelmPutDoc(reelm.id, 'members', reelm.members, { allowMemberRemoval: options.allowMemberRemoval === true })
   }
 
   const createDefaultReelm = (name, template = null, t = k => k) => {
@@ -10023,11 +10070,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const updateReelm = async (updatedReelm, options = {}) => {
     setReelms(prev => {
-      const next = prev.map(r => r.id === updatedReelm.id ? updatedReelm : r)
+      const next = prev.map(r => String(r.id) === String(updatedReelm.id) ? { ...r, ...updatedReelm } : r)
       scheduleUserPersist('reelms', next)
       return next
     })
-    setSelectedReelm(updatedReelm)
+    setSelectedReelm(prev => String(prev?.id || '') === String(updatedReelm.id) ? { ...prev, ...updatedReelm } : updatedReelm)
     const scope = options?.scope
     if (scope === 'roles-members') return persistReelmCore(updatedReelm, { only: ['roles', 'members'], allowMemberRemoval: options?.allowMemberRemoval === true })
     return persistReelmCore(updatedReelm)
@@ -10548,7 +10595,19 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         <div
           key={m.userId}
           className={`rp-member-card${isActiveStatus(status) ? ' rp-member-card--active' : ''}${isMainAdminMemberClient(selectedReelm, m) ? ' rp-member-card--main-admin' : ''}`}
-          onClick={e => openFriendProfile({ id: m.userId, name: displayName, username: m.username, photo: displayPhoto, userPhoto: displayPhoto, profileTheme: m.profileTheme || null }, e, { serverContext: true })}
+          onClick={e => openFriendProfile({
+            id: m.userId,
+            name: displayName,
+            username: m.username || info.username,
+            photo: displayPhoto,
+            userPhoto: displayPhoto,
+            cover: m.cover || m.coverImage || m.coverUrl || null,
+            coverImage: m.coverImage || m.cover || null,
+            coverUrl: m.coverUrl || m.cover || null,
+            bio: m.bio || '',
+            activity: m.activity || null,
+            profileTheme: m.profileTheme || null
+          }, e, { serverContext: true })}
         >
           <div className="rp-member-avatar-wrap">
             <div className="rp-member-avatar">
@@ -10707,7 +10766,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   const allItemsFlat = [...reelmItems, ...chatItems]
                   const pinnedItems = pinnedItemIds.map(id => allItemsFlat.find(i => i.id === id)).filter(Boolean)
                   const pinnedSet = new Set(pinnedItems.map(i => i.id))
-                  const unpinnedReelms = reelmItems.filter(i => !pinnedSet.has(i.id)).sort((a, b) => (a._stableBarIndex || 0) - (b._stableBarIndex || 0))
+                  const barOrderIndex = new Map((Array.isArray(barOrderIds) ? barOrderIds : []).map((id, idx) => [String(id), idx]))
+                  const unpinnedReelms = reelmItems.filter(i => !pinnedSet.has(i.id)).sort((a, b) => {
+                    const ai = barOrderIndex.has(String(a.id)) ? barOrderIndex.get(String(a.id)) : 100000 + (a._stableBarIndex || 0)
+                    const bi = barOrderIndex.has(String(b.id)) ? barOrderIndex.get(String(b.id)) : 100000 + (b._stableBarIndex || 0)
+                    return ai - bi
+                  })
                   const unpinnedChats = chatItems.filter(i => !pinnedSet.has(i.id)).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
                   const allItems = [...pinnedItems, ...unpinnedReelms, ...unpinnedChats]
                   if (allItems.length === 0) return <p className="no-chats-text-bar">Start a conversation</p>
@@ -10718,13 +10782,38 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           key={item.id}
                           data-bar-id={item.id}
                           className={'bar-item bar-item--' + item.itemType + (isDefaultCommunity(item) ? ' bar-item--community-root' : '') + (item.itemType === 'reelm' && mutedReelmIds.map(String).includes(String(item.id)) ? ' bar-item--muted' : '') + (item.itemType === 'chat' && item.type === 'dm' && isUserActive(item.friendId) ? ' bar-item--online' : '') + ((item.itemType === 'reelm' ? selectedReelm?.id : selectedChat?.id) === item.id ? ' bar-item-active' : '')}
+                          draggable={item.itemType === 'reelm'}
+                          onDragStart={(e) => {
+                            if (item.itemType !== 'reelm') return
+                            barDragReelmIdRef.current = String(item.id)
+                            barDragClickSuppressRef.current = true
+                            e.dataTransfer.effectAllowed = 'move'
+                            try { e.dataTransfer.setData('text/plain', String(item.id)) } catch {}
+                          }}
+                          onDragOver={(e) => {
+                            if (item.itemType !== 'reelm' || !barDragReelmIdRef.current) return
+                            e.preventDefault()
+                            e.dataTransfer.dropEffect = 'move'
+                          }}
+                          onDrop={(e) => {
+                            if (item.itemType !== 'reelm') return
+                            e.preventDefault()
+                            reorderBarReelms(barDragReelmIdRef.current || e.dataTransfer.getData('text/plain'), item.id)
+                            barDragReelmIdRef.current = null
+                            window.setTimeout(() => { barDragClickSuppressRef.current = false }, 80)
+                          }}
+                          onDragEnd={() => {
+                            barDragReelmIdRef.current = null
+                            window.setTimeout(() => { barDragClickSuppressRef.current = false }, 80)
+                          }}
                           onClick={() => {
+                            if (barDragClickSuppressRef.current) { barDragClickSuppressRef.current = false; return }
                             if (item.itemType !== 'reelm') clearUnread(item.id)
                             if (item.itemType === 'reelm') { handleSelectReelm(item) }
                             else { setReelmLoading(false); setSelectedChat(item); setSelectedReelm(null); setSelectedChannel(null); setShowDiscover(false); setShowFriendsPanel(false); setShowSettings(false) }
                           }}
                           onContextMenu={(e) => { e.preventDefault(); setBarCtxMenu({ x: e.clientX, y: e.clientY, item }) }}
-                          title={item.name}
+                          title={item.itemType === 'reelm' ? `${item.name || 'Reelm'} · drag to reorder` : item.name}
                         >
                           <span className={`bar-item-wrap${item.id === recentlyBumpedChatId ? ' bar-item-bumped' : ''}`}>
                             <div className={`bar-item-avatar${item.itemType === 'reelm' ? ' bar-item-avatar--server' : ' bar-item-avatar--profile'}${isDefaultCommunity(item) ? ' bar-item-avatar--community' : ''}`}>

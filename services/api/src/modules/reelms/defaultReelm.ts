@@ -148,10 +148,11 @@ async function ensureDefaultRoles() {
   const pk = reelmPk(DEFAULT_REELM_ID)
   const existingRoles = await getDoc<any[]>(pk, 'roles').catch(() => null)
   const roles = Array.isArray(existingRoles) && existingRoles.length ? existingRoles : defaultRoles()
-  const isElevated = (role: any) => role?.permissions?.manageReelm === true || String(role?.id || '') === DEFAULT_ADMIN_ROLE_ID
-  const isManager = (role: any) => isElevated(role) || /admin|owner|founder|moderator/i.test(String(role?.name || ''))
+  const isElevated = (role: any) => role?.permissions?.manageReelm === true || String(role?.id || '') === DEFAULT_ADMIN_ROLE_ID || /^role-admin-/i.test(String(role?.id || ''))
+  const isLegacyManagerName = (role: any) => /admin|owner|founder|moderator/i.test(String(role?.name || ''))
+  const isManager = (role: any) => isElevated(role)
   const isMemberLike = (role: any) => /^(member|citizen|user|regular)$/i.test(String(role?.name || '').trim()) || /role-(member|citizen)/i.test(String(role?.id || ''))
-  const adminSource = roles.find((role) => String(role?.id || '') === DEFAULT_ADMIN_ROLE_ID) || roles.find(isManager) || defaultRoles()[0]
+  const adminSource = roles.find((role) => String(role?.id || '') === DEFAULT_ADMIN_ROLE_ID) || roles.find(isManager) || roles.find(isLegacyManagerName) || defaultRoles()[0]
   const citizenSource = roles.find((role) => String(role?.id || '') === DEFAULT_CITIZEN_ROLE_ID) || roles.find((role) => !isManager(role) && isMemberLike(role)) || defaultRoles()[1]
   const customRoles = roles
     .filter((role) => {
@@ -167,8 +168,8 @@ async function ensureDefaultRoles() {
     }))
 
   const normalizedRoles = [
-    { ...adminSource, id: DEFAULT_ADMIN_ROLE_ID, name: 'Community Admin', color: /^#[0-9a-fA-F]{6}$/.test(String(adminSource?.color || '')) ? adminSource.color : '#a3e635', position: 0, permissions: fullManagerPermissions() },
-    { ...citizenSource, id: DEFAULT_CITIZEN_ROLE_ID, name: 'Citizen', color: /^#[0-9a-fA-F]{6}$/.test(String(citizenSource?.color || '')) ? citizenSource.color : '#b99887', position: 1, permissions: {} },
+    { ...adminSource, id: DEFAULT_ADMIN_ROLE_ID, name: String(adminSource?.name || '').trim() || 'Community Admin', color: /^#[0-9a-fA-F]{6}$/.test(String(adminSource?.color || '')) ? adminSource.color : '#a3e635', position: 0, permissions: fullManagerPermissions() },
+    { ...citizenSource, id: DEFAULT_CITIZEN_ROLE_ID, name: String(citizenSource?.name || '').trim() || 'Citizen', color: /^#[0-9a-fA-F]{6}$/.test(String(citizenSource?.color || '')) ? citizenSource.color : '#b99887', position: 1, permissions: {} },
     ...customRoles
   ]
 
@@ -233,7 +234,10 @@ async function ensureConfiguredCommunityAdmins() {
       ...(existing || {}),
       userId: uid,
       userName: existing?.userName || profile.name || profile.displayName || profile.username || 'Admin',
+      username: existing?.username || profile.username || '',
       userPhoto: getProfilePhoto(profile) || existing?.userPhoto || null,
+      photo: getProfilePhoto(profile) || existing?.photo || null,
+      profileTheme: profile.profileTheme || existing?.profileTheme || null,
       roleIds
     }
     nextMembers = [member, ...nextMembers.filter((item) => String(item?.userId) !== String(uid))]
@@ -350,7 +354,10 @@ export async function autoJoinDefaultReelm(uid: string, name?: string, photo?: s
     ...(existing || {}),
     userId: uid,
     userName: displayName || existing?.userName || 'Member',
+    username: existing?.username || profile.username || '',
     userPhoto: displayPhoto || existing?.userPhoto || null,
+    photo: displayPhoto || existing?.photo || null,
+    profileTheme: profile.profileTheme || existing?.profileTheme || null,
     roleIds: shouldBeCommunityAdmin
       ? normalizeRoleIdsForCommunityAdmin(existingRoleIds, adminRole?.id ? String(adminRole.id) : '')
       : (existingRoleIds.length ? existingRoleIds : citizenRoleIds)
