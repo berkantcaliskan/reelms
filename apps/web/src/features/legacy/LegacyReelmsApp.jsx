@@ -2537,6 +2537,7 @@ function CachedProfileCover({ src, className = '', style = {}, ...props }) {
 
 function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBlock, onUnblock, onAddFriend, isFriend = true, isBlocked = false, isPending = false, nickname, onNicknameChange, canShare, onMessage, onCreateGroup, onRequestRemoteControl, voiceContext = null, moderationContext = null, roleContext = null, isSelf = false, embedded = false, canEditNickname = true }) {
   const popupRef = useRef(null)
+  const safeFriend = normalizeFriendProfileTarget(friend || {})
   const [editingNickname, setEditingNickname] = useState(false)
   const [nicknameInput, setNicknameInput] = useState(nickname || '')
 
@@ -2556,37 +2557,37 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
 
   const popupW = 280
   const popupH = 460
-  const friendCover = friend.cover || friend.coverImage || friend.coverUrl || null
+  const friendCover = safeFriend.cover || safeFriend.coverImage || safeFriend.coverUrl || null
   const safeRect = anchorRect || { top: 96, bottom: 112, left: Math.max(8, window.innerWidth - popupW - 18) }
   let top = safeRect.top - popupH - 8
   let left = Math.min(Math.max(8, safeRect.left), window.innerWidth - popupW - 8)
   if (top < 8) top = safeRect.bottom + 8
 
   const profileNode = (
-    <div className={`friend-profile-popup${embedded ? ' friend-profile-popup--embedded' : ''}`} style={{ ...(buildProfileThemeStyle(friend) || {}), ...(embedded ? {} : { top, left, width: popupW }) }} ref={popupRef}>
+    <div className={`friend-profile-popup${embedded ? ' friend-profile-popup--embedded' : ''}`} style={{ ...(buildProfileThemeStyle(safeFriend) || {}), ...(embedded ? {} : { top, left, width: popupW }) }} ref={popupRef}>
       <CachedProfileCover src={friendCover} className={`fpp-cover${friendCover ? ' fpp-cover--has-image' : ''}`} />
       {embedded && <button type="button" className="fpp-embedded-close" onClick={onClose} aria-label="Close profile">×</button>}
       <div className="fpp-identity">
         <div className="fpp-avatar">
-          {getPersonPhoto(friend)
-            ? <CachedProfileImage src={getPersonPhoto(friend)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-            : <span>{(friend.name || '?').charAt(0).toUpperCase()}</span>
+          {getPersonPhoto(safeFriend)
+            ? <CachedProfileImage src={getPersonPhoto(safeFriend)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+            : <span>{safeDisplayText(safeFriend.name, '?').charAt(0).toUpperCase()}</span>
           }
         </div>
         <div className="fpp-names">
-          <span className="fpp-name">{nickname || friend.name}</span>
-          {friend.username && <span className="fpp-username">{'@' + (friend.username.startsWith('@') ? friend.username.slice(1) : friend.username)}</span>}
-          {friend.activity?.name && <ActivityBadge activity={friend.activity} />}
+          <span className="fpp-name">{nickname || safeFriend.name}</span>
+          {safeFriend.username && <span className="fpp-username">{'@' + (safeFriend.username.startsWith('@') ? safeFriend.username.slice(1) : safeFriend.username)}</span>}
+          {safeFriend.activity?.name && <ActivityBadge activity={safeFriend.activity} />}
         </div>
       </div>
-      {friend.bio && <p className="fpp-bio">{friend.bio}</p>}
+      {safeFriend.bio && <p className="fpp-bio">{safeFriend.bio}</p>}
       {voiceContext && !isSelf && (
         <div className="fpp-voice-section">
           {voiceContext.userRoom ? (
             <>
               <span className="fpp-section-label">VOICE</span>
               <div className="fpp-voice-row">
-                <span>{friend.name || 'Member'} is in <strong>{voiceContext.userRoom.channelName}</strong></span>
+                <span>{safeFriend.name || 'Member'} is in <strong>{voiceContext.userRoom.channelName}</strong></span>
                 {!voiceContext.isInSameRoom && (
                   <button className="fpp-action-btn fpp-action-btn--mini" onClick={() => { voiceContext.onJoinRoom?.(voiceContext.userRoom); onClose() }}>Join</button>
                 )}
@@ -2604,7 +2605,7 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
           <span className="fpp-section-label">SERVER ROLES</span>
           <div className="fpp-role-badges">
             {roleContext.roles.slice(0, roleContext.expanded ? 12 : 3).map(role => (
-              <span key={role.id} className="rp-role-badge" style={{ color: role.color, borderColor: role.color + '55', background: role.color + '18' }}>{role.name}</span>
+              <span key={role.id} className="rp-role-badge" style={{ color: safeRoleColor(role.color), borderColor: safeRoleColor(role.color) + '55', background: safeRoleColor(role.color) + '18' }}>{safeDisplayText(role.name, 'Role')}</span>
             ))}
             {roleContext.roles.length > 3 && (
               <button type="button" className="fpp-mini-link" onClick={roleContext.onToggleExpanded}>
@@ -2645,7 +2646,7 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
                 className="fpp-nickname-input"
                 value={nicknameInput}
                 onChange={e => setNicknameInput(e.target.value)}
-                placeholder={friend.name}
+                placeholder={safeFriend.name}
                 autoFocus
                 onKeyDown={e => {
                   if (e.key === 'Enter') { onNicknameChange(nicknameInput.trim()); setEditingNickname(false) }
@@ -2664,20 +2665,20 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
       )}
       <div className="fpp-actions">
         {!isSelf && !isBlocked && <button className="fpp-action-btn" onClick={() => { onMessage?.(); onClose() }}>Message</button>}
-        {!isSelf && !isBlocked && isFriend && onCreateGroup && <button className="fpp-action-btn" onClick={() => { onCreateGroup(friend); onClose() }}>Create group</button>}
-        {!isSelf && !isBlocked && isFriend && onRequestRemoteControl && <button className="fpp-action-btn" onClick={() => { onRequestRemoteControl(friend); onClose() }}>
+        {!isSelf && !isBlocked && isFriend && onCreateGroup && <button className="fpp-action-btn" onClick={() => { onCreateGroup(safeFriend); onClose() }}>Create group</button>}
+        {!isSelf && !isBlocked && isFriend && onRequestRemoteControl && <button className="fpp-action-btn" onClick={() => { onRequestRemoteControl(safeFriend); onClose() }}>
           <img src={channelLiveactionIcon} alt="" width="12" height="12" style={{filter:'brightness(0.8)', marginRight: 4}}/> Remote control
         </button>}
         {canShare && (
-          <button className="fpp-action-btn" onClick={() => { navigator.clipboard?.writeText(`${friend.name} (@${friend.username || friend.id})`); onClose() }}>Share Profile</button>
+          <button className="fpp-action-btn" onClick={() => { navigator.clipboard?.writeText(`${safeFriend.name} (@${safeFriend.username || safeFriend.id})`); onClose() }}>Share Profile</button>
         )}
-        {!isSelf && isBlocked && onUnblock && <button className="fpp-action-btn" onClick={() => { onUnblock(friend.id); onClose() }}>Unblock</button>}
+        {!isSelf && isBlocked && onUnblock && <button className="fpp-action-btn" onClick={() => { onUnblock?.(safeFriend.id); onClose() }}>Unblock</button>}
         {!isSelf && !isBlocked && !isFriend && onAddFriend && (isPending
           ? <button className="fpp-action-btn" disabled>Friend request sent</button>
-          : <button className="fpp-action-btn" onClick={() => { onAddFriend(friend); onClose() }}>Add Friend</button>
+          : <button className="fpp-action-btn" onClick={() => { onAddFriend?.(safeFriend); onClose() }}>Add Friend</button>
         )}
-        {!isSelf && !isBlocked && isFriend && <button className="fpp-action-btn fpp-action-danger" onClick={() => { onRemove(friend.id); onClose() }}>Remove Friend</button>}
-        {!isSelf && !isBlocked && onBlock && <button className="fpp-action-btn fpp-action-danger" onClick={() => { onBlock(friend); onClose() }}>Block</button>}
+        {!isSelf && !isBlocked && isFriend && <button className="fpp-action-btn fpp-action-danger" onClick={() => { onRemove?.(safeFriend.id); onClose() }}>Remove Friend</button>}
+        {!isSelf && !isBlocked && onBlock && <button className="fpp-action-btn fpp-action-danger" onClick={() => { onBlock?.(safeFriend); onClose() }}>Block</button>}
       </div>
     </div>
   )
@@ -5817,6 +5818,28 @@ function getPersonCover(person) {
   return person.cover || person.coverImage || person.coverUrl || person.headerImage || person.banner || person.bannerImage || person.backgroundCover || null
 }
 
+
+function safeDisplayText(value, fallback = 'Member') {
+  const text = String(value ?? '').trim()
+  return text || fallback
+}
+
+function safeRoleColor(value, fallback = '#94a3b8') {
+  const color = String(value || '')
+  return /^#[0-9a-fA-F]{6}$/.test(color) ? color : fallback
+}
+
+function normalizeFriendProfileTarget(friend = {}) {
+  const id = String(friend?.id || friend?.uid || friend?.userId || '').trim()
+  return {
+    ...friend,
+    id,
+    name: safeDisplayText(friend?.name || friend?.displayName || friend?.userName || friend?.username, 'Member'),
+    username: friend?.username ? String(friend.username) : undefined,
+    photo: getPersonPhoto(friend) || null,
+  }
+}
+
 function buildProfileThemeStyle(person) {
   const cfg = person?.profileTheme || person?.customization || null
   if (!cfg || typeof cfg !== 'object') return undefined
@@ -7974,18 +7997,21 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }
 
   const openFriendProfile = (friend, e, opts = {}) => {
-    if (!friend?.id) return
-    const fid = String(friend.id)
-    const rect = e.currentTarget.getBoundingClientRect()
-    const inServerSurface = !!(opts.serverContext || e.currentTarget.closest?.('.rp-members-panel, .reelm-channel-voice-users, .voice-participants, .voice-bar-participants'))
+    const normalizedFriend = normalizeFriendProfileTarget(friend || {})
+    if (!normalizedFriend.id) return
+    const fid = String(normalizedFriend.id)
+    const fallbackRect = { left: Math.max(8, window.innerWidth - 304), top: 120, right: Math.max(8, window.innerWidth - 24), bottom: 136, width: 0, height: 0 }
+    const targetEl = e?.currentTarget || null
+    const rect = typeof targetEl?.getBoundingClientRect === 'function' ? targetEl.getBoundingClientRect() : fallbackRect
+    const inServerSurface = !!(opts.serverContext || (typeof targetEl?.closest === 'function' && targetEl.closest('.rp-members-panel, .reelm-channel-voice-users, .voice-participants, .voice-bar-participants')))
     const cached = profileLookupCacheRef.current.get(fid)
     const cachedProfile = cached && (Date.now() - Number(cached.at || 0) < PROFILE_LOOKUP_CACHE_TTL_MS) ? cached.profile : null
-    const target = { friend: cachedProfile ? { ...friend, ...cachedProfile } : friend, anchorRect: rect, serverContext: inServerSurface ? 'reelm' : null }
+    const target = { friend: cachedProfile ? normalizeFriendProfileTarget({ ...normalizedFriend, ...cachedProfile, id: fid }) : normalizedFriend, anchorRect: rect, serverContext: inServerSurface ? 'reelm' : null }
     setFriendProfileTarget(target)
     if (cachedProfile) return
     userProfileGetById(fid).then(data => {
       if (!data) return
-      const merged = { ...friend, ...data, id: fid }
+      const merged = normalizeFriendProfileTarget({ ...normalizedFriend, ...data, id: fid })
       profileLookupCacheRef.current.set(fid, { profile: merged, at: Date.now() })
       setChatProfileCache(prev => sameDocValue(prev?.[fid], merged) ? prev : { ...prev, [fid]: merged })
       setFriendProfileTarget(prev => prev?.friend && String(prev.friend.id || prev.friend.uid || '') === fid ? { ...prev, friend: { ...prev.friend, ...merged } } : prev)
@@ -9474,6 +9500,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         ? prev.map(r => {
             if (String(r.id) !== String(nextReelm.id)) return r
             const merged = { ...r, ...nextReelm }
+            if ((nextReelm.image == null || nextReelm.image === '') && r.image) merged.image = r.image
             if (!Array.isArray(nextReelm.joinRequests) && Array.isArray(r.joinRequests)) merged.joinRequests = r.joinRequests
             if (!Array.isArray(nextReelm.banList) && Array.isArray(r.banList)) merged.banList = r.banList
             if (!Array.isArray(nextReelm.timeoutList) && Array.isArray(r.timeoutList)) merged.timeoutList = r.timeoutList
@@ -9486,6 +9513,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setSelectedReelm(prev => {
       if (String(prev?.id || '') !== String(nextReelm.id) && prev) return prev
       const merged = { ...(prev || {}), ...nextReelm }
+      if ((nextReelm.image == null || nextReelm.image === '') && prev?.image) merged.image = prev.image
       if (prev && !Array.isArray(nextReelm.joinRequests) && Array.isArray(prev.joinRequests)) merged.joinRequests = prev.joinRequests
       if (prev && !Array.isArray(nextReelm.banList) && Array.isArray(prev.banList)) merged.banList = prev.banList
       if (prev && !Array.isArray(nextReelm.timeoutList) && Array.isArray(prev.timeoutList)) merged.timeoutList = prev.timeoutList
@@ -9919,15 +9947,17 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }
 
   const updateReelmImage = (reelmId, imageDataUrl) => {
-    const updater = r => ({ ...r, image: imageDataUrl })
+    const id = String(reelmId || '')
+    if (!id) return
+    const updater = r => r ? ({ ...r, image: imageDataUrl, updatedAt: Date.now(), __localImagePendingAt: Date.now() }) : r
     setReelms(prev => {
-      const next = prev.map(r => r.id !== reelmId ? r : updater(r))
+      const next = prev.map(r => String(r.id) !== id ? r : updater(r))
       scheduleUserPersist('reelms', next)
       return next
     })
     setSelectedReelm(prev => {
       const next = updater(prev)
-      persistReelmCore(next)
+      if (next) persistReelmCore(next, { only: ['meta'] }).catch(() => {})
       return next
     })
   }
@@ -10478,6 +10508,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     )
   }
 
+
+  const safeRenderFriendProfileSurface = (embedded = false) => {
+    try {
+      return renderFriendProfileSurface(embedded)
+    } catch (err) {
+      console.error('[Reelms] member profile render isolated', err)
+      return null
+    }
+  }
+
   const renderReelmMembersPanel = (panelKey = 'reelm') => {
     if (!selectedReelm) return null
     const members = Array.isArray(selectedReelm.members) ? selectedReelm.members : []
@@ -10500,15 +10540,15 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       const info = getMemberPresence(m)
       const status = getMemberStatus(m)
       const isMe = String(m.userId) === String(uid)
-      const displayName = isMe ? currentUser.name : (info.userName || m.userName)
-      const displayPhoto = isMe ? (currentUser.photo || info.userPhoto || m.userPhoto) : (info.userPhoto || m.userPhoto)
+      const displayName = safeDisplayText(isMe ? currentUser.name : (info.userName || m.userName || m.name || m.username), 'Member')
+      const displayPhoto = isMe ? (currentUser.photo || info.userPhoto || m.userPhoto || m.photo || null) : (info.userPhoto || m.userPhoto || m.photo || null)
       const nowPlaying = !isMe ? spotifyFriendsNowPlaying[m.userId] : null
       const primaryRole = getPrimaryPanelRole(m)
       return (
         <div
           key={m.userId}
           className={`rp-member-card${isActiveStatus(status) ? ' rp-member-card--active' : ''}${isMainAdminMemberClient(selectedReelm, m) ? ' rp-member-card--main-admin' : ''}`}
-          onClick={e => openFriendProfile({ id: m.userId, name: displayName, photo: displayPhoto }, e, { serverContext: true })}
+          onClick={e => openFriendProfile({ id: m.userId, name: displayName, username: m.username, photo: displayPhoto, userPhoto: displayPhoto, profileTheme: m.profileTheme || null }, e, { serverContext: true })}
         >
           <div className="rp-member-avatar-wrap">
             <div className="rp-member-avatar">
@@ -10520,7 +10560,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             <span className="rp-member-status-dot" style={{ background: STATUS_COLORS[status] || STATUS_COLORS.offline }} />
           </div>
           <div className="rp-member-info">
-            <span className={`rp-member-name${nowPlaying ? ' rp-member-name--listening' : ''}`} style={primaryRole?.color ? { '--member-role-color': primaryRole.color } : undefined}>{displayName}</span>
+            <span className={`rp-member-name${nowPlaying ? ' rp-member-name--listening' : ''}`} style={primaryRole?.color ? { '--member-role-color': safeRoleColor(primaryRole.color) } : undefined}>{displayName}</span>
             {nowPlaying && (
               <div className="rp-member-nowplaying" aria-live="polite">
                 <span className="rp-member-nowplaying-track">{nowPlaying.name}</span>
@@ -10532,7 +10572,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         </div>
       )
     }
-    const selectedMemberDock = friendProfileTarget?.serverContext === 'reelm' ? renderFriendProfileSurface(true) : null
+    const selectedMemberDock = friendProfileTarget?.serverContext === 'reelm' ? safeRenderFriendProfileSurface(true) : null
     const panelLoadingMembers = members.length === 0 && (reelmLoading || selectedReelm?.__coreHydrating || !selectedReelm?.__coreHydrated)
     return (
       <div className="rp-members-panel">
@@ -10662,13 +10702,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   const topChatItems = (Array.isArray(chats) ? chats : [])
                     .filter(c => !(c.type === 'dm' && blockedIds.has(String(c.friendId || ''))))
                     .filter(c => pinnedItemIds.includes(c.id) || getChatUnreadCount(c) > 0 || selectedChat?.id === c.id)
-                  const allItemsFlat = [
-                    ...reelms.map(r => ({ ...r, itemType: 'reelm' })),
-                    ...topChatItems.map(c => ({ ...c, itemType: 'chat' }))
-                  ]
+                  const reelmItems = reelms.map((r, index) => ({ ...r, itemType: 'reelm', _stableBarIndex: index }))
+                  const chatItems = topChatItems.map(c => ({ ...c, itemType: 'chat' }))
+                  const allItemsFlat = [...reelmItems, ...chatItems]
                   const pinnedItems = pinnedItemIds.map(id => allItemsFlat.find(i => i.id === id)).filter(Boolean)
-                  const unpinnedItems = allItemsFlat.filter(i => !pinnedItemIds.includes(i.id)).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-                  const allItems = [...pinnedItems, ...unpinnedItems]
+                  const pinnedSet = new Set(pinnedItems.map(i => i.id))
+                  const unpinnedReelms = reelmItems.filter(i => !pinnedSet.has(i.id)).sort((a, b) => (a._stableBarIndex || 0) - (b._stableBarIndex || 0))
+                  const unpinnedChats = chatItems.filter(i => !pinnedSet.has(i.id)).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+                  const allItems = [...pinnedItems, ...unpinnedReelms, ...unpinnedChats]
                   if (allItems.length === 0) return <p className="no-chats-text-bar">Start a conversation</p>
                   return (
                     <div className="chats-scroll-horizontal" ref={barScrollRef}>
@@ -10691,7 +10732,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 const avatarSrc = item.itemType === 'chat' ? getChatAvatarSrc(item) : item.image
                                 const label = item.itemType === 'chat' ? getChatDisplayName(item) : item.name
                                 return avatarSrc
-                                  ? <img src={avatarSrc} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: item._type === 'reelm' ? '12px' : '50%' }} />
+                                  ? <img src={avatarSrc} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: item.itemType === 'reelm' ? '12px' : '50%' }} />
                                   : isDefaultCommunity(item) ? <ReelmsCommunityGlyph /> : (label || '?').charAt(0).toUpperCase()
                               })()}
                             </div>
@@ -13142,7 +13183,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           }} style={{ cursor: item._type === 'user' || item.joined !== false ? 'pointer' : 'default' }}>
                             <div className="discover-result-avatar">
                               {getPersonPhoto(item) || item.image
-                                ? <img src={getPersonPhoto(item) || item.image} alt={item.name || item.username || 'User'} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: item._type === 'reelm' ? '12px' : '50%' }} />
+                                ? <img src={getPersonPhoto(item) || item.image} alt={item.name || item.username || 'User'} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: item.itemType === 'reelm' ? '12px' : '50%' }} />
                                 : (item.name || item.username || item.contact || '?').charAt(0).toUpperCase()
                               }
                             </div>
@@ -13357,7 +13398,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               onActivityChange={setActivity}
             />
           )}
-          {renderFriendProfileSurface(false)}
+          {safeRenderFriendProfileSurface(false)}
         </div>
         {showMenu && (
           <div className="menu-backdrop" onClick={() => { setShowMenu(false); setCreateReelmStep(null); setSelectedTemplateId(null) }}>

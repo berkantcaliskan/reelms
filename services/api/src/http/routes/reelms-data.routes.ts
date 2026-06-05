@@ -940,7 +940,7 @@ export function createReelmsDataRouter(io: Server) {
       const adminRole = sanitizeRole({
         ...adminSource,
         id: DEFAULT_ADMIN_ROLE_ID,
-        name: 'Community Admin',
+        name: String(adminSource?.name || '').trim() || 'Community Admin',
         color: /^#[0-9a-fA-F]{6}$/.test(String(adminSource?.color || '')) ? adminSource.color : '#a3e635',
         position: 0,
         permissions: { ...FULL_MANAGER_PERMISSIONS }
@@ -948,7 +948,7 @@ export function createReelmsDataRouter(io: Server) {
       const citizenRole = sanitizeRole({
         ...citizenSource,
         id: DEFAULT_CITIZEN_ROLE_ID,
-        name: 'Citizen',
+        name: String(citizenSource?.name || '').trim() || 'Citizen',
         color: /^#[0-9a-fA-F]{6}$/.test(String(citizenSource?.color || '')) ? citizenSource.color : '#b99887',
         position: 1,
         permissions: {}
@@ -1010,7 +1010,7 @@ export function createReelmsDataRouter(io: Server) {
     const adminRole = sanitizeRole({
       ...rawAdminSource,
       id: CUSTOM_ADMIN_ROLE_ID,
-      name: 'Admin',
+      name: String(rawAdminSource?.name || '').trim() || 'Admin',
       color: ROLE_COLOR_RE.test(String(rawAdminSource?.color || '')) ? rawAdminSource.color : '#f87171',
       position: 0,
       permissions: { ...FULL_MANAGER_PERMISSIONS }
@@ -1019,7 +1019,7 @@ export function createReelmsDataRouter(io: Server) {
     const membersRole = sanitizeRole({
       ...rawMembersSource,
       id: CUSTOM_MEMBERS_ROLE_ID,
-      name: 'Members',
+      name: String(rawMembersSource?.name || '').trim() || 'Members',
       color: ROLE_COLOR_RE.test(String(rawMembersSource?.color || '')) ? rawMembersSource.color : '#60a5fa',
       position: 1,
       permissions: {}
@@ -1114,8 +1114,13 @@ export function createReelmsDataRouter(io: Server) {
     }
   }
 
-  const sanitizeRoles = (rolesInput: any[] = [], existingRoles: any[] = [], options: { actorCanManageFullRoles?: boolean } = {}) => {
+  const sanitizeRoles = (rolesInput: any[] = [], existingRoles: any[] = [], options: { actorCanManageFullRoles?: boolean, reelmId?: string } = {}) => {
     const actorCanManageFullRoles = options.actorCanManageFullRoles === true
+    const isDefaultCommunityRoles = String(options.reelmId || '') === DEFAULT_REELM_ID
+    const fallbackAdminRoleId = isDefaultCommunityRoles ? DEFAULT_ADMIN_ROLE_ID : CUSTOM_ADMIN_ROLE_ID
+    const fallbackAdminRoleName = isDefaultCommunityRoles ? 'Community Admin' : 'Admin'
+    const fallbackMemberRoleId = isDefaultCommunityRoles ? DEFAULT_CITIZEN_ROLE_ID : CUSTOM_MEMBERS_ROLE_ID
+    const fallbackMemberRoleName = isDefaultCommunityRoles ? 'Citizen' : 'Members'
     const existingById = new Map((Array.isArray(existingRoles) ? existingRoles : []).map((role: any) => [String(role?.id || ''), sanitizeRole(role, '', { allowManageReelm: true })]))
     const protectedExistingIds = new Set(Array.from(existingById.values()).filter(isProtectedRole).map((role: any) => String(role?.id || '')).filter(Boolean))
     const seen = new Set<string>()
@@ -1123,11 +1128,11 @@ export function createReelmsDataRouter(io: Server) {
       .map((role: any, index: number) => {
         let id = String(role?.id || '')
         let existing = existingById.get(id) || null
-        const defaultAdminExisting = existingById.get(DEFAULT_ADMIN_ROLE_ID) || null
+        const defaultAdminExisting = existingById.get(fallbackAdminRoleId) || null
         // If a manager/admin role arrives without the stable id, treat it as an
         // edit of the stable admin role instead of creating a duplicate role.
         if (!existing && actorCanManageFullRoles && defaultAdminExisting && (role?.permissions?.manageReelm === true || /admin|owner|founder|moderator|community/i.test(String(role?.name || '')))) {
-          id = DEFAULT_ADMIN_ROLE_ID
+          id = fallbackAdminRoleId
           existing = defaultAdminExisting
           role = { ...(role || {}), id }
         }
@@ -1142,8 +1147,8 @@ export function createReelmsDataRouter(io: Server) {
         return true
       })
       .filter((role: any) => {
-        if (String(role?.id || '') === DEFAULT_ADMIN_ROLE_ID) return true
-        if (role?.permissions?.manageReelm === true && seen.has(DEFAULT_ADMIN_ROLE_ID)) return false
+        if (String(role?.id || '') === fallbackAdminRoleId) return true
+        if (role?.permissions?.manageReelm === true && seen.has(fallbackAdminRoleId)) return false
         return true
       })
       .slice(0, 12)
@@ -1155,10 +1160,10 @@ export function createReelmsDataRouter(io: Server) {
       }
     }
     if (!roles.some(isManagerRole)) {
-      roles.unshift({ id: DEFAULT_ADMIN_ROLE_ID, name: 'Admin', color: '#f87171', position: 0, permissions: { ...FULL_MANAGER_PERMISSIONS } })
+      roles.unshift({ id: fallbackAdminRoleId, name: fallbackAdminRoleName, color: isDefaultCommunityRoles ? '#a3e635' : '#f87171', position: 0, permissions: { ...FULL_MANAGER_PERMISSIONS } })
     }
     if (!roles.some((role: any) => !isManagerRole(role))) {
-      roles.push({ id: DEFAULT_CITIZEN_ROLE_ID, name: 'Citizen', color: '#b99887', position: roles.length, permissions: {} })
+      roles.push({ id: fallbackMemberRoleId, name: fallbackMemberRoleName, color: isDefaultCommunityRoles ? '#b99887' : '#60a5fa', position: roles.length, permissions: {} })
     }
     return roles.slice(0, 12)
   }
@@ -2577,7 +2582,7 @@ export function createReelmsDataRouter(io: Server) {
       }
       if (sk === 'roles') {
         const existingRoles = (actorState?.roles || await getDoc<any[]>(pk, 'roles').catch(() => [])) || []
-        incomingData = sanitizeRoles(Array.isArray(incomingData) ? incomingData : [], existingRoles, { actorCanManageFullRoles: actorState?.canManageFullRoles === true })
+        incomingData = sanitizeRoles(Array.isArray(incomingData) ? incomingData : [], existingRoles, { actorCanManageFullRoles: actorState?.canManageFullRoles === true, reelmId })
       }
       if (sk === 'members') {
         const availableRoles = (actorState?.roles || await getDoc<any[]>(pk, 'roles').catch(() => [])) || []

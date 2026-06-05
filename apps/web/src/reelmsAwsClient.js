@@ -54,6 +54,25 @@ function requestCacheTtl(path, method) {
   return 0
 }
 
+
+function invalidateResponseCache(predicate) {
+  try {
+    for (const key of Array.from(responseCache.keys())) {
+      if (predicate(String(key))) responseCache.delete(key)
+    }
+  } catch { /* noop */ }
+}
+
+function invalidateReelmResponseCache(reelmId) {
+  const id = encodeURIComponent(String(reelmId || 'global'))
+  invalidateResponseCache(key => key.includes(`/api/v1/reelm/${id}/`) || key.includes('/api/v1/user/doc/reelms') || key.includes('/api/v1/user/bootstrap'))
+}
+
+function invalidateUserResponseCache(sk = '') {
+  const key = encodeURIComponent(String(sk || ''))
+  invalidateResponseCache(entry => entry.includes(`/api/v1/user/doc/${key}`) || entry.includes('/api/v1/user/bootstrap'))
+}
+
 function rememberUserDoc(sk, data) {
   if (!sk) return
   userDocCache.set(String(sk), { data, at: Date.now() })
@@ -185,6 +204,7 @@ export async function userPutDoc(sk, data) {
     method: 'PUT',
     body: JSON.stringify({ data }),
   })
+  invalidateUserResponseCache(key)
   rememberUserDoc(key, data)
   userPersistPendingJson.delete(key)
 }
@@ -231,10 +251,12 @@ export async function reelmGetCore(reelmId) {
 export async function reelmPutDoc(reelmId, sk, data, options = {}) {
   const id = reelmId || 'global'
   const body = { data, ...(options && typeof options === 'object' ? options : {}) }
-  await api(`/api/v1/reelm/${encodeURIComponent(id)}/doc/${encodeURIComponent(sk)}`, {
+  const result = await api(`/api/v1/reelm/${encodeURIComponent(id)}/doc/${encodeURIComponent(sk)}`, {
     method: 'PUT',
     body: JSON.stringify(body),
   })
+  invalidateReelmResponseCache(id)
+  return result
 }
 
 export async function appGetDoc(sk) {
