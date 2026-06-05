@@ -5013,6 +5013,36 @@ h6 {
   margin-top: 16px;
 }
 
+.discover-search-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 34px;
+  margin: 2px 0 8px;
+  padding: 8px 12px;
+  border: 1px solid rgba(var(--ta-rgb), 0.14);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.035);
+  color: rgba(230, 210, 200, 0.72);
+  font-size: 0.78rem;
+  text-align: center;
+}
+
+.discover-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 999px;
+  border: 2px solid rgba(var(--ta-rgb), 0.18);
+  border-top-color: rgba(var(--ta-rgb), 0.82);
+  animation: discoverSpin 0.8s linear infinite;
+  flex: 0 0 auto;
+}
+
+@keyframes discoverSpin {
+  to { transform: rotate(360deg); }
+}
+
 .discover-result-row {
   display: flex;
   align-items: center;

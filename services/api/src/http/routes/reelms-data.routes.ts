@@ -53,6 +53,152 @@ export function createReelmsDataRouter(io: Server) {
   const publicProfileCache = new Map<string, { value: any, expiresAt: number }>()
   const defaultJoinHealLast = new Map<string, number>()
 
+  type SearchCacheEntry<T> = { value?: T, promise?: Promise<T>, expiresAt: number }
+  const SEARCH_CACHE_TTL_MS = 30_000
+  const searchProfileScanCache = new Map<string, SearchCacheEntry<any[]>>()
+  const searchReelmMetaScanCache = new Map<string, SearchCacheEntry<any[]>>()
+  const searchPendingJoinCache = new Map<string, { value: any[], expiresAt: number }>()
+
+  const readSearchCache = async <T,>(cache: Map<string, SearchCacheEntry<T>>, key: string, loader: () => Promise<T>, ttlMs = SEARCH_CACHE_TTL_MS): Promise<T> => {
+    const now = Date.now()
+    const cached = cache.get(key)
+    if (cached?.value && cached.expiresAt > now) return cached.value
+    if (cached?.promise) return cached.promise
+    const promise = loader().then((value) => {
+      cache.set(key, { value, expiresAt: Date.now() + ttlMs })
+      return value
+    }).catch((err) => {
+      cache.delete(key)
+      throw err
+    })
+    cache.set(key, { promise, expiresAt: now + ttlMs })
+    return promise
+  }
+
+  const getSearchProfiles = () => readSearchCache(searchProfileScanCache, 'profiles', async () => {
+    const items = await scanByPkPrefix<any>('USER#')
+    return items
+      .filter((item: any) => item.sk === 'profile' && item.data && !(item.data as any).isSystem)
+      .map((item: any) => ({ uid: String(item.pk || '').replace(/^USER#/, ''), data: item.data as any }))
+      .filter((row: any) => Boolean(row.uid))
+  }, SEARCH_CACHE_TTL_MS)
+
+  const getSearchReelmMetas = () => readSearchCache(searchReelmMetaScanCache, 'metas', async () => {
+    const items = await scanByPkPrefix<any>('REELM#')
+    return items
+      .filter((item: any) => item.sk === 'meta' && item.data && (item.data as any).id)
+      .map((item: any) => item.data as any)
+  }, SEARCH_CACHE_TTL_MS)
+
+  const getCachedPendingJoinRequests = async (reelmId: string): Promise<any[]> => {
+    const id = String(reelmId || '')
+    if (!id) return []
+    const cached = searchPendingJoinCache.get(id)
+    if (cached && cached.expiresAt > Date.now()) return cached.value
+    const value = (await getDoc<any[]>(reelmPk(id), 'join_requests').catch(() => [])) || []
+    const safe = Array.isArray(value) ? value : []
+    searchPendingJoinCache.set(id, { value: safe, expiresAt: Date.now() + 10_000 })
+    return safe
+  }
+
+  const scoreSearchText = (q: string, terms: string[], hayParts: string[], exactFields: string[] = []) => {
+    const safeQ = String(q || '').toLowerCase()
+    const hay = hayParts.join(' ')
+    if (!safeQ) return 1
+    let score = 0
+    if (exactFields.some((part) => part === safeQ)) score += 100
+    if (hayParts.some((part) => part.startsWith(safeQ))) score += 40
+    if (hay.includes(safeQ)) score += 15
+    for (const term of terms) if (hay.includes(term)) score += 5
+    return score
+  }
+
+  const searchUsersForDiscover = async (rawQuery: string, limit = 50) => {
+    const rawQ = String(rawQuery || '').trim()
+    const q = rawQ.toLowerCase().replace(/^@+/, '')
+    const normalizedUser = normalizeUsername(rawQ)
+    const normalizedEmail = normalizeEmail(rawQ)
+    const exact = new Map<string, any>()
+
+    if (normalizedUser) {
+      const foundUid = await getDoc<string>(`USERNAME#${normalizedUser}`, 'uid').catch(() => null)
+      const profile = foundUid ? await getDoc<any>(userPk(foundUid), 'profile').catch(() => null) : null
+      if (foundUid && profile && !profile.isSystem) exact.set(String(foundUid), publicProfileFromStored(String(foundUid), profile))
+    }
+    if (normalizedEmail && normalizedEmail.includes('@')) {
+      const foundUid = await getDoc<string>(`EMAIL#${normalizedEmail}`, 'uid').catch(() => null)
+      const profile = foundUid ? await getDoc<any>(userPk(foundUid), 'profile').catch(() => null) : null
+      if (foundUid && profile && !profile.isSystem) exact.set(String(foundUid), publicProfileFromStored(String(foundUid), profile))
+    }
+
+    if (exact.size && (normalizedUser === q || normalizedEmail.includes('@'))) {
+      return Array.from(exact.values()).slice(0, limit)
+    }
+    if (q && q.length < 2) return Array.from(exact.values()).slice(0, Math.min(limit, 20))
+
+    const terms = q.split(/\s+/).map((value: string) => value.trim()).filter(Boolean).slice(0, 4)
+    const profiles = await getSearchProfiles()
+    const rows = profiles
+      .map((row: any) => {
+        const data = row.data as any
+        const hayParts = [row.uid, data.name, data.displayName, data.username, data.contact, data.email].filter(Boolean).map((value: any) => String(value).toLowerCase())
+        const exactFields = [data.username, data.name, data.displayName].filter(Boolean).map((value: any) => String(value).toLowerCase())
+        return { uid: row.uid, data, score: scoreSearchText(q, terms, hayParts, exactFields) }
+      })
+      .filter((row: any) => !q || row.score > 0)
+      .sort((a: any, b: any) => b.score - a.score || String((a.data as any).name || '').localeCompare(String((b.data as any).name || '')))
+      .slice(0, q ? limit : Math.max(limit, 100))
+      .map((row: any) => publicProfileFromStored(row.uid, row.data))
+
+    for (const profile of rows) exact.set(String(profile.id || profile.uid), profile)
+    return Array.from(exact.values()).slice(0, q ? limit : Math.max(limit, 100))
+  }
+
+  const searchReelmsForDiscover = async (rawQuery: string, uid: string, limit = 30) => {
+    const q = String(rawQuery || '').trim().toLowerCase()
+    if (q && q.length < 2) return []
+    const metas = await getSearchReelmMetas()
+    const mine = ((await getFastUserDoc(uid, 'reelms', [], 650).catch(() => [])) || []).map((reelm: any) => String(reelm?.id || ''))
+    const mineSet = new Set(mine)
+    const terms = q.split(/\s+/).map((value: string) => value.trim()).filter(Boolean).slice(0, 4)
+    const candidates = metas
+      .filter((meta: any) => {
+        const id = String(meta.id || '')
+        if (!id) return false
+        if (id === DEFAULT_REELM_ID) return true
+        return meta.showInDiscover === true || meta.ownerId === uid
+      })
+      .map((meta: any) => {
+        const hayParts = [meta.id, meta.name, meta.code, meta.description].filter(Boolean).map((value: any) => String(value).toLowerCase())
+        const score = scoreSearchText(q, terms, hayParts, [String(meta.code || '').toLowerCase(), String(meta.name || '').toLowerCase()])
+        return { meta, score }
+      })
+      .filter((row: any) => !q || row.score > 0)
+      .sort((a: any, b: any) => b.score - a.score || String(a.meta.name || '').localeCompare(String(b.meta.name || '')))
+      .slice(0, limit)
+
+    const rows = await Promise.all(candidates.map(async (row: any) => {
+      const meta = row.meta as any
+      const id = String(meta.id || '')
+      if (await withDeadline(isBannedFromReelm(id, uid).catch(() => false), 500, false)) return null
+      const pendingRequests = await withDeadline(getCachedPendingJoinRequests(id), 650, [])
+      const pending = pendingRequests.some((request: any) => String(request?.userId || request?.id || '') === uid)
+      return {
+        id: meta.id,
+        name: meta.name,
+        code: meta.code,
+        ownerId: meta.ownerId || null,
+        image: meta.image || null,
+        joinMode: id === DEFAULT_REELM_ID ? 'open' : (meta.joinMode || 'request'),
+        showInDiscover: id === DEFAULT_REELM_ID ? true : meta.showInDiscover === true,
+        isDefault: id === DEFAULT_REELM_ID,
+        joined: mineSet.has(id),
+        pending
+      }
+    }))
+    return rows.filter(Boolean)
+  }
+
   const hiddenSystemMemberIds = () => new Set([String(env.REELMS_MODERATION_UID || ''), 'reelms-moderation'].filter(Boolean))
   const entryUserId = (entry: any) => String(entry?.userId || entry?.id || '').trim()
   const hiddenMemberIdsFromBanList = (banList: any[] = []) => new Set((Array.isArray(banList) ? banList : []).map(entryUserId).filter(Boolean))
@@ -725,6 +871,8 @@ export function createReelmsDataRouter(io: Server) {
   const ROLE_COLOR_RE = /^#[0-9a-fA-F]{6}$/
   const DEFAULT_ADMIN_ROLE_ID = 'role-admin-rc'
   const DEFAULT_CITIZEN_ROLE_ID = 'role-citizen-rc'
+  const CUSTOM_ADMIN_ROLE_ID = 'role-admin'
+  const CUSTOM_MEMBERS_ROLE_ID = 'role-members'
   const REELM_ELEVATED_ROLE_RE = /admin|owner|founder|moderator/i
   const REELM_PERMISSION_KEYS = [
     'viewSettings',
@@ -756,7 +904,7 @@ export function createReelmsDataRouter(io: Server) {
 
   const roleNameKey = (role: any) => String(role?.name || '').trim().toLowerCase().replace(/\s+/g, ' ')
   const isAdminLikeRole = (role: any) => isManagerRole(role) || /admin|owner|founder|moderator|community admin/i.test(String(role?.name || ''))
-  const isDefaultMemberLikeRole = (role: any) => /^(member|citizen|user|regular)$/i.test(String(role?.name || '').trim()) || /role-(member|citizen)/i.test(String(role?.id || ''))
+  const isDefaultMemberLikeRole = (role: any) => /^(members|member|citizen|user|regular)$/i.test(String(role?.name || '').trim()) || /role-(members|member|citizen)/i.test(String(role?.id || ''))
 
   const normalizeRoleIdListForClient = (roleIds: any[] = [], roleIdMap: Map<string, string>, validRoleIds: Set<string>, fallbackRoleId = '') => {
     const next = Array.from(new Set((Array.isArray(roleIds) ? roleIds : [])
@@ -767,7 +915,8 @@ export function createReelmsDataRouter(io: Server) {
   }
 
   function normalizeReelmCoreForClient(reelmId: any, rolesInput: any[] = [], membersInput: any[] = []) {
-    const isDefaultCommunity = String(reelmId || '') === DEFAULT_REELM_ID
+    const id = String(reelmId || '')
+    const isDefaultCommunity = id === DEFAULT_REELM_ID
     const rawRoles = Array.isArray(rolesInput) ? rolesInput : []
     const rawMembers = Array.isArray(membersInput) ? membersInput : []
     const roleIdMap = new Map<string, string>()
@@ -782,10 +931,10 @@ export function createReelmsDataRouter(io: Server) {
         || { id: DEFAULT_CITIZEN_ROLE_ID, name: 'Citizen', color: '#b99887', position: 1, permissions: {} }
 
       rawRoles.forEach((role: any) => {
-        const id = String(role?.id || '')
-        if (!id) return
-        if (id === DEFAULT_ADMIN_ROLE_ID || isManagerRole(role)) roleIdMap.set(id, DEFAULT_ADMIN_ROLE_ID)
-        else if (id === DEFAULT_CITIZEN_ROLE_ID || isDefaultMemberLikeRole(role) || isAdminLikeRole(role)) roleIdMap.set(id, DEFAULT_CITIZEN_ROLE_ID)
+        const rawId = String(role?.id || '')
+        if (!rawId) return
+        if (rawId === DEFAULT_ADMIN_ROLE_ID || isManagerRole(role) || isAdminLikeRole(role)) roleIdMap.set(rawId, DEFAULT_ADMIN_ROLE_ID)
+        else if (rawId === DEFAULT_CITIZEN_ROLE_ID || isDefaultMemberLikeRole(role)) roleIdMap.set(rawId, DEFAULT_CITIZEN_ROLE_ID)
       })
 
       const adminRole = sanitizeRole({
@@ -807,8 +956,8 @@ export function createReelmsDataRouter(io: Server) {
 
       const customRoles = rawRoles
         .filter((role: any) => {
-          const id = String(role?.id || '')
-          if (!id || id === DEFAULT_ADMIN_ROLE_ID || id === DEFAULT_CITIZEN_ROLE_ID) return false
+          const rawId = String(role?.id || '')
+          if (!rawId || rawId === DEFAULT_ADMIN_ROLE_ID || rawId === DEFAULT_CITIZEN_ROLE_ID) return false
           if (isAdminLikeRole(role) || isDefaultMemberLikeRole(role)) return false
           return true
         })
@@ -817,9 +966,9 @@ export function createReelmsDataRouter(io: Server) {
       const seenRoleIds = new Set<string>()
       const roles = [adminRole, citizenRole, ...customRoles]
         .filter((role: any) => {
-          const id = String(role?.id || '')
-          if (!id || seenRoleIds.has(id)) return false
-          seenRoleIds.add(id)
+          const rawId = String(role?.id || '')
+          if (!rawId || seenRoleIds.has(rawId)) return false
+          seenRoleIds.add(rawId)
           return true
         })
         .sort((a: any, b: any) => (Number(a?.position ?? a?.order ?? 0) - Number(b?.position ?? b?.order ?? 0)))
@@ -827,7 +976,7 @@ export function createReelmsDataRouter(io: Server) {
       const members = rawMembers
         .map((member: any) => {
           const existingIds = Array.isArray(member?.roleIds) ? member.roleIds : []
-          const hadAdmin = existingIds.map(String).some((id: string) => roleIdMap.get(id) === DEFAULT_ADMIN_ROLE_ID || id === DEFAULT_ADMIN_ROLE_ID)
+          const hadAdmin = existingIds.map(String).some((roleId: string) => roleIdMap.get(roleId) === DEFAULT_ADMIN_ROLE_ID || roleId === DEFAULT_ADMIN_ROLE_ID)
           const fallback = hadAdmin ? DEFAULT_ADMIN_ROLE_ID : DEFAULT_CITIZEN_ROLE_ID
           return {
             ...member,
@@ -839,30 +988,81 @@ export function createReelmsDataRouter(io: Server) {
       return { roles, members }
     }
 
-    const seenByName = new Map<string, string>()
-    const roles: any[] = []
-    rawRoles.forEach((role: any, index: number) => {
-      const normalized = sanitizeRole(role, `role-${index}`, { allowManageReelm: true, forceManager: isManagerRole(role) })
-      const key = `${isManagerRole(normalized) ? 'manager' : 'role'}:${roleNameKey(normalized) || normalized.id}`
-      const existingId = seenByName.get(key)
-      if (existingId) {
-        if (normalized.id) roleIdMap.set(String(normalized.id), existingId)
-        return
+    const rawAdminSource = rawRoles.find((role: any) => String(role?.id || '') === CUSTOM_ADMIN_ROLE_ID)
+      || rawRoles.find(isAdminLikeRole)
+      || rawRoles.find(isManagerRole)
+      || { id: CUSTOM_ADMIN_ROLE_ID, name: 'Admin', color: '#f87171', position: 0, permissions: { ...FULL_MANAGER_PERMISSIONS } }
+    const rawMembersSource = rawRoles.find((role: any) => String(role?.id || '') === CUSTOM_MEMBERS_ROLE_ID)
+      || rawRoles.find((role: any) => !isAdminLikeRole(role) && isDefaultMemberLikeRole(role))
+      || rawRoles.find((role: any) => !isManagerRole(role) && !isAdminLikeRole(role))
+      || { id: CUSTOM_MEMBERS_ROLE_ID, name: 'Members', color: '#60a5fa', position: 1, permissions: {} }
+
+    rawRoles.forEach((role: any) => {
+      const rawId = String(role?.id || '')
+      if (!rawId) return
+      if (rawId === CUSTOM_ADMIN_ROLE_ID || isManagerRole(role) || isAdminLikeRole(role) || /^role-admin-/i.test(rawId)) {
+        roleIdMap.set(rawId, CUSTOM_ADMIN_ROLE_ID)
+      } else if (rawId === CUSTOM_MEMBERS_ROLE_ID || isDefaultMemberLikeRole(role) || /^role-(member|members|citizen)-/i.test(rawId) || rawId === DEFAULT_CITIZEN_ROLE_ID) {
+        roleIdMap.set(rawId, CUSTOM_MEMBERS_ROLE_ID)
       }
-      seenByName.set(key, String(normalized.id))
-      roles.push(normalized)
     })
-    const safeRoles = sanitizeRoles(roles, roles, { actorCanManageFullRoles: true })
-    const validRoleIds = new Set(safeRoles.map((role: any) => String(role.id)))
-    const fallbackRoleId = (safeRoles.find((role: any) => !isManagerRole(role)) || safeRoles[0])?.id || ''
+
+    const adminRole = sanitizeRole({
+      ...rawAdminSource,
+      id: CUSTOM_ADMIN_ROLE_ID,
+      name: 'Admin',
+      color: ROLE_COLOR_RE.test(String(rawAdminSource?.color || '')) ? rawAdminSource.color : '#f87171',
+      position: 0,
+      permissions: { ...FULL_MANAGER_PERMISSIONS }
+    }, CUSTOM_ADMIN_ROLE_ID, { allowManageReelm: true, forceManager: true })
+
+    const membersRole = sanitizeRole({
+      ...rawMembersSource,
+      id: CUSTOM_MEMBERS_ROLE_ID,
+      name: 'Members',
+      color: ROLE_COLOR_RE.test(String(rawMembersSource?.color || '')) ? rawMembersSource.color : '#60a5fa',
+      position: 1,
+      permissions: {}
+    }, CUSTOM_MEMBERS_ROLE_ID, { allowManageReelm: true })
+
+    const seenCustomKeys = new Set<string>()
+    const customRoles = rawRoles
+      .filter((role: any) => {
+        const rawId = String(role?.id || '')
+        if (!rawId || roleIdMap.has(rawId) || rawId === CUSTOM_ADMIN_ROLE_ID || rawId === CUSTOM_MEMBERS_ROLE_ID) return false
+        if (isAdminLikeRole(role) || isDefaultMemberLikeRole(role) || isManagerRole(role)) return false
+        const key = roleNameKey(role) || rawId
+        if (seenCustomKeys.has(key)) return false
+        seenCustomKeys.add(key)
+        return true
+      })
+      .map((role: any, index: number) => sanitizeRole({ ...role, position: Number(role?.position ?? role?.order ?? index + 2) }, `role-custom-${index}`, { allowManageReelm: true }))
+      .filter((role: any) => String(role?.id || '') !== CUSTOM_ADMIN_ROLE_ID && String(role?.id || '') !== CUSTOM_MEMBERS_ROLE_ID)
+
+    const seenRoleIds = new Set<string>()
+    const roles = [adminRole, membersRole, ...customRoles]
+      .filter((role: any) => {
+        const rawId = String(role?.id || '')
+        if (!rawId || seenRoleIds.has(rawId)) return false
+        seenRoleIds.add(rawId)
+        return true
+      })
+      .sort((a: any, b: any) => (Number(a?.position ?? a?.order ?? 0) - Number(b?.position ?? b?.order ?? 0)))
+
+    const validRoleIds = new Set(roles.map((role: any) => String(role.id)))
     const members = rawMembers
-      .map((member: any) => ({
-        ...member,
-        userId: memberUserId(member),
-        roleIds: normalizeRoleIdListForClient(Array.isArray(member?.roleIds) ? member.roleIds : [], roleIdMap, validRoleIds, fallbackRoleId)
-      }))
+      .map((member: any) => {
+        const existingIds = Array.isArray(member?.roleIds) ? member.roleIds : []
+        const mappedIds = existingIds.map(String).map((roleId: string) => roleIdMap.get(roleId) || roleId)
+        const hadAdmin = mappedIds.includes(CUSTOM_ADMIN_ROLE_ID)
+        return {
+          ...member,
+          userId: memberUserId(member),
+          roleIds: normalizeRoleIdListForClient(mappedIds, roleIdMap, validRoleIds, hadAdmin ? CUSTOM_ADMIN_ROLE_ID : CUSTOM_MEMBERS_ROLE_ID)
+        }
+      })
       .filter((member: any) => member.userId)
-    return { roles: safeRoles, members }
+    return { roles, members }
   }
 
   const coreChanged = (roles: any[], members: any[], normalized: { roles: any[]; members: any[] }) => {
@@ -1609,57 +1809,8 @@ export function createReelmsDataRouter(io: Server) {
   router.get('/users', async (req, res) => {
     try {
       const rawQ = String(req.query.q || '').trim()
-      const q = rawQ.toLowerCase().replace(/^@+/, '')
-      const normalizedUser = normalizeUsername(rawQ)
-      const normalizedEmail = normalizeEmail(rawQ)
-      const exact = new Map<string, any>()
-
-      if (normalizedUser) {
-        const uid = await getDoc<string>(`USERNAME#${normalizedUser}`, 'uid').catch(() => null)
-        const profile = uid ? await getDoc<any>(userPk(uid), 'profile').catch(() => null) : null
-        if (uid && profile && !profile.isSystem) exact.set(String(uid), publicProfileFromStored(String(uid), profile))
-      }
-      if (normalizedEmail && normalizedEmail.includes('@')) {
-        const uid = await getDoc<string>(`EMAIL#${normalizedEmail}`, 'uid').catch(() => null)
-        const profile = uid ? await getDoc<any>(userPk(uid), 'profile').catch(() => null) : null
-        if (uid && profile && !profile.isSystem) exact.set(String(uid), publicProfileFromStored(String(uid), profile))
-      }
-
-      // Exact username/email search must not wait for a full profile scan. This
-      // makes Discover user search feel instant for @username lookups and avoids
-      // Supabase scan latency blocking visible results.
-      if (exact.size && (normalizedUser === q || normalizedEmail.includes('@'))) {
-        return res.json({ data: Array.from(exact.values()).slice(0, 50) })
-      }
-      if (q && q.length < 2) return res.json({ data: Array.from(exact.values()).slice(0, 20) })
-
-      const items = await scanByPkPrefix<any>('USER#')
-      const terms = q.split(/\s+/).map((x) => x.trim()).filter(Boolean).slice(0, 4)
-      const rows = items
-        .filter((i: any) => i.sk === 'profile' && i.data && !(i.data as any).isSystem)
-        .map((i: any) => {
-          const uid = i.pk.replace(/^USER#/, '')
-          const data = i.data as any
-          const hayParts = [uid, data.name, data.displayName, data.username, data.contact, data.email].filter(Boolean).map((v) => String(v).toLowerCase())
-          const hay = hayParts.join(' ')
-          let score = 0
-          if (!q) score = 1
-          else {
-            if (String(data.username || '').toLowerCase() === q || String(data.username || '').toLowerCase() === normalizedUser) score += 100
-            if (String(data.name || '').toLowerCase() === q || String(data.displayName || '').toLowerCase() === q) score += 80
-            if (hayParts.some((part) => part.startsWith(q))) score += 40
-            if (hay.includes(q)) score += 15
-            for (const term of terms) if (hay.includes(term)) score += 5
-          }
-          return { uid, data, score }
-        })
-        .filter((row: any) => !q || row.score > 0)
-        .sort((a: any, b: any) => b.score - a.score || String((a.data as any).name || '').localeCompare(String((b.data as any).name || '')))
-        .slice(0, q ? 50 : 100)
-        .map((row: any) => publicProfileFromStored(row.uid, row.data))
-
-      for (const profile of rows) exact.set(String(profile.id || profile.uid), profile)
-      res.json({ data: Array.from(exact.values()).slice(0, q ? 50 : 100) })
+      const data = await searchUsersForDiscover(rawQ, 50)
+      res.json({ data })
     } catch (err) {
       console.error('/api/v1/users error:', err)
       res.status(500).json({ error: 'list_failed' })
@@ -1676,44 +1827,33 @@ export function createReelmsDataRouter(io: Server) {
     } catch { res.status(500).json({ error: 'scan_failed' }) }
   })
 
+  router.get('/discovery/search', async (req, res) => {
+    try {
+      const uid = String(req.userId || '')
+      const rawQ = String(req.query.q || '').trim()
+      const q = rawQ.toLowerCase().replace(/^@+/, '')
+      if (q && q.length < 2) return res.json({ data: { users: await searchUsersForDiscover(rawQ, 20), reelms: [] } })
+      const [users, reelms] = await Promise.all([
+        searchUsersForDiscover(rawQ, 50),
+        searchReelmsForDiscover(rawQ, uid, 30)
+      ])
+      res.json({ data: { users, reelms } })
+    } catch (err) {
+      console.error('/api/v1/discovery/search error:', err)
+      res.status(500).json({ error: 'discovery_search_failed' })
+    }
+  })
+
   router.get('/reelms/discover', async (req, res) => {
     try {
       const uid = String(req.userId || '')
-      const q = String(req.query.q || '').trim().toLowerCase()
-      const items = await scanByPkPrefix<any>('REELM#')
-      const metas = items.filter((i: any) => i.sk === 'meta' && i.data && (i.data as any).id).map((i: any) => i.data as any)
-      const mine = ((await getDoc<any[]>(userPk(uid), 'reelms').catch(() => [])) || []).map((r: any) => String(r?.id || ''))
-      const mineSet = new Set(mine)
-      const candidates = metas
-        .filter((m: any) => {
-          const id = String(m.id || '')
-          if (!id) return false
-          if (id === DEFAULT_REELM_ID) return true
-          return m.showInDiscover === true || m.ownerId === uid
-        })
-        .filter((m: any) => !q || String(m.name || '').toLowerCase().includes(q) || String(m.code || '').toLowerCase().includes(q))
-        .slice(0, 30)
-      const rows = await Promise.all(candidates.map(async (m: any) => {
-        const id = String(m.id || '')
-        if (await isBannedFromReelm(id, uid).catch(() => false)) return null
-        const pendingRequests = (await getDoc<any[]>(reelmPk(id), 'join_requests').catch(() => [])) || []
-        const pending = pendingRequests.some((r: any) => String(r?.userId || r?.id || '') === uid)
-        return {
-          id: m.id,
-          name: m.name,
-          code: m.code,
-          ownerId: m.ownerId || null,
-          image: m.image || null,
-          joinMode: id === DEFAULT_REELM_ID ? 'open' : (m.joinMode || 'request'),
-          showInDiscover: id === DEFAULT_REELM_ID ? true : m.showInDiscover === true,
-          isDefault: id === DEFAULT_REELM_ID,
-          joined: mineSet.has(id),
-          pending
-        }
-      }))
-      const data = rows.filter(Boolean)
+      const rawQ = String(req.query.q || '').trim()
+      const data = await searchReelmsForDiscover(rawQ, uid, 30)
       res.json({ data })
-    } catch (err) { res.status(500).json({ error: 'discover_failed' }) }
+    } catch (err) {
+      console.error('/api/v1/reelms/discover error:', err)
+      res.status(500).json({ error: 'discover_failed' })
+    }
   })
 
   router.post('/reelms/:reelmId/request-join', async (req, res) => {
@@ -2218,20 +2358,22 @@ export function createReelmsDataRouter(io: Server) {
       }
       if (!codeReserved) return res.status(409).json({ error: 'invite_code_exists' })
 
-      const roles = sanitizeRoles(Array.isArray(input.roles) && input.roles.length ? input.roles : [
-        { id: `role-admin-${id}`, name: 'Admin', color: '#f87171', position: 0, permissions: { manageReelm: true } },
-        { id: `role-member-${id}`, name: 'Member', color: '#60a5fa', position: 1, permissions: {} }
-      ])
-      const adminRole = getDefaultManagerRole(roles)
+      const requestedRoles = Array.isArray(input.roles) && input.roles.length ? input.roles : [
+        { id: CUSTOM_ADMIN_ROLE_ID, name: 'Admin', color: '#f87171', position: 0, permissions: { ...FULL_MANAGER_PERMISSIONS } },
+        { id: CUSTOM_MEMBERS_ROLE_ID, name: 'Members', color: '#60a5fa', position: 1, permissions: {} }
+      ]
       const creator = await getUserPublicProfile(uid)
       const creatorMember = {
         userId: uid,
         userName: creator.name || creator.username || 'Owner',
         userPhoto: creator.photo || null,
-        roleIds: adminRole?.id ? [adminRole.id] : []
+        roleIds: [CUSTOM_ADMIN_ROLE_ID]
       }
       const membersInput = Array.isArray(input.members) ? input.members : []
-      const members = [creatorMember, ...membersInput.filter((m: any) => String(m?.userId) !== uid)]
+      const requestedMembers = [creatorMember, ...membersInput.filter((m: any) => String(m?.userId) !== uid)]
+      const canonicalCore = normalizeReelmCoreForClient(id, requestedRoles, requestedMembers)
+      const roles = canonicalCore.roles
+      const members = canonicalCore.members.map((member: any) => memberUserId(member) === uid ? { ...member, roleIds: [CUSTOM_ADMIN_ROLE_ID] } : member)
       const categories = Array.isArray(input.categories) ? input.categories : []
       const meta = {
         id,

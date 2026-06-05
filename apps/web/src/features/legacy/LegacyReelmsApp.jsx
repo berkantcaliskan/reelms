@@ -102,6 +102,7 @@ import {
   joinReelmByCode,
   adminAllReelms,
   discoverReelms,
+  discoverySearch,
   requestJoinReelm,
   approveJoinReelm,
   rejectJoinReelm,
@@ -6479,6 +6480,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [debouncedDiscoverQuery, setDebouncedDiscoverQuery] = useState('')
   const [discoverUsers, setDiscoverUsers] = useState([])
   const [discoverReelmsList, setDiscoverReelmsList] = useState([])
+  const [discoverRemoteQuery, setDiscoverRemoteQuery] = useState('')
+  const [discoverSearchState, setDiscoverSearchState] = useState({ query: '', loading: false, error: null })
+  const discoverSearchSeqRef = useRef(0)
   const [pendingReelmJoinIds, setPendingReelmJoinIds] = useState([])
   const [showFriendsPopup, setShowFriendsPopup] = useState(false)
   const [showNotificationsPopup, setShowNotificationsPopup] = useState(false)
@@ -7352,34 +7356,58 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
 
   useEffect(() => {
-    const timer = setTimeout(() => setDebouncedDiscoverQuery(discoverQuery.trim()), 260)
+    const trimmed = discoverQuery.trim()
+    const delay = trimmed.length <= 1 ? 180 : 320
+    const timer = setTimeout(() => setDebouncedDiscoverQuery(trimmed), delay)
     return () => clearTimeout(timer)
   }, [discoverQuery])
 
-  // Discover: fetch public reelms + users from backend on debounced query change
+  // Discover: one combined, cancellable search request. Local reelms/chats still
+  // render instantly; remote people/public reelm results show a spinner until the
+  // current query finishes, so users never see misleading "No results" while IO is in flight.
   useEffect(() => {
     const q = debouncedDiscoverQuery.trim()
+    const seq = ++discoverSearchSeqRef.current
     if (!q) {
       setDiscoverUsers([])
       setDiscoverReelmsList([])
+      setDiscoverRemoteQuery('')
+      setDiscoverSearchState({ query: '', loading: false, error: null })
       return undefined
     }
-    let cancelled = false
-    usersList(q).then((users) => {
-      if (cancelled) return
-      setDiscoverUsers(Array.isArray(users) ? users.filter(u => !u.isSystem) : [])
-    }).catch(() => { if (!cancelled) setDiscoverUsers([]) })
 
-    discoverReelms(q).then((publicReelms) => {
-      if (cancelled) return
-      const safeReelms = Array.isArray(publicReelms) ? publicReelms : []
+    if (q.length < 2) {
+      setDiscoverUsers([])
+      setDiscoverReelmsList([])
+      setDiscoverRemoteQuery(q)
+      setDiscoverSearchState({ query: q, loading: false, error: null })
+      return undefined
+    }
+
+    const controller = new AbortController()
+    setDiscoverSearchState({ query: q, loading: true, error: null })
+
+    discoverySearch(q, { signal: controller.signal }).then((result) => {
+      if (controller.signal.aborted || discoverSearchSeqRef.current !== seq) return
+      const users = Array.isArray(result?.users) ? result.users.filter(u => !u.isSystem) : []
+      const safeReelms = Array.isArray(result?.reelms) ? result.reelms : []
+      setDiscoverUsers(users)
       setDiscoverReelmsList(safeReelms)
+      setDiscoverRemoteQuery(q)
       const pendingIds = safeReelms.filter(r => r?.pending).map(r => String(r.id)).filter(Boolean)
       if (pendingIds.length) {
         setPendingReelmJoinIds(prev => Array.from(new Set([...prev.map(String), ...pendingIds])))
       }
-    }).catch(() => { if (!cancelled) setDiscoverReelmsList([]) })
-    return () => { cancelled = true }
+      setDiscoverSearchState({ query: q, loading: false, error: null })
+    }).catch((err) => {
+      if (controller.signal.aborted || discoverSearchSeqRef.current !== seq) return
+      setDiscoverRemoteQuery(q)
+      setDiscoverSearchState({ query: q, loading: false, error: err?.message || 'search_failed' })
+      setDiscoverUsers([])
+      setDiscoverReelmsList([])
+    })
+
+    return () => { controller.abort() }
   }, [debouncedDiscoverQuery])
 
   const toggleFriendsPopup = () => { setShowFriendsPopup(v => !v); setShowNotificationsPopup(false) }
@@ -7425,8 +7453,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setShowFriendsPanel(false)
     setShowSettings(false)
     setShowChatList(false)
-    setReelmLoading(true)
-    setTimeout(() => setReelmLoading(false), 350)
+    const hasMemberSnapshot = Array.isArray(reelm?.members) && reelm.members.length > 0 && Array.isArray(reelm?.roles) && reelm.roles.length > 0
+    setReelmLoading(!hasMemberSnapshot)
+    if (reelm?.id) {
+      hydrateReelmCore(reelm.id).then((core) => {
+        if (core?.id) mergeReelmIntoState(core)
+      }).catch(() => {}).finally(() => setReelmLoading(false))
+      setTimeout(() => setReelmLoading(false), 1200)
+    } else {
+      setTimeout(() => setReelmLoading(false), 350)
+    }
     if (reelmLandingView === 'feed') {
       setShowFeed(true)
       setFeedTab('feed')
@@ -9510,10 +9546,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       ageRating: 'under18',
       announcementChannelId,
       roles: [
-        { id: 'role-admin-' + reelmId, name: 'Admin', color: '#f87171', position: 0, permissions: { manageReelm: true } },
-        { id: 'role-member-' + reelmId, name: 'Member', color: '#60a5fa', position: 1, permissions: {} },
+        { id: 'role-admin', name: 'Admin', color: '#f87171', position: 0, permissions: { manageReelm: true } },
+        { id: 'role-members', name: 'Members', color: '#60a5fa', position: 1, permissions: {} },
       ],
-      members: [{ userId: uid, userName: currentUser.name, userPhoto: currentUser.photo || null, roleIds: ['role-admin-' + reelmId] }],
+      members: [{ userId: uid, userName: currentUser.name, userPhoto: currentUser.photo || null, roleIds: ['role-admin'] }],
       categories,
     }
   }
@@ -10424,8 +10460,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const renderReelmMembersPanel = (panelKey = 'reelm') => {
     if (!selectedReelm) return null
-    const members = selectedReelm.members || []
-    if (members.length === 0) return null
+    const members = Array.isArray(selectedReelm.members) ? selectedReelm.members : []
     const presence = reelmPresence[selectedReelm.id] || {}
     const { groups, getMemberPresence, getMemberStatus } = buildReelmMemberGroupsClient({
       reelm: selectedReelm,
@@ -10482,7 +10517,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       <div className="rp-members-panel">
         <span className="rp-members-header">In this Reelm</span>
         {selectedMemberDock && <div className="rp-member-profile-dock">{selectedMemberDock}</div>}
-        {groups.map(group => {
+        {members.length === 0 && (
+          <div className="rp-members-empty">{reelmLoading ? 'Members loading…' : 'No visible members yet.'}</div>
+        )}
+        {members.length > 0 && groups.map(group => {
           const list = group.noRole && group.members.length > 18 && rightPanelNoRoleSearch.trim()
             ? group.members.filter(m => String((getMemberPresence(m).userName || m.userName || '')).toLowerCase().includes(rightPanelNoRoleSearch.trim().toLowerCase()))
             : group.members
@@ -13011,14 +13049,22 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               <div className="panel panel-middle discover-panel">
                 {(() => {
                   const q = discoverQuery.trim().toLowerCase()
+                  const debouncedQ = debouncedDiscoverQuery.trim().toLowerCase()
+                  const activeRemoteQuery = String(discoverRemoteQuery || '').trim().toLowerCase()
+                  const remoteIsCurrent = activeRemoteQuery === q && q.length >= 2
+                  const isWaitingForDebounce = Boolean(q && q.length >= 2 && q !== debouncedQ)
+                  const isSearching = isWaitingForDebounce || Boolean(q && q.length >= 2 && discoverSearchState.loading && String(discoverSearchState.query || '').trim().toLowerCase() === debouncedQ)
                   const joinedReelmIds = new Set((reelms || []).map(r => String(r.id)))
-                  const publicReelms = (discoverReelmsList || []).filter(r => !joinedReelmIds.has(String(r.id)))
-                  const results = q ? [
+                  const publicReelms = remoteIsCurrent ? (discoverReelmsList || []).filter(r => !joinedReelmIds.has(String(r.id))) : []
+                  const localResults = q ? [
                     ...reelms.filter(r => r.name?.toLowerCase().includes(q)).map(r => ({ ...r, _type: 'reelm', joined: true })),
-                    ...publicReelms.map(r => ({ ...r, _type: 'reelm', joined: false })),
                     ...chats.filter(c => c.name?.toLowerCase().includes(q)).map(c => ({ ...c, _type: 'chat' })),
-                    ...discoverUsers.map(u => ({ ...u, _type: 'user' })),
                   ] : []
+                  const remoteResults = q ? [
+                    ...publicReelms.map(r => ({ ...r, _type: 'reelm', joined: false })),
+                    ...(remoteIsCurrent ? discoverUsers : []).map(u => ({ ...u, _type: 'user' })),
+                  ] : []
+                  const results = [...localResults, ...remoteResults]
                   return (
                     <>
                       <button className="discover-back-btn" onClick={() => { setShowDiscover(false); setShowFeed(true) }}>
@@ -13052,7 +13098,19 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         {!q && (
                           <p className="discover-empty">Start typing to search across Reelms, chats and people.</p>
                         )}
-                        {q && results.length === 0 && (
+                        {q && q.length < 2 && (
+                          <p className="discover-empty">Type at least 2 characters to search people and public Reelms.</p>
+                        )}
+                        {q && q.length >= 2 && isSearching && (
+                          <div className="discover-search-status" role="status" aria-live="polite">
+                            <span className="discover-spinner" aria-hidden="true" />
+                            <span>{results.length ? `Still searching for "${discoverQuery.trim()}"… showing current matches.` : `Searching for "${discoverQuery.trim()}"…`}</span>
+                          </div>
+                        )}
+                        {q && q.length >= 2 && !isSearching && discoverSearchState.error && (
+                          <p className="discover-empty">Search could not refresh. Try again.</p>
+                        )}
+                        {q && q.length >= 2 && results.length === 0 && !isSearching && !discoverSearchState.error && (
                           <p className="discover-empty">No results for "{discoverQuery}"</p>
                         )}
                         {results.map((item, i) => (

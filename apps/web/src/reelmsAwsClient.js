@@ -43,6 +43,7 @@ function requestCacheTtl(path, method) {
   if (method !== 'GET') return 0
   if (path === '/api/v1/user/bootstrap') return 1000
   if (path.startsWith('/api/v1/user/profile/')) return 5 * 60 * 1000
+  if (path.startsWith('/api/v1/discovery/search')) return 30 * 1000
   if (path.startsWith('/api/v1/users')) return 30 * 1000
   if (path.startsWith('/api/v1/reelms/discover')) return 20 * 1000
   if (path.startsWith('/api/v1/user/doc/reelms')) return 10 * 1000
@@ -665,10 +666,20 @@ export async function userCheckEmail(email) {
   return { available: Boolean(j?.available), exists: Boolean(j?.exists ?? !j?.available) }
 }
 
-export async function usersList(query = '') {
+export async function usersList(query = '', opts = {}) {
   const q = encodeURIComponent(String(query || '').trim())
-  const j = await api(`/api/v1/users${q ? `?q=${q}` : ''}`)
+  const j = await api(`/api/v1/users${q ? `?q=${q}` : ''}`, opts)
   return j.data || []
+}
+
+export async function discoverySearch(query = '', opts = {}) {
+  const q = encodeURIComponent(String(query || '').trim())
+  const j = await api(`/api/v1/discovery/search${q ? `?q=${q}` : ''}`, opts)
+  const data = j?.data || {}
+  return {
+    users: Array.isArray(data.users) ? data.users : [],
+    reelms: Array.isArray(data.reelms) ? data.reelms : [],
+  }
 }
 
 // ── Messages ──────────────────────────────────────────────────────────────────
@@ -749,9 +760,9 @@ export async function adminAllReelms() {
   return j.data || []
 }
 
-export async function discoverReelms(query = '') {
+export async function discoverReelms(query = '', opts = {}) {
   const q = encodeURIComponent(String(query || '').trim())
-  const j = await api(`/api/v1/reelms/discover${q ? `?q=${q}` : ''}`)
+  const j = await api(`/api/v1/reelms/discover${q ? `?q=${q}` : ''}`, opts)
   return j?.data || []
 }
 
