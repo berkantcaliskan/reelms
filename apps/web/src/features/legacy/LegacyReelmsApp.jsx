@@ -6258,6 +6258,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const selectedChannelRef = useRef(null)
   const selectedChatRef = useRef(null)
   const [reelmLoading, setReelmLoading] = useState(false)
+  const reelmCoreSelectSeqRef = useRef(0)
 
   // Instant local cache: prevents the Reelm bar/home list from looking empty while the API/bootstrap round-trip completes.
   useEffect(() => {
@@ -6302,6 +6303,21 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [openCategoryMenu, setOpenCategoryMenu] = useState(null)
   const [selectedChannel, setSelectedChannel] = useState(null)
   useEffect(() => { selectedReelmRef.current = selectedReelm }, [selectedReelm])
+  useEffect(() => {
+    const id = selectedReelm?.id
+    if (!id || selectedReelm?.__coreHydrated || selectedReelm?.coreHydrated || selectedReelm?.__coreHydrating) return undefined
+    if (Array.isArray(selectedReelm?.members) && selectedReelm.members.length > 0) return undefined
+    let cancelled = false
+    const selectSeq = ++reelmCoreSelectSeqRef.current
+    setReelmLoading(true)
+    setSelectedReelm(prev => String(prev?.id || '') === String(id) ? { ...prev, __coreHydrating: true } : prev)
+    hydrateReelmCore(id).then(core => {
+      if (!cancelled && core?.id && reelmCoreSelectSeqRef.current === selectSeq) mergeReelmIntoState({ ...core, __coreHydrated: true })
+    }).catch(() => {}).finally(() => {
+      if (!cancelled && reelmCoreSelectSeqRef.current === selectSeq) setReelmLoading(false)
+    })
+    return () => { cancelled = true }
+  }, [selectedReelm?.id])
   useEffect(() => { selectedChannelRef.current = selectedChannel }, [selectedChannel])
   const [lastChannels, setLastChannels] = useState({})
   const [sessionsList, setSessionsList] = useState([])
@@ -7447,22 +7463,36 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }
 
   const handleSelectReelm = (reelm) => {
-    setSelectedReelm(reelm)
+    if (!reelm?.id) {
+      setSelectedReelm(reelm || null)
+      setReelmLoading(false)
+      return
+    }
+
+    const id = String(reelm.id)
+    const cached = reelmsRef.current.find(r => String(r?.id || '') === id)
+    const initial = cached ? { ...reelm, ...cached } : reelm
+    const hasUsableMemberSnapshot = Array.isArray(initial?.members) && initial.members.length > 0
+    const hasHydratedCore = Boolean(initial?.__coreHydrated || initial?.coreHydrated || hasUsableMemberSnapshot)
+    const selectSeq = ++reelmCoreSelectSeqRef.current
+
+    setSelectedReelm(hasHydratedCore ? initial : { ...initial, __coreHydrating: true })
     setSelectedChat(null)
     setShowDiscover(false)
     setShowFriendsPanel(false)
     setShowSettings(false)
     setShowChatList(false)
-    const hasMemberSnapshot = Array.isArray(reelm?.members) && reelm.members.length > 0 && Array.isArray(reelm?.roles) && reelm.roles.length > 0
-    setReelmLoading(!hasMemberSnapshot)
-    if (reelm?.id) {
-      hydrateReelmCore(reelm.id).then((core) => {
-        if (core?.id) mergeReelmIntoState(core)
-      }).catch(() => {}).finally(() => setReelmLoading(false))
-      setTimeout(() => setReelmLoading(false), 1200)
-    } else {
-      setTimeout(() => setReelmLoading(false), 350)
-    }
+    setReelmLoading(!hasHydratedCore)
+
+    hydrateReelmCore(id).then((core) => {
+      if (!core?.id || reelmCoreSelectSeqRef.current !== selectSeq) return
+      mergeReelmIntoState({ ...core, __coreHydrated: true })
+    }).catch(() => {
+      // Keep the cached/previous selected Reelm visible. Do not show a false empty state.
+    }).finally(() => {
+      if (reelmCoreSelectSeqRef.current === selectSeq) setReelmLoading(false)
+    })
+
     if (reelmLandingView === 'feed') {
       setShowFeed(true)
       setFeedTab('feed')
@@ -7480,7 +7510,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       if (type === 'reelm') {
         const code = String(value).toUpperCase()
         const found = reelms.find(r => r.code === code)
-        if (found) { setSelectedReelm(found); setShowFeed(false) }
+        if (found) { handleSelectReelm(found); setShowFeed(false) }
         else {
           // Not in user's list — show join modal pre-filled
           setJoinCodeInput(code)
@@ -7505,7 +7535,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           }
           if (foundChannel) break
         }
-        if (foundReelm && foundChannel) { setSelectedReelm(foundReelm); setSelectedChannel(foundChannel); setShowFeed(false) }
+        if (foundReelm && foundChannel) { handleSelectReelm(foundReelm); setSelectedChannel(foundChannel); setShowFeed(false) }
       } else if (type === 'post') {
         setShowFeed(true)
         setSelectedReelm(null)
@@ -7675,11 +7705,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     } else if (link.type === 'reelm') {
       const r = reelmsRef.current.find(x => String(x.id) === String(link.reelmId))
       if (r) {
-        setSelectedReelm(r)
-        setSelectedChat(null)
+        handleSelectReelm(r)
         setShowChatList(false)
         setShowFeed(false)
-        setShowDiscover(false)
         if (link.channelId) {
           const ch = r.categories?.flatMap(c => c.channels || []).find(c => String(c.id) === String(link.channelId))
           if (ch) {
@@ -7692,21 +7720,17 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     } else if (link.type === 'reelm_join_requests') {
       const r = reelmsRef.current.find(x => String(x.id) === String(link.reelmId))
       if (r) {
-        setSelectedReelm(r)
-        setSelectedChat(null)
+        handleSelectReelm(r)
         setShowChatList(false)
         setShowFeed(false)
-        setShowDiscover(false)
         setShowReelmSettings(true)
       }
     } else if (link.type === 'reelm_invite') {
       const r = reelmsRef.current.find(x => String(x.id) === String(link.reelmId))
       if (r) {
-        setSelectedReelm(r)
-        setSelectedChat(null)
+        handleSelectReelm(r)
         setShowChatList(false)
         setShowFeed(false)
-        setShowDiscover(false)
       } else {
         addNotification('Use Accept or Decline on the invite notification.')
       }
@@ -7733,9 +7757,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     try {
       const result = await acceptReelmInvite(reelmId)
       if (result?.reelm) {
-        mergeReelmIntoState(result.reelm, { persist: true })
-        setSelectedReelm(result.reelm)
-        setSelectedChat(null)
+        mergeReelmIntoState({ ...result.reelm, __coreHydrated: true }, { persist: true })
+        handleSelectReelm(result.reelm)
         setShowChatList(false)
         addNotification(`Joined ${result.reelm.name || 'Reelm'}.`)
       } else if (result?.pending) {
@@ -9430,7 +9453,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (!reelmId) return null
     try {
       const core = await reelmGetCore(reelmId)
-      if (core?.id) return { ...core, joined: core.joined !== false }
+      if (core?.id) return { ...core, joined: core.joined !== false, __coreHydrated: true, __coreHydrating: false }
     } catch (_) {}
     // Do not fall back to the old fan-out of meta/structure/roles/members/
     // moderation docs. That legacy path was the source of 20-90 second request
@@ -9571,9 +9594,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       scheduleUserPersist('reelms', next)
       return next
     })
-    setSelectedReelm(newReelm)
+    handleSelectReelm({ ...newReelm, __coreHydrated: true })
     socketJoinReelm(newReelm.id)
-    setSelectedChat(null)
     setReelmNameInput('')
     setSelectedTemplateId(null)
     setCreateReelmStep(null)
@@ -9733,9 +9755,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (!code) return
     const existing = reelms.find(r => String(r.code || '').toUpperCase() === code)
     if (existing) {
-      setSelectedReelm(existing)
+      handleSelectReelm(existing)
       socketJoinReelm(existing.id)
-      setSelectedChat(null)
       setCreateReelmStep(null)
       setShowMenu(false)
       return
@@ -9776,9 +9797,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         scheduleUserPersist('reelms', next)
         return next
       })
-      setSelectedReelm(newReelm)
+      handleSelectReelm(newReelm)
       socketJoinReelm(newReelm.id)
-      setSelectedChat(null)
       setCreateReelmStep(null)
       setShowMenu(false)
     } catch (err) {
@@ -10513,12 +10533,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       )
     }
     const selectedMemberDock = friendProfileTarget?.serverContext === 'reelm' ? renderFriendProfileSurface(true) : null
+    const panelLoadingMembers = members.length === 0 && (reelmLoading || selectedReelm?.__coreHydrating || !selectedReelm?.__coreHydrated)
     return (
       <div className="rp-members-panel">
         <span className="rp-members-header">In this Reelm</span>
         {selectedMemberDock && <div className="rp-member-profile-dock">{selectedMemberDock}</div>}
-        {members.length === 0 && (
-          <div className="rp-members-empty">{reelmLoading ? 'Members loading…' : 'No visible members yet.'}</div>
+        {members.length === 0 && panelLoadingMembers && (
+          <div className="rp-members-empty rp-members-empty--spinner" aria-label="Loading members"><span /></div>
         )}
         {members.length > 0 && groups.map(group => {
           const list = group.noRole && group.members.length > 18 && rightPanelNoRoleSearch.trim()
@@ -10658,8 +10679,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           className={'bar-item bar-item--' + item.itemType + (isDefaultCommunity(item) ? ' bar-item--community-root' : '') + (item.itemType === 'reelm' && mutedReelmIds.map(String).includes(String(item.id)) ? ' bar-item--muted' : '') + (item.itemType === 'chat' && item.type === 'dm' && isUserActive(item.friendId) ? ' bar-item--online' : '') + ((item.itemType === 'reelm' ? selectedReelm?.id : selectedChat?.id) === item.id ? ' bar-item-active' : '')}
                           onClick={() => {
                             if (item.itemType !== 'reelm') clearUnread(item.id)
-                            if (item.itemType === 'reelm') { setSelectedReelm(item); setSelectedChat(null); setShowDiscover(false); setShowFriendsPanel(false); setShowSettings(false); setReelmLoading(true); setTimeout(() => setReelmLoading(false), 350) }
-                            else { setSelectedChat(item); setSelectedReelm(null); setSelectedChannel(null); setShowDiscover(false); setShowFriendsPanel(false); setShowSettings(false) }
+                            if (item.itemType === 'reelm') { handleSelectReelm(item) }
+                            else { setReelmLoading(false); setSelectedChat(item); setSelectedReelm(null); setSelectedChannel(null); setShowDiscover(false); setShowFriendsPanel(false); setShowSettings(false) }
                           }}
                           onContextMenu={(e) => { e.preventDefault(); setBarCtxMenu({ x: e.clientX, y: e.clientY, item }) }}
                           title={item.name}
@@ -12019,7 +12040,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           if (!reelm) return
                           const ch = reelm.categories.flatMap(c => c.channels).find(c => c.id === voiceChannel.channelId)
                           if (!ch) return
-                          setSelectedReelm(reelm); setSelectedChannel(ch); setShowDiscover(false); setSelectedChat(null); setShowSettings(false)
+                          handleSelectReelm(reelm); setSelectedChannel(ch); setShowSettings(false)
                         }}
                         title="Go to voice channel"
                       >

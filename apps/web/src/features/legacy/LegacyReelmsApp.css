@@ -6432,6 +6432,29 @@ h6 {
   background: rgba(var(--ta-rgb), 0.1);
   margin: 6px 4px;
 }
+.rp-members-empty {
+  min-height: 74px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(var(--ta-rgb), 0.48);
+  font-size: 0.82rem;
+}
+.rp-members-empty--spinner {
+  color: transparent;
+}
+.rp-members-empty--spinner span {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(var(--ta-rgb), 0.16);
+  border-top-color: rgba(var(--ta-rgb), 0.75);
+  animation: rp-members-spin 0.72s linear infinite;
+  box-shadow: 0 0 18px rgba(var(--ta-rgb), 0.18);
+}
+@keyframes rp-members-spin {
+  to { transform: rotate(360deg); }
+}
 .rp-member-card {
   display: flex;
   align-items: center;
