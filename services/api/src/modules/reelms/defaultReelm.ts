@@ -94,6 +94,38 @@ function toClientReelm(meta: any, structure: any, roles: any[], members: any[]) 
   }
 }
 
+function toUserReelmSummary(reelm: any = {}) {
+  const members = Array.isArray(reelm?.members) ? reelm.members : []
+  return {
+    id: reelm.id,
+    code: reelm.code,
+    name: reelm.name,
+    ownerId: reelm.ownerId || null,
+    createdAt: reelm.createdAt || null,
+    updatedAt: reelm.updatedAt || null,
+    announcementChannelId: reelm.announcementChannelId || null,
+    image: reelm.image || null,
+    communityArtLocked: reelm.communityArtLocked === true,
+    joined: true,
+    isDefault: reelm.isDefault === true,
+    memberCount: Number.isFinite(Number(reelm.memberCount)) ? Number(reelm.memberCount) : members.length,
+    roles: Array.isArray(reelm.roles) ? reelm.roles.slice(0, 20) : [],
+    members: [],
+    categories: Array.isArray(reelm.categories) ? reelm.categories : []
+  }
+}
+
+function mergeSummaryPreserveOrder(current: any[] = [], entry: any) {
+  const list = Array.isArray(current) ? current.map(toUserReelmSummary) : []
+  const id = String(entry?.id || '')
+  if (!id) return list
+  const idx = list.findIndex((r) => String(r?.id || '') === id)
+  if (idx < 0) return [...list, entry]
+  const next = [...list]
+  next[idx] = { ...next[idx], ...entry }
+  return next
+}
+
 async function syncDefaultCommunityCopies() {
   const pk = reelmPk(DEFAULT_REELM_ID)
   const meta = await getDoc<any>(pk, 'meta')
@@ -101,14 +133,14 @@ async function syncDefaultCommunityCopies() {
   const roles = (await getDoc<any[]>(pk, 'roles').catch(() => [])) || []
   const structure = (await getDoc<any>(pk, 'structure').catch(() => null)) || defaultStructure()
   const members = (await getDoc<any[]>(pk, 'members').catch(() => [])) || []
-  const full = toClientReelm(meta, structure, roles, members)
+  const full = toUserReelmSummary(toClientReelm(meta, structure, roles, members))
 
   await Promise.all(members.map(async (member) => {
     if (!member?.userId) return
     const upk = userPk(String(member.userId))
     const current = (await getDoc<any[]>(upk, 'reelms').catch(() => [])) || []
-    const next = [full, ...current.filter((r) => String(r?.id) !== DEFAULT_REELM_ID)]
-    await putDoc(upk, 'reelms', next)
+    const next = mergeSummaryPreserveOrder(current, full)
+    if (JSON.stringify(current || []) !== JSON.stringify(next)) await putDoc(upk, 'reelms', next)
   }))
 }
 
@@ -196,16 +228,17 @@ async function ensureConfiguredCommunityAdmins() {
     nextMembers = [member, ...nextMembers.filter((item) => String(item?.userId) !== String(uid))]
     if (!existing || JSON.stringify(existing) !== JSON.stringify(member)) changed = true
 
-    await putDoc(userPk(uid), 'joined_default_reelm', true).catch(() => { })
-    await putDoc(userPk(uid), 'left_default_reelm', false).catch(() => { })
+    await putDoc(userPk(uid), 'joined_default_reelm', true).catch(() => {})
+    await putDoc(userPk(uid), 'left_default_reelm', false).catch(() => {})
   }
 
   if (changed) await putDoc(pk, 'members', nextMembers)
 
-  const full = toClientReelm(meta, structure || defaultStructure(), roles, nextMembers)
+  const full = toUserReelmSummary(toClientReelm(meta, structure || defaultStructure(), roles, nextMembers))
   await Promise.all(adminUids.map(async (uid) => {
     const current = (await getDoc<any[]>(userPk(uid), 'reelms').catch(() => [])) || []
-    await putDoc(userPk(uid), 'reelms', [full, ...current.filter((r) => String(r?.id) !== DEFAULT_REELM_ID)])
+    const next = mergeSummaryPreserveOrder(current, full)
+    if (JSON.stringify(current || []) !== JSON.stringify(next)) await putDoc(userPk(uid), 'reelms', next)
   }))
 }
 
@@ -214,19 +247,19 @@ async function ensureDefaultReelmInternal() {
   const existingMeta = await getDoc<any>(pk, 'meta')
   const meta = existingMeta
     ? {
-      ...existingMeta,
-      id: DEFAULT_REELM_ID,
-      code: 'REELMS',
-      name: 'Reelms Community',
-      isDefault: true,
-      announcementChannelId: existingMeta.announcementChannelId || 'ch-rc-welcome',
-      image: existingMeta.image || null,
-      communityArtLocked: existingMeta.communityArtLocked === true,
-      updatedAt: existingMeta.updatedAt || Date.now()
-    }
+        ...existingMeta,
+        id: DEFAULT_REELM_ID,
+        code: 'REELMS',
+        name: 'Reelms Community',
+        isDefault: true,
+        announcementChannelId: existingMeta.announcementChannelId || 'ch-rc-welcome',
+        image: existingMeta.image || null,
+        communityArtLocked: existingMeta.communityArtLocked === true,
+        updatedAt: existingMeta.updatedAt || Date.now()
+      }
     : defaultMeta()
   if (!existingMeta || JSON.stringify(existingMeta) !== JSON.stringify(meta)) await putDoc(pk, 'meta', meta)
-  await putDocIfAbsent('REELM_CODE#REELMS', 'id', DEFAULT_REELM_ID).catch(() => { })
+  await putDocIfAbsent('REELM_CODE#REELMS', 'id', DEFAULT_REELM_ID).catch(() => {})
 
   await ensureDefaultRoles()
 
@@ -249,7 +282,7 @@ async function ensureDefaultReelmInternal() {
   const existingMembers = await getDoc<any[]>(pk, 'members').catch(() => null)
   if (!Array.isArray(existingMembers)) await putDoc(pk, 'members', [])
 
-  await ensureConfiguredCommunityAdmins().catch(() => { })
+  await ensureConfiguredCommunityAdmins().catch(() => {})
 }
 
 export async function ensureDefaultReelm(options: { force?: boolean } = {}) {
@@ -311,12 +344,15 @@ export async function autoJoinDefaultReelm(uid: string, name?: string, photo?: s
       ? normalizeRoleIdsForCommunityAdmin(existingRoleIds, adminRole?.id ? String(adminRole.id) : '')
       : (existingRoleIds.length ? existingRoleIds : citizenRoleIds)
   }
-  const nextMembers = [member, ...members.filter((m) => String(m.userId) !== String(uid))]
-  await putDoc(pk, 'members', nextMembers)
+  const nextMembers = existing
+    ? members.map((m) => String(m.userId) === String(uid) ? member : m)
+    : [...members, member]
+  if (!existing || JSON.stringify(existing) !== JSON.stringify(member)) await putDoc(pk, 'members', nextMembers)
 
-  const reelmEntry = toClientReelm(meta, structure, roles, nextMembers)
+  const reelmEntry = toUserReelmSummary(toClientReelm(meta, structure, roles, nextMembers))
   const userReelms = (await getDoc<any[]>(userPk(uid), 'reelms')) || []
-  await putDoc(userPk(uid), 'reelms', [reelmEntry, ...userReelms.filter((r) => String(r?.id) !== DEFAULT_REELM_ID)])
+  const nextUserReelms = mergeSummaryPreserveOrder(userReelms, reelmEntry)
+  if (JSON.stringify(userReelms || []) !== JSON.stringify(nextUserReelms)) await putDoc(userPk(uid), 'reelms', nextUserReelms)
   await putDoc(userPk(uid), 'joined_default_reelm', true)
   await putDoc(userPk(uid), 'left_default_reelm', false)
   // Do not sync every member copy on every login/profile refresh. That made login

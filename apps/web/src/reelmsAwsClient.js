@@ -45,9 +45,11 @@ function requestCacheTtl(path, method) {
   if (path.startsWith('/api/v1/user/profile/')) return 5 * 60 * 1000
   if (path.startsWith('/api/v1/users')) return 30 * 1000
   if (path.startsWith('/api/v1/reelms/discover')) return 20 * 1000
-  if (path.startsWith('/api/v1/user/doc/')) return 1500
-  if (path.startsWith('/api/v1/reelm/') && path.endsWith('/core')) return 1200
-  if (path.startsWith('/api/v1/reelm/') && path.includes('/doc/')) return 1200
+  if (path.startsWith('/api/v1/user/doc/reelms')) return 10 * 1000
+  if (path.startsWith('/api/v1/user/doc/customization') || path.startsWith('/api/v1/user/doc/bg_image') || path.startsWith('/api/v1/user/doc/body_font') || path.startsWith('/api/v1/user/doc/environment')) return 60 * 1000
+  if (path.startsWith('/api/v1/user/doc/')) return 8 * 1000
+  if (path.startsWith('/api/v1/reelm/') && path.endsWith('/core')) return 5 * 1000
+  if (path.startsWith('/api/v1/reelm/') && path.includes('/doc/')) return 5 * 1000
   return 0
 }
 
@@ -55,6 +57,14 @@ function rememberUserDoc(sk, data) {
   if (!sk) return
   userDocCache.set(String(sk), { data, at: Date.now() })
   userPersistLastJson.set(String(sk), stableJson(data))
+}
+
+function userDocCacheTtl(sk) {
+  const key = String(sk || '')
+  if (['customization', 'bg_image', 'body_font', 'environment'].includes(key)) return 10 * 60 * 1000
+  if (key === 'reelms') return 60 * 1000
+  if (['chats', 'friends', 'friend_requests', 'notifications', 'message_requests', 'unread_counts'].includes(key)) return 15 * 1000
+  return 1200
 }
 
 async function parseApiResponse(r) {
@@ -162,7 +172,7 @@ export async function userBootstrap() {
 export async function userGetDoc(sk) {
   const key = String(sk || '')
   const cached = userDocCache.get(key)
-  if (cached && Date.now() - cached.at < 1200) return cached.data
+  if (cached && Date.now() - cached.at < userDocCacheTtl(key)) return cached.data
   const j = await api(`/api/v1/user/doc/${encodeURIComponent(key)}`)
   rememberUserDoc(key, j.data)
   return j.data
@@ -178,9 +188,36 @@ export async function userPutDoc(sk, data) {
   userPersistPendingJson.delete(key)
 }
 
+const CORE_DOC_FIELDS = new Set(['meta', 'structure', 'roles', 'members', 'join_requests', 'ban_list', 'timeout_list'])
+
+function docFromCore(core, sk) {
+  if (!core) return undefined
+  if (sk === 'meta') {
+    const { roles, members, categories, joinRequests, banList, timeoutList, ...meta } = core
+    return meta
+  }
+  if (sk === 'structure') return { categories: Array.isArray(core.categories) ? core.categories : [] }
+  if (sk === 'roles') return Array.isArray(core.roles) ? core.roles : []
+  if (sk === 'members') return Array.isArray(core.members) ? core.members : []
+  if (sk === 'join_requests') return Array.isArray(core.joinRequests) ? core.joinRequests : []
+  if (sk === 'ban_list') return Array.isArray(core.banList) ? core.banList : []
+  if (sk === 'timeout_list') return Array.isArray(core.timeoutList) ? core.timeoutList : []
+  return undefined
+}
+
 export async function reelmGetDoc(reelmId, sk) {
   const id = reelmId || 'global'
-  const j = await api(`/api/v1/reelm/${encodeURIComponent(id)}/doc/${encodeURIComponent(sk)}`)
+  const key = String(sk || '')
+  if (CORE_DOC_FIELDS.has(key)) {
+    const core = await reelmGetCore(id).catch((err) => {
+      if (err?.status === 403) return null
+      throw err
+    })
+    const value = docFromCore(core, key)
+    if (typeof value !== 'undefined') return value
+    if (key === 'join_requests' || key === 'ban_list' || key === 'timeout_list') return []
+  }
+  const j = await api(`/api/v1/reelm/${encodeURIComponent(id)}/doc/${encodeURIComponent(key)}`)
   return j.data
 }
 

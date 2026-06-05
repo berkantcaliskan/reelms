@@ -840,9 +840,9 @@ function EnvironmentPanel({ uid }) {
     if (!uid || uid === 'guest') return undefined
     let cancel = false
     const timer = setTimeout(() => {
-      if (cancel || bootstrapHydratedRef.current) return
+      if (cancel) return
       userGetDoc('environment').then((d) => {
-        if (cancel || bootstrapHydratedRef.current) return
+        if (cancel) return
         setEnv(d && typeof d === 'object' ? d : {})
       }).catch(() => {})
     }, 1200)
@@ -5884,6 +5884,30 @@ function sameDocValue(a, b) {
   return stableDocKey(a) === stableDocKey(b)
 }
 
+function mergeReelmListsPreserveOrder(prevList = [], incomingList = [], options = {}) {
+  const prev = Array.isArray(prevList) ? prevList : []
+  const incoming = Array.isArray(incomingList) ? incomingList.filter(r => r && r.id) : []
+  const incomingById = new Map(incoming.map(r => [String(r.id), r]))
+  const used = new Set()
+  const merged = []
+  for (const old of prev) {
+    const id = String(old?.id || '')
+    if (!id) continue
+    const fresh = incomingById.get(id)
+    if (fresh) {
+      used.add(id)
+      merged.push({ ...old, ...fresh })
+    } else if (!options.removeMissing) {
+      merged.push(old)
+    }
+  }
+  for (const fresh of incoming) {
+    const id = String(fresh?.id || '')
+    if (id && !used.has(id) && !merged.some(r => String(r?.id || '') === id)) merged.push(fresh)
+  }
+  return merged
+}
+
 function sameMessageList(a, b) {
   const left = dedupeMessagesForRender(a)
   const right = dedupeMessagesForRender(b)
@@ -6032,10 +6056,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     } catch {}
     // Bootstrap carries these docs. Only run this slower fallback if bootstrap did not land.
     const timer = setTimeout(() => {
-      if (cancel || bootstrapHydratedRef.current) return
+      if (cancel || bootstrapHydratedRef.current || bootstrapPendingRef.current) return
       Promise.all([userGetDoc('customization'), userGetDoc('bg_image'), userGetDoc('body_font')])
         .then(([cust, bg, bf]) => {
-          if (cancel || bootstrapHydratedRef.current) return
+          if (cancel || bootstrapHydratedRef.current || bootstrapPendingRef.current) return
           const base = cust && typeof cust === 'object' ? cust : {}
           const nextCustomization = {
             ...DEFAULT_CUSTOMIZATION,
@@ -6056,9 +6080,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (!uid || uid === 'guest') return undefined
     let cancel = false
     const timer = setTimeout(() => {
-      if (cancel || bootstrapHydratedRef.current) return
+      if (cancel || bootstrapHydratedRef.current || bootstrapPendingRef.current) return
       userGetDoc('environment').then((d) => {
-        if (cancel || bootstrapHydratedRef.current) return
+        if (cancel || bootstrapHydratedRef.current || bootstrapPendingRef.current) return
         setEnv(d && typeof d === 'object' ? d : {})
       }).catch(() => {})
     }, 1200)
@@ -6215,16 +6239,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (!uid || uid === 'guest') return undefined
     let cancel = false
     const timer = setTimeout(() => {
-      if (cancel || bootstrapHydratedRef.current) return
+      if (cancel || bootstrapHydratedRef.current || bootstrapPendingRef.current) return
       if (currentUser?.isModerator) {
         adminAllReelms()
           .then(all => { if (!cancel && all.length > 0) setReelms(all.map(r => ({ ...r, _godMode: true }))) })
           .catch(() => {
             if (cancel) return
-            userGetDoc('reelms').then(v => { if (!cancel && Array.isArray(v)) setReelms(v) }).catch(() => {})
+            userGetDoc('reelms').then(v => { if (!cancel && Array.isArray(v)) setReelms(prev => mergeReelmListsPreserveOrder(prev, v, { removeMissing: false })) }).catch(() => {})
           })
       } else {
-        userGetDoc('reelms').then(v => { if (!cancel && Array.isArray(v)) setReelms(v) }).catch(() => {})
+        userGetDoc('reelms').then(v => { if (!cancel && Array.isArray(v)) setReelms(prev => mergeReelmListsPreserveOrder(prev, v, { removeMissing: false })) }).catch(() => {})
         userGetDoc('chats').then(v => { if (!cancel && Array.isArray(v)) { setChats(v); v.forEach(c => { if (c.id) socketJoinChannel(c.id) }) } }).catch(() => {})
       }
     }, 1300)
@@ -6428,6 +6452,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [helpStatus, setHelpStatus] = useState('idle')
   const soundPrevRef = useRef({ notifs: -1, friendReqs: -1, friends: -1 })
   const bootstrapHydratedRef = useRef(false)
+  const bootstrapPendingRef = useRef(false)
   const bootstrapLastAppliedAtRef = useRef(0)
   const reconnectSyncTimerRef = useRef(null)
   const activeMsgKeyRef = useRef(null)
@@ -6664,7 +6689,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (!uid || uid === 'guest') return undefined
     let cancel = false
     bootstrapHydratedRef.current = false
+    bootstrapPendingRef.current = true
     userBootstrap().then((data) => {
+      bootstrapPendingRef.current = false
       if (cancel || !data) return
       if (Array.isArray(data.friends)) setFriends(data.friends)
       if (Array.isArray(data.friend_requests)) setFriendRequests(data.friend_requests)
@@ -6709,7 +6736,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       if (data.spotify_connected === true || data.spotify_connected === 'true') setSpotifyConnected(true)
       if (data.last_channels && typeof data.last_channels === 'object') setLastChannels(data.last_channels)
       if (Array.isArray(data.sessions)) setSessionsList(data.sessions)
-      if (Array.isArray(data.reelms)) setReelms(data.reelms)
+      if (Array.isArray(data.reelms)) setReelms(prev => mergeReelmListsPreserveOrder(prev, data.reelms, { removeMissing: false }))
       if (Array.isArray(data.chats)) { setChats(data.chats); data.chats.forEach(c => { if (c?.id) socketJoinChannel(c.id) }) }
       if (data.sounds && typeof data.sounds === 'object') setSoundSettings(s => ({ ...s, ...data.sounds }))
       soundPrevRef.current = {
@@ -6719,8 +6746,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       }
       bootstrapHydratedRef.current = true
       bootstrapLastAppliedAtRef.current = Date.now()
-    }).catch(() => { bootstrapHydratedRef.current = false })
-    return () => { cancel = true }
+    }).catch(() => { bootstrapHydratedRef.current = false; bootstrapPendingRef.current = false })
+    return () => { cancel = true; bootstrapPendingRef.current = false }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid])
 
@@ -6782,12 +6809,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             if (!Array.isArray(next.timeoutList) && Array.isArray(existing.timeoutList)) next.timeoutList = existing.timeoutList
             return next
           })
-          const currentSelectedId = String(selectedReelmRef.current?.id || '')
-          const allowedIds = new Set(serverReelms.map(r => String(r?.id || '')).filter(Boolean))
-          const nextReelms = currentSelectedId && !allowedIds.has(currentSelectedId) && selectedReelmRef.current
-            ? [selectedReelmRef.current, ...serverReelms]
-            : serverReelms
-          // Do not kick the UI out of a Reelm only because a stale user/reelms copy missed it.
+          const currentSelected = selectedReelmRef.current
+          const mergedServer = mergeReelmListsPreserveOrder(reelmsRef.current, serverReelms, { removeMissing: false })
+          const nextReelms = currentSelected && !mergedServer.some(r => String(r?.id || '') === String(currentSelected.id || ''))
+            ? mergeReelmListsPreserveOrder(mergedServer, [currentSelected], { removeMissing: false })
+            : mergedServer
+          // Do not reorder/kick the UI out of a Reelm only because a stale user/reelms copy changed.
           // Real removals are handled by explicit access-revoked / banned / closed socket events.
           setReelms(prev => sameDocValue(prev, nextReelms) ? prev : nextReelms)
         }
@@ -7184,16 +7211,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       onConnect: () => {
         // One throttled bootstrap refresh is much cheaper than 7 parallel doc GETs on every reconnect.
         const now = Date.now()
-        if (now - bootstrapLastAppliedAtRef.current < 5000) return
+        if (bootstrapPendingRef.current || now - bootstrapLastAppliedAtRef.current < 5000) return
         if (reconnectSyncTimerRef.current) clearTimeout(reconnectSyncTimerRef.current)
         reconnectSyncTimerRef.current = setTimeout(() => {
           reconnectSyncTimerRef.current = null
+          bootstrapPendingRef.current = true
           userBootstrap().then((data) => {
+            bootstrapPendingRef.current = false
             if (!data) return
             Object.entries(data).forEach(([sk, value]) => applyUserDoc(sk, value))
             bootstrapHydratedRef.current = true
             bootstrapLastAppliedAtRef.current = Date.now()
-          }).catch(() => {})
+          }).catch(() => { bootstrapPendingRef.current = false })
         }, 800)
       },
     })
@@ -9307,26 +9336,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       const core = await reelmGetCore(reelmId)
       if (core?.id) return { ...core, joined: core.joined !== false }
     } catch (_) {}
-    const [meta, structure, roles, members, joinRequests, banList, timeoutList] = await Promise.all([
-      reelmGetDoc(reelmId, 'meta').catch(() => null),
-      reelmGetDoc(reelmId, 'structure').catch(() => null),
-      reelmGetDoc(reelmId, 'roles').catch(() => []),
-      reelmGetDoc(reelmId, 'members').catch(() => []),
-      reelmGetDoc(reelmId, 'join_requests').catch(() => []),
-      reelmGetDoc(reelmId, 'ban_list').catch(() => []),
-      reelmGetDoc(reelmId, 'timeout_list').catch(() => []),
-    ])
-    if (!meta) return null
-    return {
-      ...meta,
-      roles: Array.isArray(roles) ? roles : [],
-      members: Array.isArray(members) ? members : [],
-      categories: Array.isArray(structure?.categories) ? structure.categories : [],
-      joinRequests: Array.isArray(joinRequests) ? joinRequests : [],
-      banList: Array.isArray(banList) ? banList : [],
-      timeoutList: Array.isArray(timeoutList) ? timeoutList : [],
-      joined: true,
-    }
+    // Do not fall back to the old fan-out of meta/structure/roles/members/
+    // moderation docs. That legacy path was the source of 20-90 second request
+    // storms under Supabase. The server emits core snapshots and exposes one
+    // core endpoint; if it fails, keep the current local state and retry later.
+    return null
   }
 
   const mergeReelmIntoState = (nextReelm, { persist = false } = {}) => {
@@ -9641,17 +9655,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         // Backward compatible fallback for older local APIs.
         const meta = await reelmByCode(code)
         if (meta?.id) {
-          const [structure, roles, members] = await Promise.all([
-            reelmGetDoc(meta.id, 'structure').catch(() => null),
-            reelmGetDoc(meta.id, 'roles').catch(() => []),
-            reelmGetDoc(meta.id, 'members').catch(() => []),
-          ])
-          newReelm = {
+          const core = await hydrateReelmCore(meta.id).catch(() => null)
+          newReelm = core || {
             ...meta,
-            roles: Array.isArray(roles) ? roles : [],
-            members: Array.isArray(members) ? members : [],
+            roles: [],
+            members: [],
             joined: true,
-            categories: structure?.categories || meta.categories || [
+            categories: meta.categories || [
               { id: 'cat-general', name: 'General', type: 'text', channels: [{ id: 'ch-general', name: 'general', type: 'text' }] },
             ],
           }
