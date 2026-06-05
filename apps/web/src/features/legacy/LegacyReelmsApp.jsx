@@ -93,6 +93,7 @@ import {
   appGetDoc,
   appPutDoc,
   reelmGetDoc,
+  reelmGetCore,
   reelmPutDoc,
   modInboxGet,
   modReportSend,
@@ -308,9 +309,7 @@ function SignInScreen({ onGoSignUp, onSignInSuccess }) {
         : await webSignIn(input, loginPassword.trim())
       const userData = await userProfileGetById(cred.user.uid)
       if (!userData) { setLoginError(t('user_profile_not_found')); setIsSigningIn(false); return }
-      try {
-        await recordUserSession(parseDeviceInfo, userData.notifyNewDevice)
-      } catch { /* noop */ }
+      recordUserSession(parseDeviceInfo, userData.notifyNewDevice).catch(() => {})
 
       if (userData.isModerator) {
         fetch(`${BACKEND_URL}/admin/mod-login`, {
@@ -838,13 +837,16 @@ function EnvironmentPanel({ uid }) {
   const t = useT()
   const [env, setEnv] = useState({})
   useEffect(() => {
-    if (!uid || uid === 'guest') return
+    if (!uid || uid === 'guest') return undefined
     let cancel = false
-    userGetDoc('environment').then((d) => {
-      if (cancel) return
-      setEnv(d && typeof d === 'object' ? d : {})
-    }).catch(() => {})
-    return () => { cancel = true }
+    const timer = setTimeout(() => {
+      if (cancel || bootstrapHydratedRef.current) return
+      userGetDoc('environment').then((d) => {
+        if (cancel || bootstrapHydratedRef.current) return
+        setEnv(d && typeof d === 'object' ? d : {})
+      }).catch(() => {})
+    }, 1200)
+    return () => { cancel = true; clearTimeout(timer) }
   }, [uid])
 
   const set = (key, value) => {
@@ -3064,17 +3066,18 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
   const [roleMemberSaving, setRoleMemberSaving] = useState(false)
   const [roleMemberStatus, setRoleMemberStatus] = useState('')
   const memberRemovalIntentRef = useRef(false)
+  const reelmRolesSignature = useMemo(() => JSON.stringify((reelm.roles || []).map(role => ({ id: role?.id, name: role?.name, color: role?.color, position: role?.position, permissions: role?.permissions }))), [reelm.roles])
+  const reelmMembersSignature = useMemo(() => JSON.stringify((reelm.members || []).map(member => ({ userId: member?.userId || member?.id, roleIds: member?.roleIds, userName: member?.userName || member?.name, userPhoto: member?.userPhoto || member?.photo }))), [reelm.members])
 
   useEffect(() => {
+    if (roleMemberDirty || roleMemberSaving) return
     setRoles((reelm.roles || []).map((role, i) => normalizeRoleForClient(role, `role-${i}`, true)))
     setMembers(reelm.members || [])
     setEditingRoleId(null)
     setAddingRole(false)
-    setRoleMemberDirty(false)
-    setRoleMemberSaving(false)
     setRoleMemberStatus('')
     memberRemovalIntentRef.current = false
-  }, [reelm.id])
+  }, [reelm.id, reelmRolesSignature, reelmMembersSignature, roleMemberDirty, roleMemberSaving])
 
   const ownerAge = useMemo(() => {
     return currentUser?.birthDate
@@ -6018,7 +6021,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const [customization, setCustomization] = useState(() => ({ ...DEFAULT_CUSTOMIZATION }))
   useEffect(() => {
-    if (!uid || uid === 'guest') return
+    if (!uid || uid === 'guest') return undefined
     let cancel = false
     try {
       const cached = localStorage.getItem(`reelms:customization:${uid}`)
@@ -6027,50 +6030,73 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         if (parsed && typeof parsed === 'object') setCustomization(prev => sameDocValue(prev, { ...DEFAULT_CUSTOMIZATION, ...parsed }) ? prev : { ...DEFAULT_CUSTOMIZATION, ...parsed })
       }
     } catch {}
-    Promise.all([userGetDoc('customization'), userGetDoc('bg_image'), userGetDoc('body_font')])
-      .then(([cust, bg, bf]) => {
-        if (cancel) return
-        const base = cust && typeof cust === 'object' ? cust : {}
-        const nextCustomization = {
-          ...DEFAULT_CUSTOMIZATION,
-          ...base,
-          bgImage: typeof bg === 'string' ? bg : (base.bgImage ?? null),
-        }
-        setCustomization(prev => sameDocValue(prev, nextCustomization) ? prev : nextCustomization)
-        try { localStorage.setItem(`reelms:customization:${uid}`, JSON.stringify(nextCustomization)) } catch {}
-        if (typeof bf === 'string' && bf) setBodyFont(prev => prev === bf ? prev : bf)
-      })
-      .catch(() => {})
-    return () => { cancel = true }
+    // Bootstrap carries these docs. Only run this slower fallback if bootstrap did not land.
+    const timer = setTimeout(() => {
+      if (cancel || bootstrapHydratedRef.current) return
+      Promise.all([userGetDoc('customization'), userGetDoc('bg_image'), userGetDoc('body_font')])
+        .then(([cust, bg, bf]) => {
+          if (cancel || bootstrapHydratedRef.current) return
+          const base = cust && typeof cust === 'object' ? cust : {}
+          const nextCustomization = {
+            ...DEFAULT_CUSTOMIZATION,
+            ...base,
+            bgImage: typeof bg === 'string' ? bg : (base.bgImage ?? null),
+          }
+          setCustomization(prev => sameDocValue(prev, nextCustomization) ? prev : nextCustomization)
+          try { localStorage.setItem(`reelms:customization:${uid}`, JSON.stringify(nextCustomization)) } catch {}
+          if (typeof bf === 'string' && bf) setBodyFont(prev => prev === bf ? prev : bf)
+        })
+        .catch(() => {})
+    }, 1200)
+    return () => { cancel = true; clearTimeout(timer) }
   }, [uid])
 
   const [env, setEnv] = useState({})
   useEffect(() => {
-    if (!uid || uid === 'guest') return
+    if (!uid || uid === 'guest') return undefined
     let cancel = false
-    userGetDoc('environment').then((d) => {
-      if (cancel) return
-      setEnv(d && typeof d === 'object' ? d : {})
-    }).catch(() => {})
-    return () => { cancel = true }
+    const timer = setTimeout(() => {
+      if (cancel || bootstrapHydratedRef.current) return
+      userGetDoc('environment').then((d) => {
+        if (cancel || bootstrapHydratedRef.current) return
+        setEnv(d && typeof d === 'object' ? d : {})
+      }).catch(() => {})
+    }, 1200)
+    return () => { cancel = true; clearTimeout(timer) }
   }, [uid])
   const v = (key, def) => env[key] ?? def
+
+  const profilePatchQueueRef = useRef({ timer: null, patch: {} })
+  const queueProfilePatch = (patch, ms = 900) => {
+    if (!patch || typeof patch !== 'object') return
+    const state = profilePatchQueueRef.current || { timer: null, patch: {} }
+    state.patch = { ...(state.patch || {}), ...patch }
+    if (state.timer) clearTimeout(state.timer)
+    state.timer = window.setTimeout(() => {
+      const payload = state.patch || {}
+      state.patch = {}
+      state.timer = null
+      if (Object.keys(payload).length) userProfilePatch(payload).catch(() => {})
+    }, ms)
+    profilePatchQueueRef.current = state
+  }
+  useEffect(() => () => {
+    const state = profilePatchQueueRef.current
+    if (state?.timer) clearTimeout(state.timer)
+  }, [])
 
   const updateCustomization = (updates) => {
     setCustomization(prev => {
       const updated = { ...prev, ...updates }
       const { bgImage: _b, ...toSave } = updated
       try { if (uid && uid !== 'guest') localStorage.setItem(`reelms:customization:${uid}`, JSON.stringify(updated)) } catch {}
-      scheduleUserPersist('customization', toSave)
-      // Keep account customization durable even if the app is closed shortly after a change.
-      userPutDoc('customization', toSave).catch(() => {})
-      userProfilePatch({ profileTheme: toSave }).catch(() => {})
+      scheduleUserPersist('customization', toSave, 900)
+      queueProfilePatch({ profileTheme: toSave }, 1000)
       if ('bgImage' in updates) {
         if (updates.bgImage) {
-          scheduleUserPersist('bg_image', updates.bgImage)
-          userPutDoc('bg_image', updates.bgImage).catch(() => {})
+          scheduleUserPersist('bg_image', updates.bgImage, 900)
         } else {
-          userPutDoc('bg_image', null).catch(() => {})
+          scheduleUserPersist('bg_image', null, 900)
         }
       }
       return updated
@@ -6135,9 +6161,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }, [customization.bgImage])
 
   useEffect(() => {
-    touchUserSession().catch(() => {})
-    const interval = setInterval(() => touchUserSession().catch(() => {}), 5 * 60 * 1000)
-    return () => clearInterval(interval)
+    if (!uid || uid === 'guest') return undefined
+    const first = setTimeout(() => touchUserSession().catch(() => {}), 60 * 1000)
+    const interval = setInterval(() => touchUserSession().catch(() => {}), 10 * 60 * 1000)
+    return () => { clearTimeout(first); clearInterval(interval) }
   }, [uid])
 
   useEffect(() => {
@@ -6157,6 +6184,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }, [effectiveAccent, effectiveAccentRgb, effectiveBase, effectiveBaseRgb, effectiveTextColor])
 
   const [chats, setChats] = useState([])
+  const chatsPersistReadyRef = useRef({ uid: null, ready: false })
+  useEffect(() => { chatsPersistReadyRef.current = { uid, ready: false } }, [uid])
   const chatsRef = useRef([])
   useEffect(() => { chatsRef.current = chats }, [chats])
   const [reelms, setReelms] = useState([])
@@ -6181,24 +6210,25 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     try { localStorage.setItem(reelmsLocalCacheKey, JSON.stringify(reelms.slice(0, 80))) } catch { /* noop */ }
   }, [reelmsLocalCacheKey, reelms])
 
-  // Load reelms + chats from Firestore on mount
+  // Bootstrap is the main login load. This fallback waits briefly so it does not duplicate /bootstrap.
   useEffect(() => {
-    if (!uid) return
-    if (currentUser?.isModerator) {
-      // God-mode: load all reelms from DynamoDB registry
-      adminAllReelms()
-        .then(all => {
-          if (all.length > 0) setReelms(all.map(r => ({ ...r, _godMode: true })))
-        })
-        .catch(() => {
-          // Fallback to own reelms
-          userGetDoc('reelms').then(v => { if (Array.isArray(v)) setReelms(v) }).catch(() => {})
-        })
-      // Mod account has no DMs — skip loading chats
-    } else {
-      userGetDoc('reelms').then(v => { if (Array.isArray(v)) setReelms(v) }).catch(() => {})
-      userGetDoc('chats').then(v => { if (Array.isArray(v)) { setChats(v); v.forEach(c => { if (c.id) socketJoinChannel(c.id) }) } }).catch(() => {})
-    }
+    if (!uid || uid === 'guest') return undefined
+    let cancel = false
+    const timer = setTimeout(() => {
+      if (cancel || bootstrapHydratedRef.current) return
+      if (currentUser?.isModerator) {
+        adminAllReelms()
+          .then(all => { if (!cancel && all.length > 0) setReelms(all.map(r => ({ ...r, _godMode: true }))) })
+          .catch(() => {
+            if (cancel) return
+            userGetDoc('reelms').then(v => { if (!cancel && Array.isArray(v)) setReelms(v) }).catch(() => {})
+          })
+      } else {
+        userGetDoc('reelms').then(v => { if (!cancel && Array.isArray(v)) setReelms(v) }).catch(() => {})
+        userGetDoc('chats').then(v => { if (!cancel && Array.isArray(v)) { setChats(v); v.forEach(c => { if (c.id) socketJoinChannel(c.id) }) } }).catch(() => {})
+      }
+    }, 1300)
+    return () => { cancel = true; clearTimeout(timer) }
   }, [uid, currentUser?.isModerator])
   const [createReelmStep, setCreateReelmStep] = useState(null)
   const [selectedTemplateId, setSelectedTemplateId] = useState(null)
@@ -6384,6 +6414,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [isShaking, setIsShaking] = useState(false)
   const [showDiscover, setShowDiscover] = useState(false)
   const [discoverQuery, setDiscoverQuery] = useState('')
+  const [debouncedDiscoverQuery, setDebouncedDiscoverQuery] = useState('')
   const [discoverUsers, setDiscoverUsers] = useState([])
   const [discoverReelmsList, setDiscoverReelmsList] = useState([])
   const [pendingReelmJoinIds, setPendingReelmJoinIds] = useState([])
@@ -6396,8 +6427,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [helpForm, setHelpForm] = useState({ name: '', email: '', message: '' })
   const [helpStatus, setHelpStatus] = useState('idle')
   const soundPrevRef = useRef({ notifs: -1, friendReqs: -1, friends: -1 })
+  const bootstrapHydratedRef = useRef(false)
+  const bootstrapLastAppliedAtRef = useRef(0)
+  const reconnectSyncTimerRef = useRef(null)
   const activeMsgKeyRef = useRef(null)
   const reelmRealtimeHydrateTimersRef = useRef({})
+  const reelmSyncVersionsRef = useRef({})
   const [soundSettings, setSoundSettings] = useState(SOUND_DEFAULTS)
   const [availableSounds, setAvailableSounds] = useState([])
   const reelmTemplates = getReelmTemplates(getT(language))
@@ -6429,7 +6464,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       if (Array.isArray(d.files)) setAvailableSounds(d.files)
     }).catch(() => {})
   }, [selectedSettingsCategory])
-  const updateBodyFont = (id) => { setBodyFont(id); scheduleUserPersist('body_font', id); userPutDoc('body_font', id).catch(() => {}) }
+  const updateBodyFont = (id) => { setBodyFont(id); scheduleUserPersist('body_font', id, 900) }
   const t = getT(language)
   const [spotifyConnected, setSpotifyConnected] = useState(false)
   const [spotifyNowPlaying, setSpotifyNowPlaying] = useState(null)
@@ -6628,6 +6663,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   useEffect(() => {
     if (!uid || uid === 'guest') return undefined
     let cancel = false
+    bootstrapHydratedRef.current = false
     userBootstrap().then((data) => {
       if (cancel || !data) return
       if (Array.isArray(data.friends)) setFriends(data.friends)
@@ -6643,10 +6679,32 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       if (Array.isArray(data.muted_reelms)) setMutedReelmIds(data.muted_reelms.map(String))
       if (Array.isArray(data.feed_nav) && data.feed_nav.length === ALL_FEED_NAV.length) setFeedNavOrder(data.feed_nav)
       if (typeof data.landing_view === 'string') setReelmLandingView(data.landing_view)
+      if (data.environment && typeof data.environment === 'object') setEnv(data.environment)
+      const baseCustomization = data.customization && typeof data.customization === 'object' ? data.customization : null
+      if (baseCustomization || typeof data.bg_image === 'string') {
+        const nextCustomization = {
+          ...DEFAULT_CUSTOMIZATION,
+          ...(baseCustomization || {}),
+          bgImage: typeof data.bg_image === 'string' ? data.bg_image : ((baseCustomization || {}).bgImage ?? null),
+        }
+        setCustomization(prev => sameDocValue(prev, nextCustomization) ? prev : nextCustomization)
+        try { localStorage.setItem(`reelms:customization:${uid}`, JSON.stringify(nextCustomization)) } catch {}
+      }
+      if (typeof data.body_font === 'string' && data.body_font) setBodyFont(prev => prev === data.body_font ? prev : data.body_font)
       if (data.lpw != null) setLeftWidth(parseInt(String(data.lpw), 10) || PANEL_DEFAULT)
       if (data.rpw != null) setRightWidth(parseInt(String(data.rpw), 10) || PANEL_DEFAULT)
-      if (data.sociallinks && typeof data.sociallinks === 'object') setProfileSocialLinks(data.sociallinks)
-      if (Array.isArray(data.socialorder)) setProfileActivePlatforms(data.socialorder)
+      if (data.sociallinks && typeof data.sociallinks === 'object') {
+        profileSocialLinksSavedRef.current = JSON.stringify(data.sociallinks)
+        setProfileSocialLinks(data.sociallinks)
+      } else {
+        profileSocialLinksSavedRef.current = JSON.stringify(profileSocialLinks)
+      }
+      if (Array.isArray(data.socialorder)) {
+        profileSocialOrderSavedRef.current = JSON.stringify(data.socialorder)
+        setProfileActivePlatforms(data.socialorder)
+      } else {
+        profileSocialOrderSavedRef.current = JSON.stringify(profileActivePlatforms)
+      }
       setProfilePrefsLoaded(true)
       if (data.spotify_connected === true || data.spotify_connected === 'true') setSpotifyConnected(true)
       if (data.last_channels && typeof data.last_channels === 'object') setLastChannels(data.last_channels)
@@ -6659,7 +6717,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         friendReqs: Array.isArray(data.friend_requests) ? data.friend_requests.length : 0,
         friends: Array.isArray(data.friends) ? data.friends.length : 0,
       }
-    }).catch(() => {})
+      bootstrapHydratedRef.current = true
+      bootstrapLastAppliedAtRef.current = Date.now()
+    }).catch(() => { bootstrapHydratedRef.current = false })
     return () => { cancel = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid])
@@ -6696,6 +6756,19 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       else if (sk === 'last_channels') setStableObject(setLastChannels, v && typeof v === 'object' ? v : {})
       else if (sk === 'sessions') setStableArray(setSessionsList, Array.isArray(v) ? v : [])
       else if (sk === 'body_font') { if (typeof v === 'string' && v && v !== 'style2') setBodyFont(v) }
+      else if (sk === 'environment') setStableObject(setEnv, v && typeof v === 'object' ? v : {})
+      else if (sk === 'customization') {
+        if (v && typeof v === 'object') setCustomization(prev => {
+          const next = { ...DEFAULT_CUSTOMIZATION, ...v, bgImage: prev.bgImage ?? v.bgImage ?? null }
+          return sameDocValue(prev, next) ? prev : next
+        })
+      }
+      else if (sk === 'bg_image') setCustomization(prev => {
+        const next = { ...prev, bgImage: typeof v === 'string' ? v : null }
+        return sameDocValue(prev, next) ? prev : next
+      })
+      else if (sk === 'sociallinks') { if (v && typeof v === 'object') setProfileSocialLinks(prev => sameDocValue(prev, v) ? prev : v) }
+      else if (sk === 'socialorder') { if (Array.isArray(v)) setProfileActivePlatforms(prev => sameDocValue(prev, v) ? prev : v) }
       else if (sk === 'sounds') { if (v && typeof v === 'object') setSoundSettings(prev => sameDocValue(prev, { ...prev, ...v }) ? prev : { ...prev, ...v }) }
       else if (sk === 'profile') { if (v && typeof v === 'object') setCurrentUser(prev => sameLegacyProfile(prev, v) ? prev : v) }
       else if (sk === 'reelms') {
@@ -6709,17 +6782,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             if (!Array.isArray(next.timeoutList) && Array.isArray(existing.timeoutList)) next.timeoutList = existing.timeoutList
             return next
           })
-          setReelms(prev => sameDocValue(prev, serverReelms) ? prev : serverReelms)
-          const allowedIds = new Set(serverReelms.map(r => String(r?.id || '')).filter(Boolean))
           const currentSelectedId = String(selectedReelmRef.current?.id || '')
-          if (currentSelectedId && !allowedIds.has(currentSelectedId)) {
-            socketLeaveReelm(currentSelectedId)
-            setSelectedReelm(null)
-            setSelectedChannel(null)
-            setShowFeed(false)
-            setShowReelmSettings(false)
-            setShowReelmMenu(false)
-          }
+          const allowedIds = new Set(serverReelms.map(r => String(r?.id || '')).filter(Boolean))
+          const nextReelms = currentSelectedId && !allowedIds.has(currentSelectedId) && selectedReelmRef.current
+            ? [selectedReelmRef.current, ...serverReelms]
+            : serverReelms
+          // Do not kick the UI out of a Reelm only because a stale user/reelms copy missed it.
+          // Real removals are handled by explicit access-revoked / banned / closed socket events.
+          setReelms(prev => sameDocValue(prev, nextReelms) ? prev : nextReelms)
         }
       }
       else if (sk === 'chats') { if (Array.isArray(v)) { setChats(prev => sameDocValue(prev, v) ? prev : v); v.forEach(c => { if (c.id) socketJoinChannel(c.id) }) } }
@@ -6814,17 +6884,34 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     }
 
     const off = connectReelmsSocket({
-      onUserDoc: (sk) => { userGetDoc(sk).then((v) => applyUserDoc(sk, v)).catch(() => {}) },
-      onReelmDoc: (reelmId, sk) => {
-        if (['meta', 'structure', 'roles', 'members', 'join_requests', 'ban_list', 'timeout_list'].includes(sk)) {
-          scheduleReelmCoreHydrate(reelmId, 120)
+      onUserDoc: (sk, data) => {
+        if (typeof data !== 'undefined') { applyUserDoc(sk, data); return }
+        userGetDoc(sk).then((v) => applyUserDoc(sk, v)).catch(() => {})
+      },
+      onReelmDoc: (reelmId, sk, data, version) => {
+        const coreSk = ['meta', 'structure', 'roles', 'members', 'join_requests', 'ban_list', 'timeout_list'].includes(sk)
+        if (typeof data !== 'undefined') applyReelmRealtimeDoc(reelmId, sk, data, version)
+        if (coreSk) {
+          // If the event carried the changed document, the eventual core snapshot
+          // will follow from the server. Fallback hydrate only when old servers emit
+          // doc invalidations without payloads.
+          if (typeof data === 'undefined') scheduleReelmCoreHydrate(reelmId, 180)
         } else {
           loadReelmDocuments(reelmId).then(() => setModDeleteTick((t) => t + 1)).catch(() => {})
         }
       },
-      onReelmManagerDoc: (reelmId, sk, data) => {
-        applyReelmRealtimeDoc(reelmId, sk, data)
-        scheduleReelmCoreHydrate(reelmId, 350)
+      onReelmManagerDoc: (reelmId, sk, data, version) => {
+        applyReelmRealtimeDoc(reelmId, sk, data, version)
+        if (typeof data === 'undefined') scheduleReelmCoreHydrate(reelmId, 350)
+      },
+      onReelmCoreSnapshot: ({ reelm, version }) => {
+        if (!reelm?.id) return
+        const id = String(reelm.id)
+        const nextVersion = Number(version || reelm.syncVersion || Date.now())
+        const currentVersion = Number(reelmSyncVersionsRef.current[id] || 0)
+        if (nextVersion && currentVersion && nextVersion < currentVersion) return
+        reelmSyncVersionsRef.current[id] = nextVersion || Date.now()
+        mergeReelmIntoState(reelm)
       },
       onReelmMemberJoined: ({ reelmId }) => {
         scheduleReelmCoreHydrate(reelmId, 60)
@@ -6832,7 +6919,15 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       onReelmMemberRemoved: ({ reelmId }) => {
         scheduleReelmCoreHydrate(reelmId, 60)
       },
-      onAppDoc: (sk) => {
+      onReelmMemberLeft: ({ reelmId }) => {
+        scheduleReelmCoreHydrate(reelmId, 60)
+      },
+      onAppDoc: (sk, data) => {
+        if (typeof data !== 'undefined') {
+          if (sk === 'reports' && currentUserRef.current?.isModerator) setReports(Array.isArray(data) ? data : [])
+          if (sk === 'stories') setAppStoriesTick((t) => t + 1)
+          return
+        }
         if (sk === 'reports' && currentUserRef.current?.isModerator) appGetDoc('reports').then((r) => setReports(Array.isArray(r) ? r : [])).catch(() => {})
         if (sk === 'stories') setAppStoriesTick((t) => t + 1)
       },
@@ -7087,9 +7182,19 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         })
       },
       onConnect: () => {
-        // Re-fetch critical user docs after reconnect so we don't miss anything
-        const keys = ['chats', 'reelms', 'friends', 'friend_requests', 'notifications', 'message_requests', 'unread_counts']
-        keys.forEach(sk => userGetDoc(sk).then(v => applyUserDoc(sk, v)).catch(() => {}))
+        // One throttled bootstrap refresh is much cheaper than 7 parallel doc GETs on every reconnect.
+        const now = Date.now()
+        if (now - bootstrapLastAppliedAtRef.current < 5000) return
+        if (reconnectSyncTimerRef.current) clearTimeout(reconnectSyncTimerRef.current)
+        reconnectSyncTimerRef.current = setTimeout(() => {
+          reconnectSyncTimerRef.current = null
+          userBootstrap().then((data) => {
+            if (!data) return
+            Object.entries(data).forEach(([sk, value]) => applyUserDoc(sk, value))
+            bootstrapHydratedRef.current = true
+            bootstrapLastAppliedAtRef.current = Date.now()
+          }).catch(() => {})
+        }, 800)
       },
     })
     return off
@@ -7166,36 +7271,36 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }, [showReelmSettings, selectedReelm?.id])
 
 
-  // Discover: fetch public reelms + users from backend on query change
   useEffect(() => {
-    const q = discoverQuery.trim()
+    const timer = setTimeout(() => setDebouncedDiscoverQuery(discoverQuery.trim()), 260)
+    return () => clearTimeout(timer)
+  }, [discoverQuery])
+
+  // Discover: fetch public reelms + users from backend on debounced query change
+  useEffect(() => {
+    const q = debouncedDiscoverQuery.trim()
     if (!q) {
       setDiscoverUsers([])
       setDiscoverReelmsList([])
       return undefined
     }
     let cancelled = false
-    Promise.all([
-      usersList(q).catch(() => []),
-      discoverReelms(q).catch(() => []),
-    ]).then(([users, publicReelms]) => {
+    usersList(q).then((users) => {
       if (cancelled) return
-      const safeUsers = Array.isArray(users) ? users.filter(u => !u.isSystem) : []
+      setDiscoverUsers(Array.isArray(users) ? users.filter(u => !u.isSystem) : [])
+    }).catch(() => { if (!cancelled) setDiscoverUsers([]) })
+
+    discoverReelms(q).then((publicReelms) => {
+      if (cancelled) return
       const safeReelms = Array.isArray(publicReelms) ? publicReelms : []
-      setDiscoverUsers(safeUsers)
       setDiscoverReelmsList(safeReelms)
       const pendingIds = safeReelms.filter(r => r?.pending).map(r => String(r.id)).filter(Boolean)
       if (pendingIds.length) {
         setPendingReelmJoinIds(prev => Array.from(new Set([...prev.map(String), ...pendingIds])))
       }
-    }).catch(() => {
-      if (!cancelled) {
-        setDiscoverUsers([])
-        setDiscoverReelmsList([])
-      }
-    })
+    }).catch(() => { if (!cancelled) setDiscoverReelmsList([]) })
     return () => { cancelled = true }
-  }, [discoverQuery])
+  }, [debouncedDiscoverQuery])
 
   const toggleFriendsPopup = () => { setShowFriendsPopup(v => !v); setShowNotificationsPopup(false) }
   const toggleNotifPopup = () => {
@@ -7689,6 +7794,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   useEffect(() => {
     if (activeDataUidRef.current === uid) return
     activeDataUidRef.current = uid
+    bootstrapHydratedRef.current = false
+    bootstrapLastAppliedAtRef.current = 0
+    if (reconnectSyncTimerRef.current) { clearTimeout(reconnectSyncTimerRef.current); reconnectSyncTimerRef.current = null }
     setChats([])
     let cachedReelmsForUid = []
     try {
@@ -7854,6 +7962,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [profileSocialLinks, setProfileSocialLinks] = useState({})
   const [profileActivePlatforms, setProfileActivePlatforms] = useState(['instagram', 'tiktok'])
   const [profilePrefsLoaded, setProfilePrefsLoaded] = useState(false)
+  const profileSocialLinksSavedRef = useRef('')
+  const profileSocialOrderSavedRef = useRef('')
   useEffect(() => {
     if (!currentUser?.id) return
     setProfileBio(currentUser.bio || '')
@@ -7865,8 +7975,30 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const dragState = useRef(null)
   const barScrollRef = useRef(null)
   const barPositionsRef = useRef({})
-  useEffect(() => { scheduleUserPersist('lpw', String(leftWidth)) }, [leftWidth])
-  useEffect(() => { scheduleUserPersist('rpw', String(rightWidth)) }, [rightWidth])
+  const panelWidthsPersistReadyRef = useRef({ uid: null, left: false, right: false })
+  useEffect(() => {
+    panelWidthsPersistReadyRef.current = { uid, left: false, right: false }
+  }, [uid])
+  useEffect(() => {
+    if (!bootstrapHydratedRef.current || !uid || uid === 'guest') return
+    const state = panelWidthsPersistReadyRef.current
+    if (state.uid !== uid) {
+      panelWidthsPersistReadyRef.current = { uid, left: false, right: false }
+      return
+    }
+    if (!state.left) { state.left = true; return }
+    scheduleUserPersist('lpw', String(leftWidth), 900)
+  }, [leftWidth, uid])
+  useEffect(() => {
+    if (!bootstrapHydratedRef.current || !uid || uid === 'guest') return
+    const state = panelWidthsPersistReadyRef.current
+    if (state.uid !== uid) {
+      panelWidthsPersistReadyRef.current = { uid, left: false, right: false }
+      return
+    }
+    if (!state.right) { state.right = true; return }
+    scheduleUserPersist('rpw', String(rightWidth), 900)
+  }, [rightWidth, uid])
   const barInitializedRef = useRef(false)
   const barPrevIdSetRef = useRef(null)
   useLayoutEffect(() => {
@@ -7904,16 +8036,30 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   // Remote control requests now arrive via socketVcSignal (vc:event), handled in handleVcEvent
   useEffect(() => {
     if (!profilePrefsLoaded) return
-    scheduleUserPersist('sociallinks', profileSocialLinks)
-    userProfilePatch({ sociallinks: profileSocialLinks }).catch(() => {})
+    const nextJson = JSON.stringify(profileSocialLinks || {})
+    if (!profileSocialLinksSavedRef.current) { profileSocialLinksSavedRef.current = nextJson; return }
+    if (profileSocialLinksSavedRef.current === nextJson) return
+    profileSocialLinksSavedRef.current = nextJson
+    scheduleUserPersist('sociallinks', profileSocialLinks, 900)
+    queueProfilePatch({ sociallinks: profileSocialLinks }, 900)
   }, [profileSocialLinks, profilePrefsLoaded])
   useEffect(() => {
     if (!profilePrefsLoaded) return
-    scheduleUserPersist('socialorder', profileActivePlatforms)
-    userProfilePatch({ socialorder: profileActivePlatforms }).catch(() => {})
+    const nextJson = JSON.stringify(profileActivePlatforms || [])
+    if (!profileSocialOrderSavedRef.current) { profileSocialOrderSavedRef.current = nextJson; return }
+    if (profileSocialOrderSavedRef.current === nextJson) return
+    profileSocialOrderSavedRef.current = nextJson
+    scheduleUserPersist('socialorder', profileActivePlatforms, 900)
+    queueProfilePatch({ socialorder: profileActivePlatforms }, 900)
   }, [profileActivePlatforms, profilePrefsLoaded])
   useEffect(() => {
-    if (!uid || chats.length === 0) return
+    if (!uid || uid === 'guest' || chats.length === 0 || !bootstrapHydratedRef.current) return
+    const state = chatsPersistReadyRef.current
+    if (state.uid !== uid) {
+      chatsPersistReadyRef.current = { uid, ready: false }
+      return
+    }
+    if (!state.ready) { state.ready = true; return }
     const toSave = chats.map(c => {
       const clean = { ...c }
       if (clean.photo?.startsWith('data:')) clean.photo = null
@@ -7922,9 +8068,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       }))
       return clean
     })
-    scheduleUserPersist('chats', toSave)
+    scheduleUserPersist('chats', toSave, 900)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chats])
+  }, [chats, uid])
   const [messages, setMessages] = useState({})
   const [messageInput, setMessageInput] = useState('')
   const messageInputRef = useRef('')
@@ -8644,7 +8790,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         showMediaUnavailable('voice')
         return
       }
-      const envDoc = await userGetDoc('environment').catch(() => ({})) || {}
+      const envDoc = (env && typeof env === 'object' ? env : {})
       const noiseSuppression = envDoc.noiseSuppression ?? true
       const echoCancellation = envDoc.echoCancellation ?? true
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -9013,7 +9159,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (!voiceVideoOn) {
       try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { showMediaUnavailable('camera'); return }
-        const envDoc = await userGetDoc('environment').catch(() => ({})) || {}
+        const envDoc = (env && typeof env === 'object' ? env : {})
         const cameraQuality = envDoc.cameraQuality || 'hd'
         const videoConstraints = cameraQuality === 'fullhd'
           ? { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30, max: 30 } }
@@ -9052,7 +9198,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       }
       try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) { showMediaUnavailable('screen'); return }
-        const envDoc = await userGetDoc('environment').catch(() => ({})) || {}
+        const envDoc = (env && typeof env === 'object' ? env : {})
         const resolution = envDoc.screenResolution || '1080p'
         const displayVideo = resolution === '720p'
           ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 }, cursor: 'always' }
@@ -9121,9 +9267,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     }
   }, [expandedVideoUser, expandedScreenUser, voiceParticipants, voiceScreenFullscreen])
 
-  const applyReelmRealtimeDoc = (reelmId, sk, data) => {
+  const applyReelmRealtimeDoc = (reelmId, sk, data, version = 0) => {
     const id = String(reelmId || '')
     if (!id || !sk) return
+    const stamp = Number(version || Date.now())
+    const versionKey = `${id}:${sk}`
+    const currentStamp = Number(reelmSyncVersionsRef.current[versionKey] || 0)
+    if (stamp && currentStamp && stamp < currentStamp) return
+    reelmSyncVersionsRef.current[versionKey] = stamp || Date.now()
     let patch = null
     if (sk === 'join_requests') patch = { joinRequests: Array.isArray(data) ? data : [] }
     else if (sk === 'ban_list') patch = { banList: Array.isArray(data) ? data : [] }
@@ -9152,6 +9303,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const hydrateReelmCore = async (reelmId) => {
     if (!reelmId) return null
+    try {
+      const core = await reelmGetCore(reelmId)
+      if (core?.id) return { ...core, joined: core.joined !== false }
+    } catch (_) {}
     const [meta, structure, roles, members, joinRequests, banList, timeoutList] = await Promise.all([
       reelmGetDoc(reelmId, 'meta').catch(() => null),
       reelmGetDoc(reelmId, 'structure').catch(() => null),
@@ -9176,6 +9331,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const mergeReelmIntoState = (nextReelm, { persist = false } = {}) => {
     if (!nextReelm?.id) return
+    const syncVersion = Number(nextReelm.syncVersion || Date.now())
+    const idKey = String(nextReelm.id)
+    const currentVersion = Number(reelmSyncVersionsRef.current[idKey] || 0)
+    if (syncVersion && currentVersion && syncVersion < currentVersion) return
+    reelmSyncVersionsRef.current[idKey] = syncVersion || Date.now()
     setReelms(prev => {
       const next = prev.some(r => String(r.id) === String(nextReelm.id))
         ? prev.map(r => {
@@ -12811,20 +12971,21 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           <p className="discover-empty">No results for "{discoverQuery}"</p>
                         )}
                         {results.map((item, i) => (
-                          <div key={i} className="discover-result-row" onClick={() => {
+                          <div key={i} className="discover-result-row" onClick={(e) => {
                             if (item._type === 'reelm' && item.joined !== false) { handleSelectReelm(item) }
                             else if (item._type === 'chat') { setSelectedChat(item); setSelectedChannel(null); setSelectedReelm(null); setShowDiscover(false); setShowSettings(false) }
-                          }}>
+                            else if (item._type === 'user') { openFriendProfile(item, e) }
+                          }} style={{ cursor: item._type === 'user' || item.joined !== false ? 'pointer' : 'default' }}>
                             <div className="discover-result-avatar">
-                              {item.image
-                                ? <img src={item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: item._type === 'reelm' ? '12px' : '50%' }} />
-                                : (item.name || item.contact || '?').charAt(0).toUpperCase()
+                              {getPersonPhoto(item) || item.image
+                                ? <img src={getPersonPhoto(item) || item.image} alt={item.name || item.username || 'User'} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: item._type === 'reelm' ? '12px' : '50%' }} />
+                                : (item.name || item.username || item.contact || '?').charAt(0).toUpperCase()
                               }
                             </div>
                             <div className="discover-result-info">
-                              <span className="discover-result-name">{item.name || item.contact}</span>
+                              <span className="discover-result-name">{item.name || item.displayName || item.username || item.contact}</span>
                               <span className="discover-result-type">
-                                {item._type === 'reelm' ? 'Reelm' : item._type === 'chat' ? 'Chat' : 'User'}
+                                {item._type === 'reelm' ? 'Reelm' : item._type === 'chat' ? 'Chat' : item.username ? `@${item.username}` : 'User'}
                               </span>
                             </div>
                             {item._type === 'reelm' && item.joined === false && (
@@ -13717,9 +13878,7 @@ function SignUpScreen({ onSignUpComplete, onGoBack }) {
       }
 
       await userProfilePut(userData)
-      try {
-        await recordUserSession(parseDeviceInfo, userData.notifyNewDevice)
-      } catch { /* noop */ }
+      recordUserSession(parseDeviceInfo, userData.notifyNewDevice).catch(() => {})
 
       setIsCreating(false)
       onSignUpComplete()

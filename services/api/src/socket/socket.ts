@@ -244,6 +244,21 @@ export function attachSocketServer(httpServer?: HttpServer) {
     logger.info('socket connected', socket.id, 'uid', socket.uid)
     socket.join(`u:${socket.uid}`)
     socket.join('app')
+    // Professional sync baseline: every authenticated socket immediately joins
+    // the rooms for Reelms that the server currently says it belongs to. The
+    // client still emits joinReelm for active views, but this prevents missed
+    // role/member/profile events during login, tab restore, and reconnect.
+    void getDoc<any[]>(userPk(String(socket.uid)), 'reelms').then(async (reelms) => {
+      const ids = Array.from(new Set((Array.isArray(reelms) ? reelms : []).map((r: any) => String(r?.id || '')).filter(Boolean)))
+      for (const reelmId of ids) {
+        if (!await isReelmMember(String(socket.uid), reelmId).catch(() => false)) continue
+        socket.join(`reelm:${reelmId}`)
+        socket.data.joinedReelms?.add(reelmId)
+        await emitVcCounts(socket, reelmId).catch((err) => logger.warn('initial vc:counts emit failed', err))
+        await emitPresence(reelmId, socket).catch((err) => logger.warn('initial presence state failed', err))
+        emitPresenceLater(reelmId)
+      }
+    }).catch((err) => logger.warn('socket autojoin reelms failed', err))
     void io.in(`u:${socket.uid}`).fetchSockets().then((peers) => {
       for (const peer of peers) {
         if (peer.id === socket.id) continue

@@ -46,8 +46,10 @@ export function createApp(io?: Server) {
 
   if (io) {
     app.use(createSpotifyRouter(io))
-    app.use('/api/v1/social', apiRateLimit, createSocialRouter(io))
-    app.use('/api/v1', apiRateLimit, createReelmsDataRouter(io))
+    // /api/v1 routers authenticate first, then apply apiRateLimit internally.
+    // This keeps normal app traffic user-based instead of proxy/IP-based.
+    app.use('/api/v1/social', createSocialRouter(io))
+    app.use('/api/v1', createReelmsDataRouter(io))
   }
 
   // Compatibility: old web client calls /google/login and /callback/google.
