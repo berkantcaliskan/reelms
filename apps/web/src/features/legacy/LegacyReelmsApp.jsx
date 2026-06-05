@@ -7962,6 +7962,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [groupSideExpanded, setGroupSideExpanded] = useState(null) // null | 'permissions' | 'vapor'
   const [recentlyBumpedChatId, setRecentlyBumpedChatId] = useState(null)
   const [pinnedItemIds, setPinnedItemIds] = useState([])
+  const [barOrderIds, setBarOrderIds] = useState([])
 
   const activeDataUidRef = useRef(uid)
   useEffect(() => {
@@ -7992,6 +7993,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setNotifications([])
     setUnreadCounts({})
     setPinnedItemIds([])
+    setBarOrderIds([])
     setLastChannels({})
     setSessionsList([])
     setChatProfileCache({})
