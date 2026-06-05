@@ -71,3 +71,12 @@
   font-weight: 700;
   cursor: pointer;
 }
+
+
+.reelms-fatal-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}

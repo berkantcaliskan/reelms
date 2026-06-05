@@ -197,23 +197,34 @@ async function ensureDefaultRoles() {
 
 async function ensureConfiguredCommunityAdmins() {
   const pk = reelmPk(DEFAULT_REELM_ID)
-  const [meta, structure, roles] = await Promise.all([
+  const [meta, structure, roles, banList] = await Promise.all([
     getDoc<any>(pk, 'meta').catch(() => null),
     getDoc<any>(pk, 'structure').catch(() => null),
-    ensureDefaultRoles()
+    ensureDefaultRoles(),
+    getDoc<any[]>(pk, 'ban_list').catch(() => [])
   ])
   if (!meta) return
 
   const adminRole = getManagerRole(roles)
   const adminRoleId = adminRole?.id ? String(adminRole.id) : ''
-  const adminUids = await resolveCommunityAdminUids()
-  if (!adminUids.length) return
+  const configuredAdminUids = await resolveCommunityAdminUids()
+  if (!configuredAdminUids.length) return
+
+  const bannedIds = new Set((Array.isArray(banList) ? banList : []).map((entry: any) => String(entry?.userId || entry?.id || '')).filter(Boolean))
+  const activeAdminUids: string[] = []
+  for (const uid of configuredAdminUids) {
+    const id = String(uid || '')
+    if (!id || bannedIds.has(id)) continue
+    if (await hasLeftDefaultReelm(id).catch(() => false)) continue
+    activeAdminUids.push(id)
+  }
+  if (!activeAdminUids.length) return
 
   const currentMembers = (await getDoc<any[]>(pk, 'members').catch(() => [])) || []
   let nextMembers = [...currentMembers]
   let changed = false
 
-  for (const uid of adminUids) {
+  for (const uid of activeAdminUids) {
     const profile = (await getDoc<any>(userPk(uid), 'profile').catch(() => null)) || {}
     const existing = nextMembers.find((member) => String(member?.userId) === String(uid))
     const existingRoleIds = Array.isArray(existing?.roleIds) ? existing.roleIds.map(String) : []
@@ -235,7 +246,7 @@ async function ensureConfiguredCommunityAdmins() {
   if (changed) await putDoc(pk, 'members', nextMembers)
 
   const full = toUserReelmSummary(toClientReelm(meta, structure || defaultStructure(), roles, nextMembers))
-  await Promise.all(adminUids.map(async (uid) => {
+  await Promise.all(activeAdminUids.map(async (uid) => {
     const current = (await getDoc<any[]>(userPk(uid), 'reelms').catch(() => [])) || []
     const next = mergeSummaryPreserveOrder(current, full)
     if (JSON.stringify(current || []) !== JSON.stringify(next)) await putDoc(userPk(uid), 'reelms', next)
@@ -315,8 +326,8 @@ export async function autoJoinDefaultReelm(uid: string, name?: string, photo?: s
   const pk = reelmPk(DEFAULT_REELM_ID)
   const banList = (await getDoc<any[]>(pk, 'ban_list').catch(() => [])) || []
   const isBanned = banList.some((entry: any) => String(entry?.userId || entry?.id || '') === String(uid))
-  if (isBanned && !isConfiguredAdmin) return
-  if (!opts.force && !isConfiguredAdmin && await hasLeftDefaultReelm(uid)) return
+  if (isBanned) return
+  if (!opts.force && await hasLeftDefaultReelm(uid)) return
   const meta = await getDoc<any>(pk, 'meta')
   const structure = await getDoc<any>(pk, 'structure')
   const roles = (await getDoc<any[]>(pk, 'roles')) || []

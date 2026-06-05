@@ -767,9 +767,10 @@ export async function leaveReelmRemote(reelmId) {
 }
 
 export async function closeReelmRemote(reelmId, confirmName) {
+  const confirmed = confirmName === true || confirmName === '__confirmed__'
   const j = await api(`/api/v1/reelms/${encodeURIComponent(reelmId)}/close`, {
     method: 'POST',
-    body: JSON.stringify({ confirmName }),
+    body: JSON.stringify(confirmed ? { confirmed: true } : { confirmName }),
   })
   return j?.data || null
 }
@@ -811,6 +812,14 @@ export async function inviteReelmFriend(reelmId, targetUid) {
 
 export async function banReelmMember(reelmId, targetUid, reason = '') {
   const j = await api(`/api/v1/reelms/${encodeURIComponent(reelmId)}/ban`, {
+    method: 'POST',
+    body: JSON.stringify({ targetUid, reason }),
+  })
+  return j?.data || null
+}
+
+export async function removeReelmMember(reelmId, targetUid, reason = '') {
+  const j = await api(`/api/v1/reelms/${encodeURIComponent(reelmId)}/remove-member`, {
     method: 'POST',
     body: JSON.stringify({ targetUid, reason }),
   })

@@ -109,6 +109,7 @@ import {
   acceptReelmInvite,
   rejectReelmInvite,
   banReelmMember,
+  removeReelmMember,
   timeoutReelmMember,
   untimeoutReelmMember,
   unbanReelmMember,
@@ -130,7 +131,7 @@ import {
 } from '../../reelmsAwsClient'
 import { seedModerationAccount, MODERATION_ACCOUNT_ID, isModerationSystemUser } from '../../reelmsModerationAccount'
 import { moderateText } from '../../moderationClient'
-import { playSound, applySoundSettings, previewSound, SOUND_CATEGORIES, SOUND_DEFAULTS } from '../../soundManager'
+import { playSound, applySoundSettings, previewSound, preloadSounds, unlockSounds, SOUND_CATEGORIES, SOUND_DEFAULTS } from '../../soundManager'
 import { DesktopDownloadButton, DesktopDownloadSettingsPanel } from '../desktop-download/index.js'
 import { useAuthSession as useCentralAuthSession } from '../../app/providers/AuthSessionProvider.jsx'
 
@@ -2716,7 +2717,7 @@ function renderMentions(text, uid, members, roles) {
     if (lower === 'everyone') return <span key={i} className="mention mention--everyone">{part}</span>
     const role = roles?.find(r => r.name.toLowerCase() === lower)
     if (role) return <span key={i} className="mention mention--role" style={{ color: role.color }}>{part}</span>
-    const member = members?.find(m => m.userName.toLowerCase() === lower)
+    const member = (Array.isArray(members) ? members : []).find(m => String(m?.userName || m?.name || m?.username || '').toLowerCase() === lower)
     if (member) {
       const isMe = String(member.userId) === String(uid)
       return <span key={i} className={`mention mention--user${isMe ? ' mention--me' : ''}`}>{part}</span>
@@ -3045,7 +3046,7 @@ function getReelmTemplates(t) {
   ]
 }
 
-function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onCloseReelm, onAnnouncement, onApproveJoin, onRejectJoin, onInviteFriend, onBanMember, onUnbanMember, onTimeoutMember, onUntimeoutMember }) {
+function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onCloseReelm, onAnnouncement, onApproveJoin, onRejectJoin, onInviteFriend, onRemoveMember, onBanMember, onUnbanMember, onTimeoutMember, onUntimeoutMember }) {
   const [activeTab, setActiveTab] = useState('general')
   const [roles, setRoles] = useState(() => (reelm.roles || []).map((role, i) => normalizeRoleForClient(role, `role-${i}`)))
   const [members, setMembers] = useState(() => reelm.members || [])
@@ -3065,6 +3066,10 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
   const [roleMemberDirty, setRoleMemberDirty] = useState(false)
   const [roleMemberSaving, setRoleMemberSaving] = useState(false)
   const [roleMemberStatus, setRoleMemberStatus] = useState('')
+  const [closeCooldownUntil, setCloseCooldownUntil] = useState(0)
+  const [closeCountdown, setCloseCountdown] = useState(0)
+  const [closeArmed, setCloseArmed] = useState(false)
+  const [closeBusy, setCloseBusy] = useState(false)
   const memberRemovalIntentRef = useRef(false)
   const reelmRolesSignature = useMemo(() => JSON.stringify((reelm.roles || []).map(role => ({ id: role?.id, name: role?.name, color: role?.color, position: role?.position, permissions: role?.permissions }))), [reelm.roles])
   const reelmMembersSignature = useMemo(() => JSON.stringify((reelm.members || []).map(member => ({ userId: member?.userId || member?.id, roleIds: member?.roleIds, userName: member?.userName || member?.name, userPhoto: member?.userPhoto || member?.photo }))), [reelm.members])
@@ -3120,6 +3125,31 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
   useEffect(() => {
     if (availableTabs.length && !availableTabs.some(tab => tab.key === activeTab)) setActiveTab(availableTabs[0].key)
   }, [availableTabs, activeTab])
+
+  useEffect(() => {
+    if (!closeCooldownUntil) { setCloseCountdown(0); return undefined }
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((closeCooldownUntil - Date.now()) / 1000))
+      setCloseCountdown(left)
+      if (left <= 0) setCloseCooldownUntil(0)
+    }
+    tick()
+    const timer = setInterval(tick, 250)
+    return () => clearInterval(timer)
+  }, [closeCooldownUntil])
+
+  const handleCloseServerButton = async () => {
+    if (!reelm?.id || closeBusy) return
+    if (!closeArmed) {
+      setCloseArmed(true)
+      setCloseCooldownUntil(Date.now() + 5000)
+      return
+    }
+    if (closeCountdown > 0 || closeCooldownUntil > Date.now()) return
+    setCloseBusy(true)
+    try { await onCloseReelm?.(reelm.id, true) }
+    finally { setCloseBusy(false); setCloseArmed(false); setCloseCooldownUntil(0) }
+  }
 
   const normalizeRoleMemberDraft = (updatedRoles, updatedMembers) => {
     const normalizedRoles = (updatedRoles || []).map((role, i) => normalizeRoleForClient(role, `role-${i}`, canManageFullRoles)).slice(0, 12)
@@ -3242,11 +3272,21 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
     onInviteFriend?.(reelm.id, friend.id)
   }
 
-  const removeMember = (userId) => {
-    const member = members.find(m => m.userId === userId)
+  const removeMember = async (userId) => {
+    const member = members.find(m => String(m.userId) === String(userId))
     if (!canActOnMember(member)) return
-    memberRemovalIntentRef.current = true
-    saveAll(roles, members.filter(m => m.userId !== userId))
+    const nextMembers = members.filter(m => String(m.userId) !== String(userId))
+    setMembers(nextMembers)
+    setRoleMemberDirty(false)
+    setRoleMemberStatus('Removing member…')
+    try {
+      await onRemoveMember?.(reelm.id, userId, 'removed from server settings')
+      setRoleMemberStatus('Member removed')
+      window.setTimeout(() => setRoleMemberStatus(''), 1800)
+    } catch {
+      setMembers(reelm.members || [])
+      setRoleMemberStatus('Could not remove member')
+    }
   }
 
   const nonMembers = friends.filter(f => !members.find(m => m.userId === f.id))
@@ -3303,16 +3343,14 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
               {canManageFullRoles && !reelm.isDefault && (
                 <div className="rs-danger-zone">
                   <span className="rs-section-title">Danger zone</span>
-                  <p className="rs-section-hint">Closing a server removes it from members and disables its invite code. Type the exact server name to confirm.</p>
+                  <p className="rs-section-hint">Closing a server removes it from members and disables its invite code. Press once to arm it, wait 5 seconds, then press again.</p>
                   <button
                     type="button"
                     className="rs-member-remove rs-danger-close"
-                    onClick={() => {
-                      const typed = window.prompt(`Type ${reelm.name} to close this server.`)
-                      if (typed === reelm.name) onCloseReelm?.(reelm.id, typed)
-                    }}
+                    disabled={closeBusy || closeCountdown > 0}
+                    onClick={handleCloseServerButton}
                   >
-                    Close server
+                    {closeBusy ? 'Closing…' : closeCountdown > 0 ? `Close available in ${closeCountdown}s` : closeArmed ? 'Close server now' : 'Close server'}
                   </button>
                 </div>
               )}
@@ -6481,7 +6519,17 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bodyFont])
 
-  useEffect(() => { applySoundSettings(soundSettings) }, [soundSettings])
+  useEffect(() => { applySoundSettings(soundSettings); preloadSounds() }, [soundSettings])
+
+  useEffect(() => {
+    const unlock = () => unlockSounds()
+    window.addEventListener('pointerdown', unlock, { passive: true })
+    window.addEventListener('keydown', unlock)
+    return () => {
+      window.removeEventListener('pointerdown', unlock)
+      window.removeEventListener('keydown', unlock)
+    }
+  }, [])
 
   useEffect(() => {
     if (selectedSettingsCategory !== 'usage' || availableSounds.length > 0) return
@@ -6529,7 +6577,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       const next = prev.filter(c => String(c.friendId || '') !== tid)
       if (!sameDocValue(prev, next)) {
         scheduleUserPersist('chats', next)
-        userPutDoc('chats', next).catch(() => {})
       }
       return next
     })
@@ -6567,7 +6614,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         if (prev.some(c => String(c.id) === chatId)) return prev
         const next = [restoredChat, ...prev]
         scheduleUserPersist('chats', next)
-        userPutDoc('chats', next).catch(() => {})
         return next
       })
       setSelectedChat(prev => prev?.id === chatId ? { ...prev, blockedOnly: false, photo: getPersonPhoto(restoredChat) || prev.photo } : prev)
@@ -6943,7 +6989,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       onReelmMemberJoined: ({ reelmId }) => {
         scheduleReelmCoreHydrate(reelmId, 60)
       },
-      onReelmMemberRemoved: ({ reelmId }) => {
+      onReelmMemberRemoved: ({ reelmId, userId }) => {
+        const id = String(reelmId || '')
+        const targetUid = String(userId || '')
+        if (id && targetUid) {
+          setReelms(prev => prev.map(r => String(r.id) === id ? { ...r, members: (r.members || []).filter(m => String(m.userId || m.id || '') !== targetUid) } : r))
+          setSelectedReelm(prev => String(prev?.id || '') === id ? { ...prev, members: (prev.members || []).filter(m => String(m.userId || m.id || '') !== targetUid) } : prev)
+        }
         scheduleReelmCoreHydrate(reelmId, 60)
       },
       onReelmMemberLeft: ({ reelmId }) => {
@@ -7079,7 +7131,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           const myUsername = currentUserRef.current?.username || ''
           const hasMention = myUsername && msg.text && msg.text.toLowerCase().includes(`@${myUsername.toLowerCase()}`)
           const isActiveThread = msgKey === activeMsgKeyRef.current && !document.hidden
-          if (hasMention) playSound.mention()
           const mutedReelmId = !isDmKey ? reelmsRef.current.find(r => String(msgKey).startsWith(`${r.id}_`))?.id : null
           const reelmMuted = mutedReelmId && mutedReelmIdsRef.current.includes(String(mutedReelmId))
           if (hasMention && !reelmMuted) playSound.mention()
@@ -7765,7 +7816,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setChats(prev => {
       const next = prev.filter(c => String(c.id) !== id)
       scheduleUserPersist('chats', next)
-      userPutDoc('chats', next).catch(() => {})
       return next
     })
     if (selectedChat?.id === id) setSelectedChat(null)
@@ -8708,6 +8758,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       return
     }
     if (type === 'join') {
+      const fk = String(from || '')
+      if (fk && fk !== String(uid)) {
+        // Remote room-entry cue: everyone already in the room hears a distinct join sound.
+        // The joining user does not get this remote cue; they already clicked join.
+        playSound.voiceJoin()
+      }
       setVoiceParticipants(prev => prev.find(p => String(p.userId) === String(from)) ? prev : [...prev, { userId: from, userName: msg.userName, userPhoto: msg.userPhoto, isMuted: false, isVideoOn: false }])
       createPeer(from, localStreamRef.current, shouldInitiatePeer(from))
       // Tell the newcomer we're here
@@ -8717,6 +8773,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       createPeer(from, localStreamRef.current, shouldInitiatePeer(from))
     } else if (type === 'leave') {
       const fk = String(from)
+      if (fk && fk !== String(uid)) {
+        // Remote room-exit cue: a different sound makes leave/switch/disconnect immediately understandable.
+        playSound.voiceLeave()
+      }
       setVoiceParticipants(prev => prev.filter(p => String(p.userId) !== fk))
       const pc = peersRef.current[fk]; if (pc) { pc.close(); delete peersRef.current[fk] }
       const audioNode = remoteAudiosRef.current[fk]
@@ -9869,7 +9929,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       setShowReelmSettings(false)
       addNotification(`${target.name || 'Reelm'} was closed.`)
     } catch (err) {
-      if (err?.code === 'confirmation_required' || err?.message === 'confirmation_required') addNotification('Type the exact server name to close it.')
+      if (err?.code === 'confirmation_required' || err?.message === 'confirmation_required') addNotification('Wait 5 seconds, then press the close button again.')
       else if (err?.code === 'forbidden' || err?.message === 'forbidden') addNotification('Only the server owner/admin can close this server.')
       else addNotification('Could not close this server. Please try again.')
     }
@@ -9887,13 +9947,27 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     return persistReelmCore(updatedReelm)
   }
 
-  const removeMemberFromSelectedReelm = (targetUid, reason = '') => {
+  const removeMemberFromSelectedReelm = async (targetUid, reason = '') => {
     if (!selectedReelm || !targetUid) return
+    const reelmId = selectedReelm.id
     const member = (selectedReelm.members || []).find(m => String(m.userId) === String(targetUid))
     if (!canActOnReelmMemberClient(selectedReelm, uid, member, 'manageMembers')) { addNotification('You cannot kick this member.'); return }
-    const next = { ...selectedReelm, members: (selectedReelm.members || []).filter(m => String(m.userId) !== String(targetUid)) }
-    updateReelm(next, { scope: 'roles-members', allowMemberRemoval: true })
-    addNotification(reason ? `Member kicked from Reelm: ${reason}` : 'Member kicked from Reelm.')
+    setSelectedReelm(prev => String(prev?.id || '') === String(reelmId) ? { ...prev, members: (prev.members || []).filter(m => String(m.userId) !== String(targetUid)) } : prev)
+    setReelms(prev => prev.map(r => String(r.id) === String(reelmId) ? { ...r, members: (r.members || []).filter(m => String(m.userId) !== String(targetUid)) } : r))
+    try {
+      const result = await removeReelmMember(reelmId, targetUid, reason)
+      if (Array.isArray(result?.members)) {
+        setSelectedReelm(prev => String(prev?.id || '') === String(reelmId) ? { ...prev, members: result.members } : prev)
+        setReelms(prev => prev.map(r => String(r.id) === String(reelmId) ? { ...r, members: result.members } : r))
+      }
+      hydrateReelmCore(reelmId).then(r => r && mergeReelmIntoState(r)).catch(() => {})
+      addNotification(reason ? `Member kicked from Reelm: ${reason}` : 'Member kicked from Reelm.')
+    } catch (err) {
+      hydrateReelmCore(reelmId).then(r => r && mergeReelmIntoState(r)).catch(() => {})
+      if (err?.code === 'cannot_remove_owner' || err?.message === 'cannot_remove_owner') addNotification('You cannot kick the Reelm owner.')
+      else if (err?.code === 'cannot_remove_protected' || err?.message === 'cannot_remove_protected') addNotification('This protected member cannot be kicked.')
+      else addNotification('Could not kick this member.')
+    }
   }
 
   const openServerMemberAction = (type, reelmId, user) => {
@@ -9914,7 +9988,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     try {
       if (action.type === 'ban') await banMemberFromReelm(reelmId, targetUid, reason)
       else if (action.type === 'timeout') await timeoutMemberInReelm(reelmId, targetUid, Number(serverActionMinutes) || 10, reason)
-      else if (action.type === 'remove') removeMemberFromSelectedReelm(targetUid, reason)
+      else if (action.type === 'remove') await removeMemberFromSelectedReelm(targetUid, reason)
     } catch { addNotification('Could not complete server action.') }
   }
 
@@ -10832,6 +10906,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                 onApproveJoin={approveReelmJoinRequest}
                 onRejectJoin={rejectReelmJoinRequest}
                 onInviteFriend={inviteFriendToReelm}
+                onRemoveMember={(reelmId, userId, reason) => removeMemberFromSelectedReelm(userId, reason)}
                 onBanMember={banMemberFromReelm}
                 onUnbanMember={unbanMemberFromReelm}
                 onTimeoutMember={timeoutMemberInReelm}

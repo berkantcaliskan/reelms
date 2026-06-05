@@ -8,7 +8,7 @@ import { apiRateLimit } from '../middleware/rateLimit.js'
 import { verifyIdToken } from '../../modules/auth/authService.js'
 import { APP_PK, chanPk, deleteDoc, getDoc, putDoc, putDocIfAbsent, queryDocs, reelmPk, scanByPkPrefix, userPk } from '../../modules/store/docStore.js'
 import { canManageReelm, canUseReelmPermission, getActiveReelmTimeout, getMessageKeyAccess, getUserPublicProfile as getStoredPublicProfile, isReelmMember, normalizeEmail, normalizeUsername, publicProfileFromStored } from '../../modules/reelms/access.js'
-import { autoJoinDefaultReelm, DEFAULT_REELM_ID, setDefaultReelmLeft } from '../../modules/reelms/defaultReelm.js'
+import { autoJoinDefaultReelm, DEFAULT_REELM_ID, hasLeftDefaultReelm, setDefaultReelmLeft } from '../../modules/reelms/defaultReelm.js'
 import { isCommunityAdminUid, resolveCommunityAdminUids } from '../../modules/reelms/communityAdmins.js'
 import { buildUserUploadKey, getObjectStorage } from '../../modules/storage/objectStorage.js'
 
@@ -52,6 +52,21 @@ export function createReelmsDataRouter(io: Server) {
   const fastUserDocInflight = new Map<string, Promise<any>>()
   const publicProfileCache = new Map<string, { value: any, expiresAt: number }>()
   const defaultJoinHealLast = new Map<string, number>()
+
+  const hiddenSystemMemberIds = () => new Set([String(env.REELMS_MODERATION_UID || ''), 'reelms-moderation'].filter(Boolean))
+  const entryUserId = (entry: any) => String(entry?.userId || entry?.id || '').trim()
+  const hiddenMemberIdsFromBanList = (banList: any[] = []) => new Set((Array.isArray(banList) ? banList : []).map(entryUserId).filter(Boolean))
+  const filterMembersForClient = (members: any[] = [], banList: any[] = []) => {
+    const hiddenIds = hiddenSystemMemberIds()
+    hiddenMemberIdsFromBanList(banList).forEach((id) => hiddenIds.add(id))
+    const seen = new Set<string>()
+    return (Array.isArray(members) ? members : []).filter((member: any) => {
+      const id = entryUserId(member)
+      if (!id || hiddenIds.has(id) || seen.has(id)) return false
+      seen.add(id)
+      return true
+    })
+  }
 
   const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms))
   const withDeadline = async <T,>(promise: Promise<T>, ms: number, fallback: T): Promise<T> => {
@@ -199,17 +214,20 @@ export function createReelmsDataRouter(io: Server) {
     if (existing) return existing
     const run = (async () => {
       const pk = reelmPk(id)
-      const [meta, structure, roles, members] = await Promise.all([
+      const [meta, structure, roles, members, rawBanList] = await Promise.all([
         getDoc<any>(pk, 'meta').catch(() => null),
         getDoc<any>(pk, 'structure').catch(() => null),
         getDoc<any[]>(pk, 'roles').catch(() => []),
-        getDoc<any[]>(pk, 'members').catch(() => [])
+        getDoc<any[]>(pk, 'members').catch(() => []),
+        getDoc<any[]>(pk, 'ban_list').catch(() => [])
       ])
       if (!meta?.id) return null
-      const normalized = normalizeReelmCoreForClient(id, roles || [], members || [])
+      const safeBanList = Array.isArray(rawBanList) ? rawBanList : []
+      const safeMembers = filterMembersForClient(members || [], safeBanList)
+      const normalized = normalizeReelmCoreForClient(id, roles || [], safeMembers)
       const managerDocs = options.includeManagerDocs ? await Promise.all([
         getDoc<any[]>(pk, 'join_requests').catch(() => []),
-        getDoc<any[]>(pk, 'ban_list').catch(() => []),
+        Promise.resolve(safeBanList),
         getDoc<any[]>(pk, 'timeout_list').catch(() => [])
       ]) : [[], [], []]
       const [joinRequests, banList, timeoutList] = managerDocs
@@ -960,14 +978,16 @@ export function createReelmsDataRouter(io: Server) {
         getDoc<any[]>(pk, 'members').catch(() => []),
         getDoc<any[]>(pk, 'roles').catch(() => [])
       ])
-      const isOwner = actorId && String(meta?.ownerId || '') === actorId
-      const isSystem = actorId && actorId === env.REELMS_MODERATION_UID
-      const isCommunityAdmin = id === DEFAULT_REELM_ID && actorId ? await isCommunityAdminUid(actorId).catch(() => false) : false
+      const isBanned = actorId ? await isBannedFromReelm(id, actorId).catch(() => false) : false
+      const hasLeftDefault = id === DEFAULT_REELM_ID && actorId ? await hasLeftDefaultReelm(actorId).catch(() => false) : false
+      const isOwner = Boolean(actorId && String(meta?.ownerId || '') === actorId)
+      const isSystem = Boolean(actorId && actorId === env.REELMS_MODERATION_UID)
+      const isCommunityAdmin = !isBanned && !hasLeftDefault && id === DEFAULT_REELM_ID && actorId ? await isCommunityAdminUid(actorId).catch(() => false) : false
       const member = (members || []).find((item: any) => memberUserId(item) === actorId)
       const roleIds = new Set(Array.isArray(member?.roleIds) ? member.roleIds.map(String) : [])
       const actorRoles = (roles || []).filter((role: any) => roleIds.has(String(role?.id || '')))
-      const isFullManager = isOwner || isSystem || isCommunityAdmin || actorRoles.some(isManagerRole)
-      const canManageFullRoles = isOwner || isSystem || isCommunityAdmin
+      const isFullManager = !isBanned && !hasLeftDefault && (isOwner || isSystem || isCommunityAdmin || actorRoles.some(isManagerRole))
+      const canManageFullRoles = !isBanned && !hasLeftDefault && (isOwner || isSystem || isCommunityAdmin)
       const permissions = new Set<string>()
       if (isFullManager) REELM_PERMISSION_KEYS.forEach((key) => permissions.add(key))
       for (const role of actorRoles) {
@@ -1171,10 +1191,13 @@ export function createReelmsDataRouter(io: Server) {
       resolvedCommunityAdmins.forEach((id) => { if (id) managerIds.add(String(id)) })
     }
     const data = await getDoc<any>(pk, sk).catch(() => null)
-    managerIds.forEach((id) => {
+    const bannedIds = hiddenMemberIdsFromBanList(await getBanList(reelmId).catch(() => []))
+    for (const id of managerIds) {
+      if (!id || bannedIds.has(id)) continue
+      if (reelmId === DEFAULT_REELM_ID && id !== env.REELMS_MODERATION_UID && await hasLeftDefaultReelm(id).catch(() => false)) continue
       io.to(`u:${id}`).emit('reelms:doc', { scope: 'reelm', reelmId, sk, data, version: syncVersion(), at: Date.now() })
       io.to(`u:${id}`).emit('reelms:manager-doc', { reelmId, sk, data, version: syncVersion(), at: Date.now() })
-    })
+    }
   }
 
 
@@ -1891,7 +1914,6 @@ export function createReelmsDataRouter(io: Server) {
       if (!banMessage) banMessage = `You were banned from ${meta.name || 'this Reelm'}.`
       if (String(meta.ownerId || '') === targetUid) return res.status(409).json({ error: 'cannot_ban_owner' })
       if (targetUid === env.REELMS_MODERATION_UID) return res.status(409).json({ error: 'cannot_ban_protected' })
-      if (reelmId === DEFAULT_REELM_ID && await isCommunityAdminUid(targetUid).catch(() => false)) return res.status(409).json({ error: 'cannot_ban_protected' })
       if (!await canManageReelm(actorUid, reelmId).catch(() => false)) {
         const [membersForGuard, rolesForGuard] = await Promise.all([
           getDoc<any[]>(pk, 'members').catch(() => []),
@@ -1939,6 +1961,46 @@ export function createReelmsDataRouter(io: Server) {
     } catch (err) {
       console.error('/api/v1/reelms/ban error:', err)
       res.status(500).json({ error: 'ban_failed' })
+    }
+  })
+
+
+  router.post('/reelms/:reelmId/remove-member', async (req, res) => {
+    try {
+      const actorUid = String(req.userId)
+      const reelmId = String(req.params.reelmId || '')
+      const targetUid = String(req.body?.targetUid || req.body?.userId || '')
+      const reason = String(req.body?.reason || req.body?.message || '').trim().slice(0, 320)
+      if (!targetUid) return res.status(400).json({ error: 'missing_target' })
+      if (targetUid === actorUid) return res.status(400).json({ error: 'cannot_remove_self' })
+      if (!await canUseReelmPermission(actorUid, reelmId, 'manageMembers')) return res.status(403).json({ error: 'forbidden' })
+      const pk = reelmPk(reelmId)
+      const [meta, members, roles] = await Promise.all([
+        getDoc<any>(pk, 'meta').catch(() => null),
+        getDoc<any[]>(pk, 'members').catch(() => []),
+        getDoc<any[]>(pk, 'roles').catch(() => [])
+      ])
+      if (!meta?.id) return res.status(404).json({ error: 'reelm_not_found' })
+      if (String(meta.ownerId || '') === targetUid) return res.status(409).json({ error: 'cannot_remove_owner' })
+      if (targetUid === env.REELMS_MODERATION_UID) return res.status(409).json({ error: 'cannot_remove_protected' })
+
+      const actorState = await getActorRoleState(actorUid, reelmId)
+      const targetMember = (members || []).find((member: any) => memberUserId(member) === targetUid)
+      if (!targetMember) return res.json({ data: { removed: true, members: filterMembersForClient(members || [], await getBanList(reelmId)) } })
+      const protectedRoleIds = new Set((roles || []).filter(isProtectedRole).map((role: any) => String(role?.id || '')).filter(Boolean))
+      const targetProtected = Array.isArray(targetMember?.roleIds) && targetMember.roleIds.map(String).some((id: string) => protectedRoleIds.has(id))
+      if (targetProtected && actorState?.canManageFullRoles !== true) return res.status(409).json({ error: 'cannot_remove_protected' })
+
+      const nextMembers = (members || []).filter((member: any) => memberUserId(member) !== targetUid)
+      await putDoc(pk, 'members', nextMembers)
+      await revokeReelmAccess(reelmId, targetUid, 'removed', meta.name || undefined)
+      void syncReelmMemberCopies(reelmId).catch(() => {})
+      emitReelm(reelmId, 'members')
+      io.to(`reelm:${reelmId}`).emit('reelm:member-removed', { reelmId, userId: targetUid, reason: reason || null })
+      res.json({ data: { removed: true, members: filterMembersForClient(nextMembers, await getBanList(reelmId)) } })
+    } catch (err) {
+      console.error('/api/v1/reelms/remove-member error:', err)
+      res.status(500).json({ error: 'remove_member_failed' })
     }
   })
 
@@ -1991,7 +2053,6 @@ export function createReelmsDataRouter(io: Server) {
       if (!meta?.id) return res.status(404).json({ error: 'reelm_not_found' })
       if (String(meta.ownerId || '') === targetUid) return res.status(409).json({ error: 'cannot_timeout_owner' })
       if (targetUid === env.REELMS_MODERATION_UID) return res.status(409).json({ error: 'cannot_timeout_protected' })
-      if (reelmId === DEFAULT_REELM_ID && await isCommunityAdminUid(targetUid).catch(() => false)) return res.status(409).json({ error: 'cannot_timeout_protected' })
       if (!await isReelmMember(targetUid, reelmId).catch(() => false)) return res.status(404).json({ error: 'member_not_found' })
       if (!await canManageReelm(actorUid, reelmId).catch(() => false)) {
         const [membersForGuard, rolesForGuard] = await Promise.all([
@@ -2071,7 +2132,8 @@ export function createReelmsDataRouter(io: Server) {
       const actorState = await getActorRoleState(uid, reelmId)
       if (actorState?.isFullManager !== true) return res.status(403).json({ error: 'forbidden' })
       const confirmName = String(req.body?.confirmName || '').trim()
-      if (!confirmName || confirmName !== String(meta.name || '').trim()) return res.status(400).json({ error: 'confirmation_required', code: 'confirmation_required' })
+      const confirmed = req.body?.confirmed === true || req.body?.cooldownConfirmed === true
+      if (!confirmed && (!confirmName || confirmName !== String(meta.name || '').trim())) return res.status(400).json({ error: 'confirmation_required', code: 'confirmation_required' })
 
       const memberIds = memberUserIds(members || [])
       await Promise.all(memberIds.map(memberId => removeUserReelmCopy(memberId, reelmId).catch(() => false)))
@@ -2268,19 +2330,21 @@ export function createReelmsDataRouter(io: Server) {
       const canReadJoinRequests = actorHasPermission(actorState, 'manageJoinRequests')
       const canReadModeration = actorHasPermission(actorState, 'manageModeration')
       const pk = reelmPk(reelmId)
-      const [joinRequests, banList, timeoutList] = await Promise.all([
+      const [joinRequests, rawBanList, timeoutList] = await Promise.all([
         canReadJoinRequests ? getDoc<any[]>(pk, 'join_requests').catch(() => []) : Promise.resolve([]),
-        canReadModeration ? getDoc<any[]>(pk, 'ban_list').catch(() => []) : Promise.resolve([]),
+        getDoc<any[]>(pk, 'ban_list').catch(() => []),
         canReadModeration ? getDoc<any[]>(pk, 'timeout_list').catch(() => []) : Promise.resolve([])
       ])
       const meta = actorState?.meta || null
       if (!meta) return res.status(404).json({ error: 'not_found' })
       const structure = (await getDoc<any>(pk, 'structure').catch(() => null)) || { categories: [] }
-      const normalized = normalizeReelmCoreForClient(reelmId, actorState?.roles || [], actorState?.members || [])
+      const safeBanList = Array.isArray(rawBanList) ? rawBanList : []
+      const visibleMembers = filterMembersForClient(actorState?.members || [], safeBanList)
+      const normalized = normalizeReelmCoreForClient(reelmId, actorState?.roles || [], visibleMembers)
       res.json({
         data: toClientReelm(meta, structure, normalized.roles, normalized.members, {
           joinRequests: Array.isArray(joinRequests) ? joinRequests : [],
-          banList: Array.isArray(banList) ? banList : [],
+          banList: canReadModeration ? safeBanList : [],
           timeoutList: Array.isArray(timeoutList) ? timeoutList : []
         })
       })
@@ -2307,7 +2371,9 @@ export function createReelmsDataRouter(io: Server) {
         const isMember = Boolean(actorState?.isOwner || actorState?.isFullManager || (actorState?.members || []).some((m: any) => memberUserId(m) === uid))
         if (!isMember) return res.status(403).json({ error: 'forbidden' })
         if (sk === 'roles' || sk === 'members') {
-          const normalized = normalizeReelmCoreForClient(reelmId, actorState?.roles || [], actorState?.members || [])
+          const rawBanList = await getDoc<any[]>(pk, 'ban_list').catch(() => [])
+          const visibleMembers = filterMembersForClient(actorState?.members || [], Array.isArray(rawBanList) ? rawBanList : [])
+          const normalized = normalizeReelmCoreForClient(reelmId, actorState?.roles || [], visibleMembers)
           return res.json({ data: sk === 'roles' ? normalized.roles : normalized.members })
         }
         return res.json({ data: await getDoc(pk, sk) })
@@ -2464,20 +2530,6 @@ export function createReelmsDataRouter(io: Server) {
           const adminRole = getDefaultManagerRole(roles)
           const adminRoleId = adminRole?.id ? String(adminRole.id) : ''
 
-          for (const previousMember of previousMembers) {
-            const previousUid = memberUserId(previousMember)
-            if (!previousUid || !await isCommunityAdminUid(previousUid).catch(() => false)) continue
-            if (incomingData.some((member: any) => memberUserId(member) === previousUid)) continue
-            const profile = await getUserPublicProfile(previousUid).catch(() => null)
-            incomingData.unshift({
-              ...previousMember,
-              userId: previousUid,
-              userName: previousMember?.userName || profile?.name || profile?.username || 'Admin',
-              userPhoto: previousMember?.userPhoto || getProfilePhoto(profile || {}),
-              roleIds: Array.isArray(previousMember?.roleIds) ? previousMember.roleIds : []
-            })
-          }
-
           if (adminRoleId) {
             incomingData = await Promise.all(incomingData.map(async (member: any) => {
               const memberUid = memberUserId(member)
@@ -2509,6 +2561,12 @@ export function createReelmsDataRouter(io: Server) {
         }
 
         const bannedIds = new Set((await getBanList(reelmId)).map((entry: any) => String(entry?.userId || entry?.id || '')).filter(Boolean))
+        hiddenSystemMemberIds().forEach((id) => bannedIds.add(id))
+        if (reelmId === DEFAULT_REELM_ID) {
+          for (const incomingId of memberUserIds(incomingData)) {
+            if (incomingId && await hasLeftDefaultReelm(incomingId).catch(() => false)) bannedIds.add(incomingId)
+          }
+        }
         if (!allowMemberRemoval) {
           const incomingIds = new Set(memberUserIds(incomingData))
           for (const previous of previousMembers) {
@@ -2540,10 +2598,7 @@ export function createReelmsDataRouter(io: Server) {
       if (sk === 'members') {
         const previousIds = new Set(memberUserIds(previousMembers))
         const nextIds = new Set(memberUserIds(incomingData))
-        const configuredCommunityAdmins = reelmId === DEFAULT_REELM_ID
-          ? (await Promise.all(Array.from(previousIds).map(async (id) => await isCommunityAdminUid(id).catch(() => false) ? id : ''))).filter(Boolean)
-          : []
-        const protectedIds = new Set([String(existingMeta?.ownerId || ''), env.REELMS_MODERATION_UID, ...configuredCommunityAdmins].filter(Boolean))
+        const protectedIds = new Set([String(existingMeta?.ownerId || ''), env.REELMS_MODERATION_UID].filter(Boolean))
         const removedIds = Array.from(previousIds).filter((id) => !nextIds.has(id) && !protectedIds.has(id))
         const addedIds = Array.from(nextIds).filter((id) => !previousIds.has(id))
         await Promise.all(addedIds.map((id) => cleanupJoinRequest(reelmId, id).catch(() => null)))
