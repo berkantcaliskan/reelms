@@ -890,7 +890,7 @@ h6 {
   align-self: center;
   /* + butonunun içindeki ikon 32px iken, buton 40px olduğu için görsel hizayı dengeler. */
   margin-left: -4px;
-  margin-top: -4px;
+  margin-top: -6px;
 }
 
 .chats-row {
@@ -1075,7 +1075,7 @@ h6 {
   display: flex;
   flex-direction: row;
   align-items: flex-start;
-  gap: 28px;
+  gap: 16px;
   padding: 0 36px;
   width: 100%;
   max-width: 900px;
@@ -1194,7 +1194,9 @@ h6 {
   color: rgba(var(--ta-rgb), 0.35);
   font-style: italic;
   padding: 4px 10px;
-  margin: 0;
+  padding-left: 52px;
+  margin-top: 5px;
+  margin-bottom: 0;
 }
 
 .home-section-viewall {
