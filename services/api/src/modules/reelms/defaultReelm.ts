@@ -1,4 +1,4 @@
-import { getDoc, putDoc, putDocIfAbsent, reelmPk, scanByPkPrefix, userPk } from '../store/docStore.js'
+import { getDoc, putDoc, putDocIfAbsent, reelmPk, scanByPkPrefixAndSk, userPk } from '../store/docStore.js'
 import { isCommunityAdminEmail, isCommunityAdminUid, isCommunityAdminUsername, resolveCommunityAdminUids } from './communityAdmins.js'
 
 export const DEFAULT_REELM_ID = 'reelms-community'
@@ -327,9 +327,9 @@ export async function ensureUserHasDefaultReelm(uid: string) {
 
 export async function syncAllDefaultCommunityMembersFromProfiles() {
   await ensureDefaultReelm()
-  const profiles = await scanByPkPrefix('USER#')
+  const profiles = await scanByPkPrefixAndSk('USER#', 'profile', 5000)
   for (const item of profiles) {
-    if (item.sk !== 'profile' || !(item.data as any)?.id) continue
+    if (!(item.data as any)?.id) continue
     const profile = item.data as any
     await autoJoinDefaultReelm(String(profile.id), profile.name || profile.displayName || profile.username || '', getProfilePhoto(profile))
   }

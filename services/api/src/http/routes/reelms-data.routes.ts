@@ -5,7 +5,7 @@ import type { Server } from 'socket.io'
 import { env } from '../../config/env.js'
 import { authenticate } from '../middleware/authenticate.js'
 import { verifyIdToken } from '../../modules/auth/authService.js'
-import { APP_PK, chanPk, deleteDoc, getDoc, putDoc, putDocIfAbsent, queryDocs, reelmPk, scanByPkPrefix, userPk } from '../../modules/store/docStore.js'
+import { APP_PK, chanPk, deleteDoc, getDoc, putDoc, putDocIfAbsent, queryDocs, reelmPk, scanByPkPrefix, scanByPkPrefixAndSk, userPk } from '../../modules/store/docStore.js'
 import { canManageReelm, canUseReelmPermission, getActiveReelmTimeout, getMessageKeyAccess, getUserPublicProfile as getStoredPublicProfile, isReelmMember, normalizeEmail, normalizeUsername, publicProfileFromStored } from '../../modules/reelms/access.js'
 import { autoJoinDefaultReelm, DEFAULT_REELM_ID, setDefaultReelmLeft } from '../../modules/reelms/defaultReelm.js'
 import { isCommunityAdminUid, resolveCommunityAdminUids } from '../../modules/reelms/communityAdmins.js'
@@ -986,7 +986,10 @@ export function createReelmsDataRouter(io: Server) {
         getDoc<any>(userPk(requestedUid), 'customization').catch(() => null)
       ])
       return res.json({ data: publicProfileFromStored(requestedUid, { ...profile, sociallinks: sociallinks || profile.sociallinks || {}, socialorder: Array.isArray(socialorder) ? socialorder : (profile.socialorder || []), profileTheme: profile.profileTheme || customization || null }) })
-    } catch { res.status(500).json({ error: 'get_failed' }) }
+    } catch (err) {
+      console.error('/api/v1/user/profile/:uid get error:', err)
+      res.status(500).json({ error: 'get_failed' })
+    }
   })
 
   router.patch('/user/profile', async (req, res) => {
@@ -1078,10 +1081,10 @@ export function createReelmsDataRouter(io: Server) {
 
   router.get('/users', async (req, res) => {
     try {
-      const q = String(req.query.q || '').trim().toLowerCase()
-      const items = await scanByPkPrefix<any>('USER#')
+      const q = String(req.query.q || '').trim().toLowerCase().slice(0, 60)
+      const items = await scanByPkPrefixAndSk<any>('USER#', 'profile', q ? 2500 : 200)
       const profiles = items
-        .filter((i) => i.sk === 'profile' && i.data && !(i.data as any).isSystem)
+        .filter((i) => i.data && !(i.data as any).isSystem && !(i.data as any).deletedAt && !(i.data as any).accountClosedAt)
         .filter((i) => {
           if (!q) return true
           const data = i.data as any
@@ -1098,7 +1101,10 @@ export function createReelmsDataRouter(io: Server) {
         .slice(0, q ? 50 : 100)
         .map((i) => publicProfileFromStored(i.pk.replace(/^USER#/, ''), i.data))
       res.json({ data: profiles })
-    } catch { res.status(500).json({ error: 'list_failed' }) }
+    } catch (err) {
+      console.error('/api/v1/users list error:', err)
+      res.status(500).json({ error: 'list_failed' })
+    }
   })
 
   router.get('/admin/all-reelms', async (req, res) => {
@@ -1114,9 +1120,9 @@ export function createReelmsDataRouter(io: Server) {
   router.get('/reelms/discover', async (req, res) => {
     try {
       const uid = String(req.userId || '')
-      const q = String(req.query.q || '').trim().toLowerCase()
-      const items = await scanByPkPrefix<any>('REELM#')
-      const metas = items.filter((i) => i.sk === 'meta' && i.data && (i.data as any).id).map((i) => i.data as any)
+      const q = String(req.query.q || '').trim().toLowerCase().slice(0, 80)
+      const items = await scanByPkPrefixAndSk<any>('REELM#', 'meta', 1500)
+      const metas = items.filter((i) => i.data && (i.data as any).id).map((i) => i.data as any)
       const mine = ((await getDoc<any[]>(userPk(uid), 'reelms').catch(() => [])) || []).map((r: any) => String(r?.id || ''))
       const mineSet = new Set(mine)
       const candidates = metas
@@ -1148,7 +1154,10 @@ export function createReelmsDataRouter(io: Server) {
       }))
       const data = rows.filter(Boolean)
       res.json({ data })
-    } catch (err) { res.status(500).json({ error: 'discover_failed' }) }
+    } catch (err) {
+      console.error('/api/v1/reelms/discover error:', err)
+      res.status(500).json({ error: 'discover_failed' })
+    }
   })
 
   router.post('/reelms/:reelmId/request-join', async (req, res) => {

@@ -3,13 +3,19 @@ import { getWebToken } from '../../webAuth.js'
 
 const env = getWebEnv()
 const SESSION_ID = `${Date.now()}_${Math.random().toString(36).slice(2, 10)}`
+const MAX_QUEUE = 100
+const MAX_BATCH = 30
+const FLUSH_MS = 15_000
 
 let _uid = null
 let _queue = []
 let _flushTimer = null
+let _initialized = false
+let _lastClickKey = ''
+let _lastClickAt = 0
 
 export function setTrackerUid(uid) {
-  _uid = uid
+  _uid = uid || null
 }
 
 function resolveUid() {
@@ -23,75 +29,135 @@ function resolveUid() {
 }
 
 function currentPage() {
-  try { return window.location.hash || window.location.pathname } catch { return null }
+  try { return (window.location.hash || window.location.pathname || '').slice(0, 160) } catch { return null }
+}
+
+function clean(value, max = 96) {
+  return String(value || '').replace(/[\r\n\t]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max)
+}
+
+function safeKey(value, fallback = '') {
+  return clean(value, 48).toLowerCase().replace(/[^a-z0-9_.:-]+/g, '_').replace(/^_+|_+$/g, '') || fallback
 }
 
 function describeTarget(el) {
   if (!el) return null
-  const parts = []
-  if (el.id) parts.push(`#${el.id}`)
-  if (el.dataset?.action) parts.push(`[${el.dataset.action}]`)
-  const tag = el.tagName?.toLowerCase()
-  if (tag && ['button', 'a', 'input', 'select', 'textarea'].includes(tag)) parts.push(tag)
-  const text = el.textContent?.trim().replace(/\s+/g, ' ').slice(0, 50)
-  if (text) parts.push(`"${text}"`)
-  return parts.join(' ') || tag || null
+  const explicit = el.getAttribute?.('data-track') || el.getAttribute?.('data-action')
+  if (explicit) return safeKey(explicit, 'action')
+
+  const aria = el.getAttribute?.('aria-label') || el.getAttribute?.('title') || el.getAttribute?.('name')
+  const tag = clean(el.tagName || 'element', 24).toLowerCase()
+  const role = el.getAttribute?.('role')
+  const classes = typeof el.className === 'string'
+    ? el.className.split(/\s+/).filter(Boolean).slice(0, 2).map((c) => safeKey(c)).filter(Boolean).join('.')
+    : ''
+
+  // Never send textContent. Chat/profile/message text can be private.
+  return [tag, role ? `role:${safeKey(role)}` : '', aria ? `label:${safeKey(aria)}` : '', classes ? `class:${classes}` : '']
+    .filter(Boolean)
+    .join('|')
+    .slice(0, 96) || null
+}
+
+function sanitizeMetadata(metadata) {
+  if (!metadata || typeof metadata !== 'object' || Array.isArray(metadata)) return null
+  const out = {}
+  for (const [rawKey, rawValue] of Object.entries(metadata).slice(0, 12)) {
+    const key = safeKey(rawKey)
+    if (!key) continue
+    if (rawValue == null) out[key] = null
+    else if (typeof rawValue === 'string') out[key] = clean(rawValue, 160)
+    else if (typeof rawValue === 'number' && Number.isFinite(rawValue)) out[key] = rawValue
+    else if (typeof rawValue === 'boolean') out[key] = rawValue
+  }
+  return Object.keys(out).length ? out : null
 }
 
 function push(eventType, extra = {}) {
+  const token = getWebToken()
+  const uid = resolveUid()
+  if (!token || !uid) return
+
   _queue.push({
-    event_type: eventType,
-    uid: resolveUid(),
+    event_type: safeKey(eventType, 'event'),
+    uid,
     session_id: SESSION_ID,
     page: currentPage(),
     occurred_at: new Date().toISOString(),
-    ...extra,
+    category: safeKey(extra.category, 'ui'),
+    element: extra.element ? clean(extra.element, 96) : null,
+    metadata: sanitizeMetadata(extra.metadata),
   })
-  if (_queue.length >= 20) flush()
+
+  if (_queue.length > MAX_QUEUE) _queue = _queue.slice(-MAX_QUEUE)
+  if (_queue.length >= MAX_BATCH) void flush()
 }
 
-async function flush() {
-  if (!_queue.length) return
-  const batch = _queue.splice(0)
+export async function flush() {
   const token = getWebToken()
+  const uid = resolveUid()
+  if (!token || !uid || !_queue.length) return
+
+  const batch = _queue.splice(0, MAX_BATCH)
   try {
-    await fetch(`${env.apiBaseUrl}/api/v1/track`, {
+    const res = await fetch(`${env.apiBaseUrl}/api/v1/track`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ uid: resolveUid(), events: batch }),
+      body: JSON.stringify({ events: batch }),
       keepalive: true,
     })
-  } catch {}
+    // If the backend build does not have /track yet, do not hammer it.
+    if (res.status === 404 || res.status === 405) {
+      _queue = []
+      stopTrackerTimer()
+    }
+  } catch {
+    // Put the batch back once, bounded. Tracking must not affect UX.
+    _queue = [...batch, ..._queue].slice(0, MAX_QUEUE)
+  }
+}
+
+function stopTrackerTimer() {
+  if (_flushTimer) clearInterval(_flushTimer)
+  _flushTimer = null
 }
 
 export function initTracker() {
-  // Tıklama takibi
-  document.addEventListener('click', (e) => {
-    const target = e.target?.closest('button, a, [role="button"], [data-action], input[type="submit"]') || e.target
-    push('click', { element: describeTarget(target), category: 'ui' })
+  if (_initialized || typeof window === 'undefined' || typeof document === 'undefined') return
+  _initialized = true
+
+  document.addEventListener('click', (event) => {
+    const target = event.target?.closest?.('button, a, [role="button"], [data-action], [data-track], input[type="submit"]')
+    if (!target) return
+    const element = describeTarget(target)
+    if (!element) return
+
+    const now = Date.now()
+    const clickKey = `${currentPage()}::${element}`
+    if (clickKey === _lastClickKey && now - _lastClickAt < 350) return
+    _lastClickKey = clickKey
+    _lastClickAt = now
+
+    push('click', { element, category: 'ui' })
   }, { passive: true })
 
-  // Sayfa değişim takibi (hash router)
   window.addEventListener('hashchange', () => {
     push('page_view', { page: currentPage(), category: 'navigation' })
   })
 
-  // Sekme kapanınca boşalt
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'hidden') flush()
+    if (document.visibilityState === 'hidden') void flush()
   })
-  window.addEventListener('pagehide', flush)
+  window.addEventListener('pagehide', () => { void flush() })
 
-  // Her 10 saniyede otomatik gönder
-  _flushTimer = setInterval(flush, 10_000)
-
-  // İlk sayfa görüntüleme
+  stopTrackerTimer()
+  _flushTimer = setInterval(() => { void flush() }, FLUSH_MS)
   push('page_view', { page: currentPage(), category: 'navigation' })
 }
 
 export function trackAction(name, metadata) {
-  push(name, { category: 'action', metadata: metadata ?? null })
+  push(name, { category: 'action', metadata })
 }

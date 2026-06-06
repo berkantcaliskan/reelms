@@ -16,5 +16,6 @@ export interface DocStoreDriver {
   deleteDoc(pk: string, sk: string): Promise<void>
   queryDocs<T = unknown>(pk: string, skPrefix?: string): Promise<QueryResult<T>>
   scanByPkPrefix<T = unknown>(prefix: string): Promise<Array<StoreItem<T>>>
+  scanByPkPrefixAndSk?<T = unknown>(prefix: string, sk: string, limit?: number): Promise<Array<StoreItem<T>>>
   close?(): Promise<void>
 }

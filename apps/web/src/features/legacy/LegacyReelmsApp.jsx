@@ -7201,35 +7201,43 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }, [showReelmSettings, selectedReelm?.id])
 
 
-  // Discover: fetch public reelms + users from backend on query change
+  // Discover: fetch public reelms + users from backend on query change.
+  // Debounced and min 2 characters so typing does not flood the API/rate limiter.
   useEffect(() => {
     const q = discoverQuery.trim()
-    if (!q) {
+    if (!q || q.length < 2) {
       setDiscoverUsers([])
       setDiscoverReelmsList([])
       return undefined
     }
+
     let cancelled = false
-    Promise.all([
-      usersList(q).catch(() => []),
-      discoverReelms(q).catch(() => []),
-    ]).then(([users, publicReelms]) => {
-      if (cancelled) return
-      const safeUsers = Array.isArray(users) ? users.filter(u => !u.isSystem) : []
-      const safeReelms = Array.isArray(publicReelms) ? publicReelms : []
-      setDiscoverUsers(safeUsers)
-      setDiscoverReelmsList(safeReelms)
-      const pendingIds = safeReelms.filter(r => r?.pending).map(r => String(r.id)).filter(Boolean)
-      if (pendingIds.length) {
-        setPendingReelmJoinIds(prev => Array.from(new Set([...prev.map(String), ...pendingIds])))
-      }
-    }).catch(() => {
-      if (!cancelled) {
-        setDiscoverUsers([])
-        setDiscoverReelmsList([])
-      }
-    })
-    return () => { cancelled = true }
+    const timer = window.setTimeout(() => {
+      Promise.all([
+        usersList(q).catch(() => []),
+        discoverReelms(q).catch(() => []),
+      ]).then(([users, publicReelms]) => {
+        if (cancelled) return
+        const safeUsers = Array.isArray(users) ? users.filter(u => !u.isSystem) : []
+        const safeReelms = Array.isArray(publicReelms) ? publicReelms : []
+        setDiscoverUsers(safeUsers)
+        setDiscoverReelmsList(safeReelms)
+        const pendingIds = safeReelms.filter(r => r?.pending).map(r => String(r.id)).filter(Boolean)
+        if (pendingIds.length) {
+          setPendingReelmJoinIds(prev => Array.from(new Set([...prev.map(String), ...pendingIds])))
+        }
+      }).catch(() => {
+        if (!cancelled) {
+          setDiscoverUsers([])
+          setDiscoverReelmsList([])
+        }
+      })
+    }, 350)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(timer)
+    }
   }, [discoverQuery])
 
   const toggleFriendsPopup = () => { setShowFriendsPopup(v => !v); setShowNotificationsPopup(false) }
@@ -9209,25 +9217,38 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const hydrateReelmCore = async (reelmId) => {
     if (!reelmId) return null
-    const [meta, structure, roles, members, joinRequests, banList, timeoutList] = await Promise.all([
+
+    const [meta, structure, roles, members] = await Promise.all([
       reelmGetDoc(reelmId, 'meta').catch(() => null),
       reelmGetDoc(reelmId, 'structure').catch(() => null),
       reelmGetDoc(reelmId, 'roles').catch(() => []),
       reelmGetDoc(reelmId, 'members').catch(() => []),
-      reelmGetDoc(reelmId, 'join_requests').catch(() => []),
-      reelmGetDoc(reelmId, 'ban_list').catch(() => []),
-      reelmGetDoc(reelmId, 'timeout_list').catch(() => []),
     ])
     if (!meta) return null
-    return {
+
+    const baseReelm = {
       ...meta,
       roles: Array.isArray(roles) ? roles : [],
       members: Array.isArray(members) ? members : [],
       categories: Array.isArray(structure?.categories) ? structure.categories : [],
-      joinRequests: Array.isArray(joinRequests) ? joinRequests : [],
-      banList: Array.isArray(banList) ? banList : [],
-      timeoutList: Array.isArray(timeoutList) ? timeoutList : [],
       joined: true,
+    }
+
+    const permissionSet = getReelmPermissionSetClient(baseReelm, uid)
+    const canReadJoinRequests = permissionSet.has('manageReelm') || permissionSet.has('manageJoinRequests')
+    const canReadModeration = permissionSet.has('manageReelm') || permissionSet.has('manageModeration')
+
+    const [joinRequests, banList, timeoutList] = await Promise.all([
+      canReadJoinRequests ? reelmGetDoc(reelmId, 'join_requests').catch(() => []) : Promise.resolve(undefined),
+      canReadModeration ? reelmGetDoc(reelmId, 'ban_list').catch(() => []) : Promise.resolve(undefined),
+      canReadModeration ? reelmGetDoc(reelmId, 'timeout_list').catch(() => []) : Promise.resolve(undefined),
+    ])
+
+    return {
+      ...baseReelm,
+      ...(Array.isArray(joinRequests) ? { joinRequests } : {}),
+      ...(Array.isArray(banList) ? { banList } : {}),
+      ...(Array.isArray(timeoutList) ? { timeoutList } : {}),
     }
   }
 
@@ -10292,7 +10313,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             <div className="rp-member-avatar-wrap">
               <div className="rp-member-avatar">
                 {displayPhoto
-                  ? <img src={displayPhoto} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                  ? <CachedProfileImage src={displayPhoto} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
                   : (displayName || '?').charAt(0).toUpperCase()
                 }
               </div>

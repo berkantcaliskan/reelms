@@ -66,6 +66,14 @@ export class PostgresDocStore implements DocStoreDriver {
     return result.rows.map((row) => ({ pk: row.pk, sk: row.sk, data: row.data as T, updatedAt: Number(row.updated_at) }))
   }
 
+  async scanByPkPrefixAndSk<T = unknown>(prefix: string, sk: string, limit = 1000): Promise<Array<StoreItem<T>>> {
+    const result = await this.pool.query(
+      'select pk, sk, data, updated_at from reelms_docs where pk like $1 and sk = $2 order by updated_at desc limit $3',
+      [`${prefix}%`, sk, Math.max(1, Math.min(Number(limit) || 1000, 5000))]
+    )
+    return result.rows.map((row) => ({ pk: row.pk, sk: row.sk, data: row.data as T, updatedAt: Number(row.updated_at) }))
+  }
+
   async close() {
     await this.pool.end()
   }

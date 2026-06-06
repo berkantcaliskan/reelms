@@ -72,6 +72,13 @@ export async function scanByPkPrefix<T = unknown>(prefix: string) {
   return getDriver().scanByPkPrefix<T>(prefix)
 }
 
+export async function scanByPkPrefixAndSk<T = unknown>(prefix: string, sk: string, limit = 1000) {
+  const activeDriver = getDriver()
+  if (activeDriver.scanByPkPrefixAndSk) return activeDriver.scanByPkPrefixAndSk<T>(prefix, sk, limit)
+  const rows = await activeDriver.scanByPkPrefix<T>(prefix)
+  return rows.filter((row) => row.sk === sk).slice(0, limit)
+}
+
 export const userPk = (uid: string) => `USER#${uid}`
 export const reelmPk = (reelmId: string) => `REELM#${reelmId}`
 export const chanPk = (channelKey: string) => `CHAN#${channelKey}`

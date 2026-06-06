@@ -14,7 +14,7 @@ import { debugRouter } from './routes/debug.routes.js'
 import { trackRouter } from './routes/track.routes.js'
 import { requestContext } from './middleware/requestContext.js'
 import { requestLogger } from './middleware/requestLogger.js'
-import { apiRateLimit, authRateLimit } from './middleware/rateLimit.js'
+import { apiRateLimit, authRateLimit, trackingRateLimit } from './middleware/rateLimit.js'
 import { errorHandler, notFoundHandler } from './utils/errors.js'
 
 export function createApp(io?: Server) {
@@ -22,8 +22,18 @@ export function createApp(io?: Server) {
 
   app.set('trust proxy', 1)
   app.disable('x-powered-by')
+  app.set('etag', false)
   app.use(requestContext)
   app.use(requestLogger)
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api/') || req.path.startsWith('/auth') || req.path.startsWith('/realtime')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+      res.setHeader('Pragma', 'no-cache')
+      res.setHeader('Expires', '0')
+      res.setHeader('Surrogate-Control', 'no-store')
+    }
+    next()
+  })
   app.use(helmet({
     crossOriginResourcePolicy: false,
     contentSecurityPolicy: env.NODE_ENV === 'production' ? undefined : false
@@ -40,7 +50,7 @@ export function createApp(io?: Server) {
   }))
 
   app.use('/health', healthRouter)
-  app.use(apiRateLimit, trackRouter)
+  app.use(trackingRateLimit, trackRouter)
   app.use('/auth', authRateLimit, authRouter)
   app.use('/realtime', realtimeRouter)
   app.use('/api/v1/debug', debugRouter)

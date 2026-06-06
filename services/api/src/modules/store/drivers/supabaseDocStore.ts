@@ -15,6 +15,10 @@ type SupabaseRow<T = unknown> = {
   updated_at: number
 }
 
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
 function assertConfigured(url: string, serviceRoleKey: string) {
   if (!url || !serviceRoleKey) {
     throw new Error('SupabaseDocStore requires SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY')
@@ -38,21 +42,42 @@ export class SupabaseDocStore implements DocStoreDriver {
   }
 
   private async request<T>(url: string, init: RequestInit = {}): Promise<T> {
-    const response = await fetch(url, {
-      ...init,
-      headers: {
-        ...this.headers,
-        ...(init.headers || {})
-      }
-    })
+    const method = String(init.method || 'GET').toUpperCase()
+    const canRetry = ['GET', 'HEAD'].includes(method)
+    let lastError: unknown = null
 
-    if (!response.ok) {
-      const text = await response.text().catch(() => '')
-      throw new Error(`Supabase request failed ${response.status}: ${text || response.statusText}`)
+    for (let attempt = 0; attempt < (canRetry ? 3 : 1); attempt += 1) {
+      try {
+        const response = await fetch(url, {
+          ...init,
+          headers: {
+            ...this.headers,
+            ...(init.headers || {})
+          }
+        })
+
+        if (!response.ok) {
+          const text = await response.text().catch(() => '')
+          const retryableStatus = response.status === 429 || response.status >= 500
+          const error = new Error(`Supabase request failed ${response.status}: ${text || response.statusText}`)
+          if (canRetry && retryableStatus && attempt < 2) {
+            lastError = error
+            await sleep(200 * (attempt + 1))
+            continue
+          }
+          throw error
+        }
+
+        if (response.status === 204) return null as T
+        return readMaybeJson(response) as Promise<T>
+      } catch (err) {
+        lastError = err
+        if (!canRetry || attempt >= 2) throw err
+        await sleep(200 * (attempt + 1))
+      }
     }
 
-    if (response.status === 204) return null as T
-    return readMaybeJson(response) as Promise<T>
+    throw lastError instanceof Error ? lastError : new Error('Supabase request failed')
   }
 
   async init() {
@@ -123,4 +148,12 @@ export class SupabaseDocStore implements DocStoreDriver {
     }
     return allRows.map((row) => ({ pk: row.pk, sk: row.sk, data: row.data, updatedAt: Number(row.updated_at) }))
   }
+
+  async scanByPkPrefixAndSk<T = unknown>(prefix: string, sk: string, limit = 1000): Promise<Array<StoreItem<T>>> {
+    const safeLimit = Math.max(1, Math.min(Number(limit) || 1000, 5000))
+    const url = `${this.restUrl}?select=pk,sk,data,updated_at&pk=like.${encodeURIComponent(`${prefix}%`)}&sk=eq.${encodeURIComponent(sk)}&order=updated_at.desc&limit=${safeLimit}`
+    const rows = await this.request<Array<SupabaseRow<T>>>(url)
+    return rows.map((row) => ({ pk: row.pk, sk: row.sk, data: row.data, updatedAt: Number(row.updated_at) }))
+  }
 }
+
