@@ -1,4 +1,10 @@
-import 'dotenv/config'
+import { config } from 'dotenv'
+import { resolve, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+config({ path: resolve(__dirname, '../../.env'), override: false })
+
 import { z } from 'zod'
 
 const emptyToUndefined = (value: unknown) => {

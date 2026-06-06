@@ -11,6 +11,7 @@
   --bg-blur-outside: 16px;
   --bg-blur-panel-extra: 10px;
   --body-font: 'Be Vietnam Pro', sans-serif;
+  --grain-opacity: 0.18;
 }
 
 @property --gx1 {
@@ -59,6 +60,19 @@
 
 html {
   background-color: var(--tb);
+}
+
+/* ── Grain doku katmanı ── */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 180px 180px;
+  opacity: var(--grain-opacity);
+  pointer-events: none;
+  z-index: 0;
 }
 
 body {
@@ -876,6 +890,7 @@ h6 {
   align-self: center;
   /* + butonunun içindeki ikon 32px iken, buton 40px olduğu için görsel hizayı dengeler. */
   margin-left: -4px;
+  margin-top: -2px;
 }
 
 .chats-row {
@@ -905,7 +920,7 @@ h6 {
   cursor: pointer;
   transition: background 0.2s ease, color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
   flex-shrink: 0;
-  margin-top: -4px;
+  margin-top: -6px;
 }
 
 .new-chat-btn:hover {
@@ -4667,13 +4682,25 @@ h6 {
 
 .cust-theme-swatch {
   aspect-ratio: 1;
-  border-radius: 10px;
+  border-radius: 14px;
   border: 2px solid transparent;
   cursor: pointer;
-  padding: 0;
+  padding: 7px;
   overflow: hidden;
   position: relative;
   transition: border-color 0.18s, transform 0.18s;
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+}
+
+.cust-theme-swatch-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  border: 2px solid rgba(255,255,255,0.20);
+  pointer-events: none;
 }
 
 .cust-theme-swatch:hover {
@@ -5374,6 +5401,55 @@ h6 {
 
 /* ── Message Bar ── */
 .msg-bar-wrap { position: relative; align-self: stretch; }
+
+@keyframes typing-wave {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30%            { transform: translateY(-5px); opacity: 1; }
+}
+
+.typing-indicator-row {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 2px 20px 4px;
+  min-height: 22px;
+}
+
+.typing-indicator-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.typing-indicator-avatar--text {
+  background: rgba(var(--ta-rgb), 0.25);
+  color: rgba(var(--ta-rgb), 0.85);
+  font-size: 0.62rem;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.typing-dots {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(var(--ta-rgb), 0.55);
+  animation: typing-wave 1.2s ease-in-out infinite;
+}
+
+.typing-dot:nth-child(1) { animation-delay: 0s; }
+.typing-dot:nth-child(2) { animation-delay: 0.2s; }
+.typing-dot:nth-child(3) { animation-delay: 0.4s; }
 
 .mention-dropdown {
   position: absolute;
@@ -12972,4 +13048,139 @@ button, input, select, textarea,
     transition-duration: 0.001ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* ── Message reply ────────────────────────────────────────── */
+
+/* Context menu button (⋮) on messages */
+.msg-ctx-menu-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.msg-ctx-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 2px 5px;
+  color: rgba(var(--ta-rgb), 0.45);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s;
+}
+.msg-row:hover .msg-ctx-btn,
+.bubble-row:hover .msg-ctx-btn { opacity: 1; }
+.msg-ctx-btn:hover { color: rgba(var(--ta-rgb), 0.9); }
+
+.msg-ctx-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 120;
+  background: var(--tb);
+  border: 1px solid rgba(var(--ta-rgb), 0.14);
+  border-radius: 8px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.22);
+  min-width: 110px;
+  overflow: hidden;
+}
+.msg-ctx-item {
+  display: block;
+  width: 100%;
+  padding: 8px 14px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: 0.82rem;
+  color: rgba(var(--ta-rgb), 0.85);
+  transition: background 0.12s;
+}
+.msg-ctx-item:hover { background: rgba(var(--ta-rgb), 0.09); }
+.msg-ctx-item--danger { color: #f87171; }
+.msg-ctx-item--danger:hover { background: rgba(248,113,113,0.1); }
+
+/* Quoted reply block inside messages */
+.msg-reply-quote {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 5px 9px;
+  margin-bottom: 5px;
+  border-left: 2.5px solid rgba(var(--ta-rgb), 0.5);
+  background: rgba(var(--ta-rgb), 0.07);
+  border-radius: 0 5px 5px 0;
+  max-width: 340px;
+}
+.msg-reply-quote--bubble {
+  border-radius: 5px;
+  border-left-color: rgba(var(--ta-rgb), 0.6);
+  background: rgba(0,0,0,0.12);
+  margin-bottom: 6px;
+}
+.msg-reply-quote-name {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(var(--ta-rgb), 0.75);
+  line-height: 1;
+}
+.msg-reply-quote-text {
+  font-size: 0.78rem;
+  color: rgba(var(--ta-rgb), 0.55);
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+}
+
+/* Reply banner above message input */
+.msg-reply-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: rgba(var(--ta-rgb), 0.07);
+  border-top: 1px solid rgba(var(--ta-rgb), 0.1);
+  border-bottom: 1px solid rgba(var(--ta-rgb), 0.08);
+  gap: 8px;
+}
+.msg-reply-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: rgba(var(--ta-rgb), 0.6);
+}
+.msg-reply-banner-name {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: rgba(var(--ta-rgb), 0.8);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.msg-reply-banner-text {
+  font-size: 0.75rem;
+  color: rgba(var(--ta-rgb), 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.msg-reply-banner-cancel {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(var(--ta-rgb), 0.45);
+  padding: 4px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+.msg-reply-banner-cancel:hover {
+  color: rgba(var(--ta-rgb), 0.9);
+  background: rgba(var(--ta-rgb), 0.1);
 }

@@ -74,6 +74,8 @@ import {
   socketVcModeratorMute,
   socketRequestVcCounts,
   socketSetPresenceStatus,
+  socketEmitTyping,
+  socketEmitTypingStop,
   messagesGet,
   messageSend,
   messageDelete,
@@ -763,18 +765,18 @@ function PillSelect({ value, onChange, options }) {
 }
 
 const THEMES = [
-  { id: 'default',  name: 'Default Warm', accent: '#b99887', accentRgb: '185,152,135', base: '#0c0c20', baseRgb: '12,12,32' },
-  { id: 'stone',    name: 'Stone',     accent: '#c8bfa8', accentRgb: '200,191,168', base: '#383835', baseRgb: '56,56,53', noGradient: true },
-  { id: 'sage',     name: 'Sage',      accent: '#68c586', accentRgb: '104,197,134', base: '#0d1d14', baseRgb: '13,29,20' },
-  { id: 'rose',     name: 'Rose',      accent: '#e8a4b8', accentRgb: '232,164,184', base: '#1a0d12', baseRgb: '26,13,18' },
-  { id: 'crimson',  name: 'Crimson',   accent: '#d46e82', accentRgb: '212,110,130', base: '#18080d', baseRgb: '24,8,13' },
-  { id: 'sky',      name: 'Sky',       accent: '#7fc8e8', accentRgb: '127,200,232', base: '#0a1520', baseRgb: '10,21,32' },
-  { id: 'ocean',    name: 'Ocean',     accent: '#4a96be', accentRgb: '74,150,190',  base: '#080f1a', baseRgb: '8,15,26' },
-  { id: 'lavender', name: 'Lavender',  accent: '#c0a8e0', accentRgb: '192,168,224', base: '#120d1a', baseRgb: '18,13,26' },
-  { id: 'dusk',     name: 'Dusk',      accent: '#9070c0', accentRgb: '144,112,192', base: '#0d0a18', baseRgb: '13,10,24' },
-  { id: 'peach',    name: 'Peach',     accent: '#f0a06a', accentRgb: '240,160,106', base: '#1a0e08', baseRgb: '26,14,8' },
-  { id: 'amber',    name: 'Amber',     accent: '#d4a030', accentRgb: '212,160,48',  base: '#180f00', baseRgb: '24,15,0' },
-  { id: 'lemon',    name: 'Lemon',     accent: '#c8c040', accentRgb: '200,192,64',  base: '#161400', baseRgb: '22,20,0' },
+  { id: 'default',  name: 'Default',         accent: '#b99887', accentRgb: '185,152,135', base: '#0c0c20', baseRgb: '12,12,32' },
+  { id: 'gece',     name: 'Night',           accent: '#a89cf5', accentRgb: '168,156,245', base: '#1e1c1a', baseRgb: '30,28,26' },
+  { id: 'stone',    name: 'Soft Light',      accent: '#c8bfa8', accentRgb: '200,191,168', base: '#383835', baseRgb: '56,56,53', noGradient: true },
+  { id: 'lavender', name: 'Purple Sunlight', accent: '#c0a8e0', accentRgb: '192,168,224', base: '#120d1a', baseRgb: '18,13,26' },
+  { id: 'dusk',     name: 'Purple Nightlight', accent: '#9070c0', accentRgb: '144,112,192', base: '#0d0a18', baseRgb: '13,10,24' },
+  { id: 'rose',     name: 'Rose',            accent: '#e8a4b8', accentRgb: '232,164,184', base: '#1a0d12', baseRgb: '26,13,18' },
+  { id: 'crimson',  name: 'Pink in Red',     accent: '#d46e82', accentRgb: '212,110,130', base: '#18080d', baseRgb: '24,8,13' },
+  { id: 'sage',     name: 'Sage',            accent: '#68c586', accentRgb: '104,197,134', base: '#0d1d14', baseRgb: '13,29,20' },
+  { id: 'sky',      name: 'Earth Sky',       accent: '#7fc8e8', accentRgb: '127,200,232', base: '#0a1520', baseRgb: '10,21,32' },
+  { id: 'ocean',    name: 'Ocean',           accent: '#4a96be', accentRgb: '74,150,190',  base: '#080f1a', baseRgb: '8,15,26' },
+  { id: 'peach',    name: 'Sunbathe',        accent: '#f0a06a', accentRgb: '240,160,106', base: '#1a0e08', baseRgb: '26,14,8' },
+  { id: 'lemon',    name: 'Lemonade',        accent: '#c8c040', accentRgb: '200,192,64',  base: '#161400', baseRgb: '22,20,0' },
 ]
 
 function hexToRgb(hex) {
@@ -1131,8 +1133,10 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
               className={`cust-theme-swatch${customization.themeId === th.id ? ' cust-theme-swatch-active' : ''}`}
               onClick={() => onChange({ themeId: th.id })}
               title={th.name}
-              style={{ background: `linear-gradient(to bottom, ${th.accent} 68%, ${th.base} 68%)` }}
-            />
+              style={{ background: th.base }}
+            >
+              <span className="cust-theme-swatch-dot" style={{ background: th.accent }} />
+            </button>
           ))}
         </div>
       </div>
@@ -7091,6 +7095,31 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         const keys = ['chats', 'reelms', 'friends', 'friend_requests', 'notifications', 'message_requests', 'unread_counts']
         keys.forEach(sk => userGetDoc(sk).then(v => applyUserDoc(sk, v)).catch(() => {}))
       },
+      onTyping: ({ uid: typingUid, msgKey, name, photo }) => {
+        if (String(typingUid) === String(uid)) return
+        setTypingUsers(prev => {
+          const key = String(msgKey)
+          const existing = prev[key] || []
+          const filtered = existing.filter(u => u.uid !== String(typingUid))
+          return { ...prev, [key]: [...filtered, { uid: String(typingUid), name: name || '', photo: photo || '' }] }
+        })
+        const timerKey = `${msgKey}:${typingUid}`
+        clearTimeout(typingTimers.current[timerKey])
+        typingTimers.current[timerKey] = setTimeout(() => {
+          setTypingUsers(prev => {
+            const key = String(msgKey)
+            return { ...prev, [key]: (prev[key] || []).filter(u => u.uid !== String(typingUid)) }
+          })
+        }, 4000)
+      },
+      onTypingStop: ({ uid: typingUid, msgKey }) => {
+        const timerKey = `${msgKey}:${typingUid}`
+        clearTimeout(typingTimers.current[timerKey])
+        setTypingUsers(prev => {
+          const key = String(msgKey)
+          return { ...prev, [key]: (prev[key] || []).filter(u => u.uid !== String(typingUid)) }
+        })
+      },
     })
     return off
   }, [uid])
@@ -7937,8 +7966,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [messageInput, setMessageInput] = useState('')
   const messageInputRef = useRef('')
   const [pendingAttachment, setPendingAttachment] = useState(null)
+  const [typingUsers, setTypingUsers] = useState({})
+  const typingTimers = useRef({})
+  const typingEmitTimer = useRef(null)
+  const isTypingRef = useRef(false)
   const [msgReactions, setMsgReactions] = useState({})
   const [showMsgEmojiFor, setShowMsgEmojiFor] = useState(null)
+  const [replyingTo, setReplyingTo] = useState(null)
+  const [openMsgCtxFor, setOpenMsgCtxFor] = useState(null)
   useEffect(() => {
     if (!showMsgEmojiFor) return undefined
     const handler = (e) => {
@@ -7947,6 +7982,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [showMsgEmojiFor])
+  useEffect(() => {
+    if (!openMsgCtxFor) return undefined
+    const handler = (e) => {
+      if (!e.target.closest('.msg-ctx-menu-wrap')) setOpenMsgCtxFor(null)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [openMsgCtxFor])
   const [lightboxImg, setLightboxImg] = useState(null)
   const [showInputEmoji, setShowInputEmoji] = useState(false)
   const [mentionQuery, setMentionQuery] = useState(null)
@@ -9927,9 +9970,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
     const now = Date.now()
     const baseMessageId = createClientMessageId()
+    const replySnap = replyingTo
     if (attach) setPendingAttachment(null)
     messageInputRef.current = ''
     setMessageInput('')
+    setReplyingTo(null)
+    if (isTypingRef.current) {
+      isTypingRef.current = false
+      clearTimeout(typingEmitTimer.current)
+      socketEmitTypingStop(msgKey)
+    }
 
     // Send image/video first
     if (attach) {
@@ -9949,7 +9999,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       const imageMsg = {
         id: `${baseMessageId}_media`,
         sender: { id: currentUser.id, name: currentUser.name, photo: getPersonPhoto(currentUser) || null },
-        time: now, mediaUrl, mediaType: attach.mediaType, mediaStorage: uploadedMedia ? 's3' : 'inline', mediaId: uploadedMedia?.id || null, ...vanish
+        time: now, mediaUrl, mediaType: attach.mediaType, mediaStorage: uploadedMedia ? 's3' : 'inline', mediaId: uploadedMedia?.id || null, ...vanish,
+        ...(replySnap ? { replyTo: { id: replySnap.id, text: replySnap.text, senderName: replySnap.senderName, senderId: replySnap.senderId } } : {})
       }
       setMessages(prev => appendUniqueMessage(prev, msgKey, imageMsg))
       messageSend(msgKey, imageMsg).catch(err => handleRemoteMessageError(err, msgKey, imageMsg.id))
@@ -9959,10 +10010,19 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     // Then send text
     if (text) {
       const textId = attach ? `${baseMessageId}_text` : baseMessageId
-      const msg = { id: textId, text, sender: { id: currentUser.id, name: currentUser.name, photo: getPersonPhoto(currentUser) || null }, time: now }
+      const msg = {
+        id: textId, text,
+        sender: { id: currentUser.id, name: currentUser.name, photo: getPersonPhoto(currentUser) || null },
+        time: now,
+        ...(replySnap ? { replyTo: { id: replySnap.id, text: replySnap.text, senderName: replySnap.senderName, senderId: replySnap.senderId } } : {})
+      }
       setMessages(prev => appendUniqueMessage(prev, msgKey, msg))
       messageSend(msgKey, msg).catch(err => handleRemoteMessageError(err, msgKey, msg.id))
       notifyMentions(text)
+      if (replySnap && String(replySnap.senderId) !== String(uid)) {
+        _pushNotifTo(replySnap.senderId, `${currentUser.name || 'Someone'} ${t('replied_to_you')}`,
+          selectedChat ? { type: 'dm', chatId: selectedChat.id } : { type: 'reelm', reelmId: selectedReelm?.id, channelId: selectedChannel?.id })
+      }
 
       // Moderate text in reelm channels in background (not DMs — privacy)
       if (selectedReelm && selectedChannel) {
@@ -9993,8 +10053,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     }
   }
 
-  // Clear pending attachment when switching channel or chat
-  useEffect(() => { setPendingAttachment(null) }, [selectedChannel?.id, selectedChat?.id])
+  // Clear pending attachment and reply state when switching channel or chat
+  useEffect(() => { setPendingAttachment(null); setReplyingTo(null); setOpenMsgCtxFor(null) }, [selectedChannel?.id, selectedChat?.id])
 
   // Track active chat key for sound routing
   useEffect(() => {
@@ -12355,7 +12415,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               if (!isBubbleMode) return (
                                 <React.Fragment key={msg.id}>
                                   {showDateSep && <div className="bubble-date-sep"><span>{msgDateLabel}</span></div>}
-                                <div className={`msg-row${msg.id === newMsgId ? ' msg-row-new' : ''}${isMod ? ' msg-row-mod' : ''}${blocked.some(b => b.id === sender.id) ? ' msg-row-blocked' : ''}`}>
+                                <div className={`msg-row${msg.id === newMsgId ? ' msg-row-new' : ''}${isMod ? ' msg-row-mod' : ''}${blocked.some(b => b.id === sender.id) ? ' msg-row-blocked' : ''}`} onDoubleClick={() => !selectedChatSystemLocked && setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id })}>
                                   <div className="msg-avatar">
                                     {(sender.photo || sender.image)
                                       ? <img src={sender.photo || sender.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
@@ -12366,6 +12426,19 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                     <div className="msg-header">
                                       <span className="msg-name">{sender.name}</span>
                                       <span className="msg-time">{formatTime(msg.time)}</span>
+                                      {!selectedChatSystemLocked && (
+                                        <div className="msg-ctx-menu-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+                                          <button className="msg-ctx-btn" onClick={() => setOpenMsgCtxFor(f => f === msg.id ? null : msg.id)}>
+                                            <svg width="3" height="12" viewBox="0 0 3 12" fill="currentColor"><circle cx="1.5" cy="1.5" r="1.5"/><circle cx="1.5" cy="6" r="1.5"/><circle cx="1.5" cy="10.5" r="1.5"/></svg>
+                                          </button>
+                                          {openMsgCtxFor === msg.id && (
+                                            <div className="msg-ctx-menu">
+                                              <button className="msg-ctx-item" onClick={() => { setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id }); setOpenMsgCtxFor(null) }}>{t('reply')}</button>
+                                              {isMod && <button className="msg-ctx-item msg-ctx-item--danger" onClick={() => { modDeleteMessage(msgKey2, msg.id); setOpenMsgCtxFor(null) }}>{t('delete')}</button>}
+                                            </div>
+                                          )}
+                                        </div>
+                                      )}
                                       {isMod && !selectedChatSystemLocked && <button className="mod-msg-delete-btn" title="Delete message" onClick={() => modDeleteMessage(msgKey2, msg.id)}>
                                         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
                                       </button>}
@@ -12383,6 +12456,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                         </div>
                                       </div>}
                                     </div>
+                                    {msg.replyTo && (
+                                      <div className="msg-reply-quote">
+                                        <span className="msg-reply-quote-name">{msg.replyTo.senderName}</span>
+                                        <span className="msg-reply-quote-text">{msg.replyTo.text ? msg.replyTo.text.slice(0, 120) : '📎'}</span>
+                                      </div>
+                                    )}
                                     {msg.text && <div className="msg-text">{renderMentions(msg.text, uid, selectedReelm?.members, selectedReelm?.roles)}</div>}
                                     {msg.mediaUrl && msg.mediaType === 'image' && <img src={msg.mediaUrl} alt="" className="msg-media-img" onClick={() => setLightboxImg(msg.mediaUrl)} />}
                                     {msg.mediaUrl && msg.mediaType === 'video' && <video src={msg.mediaUrl} className="msg-media-video" controls />}
@@ -12409,7 +12488,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               return (
                                 <div key={msg.id}>
                                   {showDateSep && <div className="bubble-date-sep"><span>{msgDateLabel}</span></div>}
-                                  <div className={`bubble-row${isOwn ? ' bubble-row--own' : ' bubble-row--other'}${msg.id === newMsgId ? ' msg-row-new' : ''}`}>
+                                  <div className={`bubble-row${isOwn ? ' bubble-row--own' : ' bubble-row--other'}${msg.id === newMsgId ? ' msg-row-new' : ''}`} onDoubleClick={() => !selectedChatSystemLocked && setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id })}>
                                     {!isOwn && (
                                       <div className="bubble-avatar bubble-avatar--clickable" onClick={e => sender.id && openFriendProfile({ id: sender.id, name: sender.name, photo: sender.photo || sender.image || null }, e)}>
                                         {(sender.photo || sender.image)
@@ -12425,6 +12504,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                           <img src={msg.mediaUrl} alt="" className="msg-media-img" onClick={() => setLightboxImg(msg.mediaUrl)} style={{ cursor: 'pointer' }} />
                                         ) : (
                                         <div className={`bubble${isOwn ? ' bubble--own' : ' bubble--other'}`}>
+                                          {msg.replyTo && (
+                                            <div className="msg-reply-quote msg-reply-quote--bubble">
+                                              <span className="msg-reply-quote-name">{msg.replyTo.senderName}</span>
+                                              <span className="msg-reply-quote-text">{msg.replyTo.text ? msg.replyTo.text.slice(0, 120) : '📎'}</span>
+                                            </div>
+                                          )}
                                           {msg.text && <span className="bubble-text">{renderMentions(msg.text, uid, selectedReelm?.members, selectedReelm?.roles)}</span>}
                                           {msg.mediaUrl && msg.mediaType === 'image' && <img src={msg.mediaUrl} alt="" className="msg-media-img" onClick={() => setLightboxImg(msg.mediaUrl)} />}
                                           {msg.mediaUrl && msg.mediaType === 'video' && <video src={msg.mediaUrl} className="msg-media-video" controls />}
@@ -12437,6 +12522,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                         </div>
                                         )}
                                         {!selectedChatSystemLocked && <div className="msg-react-ctrl">
+                                          <div className="msg-ctx-menu-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+                                            <button className="msg-ctx-btn" onClick={() => setOpenMsgCtxFor(f => f === msg.id ? null : msg.id)}>
+                                              <svg width="3" height="12" viewBox="0 0 3 12" fill="currentColor"><circle cx="1.5" cy="1.5" r="1.5"/><circle cx="1.5" cy="6" r="1.5"/><circle cx="1.5" cy="10.5" r="1.5"/></svg>
+                                            </button>
+                                            {openMsgCtxFor === msg.id && (
+                                              <div className="msg-ctx-menu">
+                                                <button className="msg-ctx-item" onClick={() => { setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id }); setOpenMsgCtxFor(null) }}>{t('reply')}</button>
+                                              </div>
+                                            )}
+                                          </div>
                                           <button className="msg-react-btn msg-react-plus" title="+1" onClick={() => toggleReaction(msgKey2, msg.id, '+')}><img src={newIcon} alt="+" style={{ width: '12px', height: '12px', display: 'block', opacity: 0.65 }} /></button>
                                           <div className="msg-react-emoji-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
                                             <button className="msg-react-btn" title="Tepki ekle" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowMsgEmojiFor(f => f?.msgId === String(msg.id) ? null : { msgKey: msgKey2, msgId: String(msg.id) }); }}>
@@ -12467,6 +12562,26 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             })
                           })()}
                         </div>
+                        {(() => {
+                          const tMsgKey = selectedChat ? selectedChat.id : composeReelmMsgKey(selectedReelm, selectedChannel)
+                          const typers = tMsgKey ? (typingUsers[tMsgKey] || []) : []
+                          if (!typers.length) return null
+                          const isDM = selectedChat?.type === 'dm'
+                          return (
+                            <div className="typing-indicator-row">
+                              {!isDM && typers[0]?.photo ? (
+                                <img className="typing-indicator-avatar" src={typers[0].photo} alt="" />
+                              ) : !isDM && typers[0]?.name ? (
+                                <div className="typing-indicator-avatar typing-indicator-avatar--text">{typers[0].name.charAt(0).toUpperCase()}</div>
+                              ) : null}
+                              <div className="typing-dots">
+                                <span className="typing-dot" />
+                                <span className="typing-dot" />
+                                <span className="typing-dot" />
+                              </div>
+                            </div>
+                          )
+                        })()}
                         {!canPost && (
                           <div className="msg-bar-locked">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
@@ -12513,6 +12628,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               ))}
                             </div>
                           )}
+                          {replyingTo && (
+                            <div className="msg-reply-banner">
+                              <div className="msg-reply-banner-content">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg>
+                                <span className="msg-reply-banner-name">{t('replying_to')} {replyingTo.senderName}</span>
+                                <span className="msg-reply-banner-text">{replyingTo.text ? replyingTo.text.slice(0, 80) : '📎'}</span>
+                              </div>
+                              <button className="msg-reply-banner-cancel" onClick={() => setReplyingTo(null)}>
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg>
+                              </button>
+                            </div>
+                          )}
                           <div className="msg-bar">
                           <div className={`msg-input-wrap${pendingAttachment ? ' msg-input-wrap--has-attach' : ''}`}>
                             <input
@@ -12529,6 +12656,24 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 const match = before.match(/@(\w*)$/)
                                 if (match) { setMentionQuery({ query: match[1], triggerStart: cursor - match[0].length }); setMentionSelIdx(0) }
                                 else setMentionQuery(null)
+                                const tMsgKey = selectedChat ? selectedChat.id : composeReelmMsgKey(selectedReelm, selectedChannel)
+                                if (tMsgKey) {
+                                  if (val.trim()) {
+                                    if (!isTypingRef.current) {
+                                      isTypingRef.current = true
+                                      socketEmitTyping(tMsgKey, { name: currentUser?.displayName || currentUser?.name || '', photo: currentUser?.photoURL || currentUser?.photo || '' })
+                                    }
+                                    clearTimeout(typingEmitTimer.current)
+                                    typingEmitTimer.current = setTimeout(() => {
+                                      isTypingRef.current = false
+                                      socketEmitTypingStop(tMsgKey)
+                                    }, 3000)
+                                  } else if (isTypingRef.current) {
+                                    isTypingRef.current = false
+                                    clearTimeout(typingEmitTimer.current)
+                                    socketEmitTypingStop(tMsgKey)
+                                  }
+                                }
                               }}
                               onKeyDown={e => {
                                 if (mentionQuery && mentionOptions.length > 0) {

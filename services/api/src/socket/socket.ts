@@ -296,6 +296,17 @@ export function attachSocketServer(httpServer?: HttpServer) {
 
     socket.on('leaveChannel', (msgKey) => { if (typeof msgKey === 'string') socket.leave(`chan:${msgKey}`) })
 
+    socket.on('typing:start', ({ msgKey, name, photo }: { msgKey: string; name?: string; photo?: string }) => {
+      if (typeof msgKey !== 'string' || !msgKey) return
+      if (!socket.rooms.has(`chan:${msgKey}`)) return
+      socket.to(`chan:${msgKey}`).emit('reelms:typing', { uid: socket.uid, msgKey, name: name || '', photo: photo || '' })
+    })
+
+    socket.on('typing:stop', ({ msgKey }: { msgKey: string }) => {
+      if (typeof msgKey !== 'string' || !msgKey) return
+      socket.to(`chan:${msgKey}`).emit('reelms:typing:stop', { uid: socket.uid, msgKey })
+    })
+
     socket.on('voicePosition', ({ reelmId, channelId, x, y }) => {
       if (typeof reelmId !== 'string' || typeof channelId !== 'string') return
       if (typeof x !== 'number' || typeof y !== 'number') return

@@ -256,7 +256,7 @@ export async function loadReelmDocuments(reelmId) {
 }
 
 export function connectReelmsSocket(handlers) {
-  const { onUserDoc, onReelmDoc, onReelmManagerDoc, onAppDoc, onMessage, onMessageDeleted, onMessagesCleared, onReaction, onVoicePosition, onVcEvent, onVcError, onVcCount, onVcCounts, onVcParticipants, onVcState, onPresence, onProfileUpdated, onReelmAccessRevoked, onReelmMemberJoined, onReelmMemberRemoved, onJoinRequestRejected, onJoinRequestApproved, onReelmTimeout, onReelmTimeoutRemoved, onReelmBanned, onReelmClosed, onConnect } = handlers
+  const { onUserDoc, onReelmDoc, onReelmManagerDoc, onAppDoc, onMessage, onMessageDeleted, onMessagesCleared, onReaction, onVoicePosition, onVcEvent, onVcError, onVcCount, onVcCounts, onVcParticipants, onVcState, onPresence, onProfileUpdated, onReelmAccessRevoked, onReelmMemberJoined, onReelmMemberRemoved, onJoinRequestRejected, onJoinRequestApproved, onReelmTimeout, onReelmTimeoutRemoved, onReelmBanned, onReelmClosed, onConnect, onTyping, onTypingStop } = handlers
   const run = async () => {
     const token = await getIdToken()
     if (!token) return
@@ -267,7 +267,7 @@ export function connectReelmsSocket(handlers) {
     socket = io(BASE, {
       path: '/socket.io',
       auth: { token, clientId: getClientId() },
-      transports: ['polling', 'websocket'],
+      transports: ['websocket', 'polling'],
     })
     // On every (re)connect: re-join all tracked rooms so server-side memberships are restored
     socket.on('connect', () => {
@@ -359,6 +359,12 @@ export function connectReelmsSocket(handlers) {
     socket.on('reelms:presence:update', (msg) => {
       if (msg?.reelmId && Array.isArray(msg.users)) onPresence?.(msg)
     })
+    socket.on('reelms:typing', (msg) => {
+      if (msg?.msgKey && msg?.uid) onTyping?.(msg)
+    })
+    socket.on('reelms:typing:stop', (msg) => {
+      if (msg?.msgKey && msg?.uid) onTypingStop?.(msg)
+    })
     socket.on('auth:session-replaced', (msg) => {
       const code = msg?.code || 'auth/session-replaced'
       try { window.dispatchEvent(new CustomEvent('reelms:session-invalid', { detail: { code } })) } catch {}
@@ -403,6 +409,16 @@ export function socketLeaveChannel(msgKey) {
   if (!msgKey) return
   _pendingChannels.delete(msgKey)
   if (socket?.connected) socket.emit('leaveChannel', msgKey)
+}
+
+export function socketEmitTyping(msgKey, { name = '', photo = '' } = {}) {
+  if (!socket?.connected || !msgKey) return
+  socket.emit('typing:start', { msgKey, name, photo })
+}
+
+export function socketEmitTypingStop(msgKey) {
+  if (!socket?.connected || !msgKey) return
+  socket.emit('typing:stop', { msgKey })
 }
 
 export function socketSetPresenceStatus(status) {
