@@ -7369,15 +7369,23 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }, [spotifyConnected, uid, selectedReelm?.id, friends])
 
   const connectSpotify = async () => {
-    const token = await getIdToken().catch(() => null)
-    if (!token) return
-    const res = await fetch(`${BACKEND_URL}/spotify/start`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
-    const data = await res.json().catch(() => ({}))
-    if (!res.ok || !data?.url) return
-    if (window.electronAPI?.openExternal) {
-      window.electronAPI.openExternal(data.url)
-    } else {
-      window.open(data.url, '_blank', 'noopener')
+    // Pencereyi hemen aç — async sonrası açılırsa tarayıcı popup blocker devreye girer
+    const popup = window.electronAPI?.openExternal ? null : window.open('', '_blank', 'width=500,height=700,noopener')
+    try {
+      const token = await getIdToken().catch(() => null)
+      if (!token) { popup?.close(); return }
+      const res = await fetch(`${BACKEND_URL}/spotify/start`, { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok || !data?.url) { popup?.close(); return }
+      if (window.electronAPI?.openExternal) {
+        window.electronAPI.openExternal(data.url)
+      } else if (popup) {
+        popup.location.href = data.url
+      } else {
+        window.location.href = data.url
+      }
+    } catch {
+      popup?.close()
     }
   }
 

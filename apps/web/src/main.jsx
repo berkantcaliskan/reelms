@@ -3,6 +3,9 @@ import { createRoot } from 'react-dom/client'
 import { HashRouter } from 'react-router-dom'
 import './index.css'
 import AppShell from './app/AppShell.jsx'
+import { initTracker } from './shared/lib/tracker.js'
+
+initTracker()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
