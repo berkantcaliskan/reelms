@@ -134,6 +134,7 @@ import { moderateText } from '../../moderationClient'
 import { playSound, applySoundSettings, previewSound, preloadSounds, SOUND_CATEGORIES, SOUND_DEFAULTS } from '../../soundManager'
 import { DesktopDownloadButton, DesktopDownloadSettingsPanel } from '../desktop-download/index.js'
 import { useAuthSession as useCentralAuthSession } from '../../app/providers/AuthSessionProvider.jsx'
+import SpotifyPlayer from '../spotify/SpotifyPlayer.jsx'
 
 const isReelmsSystemUid = (value) => isModerationSystemUser(value) || String(value || '') === String(MODERATION_ACCOUNT_ID)
 const isReelmsSystemChat = (chat) => {
@@ -2538,7 +2539,7 @@ function CachedProfileCover({ src, className = '', style = {}, ...props }) {
   return <div {...props} className={className} style={{ ...style, ...backgroundStyle }} />
 }
 
-function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBlock, onUnblock, onAddFriend, isFriend = true, isBlocked = false, isPending = false, nickname, onNicknameChange, canShare, onMessage, onCreateGroup, onRequestRemoteControl, voiceContext = null, moderationContext = null, roleContext = null, isSelf = false, embedded = false, canEditNickname = true }) {
+function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBlock, onUnblock, onAddFriend, isFriend = true, isBlocked = false, isPending = false, nickname, onNicknameChange, canShare, onMessage, onCreateGroup, onRequestRemoteControl, voiceContext = null, moderationContext = null, roleContext = null, isSelf = false, embedded = false, canEditNickname = true, onViewFullProfile }) {
   const popupRef = useRef(null)
   const safeFriend = normalizeFriendProfileTarget(friend || {})
   const [editingNickname, setEditingNickname] = useState(false)
@@ -2682,12 +2683,121 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
         )}
         {!isSelf && !isBlocked && isFriend && <button className="fpp-action-btn fpp-action-danger" onClick={() => { onRemove(friend.id); onClose() }}>Remove Friend</button>}
         {!isSelf && !isBlocked && onBlock && <button className="fpp-action-btn fpp-action-danger" onClick={() => { onBlock(friend); onClose() }}>Block</button>}
+        <button className="fpp-view-full-btn" onClick={() => { onClose(); setTimeout(() => onViewFullProfile?.(friend), 50) }}>Tüm profili gör →</button>
       </div>
     </div>
   )
 
   if (embedded) return profileNode
   return ReactDOM.createPortal(profileNode, document.body)
+}
+
+function FullProfilePage({ user, isSelf, reelms = [], onClose, onMessage, onAddFriend, onRemove, onBlock, onUnblock, isFriend, isBlocked, isPending }) {
+  const [visible, setVisible] = useState(false)
+  useEffect(() => { const t = setTimeout(() => setVisible(true), 10); return () => clearTimeout(t) }, [])
+
+  const cover = user.cover || user.coverImage || user.coverUrl || null
+  const photo = getPersonPhoto(user) || user.photo || user.photoURL || null
+  const SOCIAL_ICONS = { instagram: InstagramIcon, x: XIcon, tiktok: TikTokIcon, linkedin: LinkedInIcon, whatsapp: WhatsAppIcon, discord: DiscordSocialIcon, snapchat: SnapchatIcon, custom: CustomLinkIcon }
+
+  const handleClose = () => {
+    setVisible(false)
+    setTimeout(onClose, 320)
+  }
+
+  return (
+    <div className={`fp-overlay${visible ? ' fp-overlay--in' : ''}`} onClick={e => { if (e.target === e.currentTarget) handleClose() }}>
+      <div className={`fp-page${visible ? ' fp-page--in' : ''}`}>
+        <button className="fp-back-btn" onClick={handleClose}>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M19 12H5M5 12l7 7M5 12l7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+          </svg>
+          Geri
+        </button>
+
+        <div className="fp-layout">
+          <div className="fp-main">
+            <div className="fp-cover" style={cover ? { backgroundImage: `url(${cover})` } : {}}>
+              <div className="fp-avatar-wrap">
+                {photo
+                  ? <img src={photo} alt="" className="fp-avatar" />
+                  : <div className="fp-avatar fp-avatar--text">{(user.name || '?').charAt(0).toUpperCase()}</div>}
+              </div>
+            </div>
+
+            <div className="fp-identity">
+              <div className="fp-identity-names">
+                <h1 className="fp-name">{user.name}</h1>
+                {user.username && <span className="fp-username">@{user.username.startsWith('@') ? user.username.slice(1) : user.username}</span>}
+              </div>
+              {user.activity?.name && (
+                <div className="fp-activity"><ActivityBadge activity={user.activity} /></div>
+              )}
+            </div>
+
+            {user.bio && (
+              <div className="fp-section">
+                <p className="fp-bio">{user.bio}</p>
+              </div>
+            )}
+
+            {user.socialLinks && Object.keys(user.socialLinks).some(k => (user.activePlatforms || []).includes(k) && user.socialLinks[k]) && (
+              <div className="fp-section">
+                <span className="fp-section-label">SOCIALS</span>
+                <div className="fp-socials-row">
+                  {Object.entries(user.socialLinks).filter(([k, v]) => (user.activePlatforms || []).includes(k) && v).map(([k, handle]) => {
+                    const Icon = SOCIAL_ICONS[k]
+                    return Icon ? (
+                      <a key={k} className="fp-social-link" href={handle.startsWith('http') ? handle : `#`} target="_blank" rel="noopener noreferrer" title={handle}>
+                        <Icon size={18} />
+                      </a>
+                    ) : null
+                  })}
+                </div>
+              </div>
+            )}
+
+            {!isSelf && (
+              <div className="fp-actions">
+                {!isBlocked && onMessage && <button className="fp-action-btn fp-action-btn--primary" onClick={() => { onMessage(); handleClose() }}>Mesaj Gönder</button>}
+                {!isBlocked && !isFriend && !isPending && onAddFriend && <button className="fp-action-btn" onClick={() => { onAddFriend(user); handleClose() }}>Arkadaş Ekle</button>}
+                {!isBlocked && !isFriend && isPending && <button className="fp-action-btn" disabled>İstek Gönderildi</button>}
+                {!isBlocked && isFriend && onRemove && <button className="fp-action-btn fp-action-danger" onClick={() => { onRemove(user.id); handleClose() }}>Arkadaşlıktan Çıkar</button>}
+                {isBlocked && onUnblock && <button className="fp-action-btn" onClick={() => { onUnblock(user.id); handleClose() }}>Engeli Kaldır</button>}
+                {!isBlocked && onBlock && <button className="fp-action-btn fp-action-danger" onClick={() => { onBlock(user); handleClose() }}>Engelle</button>}
+              </div>
+            )}
+          </div>
+
+          <div className="fp-sidebar">
+            {reelms.length > 0 && (
+              <div className="fp-sidebar-card">
+                <span className="fp-section-label">{isSelf ? 'REELMLER' : 'ORTAK REELMLER'}</span>
+                <div className="fp-reelms-list">
+                  {reelms.slice(0, 8).map(r => (
+                    <div key={r.id} className="fp-reelm-row">
+                      <div className="fp-reelm-avatar">
+                        {r.photo ? <img src={r.photo} alt="" /> : <span>{(r.name || 'R').charAt(0).toUpperCase()}</span>}
+                      </div>
+                      <span className="fp-reelm-name">{r.name}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            <div className="fp-sidebar-card">
+              <span className="fp-section-label">AKTİVİTE</span>
+              <div className="fp-activity-log">
+                {user.activity?.name
+                  ? <div className="fp-activity-item"><ActivityBadge activity={user.activity} /></div>
+                  : <span className="fp-activity-empty">Aktif aktivite yok</span>}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 }
 
 const FLYING_ROOM_DURATIONS = [
@@ -6396,6 +6506,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [showMenu, setShowMenu] = useState(false)
   const [showFeed, setShowFeed] = useState(false)
   const [showProfilePopup, setShowProfilePopup] = useState(false)
+  const [fullProfileTarget, setFullProfileTarget] = useState(null)
   const [showLiveParticipantsPopup, setShowLiveParticipantsPopup] = useState(false)
   const [activeNudge, setActiveNudge] = useState(null)
   const [isShaking, setIsShaking] = useState(false)
@@ -6451,6 +6562,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [spotifyConnected, setSpotifyConnected] = useState(false)
   const [spotifyNowPlaying, setSpotifyNowPlaying] = useState(null)
   const [spotifyFriendsNowPlaying, setSpotifyFriendsNowPlaying] = useState({})
+  const [spotifyInlinePaused, setSpotifyInlinePaused] = useState(true)
+  const spotifyControlsRef = useRef(null)
+  // Voice recording
+  const [isRecording, setIsRecording] = useState(false)
+  const [recordingSeconds, setRecordingSeconds] = useState(0)
+  const mediaRecorderRef = useRef(null)
+  const audioChunksRef = useRef([])
+  const recordingTimerRef = useRef(null)
+  // Poll creator
+  const [showPollCreator, setShowPollCreator] = useState(false)
+  const [pollQuestion, setPollQuestion] = useState('')
+  const [pollOptions, setPollOptions] = useState(['', ''])
   const [reportModal, setReportModal] = useState(null)
   const [reports, setReports] = useState([])
   const [modDeleteTick, setModDeleteTick] = useState(0)
@@ -7449,6 +7572,58 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setSpotifyNowPlaying(null)
   }
 
+
+  async function toggleRecording() {
+    if (isRecording) {
+      mediaRecorderRef.current?.stop()
+      clearInterval(recordingTimerRef.current)
+      setIsRecording(false)
+      setRecordingSeconds(0)
+      return
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const recorder = new MediaRecorder(stream)
+      audioChunksRef.current = []
+      recorder.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
+      recorder.onstop = () => {
+        stream.getTracks().forEach(t => t.stop())
+        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
+        const file = new File([blob], `voice_${Date.now()}.webm`, { type: 'audio/webm' })
+        const reader = new FileReader()
+        reader.onload = ev => setPendingAttachment({ dataUrl: ev.target.result, file, mediaType: 'audio' })
+        reader.readAsDataURL(blob)
+      }
+      recorder.start()
+      mediaRecorderRef.current = recorder
+      setIsRecording(true)
+      setRecordingSeconds(0)
+      recordingTimerRef.current = setInterval(() => setRecordingSeconds(s => s + 1), 1000)
+    } catch (err) {
+      console.error('[Voice] Mikrofon erişimi reddedildi:', err)
+    }
+  }
+
+  function sendPoll() {
+    const opts = pollOptions.filter(o => o.trim())
+    if (!pollQuestion.trim() || opts.length < 2) return
+    const chatKey = selectedChat ? selectedChat.id : composeReelmMsgKey(selectedReelm, selectedChannel)
+    if (!chatKey) return
+    const pollMsg = {
+      type: 'poll',
+      question: pollQuestion.trim(),
+      options: opts.map(o => ({ text: o.trim(), votes: [] })),
+      senderId: uid,
+      senderName: currentUser?.displayName || currentUser?.name || '',
+      senderPhoto: currentUser?.photoURL || currentUser?.photo || null,
+      timestamp: Date.now(),
+    }
+    socketEmitMessage(chatKey, pollMsg)
+    setShowPollCreator(false)
+    setPollQuestion('')
+    setPollOptions(['', ''])
+    setShowPlusMenu(false)
+  }
 
   // Fetch changelog once on mount
   useEffect(() => {
@@ -10276,6 +10451,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         isSelf={String(friendProfileTarget.friend?.id) === String(uid)}
         embedded={embedded}
         canEditNickname={!isReelmsSystemUid(f.id)}
+        onViewFullProfile={(friend) => { setFriendProfileTarget(null); setFullProfileTarget({ isSelf: false, user: friend }) }}
       />
     )
   }
@@ -10522,7 +10698,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             </div>
 
             <div className="dashboard-top-right" style={{ width: rightWidth }}>
-              <div className={`profile-card${showProfilePopup ? ' profile-card-active' : ''}`} onClick={() => setShowProfilePopup(true)}>
+              <div className={`profile-card${showProfilePopup ? ' profile-card-active' : ''}`} onClick={() => setShowProfilePopup(true)} style={{ cursor: 'pointer' }}>
                 <img src={getPersonPhoto(currentUser) || avatarUIcon} alt="Avatar" className="profile-avatar" />
                 <div className="profile-info">
                   <div className="profile-name-row">
@@ -10540,6 +10716,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   {currentActivity?.name && <ActivityBadge activity={currentActivity} />}
                 </div>
               </div>
+              <button className="profile-view-full-btn" onClick={e => { e.stopPropagation(); setFullProfileTarget({ isSelf: true, user: currentUser }) }}>
+                Tüm profili gör
+              </button>
             </div>
           </div>
 
@@ -11579,6 +11758,17 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                   placeholder={displayName}
                                 />
                               </div>
+                            )}
+                            {!isReelmsSystemChat(selectedChat) && (
+                              <button
+                                className="dm-view-full-profile-btn"
+                                onClick={() => {
+                                  const friend = friends.find(f => String(f.id) === String(selectedChat.friendId)) || { id: selectedChat.friendId, name: selectedChat.name, photo: selectedChat.photo }
+                                  setFullProfileTarget({ isSelf: false, user: friend })
+                                }}
+                              >
+                                Tüm profili gör →
+                              </button>
                             )}
                           </div>
                         )}
@@ -12675,6 +12865,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               </button>
                             </div>
                           )}
+                          <div className={`msg-outer-row${spotifyNowPlaying ? ' msg-outer-row--spotify' : ''}`}>
                           <div className="msg-bar">
                           <div className={`msg-input-wrap${pendingAttachment ? ' msg-input-wrap--has-attach' : ''}`}>
                             <input
@@ -12724,6 +12915,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               <div className="msg-attach-preview">
                                 {pendingAttachment.mediaType === 'image' ? (
                                   <img className="msg-attach-thumb" src={pendingAttachment.dataUrl} alt="" />
+                                ) : pendingAttachment.mediaType === 'audio' ? (
+                                  <div className="msg-attach-thumb msg-attach-thumb--audio">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/><path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                                  </div>
                                 ) : (
                                   <div className="msg-attach-thumb msg-attach-thumb--video">
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5,3 19,12 5,21"/></svg>
@@ -12758,14 +12953,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 </div>
                               )}
                             </div>
-                            <button className="msg-action-btn" title="Birlikte Yap">
-                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                                <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.8"/>
-                                <path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                                <path d="M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                              </svg>
-                            </button>
+                            {!spotifyNowPlaying && (
+                              <button className="msg-action-btn" title="Birlikte Yap">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                                  <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.8"/>
+                                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                                  <path d="M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                                </svg>
+                              </button>
+                            )}
                             <button className="msg-action-btn" title="Medya" disabled={!canPost} onClick={() => mediaInputRef.current?.click()}>
                               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                                 <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.8"/>
@@ -12773,40 +12970,42 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 <path d="M3 17l5-5 3.5 4 2.5-2.5 5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
                               </svg>
                             </button>
-                            <button className="msg-action-btn" title="Belge" disabled={!canPost} onClick={() => docInputRef.current?.click()}>
-                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                                <polyline points="14 2 14 8 20 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                                <line x1="8" y1="13" x2="16" y2="13" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/>
-                                <line x1="8" y1="17" x2="16" y2="17" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round"/>
-                              </svg>
-                            </button>
-                            <input ref={mediaInputRef} type="file" accept="image/*,video/*" style={{ display: 'none' }} onChange={e => {
+                            <input ref={mediaInputRef} type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar" style={{ display: 'none' }} onChange={e => {
                               const file = e.target.files[0]
                               if (file) {
-                                const reader = new FileReader()
-                                reader.onload = ev => setPendingAttachment({ dataUrl: ev.target.result, file, mediaType: file.type.startsWith('video/') ? 'video' : 'image' })
-                                reader.readAsDataURL(file)
+                                const isMedia = file.type.startsWith('image/') || file.type.startsWith('video/')
+                                if (isMedia) {
+                                  const reader = new FileReader()
+                                  reader.onload = ev => setPendingAttachment({ dataUrl: ev.target.result, file, mediaType: file.type.startsWith('video/') ? 'video' : 'image' })
+                                  reader.readAsDataURL(file)
+                                } else {
+                                  sendAttachment(file, 'doc')
+                                }
                               }
                               e.target.value = ''
                             }} />
-                            <input ref={docInputRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar" style={{ display: 'none' }} onChange={e => { sendAttachment(e.target.files[0], 'doc'); e.target.value = '' }} />
-                            <button className="msg-action-btn" title="Sesli Mesaj">
-                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                                <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                                <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                                <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                              </svg>
+                            <button className={`msg-action-btn${isRecording ? ' msg-action-btn--recording' : ''}`} title={isRecording ? `Durdurup Gönder (${recordingSeconds}s)` : 'Sesli Mesaj'} disabled={!canPost} onClick={toggleRecording}>
+                              {isRecording ? (
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+                              ) : (
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                                  <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                                  <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                                </svg>
+                              )}
                             </button>
-                            <button className="msg-action-btn" title="Oyun">
-                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                                <rect x="2" y="6" width="20" height="12" rx="6" stroke="currentColor" strokeWidth="1.8"/>
-                                <path d="M6 12h4M8 10v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                                <circle cx="15" cy="11" r="1" fill="currentColor"/>
-                                <circle cx="17" cy="13" r="1" fill="currentColor"/>
-                              </svg>
-                            </button>
+                            {!spotifyNowPlaying && (
+                              <button className="msg-action-btn" title="Oyun">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                  <rect x="2" y="6" width="20" height="12" rx="6" stroke="currentColor" strokeWidth="1.8"/>
+                                  <path d="M6 12h4M8 10v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                                  <circle cx="15" cy="11" r="1" fill="currentColor"/>
+                                  <circle cx="17" cy="13" r="1" fill="currentColor"/>
+                                </svg>
+                              </button>
+                            )}
                             <div className="msg-plus-wrap">
                               <button className="msg-action-btn" onClick={() => setShowPlusMenu(v => !v)} title="Daha Fazla">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
@@ -12816,7 +13015,19 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               </button>
                               {showPlusMenu && (
                                 <div className="msg-plus-menu">
-                                  <button className="msg-plus-menu-item" onClick={() => setShowPlusMenu(false)}>
+                                  {spotifyNowPlaying && (
+                                    <>
+                                      <button className="msg-plus-menu-item">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.8"/><path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><path d="M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                                        Birlikte Yap
+                                      </button>
+                                      <button className="msg-plus-menu-item">
+                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="12" rx="6" stroke="currentColor" strokeWidth="1.8"/><path d="M6 12h4M8 10v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="15" cy="11" r="1" fill="currentColor"/><circle cx="17" cy="13" r="1" fill="currentColor"/></svg>
+                                        Oyun
+                                      </button>
+                                    </>
+                                  )}
+                                  <button className="msg-plus-menu-item" onClick={() => { setShowPollCreator(true); setShowPlusMenu(false) }}>
                                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                                       <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.8"/>
                                       <line x1="3" y1="9" x2="21" y2="9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
@@ -12830,6 +13041,80 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             </div>
                           </div>
                           </div>
+                          {spotifyNowPlaying && (
+                            <div className="msg-spotify-bar">
+                              {spotifyNowPlaying.albumArt && (
+                                <img src={spotifyNowPlaying.albumArt} alt="" className="msb-art" />
+                              )}
+                              <div className="msb-info">
+                                <span className="msb-name">{spotifyNowPlaying.name}</span>
+                                <span className="msb-artist">{spotifyNowPlaying.artist}</span>
+                              </div>
+                              <div className="msb-controls">
+                                <button className="msb-btn" onClick={() => spotifyControlsRef.current?.prevTrack()}>
+                                  <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M3.3 1a.7.7 0 0 1 .7.7v5.15L14 1.108A.7.7 0 0 1 15 1.7v12.6a.7.7 0 0 1-1.05.607L4 9.149V13.3a.7.7 0 0 1-.7.7H1.7a.7.7 0 0 1-.7-.7V1.7a.7.7 0 0 1 .7-.7h1.6z"/></svg>
+                                </button>
+                                <button className="msb-btn msb-btn-play" onClick={() => spotifyControlsRef.current?.togglePlay()}>
+                                  {spotifyInlinePaused
+                                    ? <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3 1.713a.7.7 0 0 1 1.05-.607l10.89 6.288a.7.7 0 0 1 0 1.212L4.05 14.894A.7.7 0 0 1 3 14.288V1.713z"/></svg>
+                                    : <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.7 1a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7H2.7zm8 0a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-2.6z"/></svg>
+                                  }
+                                </button>
+                                <button className="msb-btn" onClick={() => spotifyControlsRef.current?.nextTrack()}>
+                                  <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M12.7 1a.7.7 0 0 0-.7.7v5.15L2.05 1.108A.7.7 0 0 0 1 1.7v12.6a.7.7 0 0 0 1.05.607L12 9.149V13.3a.7.7 0 0 0 .7.7h1.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-1.6z"/></svg>
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                          </div>
+                          {showPollCreator && (
+                            <div className="poll-creator-overlay" onClick={e => { if (e.target === e.currentTarget) setShowPollCreator(false) }}>
+                              <div className="poll-creator">
+                                <div className="poll-creator-header">
+                                  <span className="poll-creator-title">Anket Oluştur</span>
+                                  <button className="poll-creator-close" onClick={() => setShowPollCreator(false)}>
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
+                                  </button>
+                                </div>
+                                <input
+                                  className="poll-creator-question"
+                                  placeholder="Soru..."
+                                  value={pollQuestion}
+                                  onChange={e => setPollQuestion(e.target.value)}
+                                  maxLength={200}
+                                />
+                                <div className="poll-creator-options">
+                                  {pollOptions.map((opt, i) => (
+                                    <div key={i} className="poll-creator-option-row">
+                                      <input
+                                        className="poll-creator-option-input"
+                                        placeholder={`Seçenek ${i + 1}`}
+                                        value={opt}
+                                        onChange={e => { const next = [...pollOptions]; next[i] = e.target.value; setPollOptions(next) }}
+                                        maxLength={100}
+                                      />
+                                      {pollOptions.length > 2 && (
+                                        <button className="poll-creator-remove-opt" onClick={() => setPollOptions(pollOptions.filter((_, j) => j !== i))}>
+                                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
+                                        </button>
+                                      )}
+                                    </div>
+                                  ))}
+                                  {pollOptions.length < 6 && (
+                                    <button className="poll-creator-add-opt" onClick={() => setPollOptions([...pollOptions, ''])}>
+                                      + Seçenek ekle
+                                    </button>
+                                  )}
+                                </div>
+                                <div className="poll-creator-footer">
+                                  <button className="poll-creator-cancel" onClick={() => setShowPollCreator(false)}>İptal</button>
+                                  <button className="poll-creator-send" onClick={sendPoll} disabled={!pollQuestion.trim() || pollOptions.filter(o => o.trim()).length < 2}>
+                                    Gönder
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          )}
                         </div>}
                       </>
                     )
@@ -13119,70 +13404,108 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                 <ModInboxPanel onClose={() => {}} />
               </div>
             ) : (
-              <div className="panel panel-middle">
+              <div className="panel panel-middle home-panel">
                 {(() => {
-                  const reelmsWithUpdates = reelms.filter(r => unreadCounts[r.id] > 0)
-                  const totalReelmMsgs = reelmsWithUpdates.reduce((s, r) => s + (unreadCounts[r.id] || 0), 0)
-                  const mostRecentReelm = [...reelms].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0]
-                  const chatsWithUpdates = chats.filter(c => unreadCounts[c.id] > 0)
-                  const totalChatMsgs = chatsWithUpdates.reduce((s, c) => s + (unreadCounts[c.id] || 0), 0)
+                  const sortedReelms = [...reelms].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+                  const sortedChats = [...chats].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+                  const ArrowRight = () => (
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                      <polyline points="9 18 15 12 9 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  )
                   return (
-                <div className="welcome-grid">
-                  <div
-                    className="welcome-card welcome-card-rect su-drop su-drop-2"
-                    style={{ cursor: mostRecentReelm ? 'pointer' : 'default' }}
-                    onClick={() => { if (mostRecentReelm) handleSelectReelm(mostRecentReelm) }}
-                  >
-                    <div>
-                      <span className="welcome-card-title" style={{ fontFamily: "'Dela Gothic One', sans-serif" }}>Your Reelms, recently</span>
-                      {totalReelmMsgs > 0
-                        ? <span className="welcome-card-summary">{totalReelmMsgs} message{totalReelmMsgs !== 1 ? 's' : ''} from {reelmsWithUpdates.length} reelm{reelmsWithUpdates.length !== 1 ? 's' : ''}</span>
-                        : <span className="welcome-card-empty">You're all caught up.</span>
-                      }
-                    </div>
-                    <div className="welcome-card-reelm-photos">
-                      {reelmsWithUpdates.slice(0, 4).map(r => (
-                        <div key={r.id} className="welcome-card-reelm-photo">
-                          {r.image
-                            ? <img src={r.image} alt={r.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-                            : <span style={{ fontSize: '0.75rem' }}>{(r.name || '?').charAt(0)}</span>
-                          }
+                    <div className="home-sections">
+                      {/* Your Reelms, recently */}
+                      <div className="home-section">
+                        <div className="home-section-header">
+                          <img src={readyreelmIcon} alt="" className="home-section-icon" />
+                          <span className="home-section-title">Your Reelms, recently</span>
                         </div>
-                      ))}
-                      {reelmsWithUpdates.length === 0 && <img src={feedIcon} alt="Feed" className="welcome-card-icon" />}
-                    </div>
-                  </div>
-                  <div className="welcome-cards-row">
-                    <div
-                      className="welcome-card welcome-card-square su-drop su-drop-3"
-                      style={{ cursor: 'pointer' }}
-                      onClick={() => { setSelectedChat(null); setShowChatList(true); setChatListFilter('all') }}
-                    >
-                      <div>
-                        <span className="welcome-card-title" style={{ fontFamily: "'Dela Gothic One', sans-serif" }}>Recent chats</span>
-                        {totalChatMsgs > 0
-                          ? <span className="welcome-card-summary">{totalChatMsgs} message{totalChatMsgs !== 1 ? 's' : ''} from {chatsWithUpdates.length} chat{chatsWithUpdates.length !== 1 ? 's' : ''}</span>
-                          : <span className="welcome-card-empty">You're all caught up.</span>
-                        }
+                        {sortedReelms.length > 0 && (
+                          <div className="home-section-list">
+                            {sortedReelms.slice(0, 5).map(r => (
+                              <button key={r.id} className="home-item" onClick={() => handleSelectReelm(r)}>
+                                <div className="home-item-avatar home-item-avatar--server">
+                                  {r.image
+                                    ? <img src={r.image} alt={r.name} className="home-item-avatar-img" />
+                                    : <span className="home-item-avatar-letter">{(r.name || '?').charAt(0)}</span>
+                                  }
+                                </div>
+                                <span className="home-item-name">{r.name}</span>
+                                {unreadCounts[r.id] > 0 && <span className="home-item-badge">{unreadCounts[r.id]}</span>}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <button className="home-section-viewall" onClick={() => { setShowDiscover(false); setShowFriendsPanel(false); setShowSettings(false); setShowMsgRequests(false) }}>
+                          All Reelms <ArrowRight />
+                        </button>
                       </div>
-                      <img src={newdmIcon} alt="Messages" className="welcome-card-icon" />
-                    </div>
-                    <div
-                      className="welcome-card welcome-card-square su-drop su-drop-4"
-                      style={{ cursor: notifications.length > 0 ? 'pointer' : 'default' }}
-                      onClick={() => { if (notifications.length > 0) toggleNotifPopup() }}
-                    >
-                      <div>
-                        <span className="welcome-card-title" style={{ fontFamily: "'Dela Gothic One', sans-serif" }}>Updates</span>
-                        {notifications.length > 0
-                          ? <span className="welcome-card-summary">{notifications.length} notification{notifications.length !== 1 ? 's' : ''}</span>
-                          : <span className="welcome-card-empty">You're all caught up.</span>
-                        }
+
+                      {/* Messages */}
+                      <div className="home-section">
+                        <div className="home-section-header">
+                          <img src={newdmIcon} alt="" className="home-section-icon" />
+                          <span className="home-section-title">Messages</span>
+                        </div>
+                        {sortedChats.length > 0 ? (
+                          <div className="home-section-list">
+                            {sortedChats.slice(0, 5).map(c => {
+                              const avatarSrc = getChatAvatarSrc(c)
+                              const displayName = getChatDisplayName(c)
+                              return (
+                                <button key={c.id} className="home-item" onClick={() => { setSelectedChat(c); setSelectedReelm(null); setSelectedChannel(null); setShowChatList(false); setShowFeed(false); setShowDiscover(false) }}>
+                                  <div className="home-item-avatar">
+                                    {avatarSrc
+                                      ? <img src={avatarSrc} alt={displayName} className="home-item-avatar-img" />
+                                      : <span className="home-item-avatar-letter">{(displayName || '?').charAt(0)}</span>
+                                    }
+                                  </div>
+                                  <span className="home-item-name">{displayName}</span>
+                                  {unreadCounts[c.id] > 0 && <span className="home-item-badge">{unreadCounts[c.id]}</span>}
+                                </button>
+                              )
+                            })}
+                          </div>
+                        ) : (
+                          <p className="home-empty">You're all caught up.</p>
+                        )}
+                        <button className="home-section-viewall" onClick={() => { setSelectedChat(null); setShowChatList(true); setChatListFilter('all') }}>
+                          All Messages <ArrowRight />
+                        </button>
                       </div>
-                      <img src={notificationIcon} alt="Notifications" className="welcome-card-icon" />
+
+                      {/* Notifications */}
+                      <div className="home-section">
+                        <div className="home-section-header">
+                          <img src={notificationIcon} alt="" className="home-section-icon" />
+                          <span className="home-section-title">Notifications</span>
+                        </div>
+                        {notifications.length > 0 ? (
+                          <div className="home-section-list">
+                            {notifications.slice(0, 5).map(n => (
+                              <button
+                                key={n.id}
+                                className="home-item home-item--notif"
+                                onClick={() => {
+                                  if (n.link?.type !== 'reelm_invite') {
+                                    navigateToNotificationLink(n.link)
+                                    deleteNotification(n.id)
+                                  }
+                                }}
+                              >
+                                <span className="home-item-notif-text">{n.text}</span>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="home-empty">You're all caught up.</p>
+                        )}
+                        <button className="home-section-viewall" onClick={toggleNotifPopup}>
+                          All Notifications <ArrowRight />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                </div>
                   )
                 })()}
                 <button
@@ -13229,6 +13552,25 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             />
           )}
           {renderFriendProfileSurface(false)}
+          {fullProfileTarget && (
+            <FullProfilePage
+              user={fullProfileTarget.isSelf ? currentUser : fullProfileTarget.user}
+              isSelf={fullProfileTarget.isSelf}
+              reelms={reelms}
+              onClose={() => setFullProfileTarget(null)}
+              onMessage={() => {
+                const friend = friends.find(f => String(f.id) === String(fullProfileTarget.user?.id)) || fullProfileTarget.user
+                if (friend) startDM(friend)
+              }}
+              onAddFriend={sendFriendRequest}
+              onRemove={removeFriend}
+              onBlock={blockUserFn}
+              onUnblock={unblockUserFn}
+              isFriend={fullProfileTarget.user && friends.some(f => String(f.id) === String(fullProfileTarget.user.id))}
+              isBlocked={fullProfileTarget.user && blocked.some(b => String(b.id) === String(fullProfileTarget.user.id))}
+              isPending={fullProfileTarget.user && friendRequestsOut.map(String).includes(String(fullProfileTarget.user.id))}
+            />
+          )}
         </div>
         {showMenu && (
           <div className="menu-backdrop" onClick={() => { setShowMenu(false); setCreateReelmStep(null); setSelectedTemplateId(null) }}>
@@ -13821,6 +14163,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
           </button>
         </div>
+      )}
+      {spotifyConnected && (
+        <SpotifyPlayer
+          uid={uid}
+          onNowPlayingChange={setSpotifyNowPlaying}
+          onControlsReady={controls => { spotifyControlsRef.current = controls }}
+          onPlayerStateChange={({ paused }) => setSpotifyInlinePaused(paused)}
+        />
       )}
       <ToastStack
         toasts={dashToasts}
