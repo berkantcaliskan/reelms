@@ -2,7 +2,6 @@ import { Router } from 'express'
 import type { Server } from 'socket.io'
 import { env } from '../../config/env.js'
 import { authenticate } from '../middleware/authenticate.js'
-import { apiRateLimit } from '../middleware/rateLimit.js'
 import { getDoc, putDoc, userPk } from '../../modules/store/docStore.js'
 import { getUserPublicProfile } from '../../modules/reelms/access.js'
 
@@ -29,22 +28,8 @@ function hasFriend(list: any[], uid: string) {
 export function createSocialRouter(io: Server) {
   const router = Router()
   router.use(authenticate)
-  router.use(apiRateLimit)
 
-  const syncVersion = () => Date.now()
-  const emit = (uid: string, sk: string, data?: any) => {
-    const targetUid = String(uid || '')
-    if (!targetUid || !sk) return
-    const send = (value: any, hasData = true) => io.to(`u:${targetUid}`).emit('reelms:doc', {
-      scope: 'user',
-      sk,
-      ...(hasData ? { data: value } : {}),
-      version: syncVersion(),
-      at: Date.now()
-    })
-    if (typeof data !== 'undefined') { send(data); return }
-    void getDoc(userPk(targetUid), sk).then((value) => send(value)).catch(() => send(null, false))
-  }
+  const emit = (uid: string, sk: string) => io.to(`u:${uid}`).emit('reelms:doc', { scope: 'user', sk })
   const isSystemInboxUid = (uid: string) => String(uid || '') === String(env.REELMS_MODERATION_UID || '')
 
   router.post('/notify', async (req, res) => {

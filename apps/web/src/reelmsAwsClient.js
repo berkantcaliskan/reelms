@@ -24,140 +24,37 @@ export function getClientId() {
   return getWebClientId()
 }
 
-const inflightRequests = new Map()
-const responseCache = new Map()
-const userDocCache = new Map()
-const userPersistLastJson = new Map()
-const userPersistPendingJson = new Map()
-const profileCache = new Map()
-// Server-owned documents must only be refreshed from the API. Letting the
-// client PUT these snapshots back creates stale role/member copies and is the
-// root cause of phantom members, duplicate roles, and slow login fan-out.
-const SERVER_OWNED_USER_DOCS = new Set(['reelms'])
-
-function stableJson(value) {
-  try { return JSON.stringify(value) } catch { return String(value) }
-}
-
-function requestCacheTtl(path, method) {
-  if (method !== 'GET') return 0
-  if (path === '/api/v1/user/bootstrap') return 1000
-  if (path.startsWith('/api/v1/user/profile/')) return 5 * 60 * 1000
-  if (path.startsWith('/api/v1/discovery/search')) return 30 * 1000
-  if (path.startsWith('/api/v1/users')) return 30 * 1000
-  if (path.startsWith('/api/v1/reelms/discover')) return 20 * 1000
-  if (path.startsWith('/api/v1/user/doc/reelms')) return 10 * 1000
-  if (path.startsWith('/api/v1/user/doc/customization') || path.startsWith('/api/v1/user/doc/bg_image') || path.startsWith('/api/v1/user/doc/body_font') || path.startsWith('/api/v1/user/doc/environment')) return 60 * 1000
-  if (path.startsWith('/api/v1/user/doc/')) return 8 * 1000
-  if (path.startsWith('/api/v1/reelm/') && path.endsWith('/core')) return 5 * 1000
-  if (path.startsWith('/api/v1/reelm/') && path.includes('/doc/')) return 5 * 1000
-  return 0
-}
-
-
-function invalidateResponseCache(predicate) {
-  try {
-    for (const key of Array.from(responseCache.keys())) {
-      if (predicate(String(key))) responseCache.delete(key)
+async function api(path, opts = {}) {
+  const token = await getIdToken()
+  if (!token) throw new Error('not_signed_in')
+  const r = await fetch(`${BASE}${path}`, {
+    ...opts,
+    headers: {
+      'Content-Type': 'application/json',
+      ...(opts.headers || {}),
+      Authorization: `Bearer ${token}`,
+      'X-Reelms-Client-Id': getClientId(),
+    },
+  })
+  if (!r.ok) {
+    if (r.status === 404 && opts.allowNotFound) return null
+    const text = await r.text()
+    let payload = null
+    try { payload = text ? JSON.parse(text) : null } catch {}
+    const err = new Error(payload?.message || payload?.error || text || r.statusText)
+    err.status = r.status
+    err.code = payload?.code || payload?.error || `http/${r.status}`
+    err.details = payload?.details || payload?.issues || null
+    err.payload = payload
+    if (r.status === 401 && (err.code === 'auth/session-replaced' || err.code === 'session_replaced' || err.message === 'session_replaced')) {
+      try { window.dispatchEvent(new CustomEvent('reelms:session-invalid', { detail: { code: err.code } })) } catch {}
     }
-  } catch { /* noop */ }
-}
-
-function invalidateReelmResponseCache(reelmId) {
-  const id = encodeURIComponent(String(reelmId || 'global'))
-  invalidateResponseCache(key => key.includes(`/api/v1/reelm/${id}/`) || key.includes('/api/v1/user/doc/reelms') || key.includes('/api/v1/user/bootstrap'))
-}
-
-function invalidateUserResponseCache(sk = '') {
-  const key = encodeURIComponent(String(sk || ''))
-  invalidateResponseCache(entry => entry.includes(`/api/v1/user/doc/${key}`) || entry.includes('/api/v1/user/bootstrap'))
-}
-
-function rememberUserDoc(sk, data) {
-  if (!sk) return
-  userDocCache.set(String(sk), { data, at: Date.now() })
-  userPersistLastJson.set(String(sk), stableJson(data))
-}
-
-function userDocCacheTtl(sk) {
-  const key = String(sk || '')
-  if (['customization', 'bg_image', 'body_font', 'environment'].includes(key)) return 10 * 60 * 1000
-  if (key === 'reelms') return 60 * 1000
-  if (['chats', 'friends', 'friend_requests', 'notifications', 'message_requests', 'unread_counts'].includes(key)) return 15 * 1000
-  return 1200
-}
-
-async function parseApiResponse(r) {
+    throw err
+  }
   if (r.status === 204) return null
   const ct = r.headers.get('content-type')
   if (!ct || !ct.includes('application/json')) return null
   return r.json()
-}
-
-function makeApiError(r, text) {
-  let payload = null
-  try { payload = text ? JSON.parse(text) : null } catch {}
-  const err = new Error(payload?.message || payload?.error || text || r.statusText)
-  err.status = r.status
-  err.code = payload?.code || payload?.error || `http/${r.status}`
-  err.details = payload?.details || payload?.issues || null
-  err.payload = payload
-  if (r.status === 401 && (err.code === 'auth/session-replaced' || err.code === 'session_replaced' || err.message === 'session_replaced')) {
-    try { window.dispatchEvent(new CustomEvent('reelms:session-invalid', { detail: { code: err.code } })) } catch {}
-  }
-  return err
-}
-
-async function api(path, opts = {}) {
-  const token = await getIdToken()
-  if (!token) throw new Error('not_signed_in')
-  const method = String(opts.method || 'GET').toUpperCase()
-  const cacheKey = `${method}:${path}:${opts.body || ''}`
-  const ttl = requestCacheTtl(path, method)
-  const now = Date.now()
-  if (ttl > 0) {
-    const cached = responseCache.get(cacheKey)
-    if (cached && now - cached.at < ttl) return cached.value
-    if (inflightRequests.has(cacheKey)) return inflightRequests.get(cacheKey)
-  }
-
-  const run = (async () => {
-    let attempt = 0
-    while (true) {
-      const r = await fetch(`${BASE}${path}`, {
-        ...opts,
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          ...(opts.headers || {}),
-          Authorization: `Bearer ${token}`,
-          'X-Reelms-Client-Id': getClientId(),
-        },
-      })
-      if (r.ok) {
-        const value = await parseApiResponse(r)
-        if (ttl > 0) responseCache.set(cacheKey, { value, at: Date.now() })
-        return value
-      }
-      if (r.status === 404 && opts.allowNotFound) return null
-      const text = await r.text()
-      const err = makeApiError(r, text)
-      if (r.status === 429 && attempt < 2) {
-        const retryAfter = Number(r.headers.get('retry-after') || 0)
-        const waitMs = Math.min(2500, Math.max(350, retryAfter ? retryAfter * 1000 : 450 * (attempt + 1)))
-        await new Promise(resolve => setTimeout(resolve, waitMs))
-        attempt += 1
-        continue
-      }
-      throw err
-    }
-  })()
-
-  if (ttl > 0) {
-    inflightRequests.set(cacheKey, run)
-    run.finally(() => inflightRequests.delete(cacheKey)).catch(() => {})
-  }
-  return run
 }
 
 async function publicApi(path, opts = {}) {
@@ -184,79 +81,34 @@ async function publicApi(path, opts = {}) {
 export async function userBootstrap() {
   if (!isElectron) await claimWebClient().catch(() => null)
   const j = await api('/api/v1/user/bootstrap')
-  const data = j.data || {}
-  Object.entries(data || {}).forEach(([sk, value]) => rememberUserDoc(sk, value))
-  return data
+  return j.data || {}
 }
 
 export async function userGetDoc(sk) {
-  const key = String(sk || '')
-  const cached = userDocCache.get(key)
-  if (cached && Date.now() - cached.at < userDocCacheTtl(key)) return cached.data
-  const j = await api(`/api/v1/user/doc/${encodeURIComponent(key)}`)
-  rememberUserDoc(key, j.data)
+  const j = await api(`/api/v1/user/doc/${encodeURIComponent(sk)}`)
   return j.data
 }
 
 export async function userPutDoc(sk, data) {
-  const key = String(sk || '')
-  await api(`/api/v1/user/doc/${encodeURIComponent(key)}`, {
+  await api(`/api/v1/user/doc/${encodeURIComponent(sk)}`, {
     method: 'PUT',
     body: JSON.stringify({ data }),
   })
-  invalidateUserResponseCache(key)
-  rememberUserDoc(key, data)
-  userPersistPendingJson.delete(key)
-}
-
-const CORE_DOC_FIELDS = new Set(['meta', 'structure', 'roles', 'members', 'join_requests', 'ban_list', 'timeout_list'])
-
-function docFromCore(core, sk) {
-  if (!core) return undefined
-  if (sk === 'meta') {
-    const { roles, members, categories, joinRequests, banList, timeoutList, ...meta } = core
-    return meta
-  }
-  if (sk === 'structure') return { categories: Array.isArray(core.categories) ? core.categories : [] }
-  if (sk === 'roles') return Array.isArray(core.roles) ? core.roles : []
-  if (sk === 'members') return Array.isArray(core.members) ? core.members : []
-  if (sk === 'join_requests') return Array.isArray(core.joinRequests) ? core.joinRequests : []
-  if (sk === 'ban_list') return Array.isArray(core.banList) ? core.banList : []
-  if (sk === 'timeout_list') return Array.isArray(core.timeoutList) ? core.timeoutList : []
-  return undefined
 }
 
 export async function reelmGetDoc(reelmId, sk) {
   const id = reelmId || 'global'
-  const key = String(sk || '')
-  if (CORE_DOC_FIELDS.has(key)) {
-    const core = await reelmGetCore(id).catch((err) => {
-      if (err?.status === 403) return null
-      throw err
-    })
-    const value = docFromCore(core, key)
-    if (typeof value !== 'undefined') return value
-    if (key === 'join_requests' || key === 'ban_list' || key === 'timeout_list') return []
-  }
-  const j = await api(`/api/v1/reelm/${encodeURIComponent(id)}/doc/${encodeURIComponent(key)}`)
+  const j = await api(`/api/v1/reelm/${encodeURIComponent(id)}/doc/${encodeURIComponent(sk)}`)
   return j.data
-}
-
-export async function reelmGetCore(reelmId) {
-  const id = reelmId || 'global'
-  const j = await api(`/api/v1/reelm/${encodeURIComponent(id)}/core`)
-  return j?.data || null
 }
 
 export async function reelmPutDoc(reelmId, sk, data, options = {}) {
   const id = reelmId || 'global'
   const body = { data, ...(options && typeof options === 'object' ? options : {}) }
-  const result = await api(`/api/v1/reelm/${encodeURIComponent(id)}/doc/${encodeURIComponent(sk)}`, {
+  await api(`/api/v1/reelm/${encodeURIComponent(id)}/doc/${encodeURIComponent(sk)}`, {
     method: 'PUT',
     body: JSON.stringify(body),
   })
-  invalidateReelmResponseCache(id)
-  return result
 }
 
 export async function appGetDoc(sk) {
@@ -321,21 +173,11 @@ export function scheduleReelmPersist(reelmId, field, value, ms = 450) {
   }, ms)
 }
 
-export function scheduleUserPersist(sk, data, ms = 650) {
-  const key = String(sk || '')
-  if (SERVER_OWNED_USER_DOCS.has(key)) {
-    rememberUserDoc(key, data)
-    return
-  }
-  const nextJson = stableJson(data)
-  if (userPersistLastJson.get(key) === nextJson || userPersistPendingJson.get(key) === nextJson) return
-  userPersistPendingJson.set(key, nextJson)
-  clearTimeout(userTimers[key])
-  userTimers[key] = setTimeout(() => {
-    userPutDoc(key, data).catch(() => {}).finally(() => {
-      if (userPersistPendingJson.get(key) === nextJson) userPersistPendingJson.delete(key)
-      delete userTimers[key]
-    })
+export function scheduleUserPersist(sk, data, ms = 350) {
+  clearTimeout(userTimers[sk])
+  userTimers[sk] = setTimeout(() => {
+    userPutDoc(sk, data).catch(() => {})
+    delete userTimers[sk]
   }, ms)
 }
 
@@ -349,30 +191,50 @@ export function scheduleAppPersist(sk, data, ms = 450) {
 }
 
 export async function recordUserSession(parseDeviceInfo, notifyNewDevice) {
+  const sessions = (await userGetDoc('sessions')) || []
   const ua = navigator.userAgent
-  const device = parseDeviceInfo(ua)
-  const j = await api('/api/v1/user/session/record', {
-    method: 'POST',
-    body: JSON.stringify({ ua, device, notifyNewDevice }),
-  })
-  const sessionId = j?.data?.sessionId || `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
-  try { sessionStorage.setItem('reelms_session_id', sessionId) } catch (_) {}
-  if (Array.isArray(j?.data?.sessions)) rememberUserDoc('sessions', j.data.sessions)
+  const list = Array.isArray(sessions) ? sessions : []
+  const isNewDevice = list.length > 0 && !list.some((s) => s.ua === ua)
+  const sessionId = `${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+  const entry = {
+    id: sessionId,
+    loginTime: Date.now(),
+    lastActivity: Date.now(),
+    ua,
+    device: parseDeviceInfo(ua),
+  }
+  const next = [entry, ...list].slice(0, 10)
+  await userPutDoc('sessions', next)
+  try {
+    sessionStorage.setItem('reelms_session_id', sessionId)
+  } catch (_) {}
+  if (isNewDevice && notifyNewDevice !== false) {
+    const notifs = (await userGetDoc('notifications')) || []
+    const n = Array.isArray(notifs) ? notifs : []
+    n.unshift({
+      id: `${Date.now()}_${Math.random().toString(36).slice(2, 11)}`,
+      text: `New sign-in detected from ${parseDeviceInfo(ua)}`,
+      time: Date.now(),
+    })
+    await userPutDoc('notifications', n)
+  }
   return sessionId
 }
 
-let lastSessionTouchAt = 0
 export async function touchUserSession() {
   let sessionId
-  try { sessionId = sessionStorage.getItem('reelms_session_id') } catch (_) { return }
+  try {
+    sessionId = sessionStorage.getItem('reelms_session_id')
+  } catch (_) {
+    return
+  }
   if (!sessionId) return
-  const now = Date.now()
-  if (now - lastSessionTouchAt < 4 * 60 * 1000) return
-  lastSessionTouchAt = now
-  await api('/api/v1/user/session/touch', {
-    method: 'POST',
-    body: JSON.stringify({ sessionId }),
-  })
+  const sessions = (await userGetDoc('sessions')) || []
+  const list = Array.isArray(sessions) ? sessions : []
+  const next = list.map((s) =>
+    s.id === sessionId ? { ...s, lastActivity: Date.now() } : s
+  )
+  await userPutDoc('sessions', next)
 }
 
 export async function loadReelmDocuments(reelmId) {
@@ -394,7 +256,7 @@ export async function loadReelmDocuments(reelmId) {
 }
 
 export function connectReelmsSocket(handlers) {
-  const { onUserDoc, onReelmDoc, onReelmManagerDoc, onReelmCoreSnapshot, onAppDoc, onMessage, onMessageDeleted, onMessagesCleared, onReaction, onVoicePosition, onVcEvent, onVcError, onVcCount, onVcCounts, onVcParticipants, onVcState, onPresence, onProfileUpdated, onReelmAccessRevoked, onReelmMemberJoined, onReelmMemberRemoved, onReelmMemberLeft, onJoinRequestRejected, onJoinRequestApproved, onReelmTimeout, onReelmTimeoutRemoved, onReelmBanned, onReelmClosed, onConnect } = handlers
+  const { onUserDoc, onReelmDoc, onReelmManagerDoc, onAppDoc, onMessage, onMessageDeleted, onMessagesCleared, onReaction, onVoicePosition, onVcEvent, onVcError, onVcCount, onVcCounts, onVcParticipants, onVcState, onPresence, onProfileUpdated, onReelmAccessRevoked, onReelmMemberJoined, onReelmMemberRemoved, onJoinRequestRejected, onJoinRequestApproved, onReelmTimeout, onReelmTimeoutRemoved, onReelmBanned, onReelmClosed, onConnect } = handlers
   const run = async () => {
     const token = await getIdToken()
     if (!token) return
@@ -419,25 +281,12 @@ export function connectReelmsSocket(handlers) {
     })
     socket.on('reelms:doc', (msg) => {
       if (!msg || !msg.scope) return
-      if (msg.scope === 'user' && msg.sk) {
-        if (typeof msg.data !== 'undefined') rememberUserDoc(msg.sk, msg.data)
-        onUserDoc?.(msg.sk, msg.data, msg.version, msg)
-      }
-      if (msg.scope === 'reelm' && msg.sk) onReelmDoc?.(msg.reelmId, msg.sk, msg.data, msg.version, msg)
-      if (msg.scope === 'app' && msg.sk) onAppDoc?.(msg.sk, msg.data, msg.version, msg)
+      if (msg.scope === 'user' && msg.sk) onUserDoc?.(msg.sk)
+      if (msg.scope === 'reelm' && msg.sk) onReelmDoc?.(msg.reelmId, msg.sk, msg.data)
+      if (msg.scope === 'app' && msg.sk) onAppDoc?.(msg.sk)
     })
     socket.on('reelms:manager-doc', (msg) => {
-      if (msg?.reelmId && msg?.sk) onReelmManagerDoc?.(msg.reelmId, msg.sk, msg.data, msg.version, msg)
-    })
-    socket.on('reelm:core-snapshot', (msg) => {
-      const id = String(msg?.reelm?.id || msg?.reelmId || '')
-      if (id && msg?.reelm) {
-        patchReelmCache(id, msg.reelm)
-        for (const key of Array.from(responseCache.keys())) {
-          if (String(key).includes(`/api/v1/reelm/${encodeURIComponent(id)}/`)) responseCache.delete(key)
-        }
-      }
-      if (id) onReelmCoreSnapshot?.(msg)
+      if (msg?.reelmId && msg?.sk) onReelmManagerDoc?.(msg.reelmId, msg.sk, msg.data)
     })
     socket.on('reelms:message', (msg) => {
       if (msg?.msgKey && msg?.message) onMessage?.(msg.msgKey, msg.message)
@@ -452,14 +301,7 @@ export function connectReelmsSocket(handlers) {
       if (msg?.msgKey && msg?.msgId && msg?.emoji) onReaction?.(msg)
     })
     socket.on('reelms:profile-updated', (msg) => {
-      const id = String(msg?.profile?.id || msg?.profile?.uid || '')
-      if (id) {
-        profileCache.set(id, { data: msg.profile, at: Date.now() })
-        for (const key of Array.from(responseCache.keys())) {
-          if (String(key).includes(`/api/v1/user/profile/${encodeURIComponent(id)}`)) responseCache.delete(key)
-        }
-        onProfileUpdated?.(msg.profile)
-      }
+      if (msg?.profile?.id || msg?.profile?.uid) onProfileUpdated?.(msg.profile)
     })
     socket.on('reelm:access-revoked', (msg) => {
       if (msg?.reelmId) onReelmAccessRevoked?.(msg)
@@ -469,9 +311,6 @@ export function connectReelmsSocket(handlers) {
     })
     socket.on('reelm:member-removed', (msg) => {
       if (msg?.reelmId) onReelmMemberRemoved?.(msg)
-    })
-    socket.on('reelm:member-left', (msg) => {
-      if (msg?.reelmId) onReelmMemberLeft?.(msg)
     })
     socket.on('reelm:join-request-rejected', (msg) => {
       if (msg?.reelmId) onJoinRequestRejected?.(msg)
@@ -636,14 +475,10 @@ export function socketVcBroadcast(reelmId, channelId, payload) {
 
 export async function userProfilePut(data) {
   await api('/api/v1/user/profile', { method: 'PUT', body: JSON.stringify({ data }) })
-  const id = String(data?.id || data?.uid || '')
-  if (id) profileCache.set(id, { data, at: Date.now() })
 }
 
 export async function userProfilePatch(data) {
   await api('/api/v1/user/profile', { method: 'PATCH', body: JSON.stringify({ data }) })
-  const id = String(data?.id || data?.uid || '')
-  if (id) profileCache.set(id, { data: { ...(profileCache.get(id)?.data || {}), ...data }, at: Date.now() })
 }
 
 export async function userProfileGet() {
@@ -652,18 +487,16 @@ export async function userProfileGet() {
 }
 
 export async function userProfileGetById(uid) {
-  const id = String(uid || '')
-  if (!id) return null
-  const cached = profileCache.get(id)
-  if (cached && Date.now() - cached.at < 5 * 60 * 1000) return cached.data
-  const j = await api(`/api/v1/user/profile/${encodeURIComponent(id)}`)
-  const data = j.data || null
-  if (data) profileCache.set(id, { data, at: Date.now() })
-  return data
+  const j = await api(`/api/v1/user/profile/${encodeURIComponent(uid)}`)
+  return j.data
 }
 
 export async function userProfileDelete() {
-  await api('/api/v1/user/profile', { method: 'DELETE' })
+  await api('/api/v1/user/profile?intent=close-account', {
+    method: 'DELETE',
+    headers: { 'X-Reelms-Account-Close': 'true' },
+    body: JSON.stringify({ closeAccount: true, confirmation: 'DELETE_MY_REELMS_ACCOUNT' })
+  })
 }
 
 export async function userByUsername(username) {
@@ -688,20 +521,10 @@ export async function userCheckEmail(email) {
   return { available: Boolean(j?.available), exists: Boolean(j?.exists ?? !j?.available) }
 }
 
-export async function usersList(query = '', opts = {}) {
+export async function usersList(query = '') {
   const q = encodeURIComponent(String(query || '').trim())
-  const j = await api(`/api/v1/users${q ? `?q=${q}` : ''}`, opts)
+  const j = await api(`/api/v1/users${q ? `?q=${q}` : ''}`)
   return j.data || []
-}
-
-export async function discoverySearch(query = '', opts = {}) {
-  const q = encodeURIComponent(String(query || '').trim())
-  const j = await api(`/api/v1/discovery/search${q ? `?q=${q}` : ''}`, opts)
-  const data = j?.data || {}
-  return {
-    users: Array.isArray(data.users) ? data.users : [],
-    reelms: Array.isArray(data.reelms) ? data.reelms : [],
-  }
 }
 
 // ── Messages ──────────────────────────────────────────────────────────────────
@@ -782,9 +605,9 @@ export async function adminAllReelms() {
   return j.data || []
 }
 
-export async function discoverReelms(query = '', opts = {}) {
+export async function discoverReelms(query = '') {
   const q = encodeURIComponent(String(query || '').trim())
-  const j = await api(`/api/v1/reelms/discover${q ? `?q=${q}` : ''}`, opts)
+  const j = await api(`/api/v1/reelms/discover${q ? `?q=${q}` : ''}`)
   return j?.data || []
 }
 
@@ -800,10 +623,9 @@ export async function leaveReelmRemote(reelmId) {
 }
 
 export async function closeReelmRemote(reelmId, confirmName) {
-  const confirmed = confirmName === true || confirmName === '__confirmed__'
   const j = await api(`/api/v1/reelms/${encodeURIComponent(reelmId)}/close`, {
     method: 'POST',
-    body: JSON.stringify(confirmed ? { confirmed: true } : { confirmName }),
+    body: JSON.stringify({ confirmName }),
   })
   return j?.data || null
 }
@@ -845,14 +667,6 @@ export async function inviteReelmFriend(reelmId, targetUid) {
 
 export async function banReelmMember(reelmId, targetUid, reason = '') {
   const j = await api(`/api/v1/reelms/${encodeURIComponent(reelmId)}/ban`, {
-    method: 'POST',
-    body: JSON.stringify({ targetUid, reason }),
-  })
-  return j?.data || null
-}
-
-export async function removeReelmMember(reelmId, targetUid, reason = '') {
-  const j = await api(`/api/v1/reelms/${encodeURIComponent(reelmId)}/remove-member`, {
     method: 'POST',
     body: JSON.stringify({ targetUid, reason }),
   })

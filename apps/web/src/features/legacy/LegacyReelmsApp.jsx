@@ -93,7 +93,6 @@ import {
   appGetDoc,
   appPutDoc,
   reelmGetDoc,
-  reelmGetCore,
   reelmPutDoc,
   modInboxGet,
   modReportSend,
@@ -102,7 +101,6 @@ import {
   joinReelmByCode,
   adminAllReelms,
   discoverReelms,
-  discoverySearch,
   requestJoinReelm,
   approveJoinReelm,
   rejectJoinReelm,
@@ -110,7 +108,6 @@ import {
   acceptReelmInvite,
   rejectReelmInvite,
   banReelmMember,
-  removeReelmMember,
   timeoutReelmMember,
   untimeoutReelmMember,
   unbanReelmMember,
@@ -132,7 +129,7 @@ import {
 } from '../../reelmsAwsClient'
 import { seedModerationAccount, MODERATION_ACCOUNT_ID, isModerationSystemUser } from '../../reelmsModerationAccount'
 import { moderateText } from '../../moderationClient'
-import { playSound, applySoundSettings, previewSound, preloadSounds, unlockSounds, SOUND_CATEGORIES, SOUND_DEFAULTS } from '../../soundManager'
+import { playSound, applySoundSettings, previewSound, SOUND_CATEGORIES, SOUND_DEFAULTS } from '../../soundManager'
 import { DesktopDownloadButton, DesktopDownloadSettingsPanel } from '../desktop-download/index.js'
 import { useAuthSession as useCentralAuthSession } from '../../app/providers/AuthSessionProvider.jsx'
 
@@ -311,7 +308,9 @@ function SignInScreen({ onGoSignUp, onSignInSuccess }) {
         : await webSignIn(input, loginPassword.trim())
       const userData = await userProfileGetById(cred.user.uid)
       if (!userData) { setLoginError(t('user_profile_not_found')); setIsSigningIn(false); return }
-      recordUserSession(parseDeviceInfo, userData.notifyNewDevice).catch(() => {})
+      try {
+        await recordUserSession(parseDeviceInfo, userData.notifyNewDevice)
+      } catch { /* noop */ }
 
       if (userData.isModerator) {
         fetch(`${BACKEND_URL}/admin/mod-login`, {
@@ -839,16 +838,13 @@ function EnvironmentPanel({ uid }) {
   const t = useT()
   const [env, setEnv] = useState({})
   useEffect(() => {
-    if (!uid || uid === 'guest') return undefined
+    if (!uid || uid === 'guest') return
     let cancel = false
-    const timer = setTimeout(() => {
+    userGetDoc('environment').then((d) => {
       if (cancel) return
-      userGetDoc('environment').then((d) => {
-        if (cancel) return
-        setEnv(d && typeof d === 'object' ? d : {})
-      }).catch(() => {})
-    }, 1200)
-    return () => { cancel = true; clearTimeout(timer) }
+      setEnv(d && typeof d === 'object' ? d : {})
+    }).catch(() => {})
+    return () => { cancel = true }
   }, [uid])
 
   const set = (key, value) => {
@@ -2537,7 +2533,6 @@ function CachedProfileCover({ src, className = '', style = {}, ...props }) {
 
 function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBlock, onUnblock, onAddFriend, isFriend = true, isBlocked = false, isPending = false, nickname, onNicknameChange, canShare, onMessage, onCreateGroup, onRequestRemoteControl, voiceContext = null, moderationContext = null, roleContext = null, isSelf = false, embedded = false, canEditNickname = true }) {
   const popupRef = useRef(null)
-  const safeFriend = normalizeFriendProfileTarget(friend || {})
   const [editingNickname, setEditingNickname] = useState(false)
   const [nicknameInput, setNicknameInput] = useState(nickname || '')
 
@@ -2557,37 +2552,37 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
 
   const popupW = 280
   const popupH = 460
-  const friendCover = safeFriend.cover || safeFriend.coverImage || safeFriend.coverUrl || null
+  const friendCover = friend.cover || friend.coverImage || friend.coverUrl || null
   const safeRect = anchorRect || { top: 96, bottom: 112, left: Math.max(8, window.innerWidth - popupW - 18) }
   let top = safeRect.top - popupH - 8
   let left = Math.min(Math.max(8, safeRect.left), window.innerWidth - popupW - 8)
   if (top < 8) top = safeRect.bottom + 8
 
   const profileNode = (
-    <div className={`friend-profile-popup${embedded ? ' friend-profile-popup--embedded' : ''}`} style={{ ...(buildProfileThemeStyle(safeFriend) || {}), ...(embedded ? {} : { top, left, width: popupW }) }} ref={popupRef}>
+    <div className={`friend-profile-popup${embedded ? ' friend-profile-popup--embedded' : ''}`} style={{ ...(buildProfileThemeStyle(friend) || {}), ...(embedded ? {} : { top, left, width: popupW }) }} ref={popupRef}>
       <CachedProfileCover src={friendCover} className={`fpp-cover${friendCover ? ' fpp-cover--has-image' : ''}`} />
       {embedded && <button type="button" className="fpp-embedded-close" onClick={onClose} aria-label="Close profile">×</button>}
       <div className="fpp-identity">
         <div className="fpp-avatar">
-          {getPersonPhoto(safeFriend)
-            ? <CachedProfileImage src={getPersonPhoto(safeFriend)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-            : <span>{safeDisplayText(safeFriend.name, '?').charAt(0).toUpperCase()}</span>
+          {getPersonPhoto(friend)
+            ? <CachedProfileImage src={getPersonPhoto(friend)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+            : <span>{(friend.name || '?').charAt(0).toUpperCase()}</span>
           }
         </div>
         <div className="fpp-names">
-          <span className="fpp-name">{nickname || safeFriend.name}</span>
-          {safeFriend.username && <span className="fpp-username">{'@' + (safeFriend.username.startsWith('@') ? safeFriend.username.slice(1) : safeFriend.username)}</span>}
-          {safeFriend.activity?.name && <ActivityBadge activity={safeFriend.activity} />}
+          <span className="fpp-name">{nickname || friend.name}</span>
+          {friend.username && <span className="fpp-username">{'@' + (friend.username.startsWith('@') ? friend.username.slice(1) : friend.username)}</span>}
+          {friend.activity?.name && <ActivityBadge activity={friend.activity} />}
         </div>
       </div>
-      {safeFriend.bio && <p className="fpp-bio">{safeFriend.bio}</p>}
+      {friend.bio && <p className="fpp-bio">{friend.bio}</p>}
       {voiceContext && !isSelf && (
         <div className="fpp-voice-section">
           {voiceContext.userRoom ? (
             <>
               <span className="fpp-section-label">VOICE</span>
               <div className="fpp-voice-row">
-                <span>{safeFriend.name || 'Member'} is in <strong>{voiceContext.userRoom.channelName}</strong></span>
+                <span>{friend.name || 'Member'} is in <strong>{voiceContext.userRoom.channelName}</strong></span>
                 {!voiceContext.isInSameRoom && (
                   <button className="fpp-action-btn fpp-action-btn--mini" onClick={() => { voiceContext.onJoinRoom?.(voiceContext.userRoom); onClose() }}>Join</button>
                 )}
@@ -2605,7 +2600,7 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
           <span className="fpp-section-label">SERVER ROLES</span>
           <div className="fpp-role-badges">
             {roleContext.roles.slice(0, roleContext.expanded ? 12 : 3).map(role => (
-              <span key={role.id} className="rp-role-badge" style={{ color: safeRoleColor(role.color), borderColor: safeRoleColor(role.color) + '55', background: safeRoleColor(role.color) + '18' }}>{safeDisplayText(role.name, 'Role')}</span>
+              <span key={role.id} className="rp-role-badge" style={{ color: role.color, borderColor: role.color + '55', background: role.color + '18' }}>{role.name}</span>
             ))}
             {roleContext.roles.length > 3 && (
               <button type="button" className="fpp-mini-link" onClick={roleContext.onToggleExpanded}>
@@ -2646,7 +2641,7 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
                 className="fpp-nickname-input"
                 value={nicknameInput}
                 onChange={e => setNicknameInput(e.target.value)}
-                placeholder={safeFriend.name}
+                placeholder={friend.name}
                 autoFocus
                 onKeyDown={e => {
                   if (e.key === 'Enter') { onNicknameChange(nicknameInput.trim()); setEditingNickname(false) }
@@ -2665,20 +2660,20 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
       )}
       <div className="fpp-actions">
         {!isSelf && !isBlocked && <button className="fpp-action-btn" onClick={() => { onMessage?.(); onClose() }}>Message</button>}
-        {!isSelf && !isBlocked && isFriend && onCreateGroup && <button className="fpp-action-btn" onClick={() => { onCreateGroup(safeFriend); onClose() }}>Create group</button>}
-        {!isSelf && !isBlocked && isFriend && onRequestRemoteControl && <button className="fpp-action-btn" onClick={() => { onRequestRemoteControl(safeFriend); onClose() }}>
+        {!isSelf && !isBlocked && isFriend && onCreateGroup && <button className="fpp-action-btn" onClick={() => { onCreateGroup(friend); onClose() }}>Create group</button>}
+        {!isSelf && !isBlocked && isFriend && onRequestRemoteControl && <button className="fpp-action-btn" onClick={() => { onRequestRemoteControl(friend); onClose() }}>
           <img src={channelLiveactionIcon} alt="" width="12" height="12" style={{filter:'brightness(0.8)', marginRight: 4}}/> Remote control
         </button>}
         {canShare && (
-          <button className="fpp-action-btn" onClick={() => { navigator.clipboard?.writeText(`${safeFriend.name} (@${safeFriend.username || safeFriend.id})`); onClose() }}>Share Profile</button>
+          <button className="fpp-action-btn" onClick={() => { navigator.clipboard?.writeText(`${friend.name} (@${friend.username || friend.id})`); onClose() }}>Share Profile</button>
         )}
-        {!isSelf && isBlocked && onUnblock && <button className="fpp-action-btn" onClick={() => { onUnblock?.(safeFriend.id); onClose() }}>Unblock</button>}
+        {!isSelf && isBlocked && onUnblock && <button className="fpp-action-btn" onClick={() => { onUnblock(friend.id); onClose() }}>Unblock</button>}
         {!isSelf && !isBlocked && !isFriend && onAddFriend && (isPending
           ? <button className="fpp-action-btn" disabled>Friend request sent</button>
-          : <button className="fpp-action-btn" onClick={() => { onAddFriend?.(safeFriend); onClose() }}>Add Friend</button>
+          : <button className="fpp-action-btn" onClick={() => { onAddFriend(friend); onClose() }}>Add Friend</button>
         )}
-        {!isSelf && !isBlocked && isFriend && <button className="fpp-action-btn fpp-action-danger" onClick={() => { onRemove?.(safeFriend.id); onClose() }}>Remove Friend</button>}
-        {!isSelf && !isBlocked && onBlock && <button className="fpp-action-btn fpp-action-danger" onClick={() => { onBlock?.(safeFriend); onClose() }}>Block</button>}
+        {!isSelf && !isBlocked && isFriend && <button className="fpp-action-btn fpp-action-danger" onClick={() => { onRemove(friend.id); onClose() }}>Remove Friend</button>}
+        {!isSelf && !isBlocked && onBlock && <button className="fpp-action-btn fpp-action-danger" onClick={() => { onBlock(friend); onClose() }}>Block</button>}
       </div>
     </div>
   )
@@ -2719,7 +2714,7 @@ function renderMentions(text, uid, members, roles) {
     if (lower === 'everyone') return <span key={i} className="mention mention--everyone">{part}</span>
     const role = roles?.find(r => r.name.toLowerCase() === lower)
     if (role) return <span key={i} className="mention mention--role" style={{ color: role.color }}>{part}</span>
-    const member = (Array.isArray(members) ? members : []).find(m => String(m?.userName || m?.name || m?.username || '').toLowerCase() === lower)
+    const member = members?.find(m => m.userName.toLowerCase() === lower)
     if (member) {
       const isMe = String(member.userId) === String(uid)
       return <span key={i} className={`mention mention--user${isMe ? ' mention--me' : ''}`}>{part}</span>
@@ -3048,7 +3043,7 @@ function getReelmTemplates(t) {
   ]
 }
 
-function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onCloseReelm, onAnnouncement, onApproveJoin, onRejectJoin, onInviteFriend, onRemoveMember, onBanMember, onUnbanMember, onTimeoutMember, onUntimeoutMember }) {
+function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onCloseReelm, onAnnouncement, onApproveJoin, onRejectJoin, onInviteFriend, onBanMember, onUnbanMember, onTimeoutMember, onUntimeoutMember }) {
   const [activeTab, setActiveTab] = useState('general')
   const [roles, setRoles] = useState(() => (reelm.roles || []).map((role, i) => normalizeRoleForClient(role, `role-${i}`)))
   const [members, setMembers] = useState(() => reelm.members || [])
@@ -3068,23 +3063,18 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
   const [roleMemberDirty, setRoleMemberDirty] = useState(false)
   const [roleMemberSaving, setRoleMemberSaving] = useState(false)
   const [roleMemberStatus, setRoleMemberStatus] = useState('')
-  const [closeCooldownUntil, setCloseCooldownUntil] = useState(0)
-  const [closeCountdown, setCloseCountdown] = useState(0)
-  const [closeArmed, setCloseArmed] = useState(false)
-  const [closeBusy, setCloseBusy] = useState(false)
   const memberRemovalIntentRef = useRef(false)
-  const reelmRolesSignature = useMemo(() => JSON.stringify((reelm.roles || []).map(role => ({ id: role?.id, name: role?.name, color: role?.color, position: role?.position, permissions: role?.permissions }))), [reelm.roles])
-  const reelmMembersSignature = useMemo(() => JSON.stringify((reelm.members || []).map(member => ({ userId: member?.userId || member?.id, roleIds: member?.roleIds, userName: member?.userName || member?.name, userPhoto: member?.userPhoto || member?.photo }))), [reelm.members])
 
   useEffect(() => {
-    if (roleMemberDirty || roleMemberSaving) return
     setRoles((reelm.roles || []).map((role, i) => normalizeRoleForClient(role, `role-${i}`, true)))
     setMembers(reelm.members || [])
     setEditingRoleId(null)
     setAddingRole(false)
+    setRoleMemberDirty(false)
+    setRoleMemberSaving(false)
     setRoleMemberStatus('')
     memberRemovalIntentRef.current = false
-  }, [reelm.id, reelmRolesSignature, reelmMembersSignature, roleMemberDirty, roleMemberSaving])
+  }, [reelm.id])
 
   const ownerAge = useMemo(() => {
     return currentUser?.birthDate
@@ -3127,31 +3117,6 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
   useEffect(() => {
     if (availableTabs.length && !availableTabs.some(tab => tab.key === activeTab)) setActiveTab(availableTabs[0].key)
   }, [availableTabs, activeTab])
-
-  useEffect(() => {
-    if (!closeCooldownUntil) { setCloseCountdown(0); return undefined }
-    const tick = () => {
-      const left = Math.max(0, Math.ceil((closeCooldownUntil - Date.now()) / 1000))
-      setCloseCountdown(left)
-      if (left <= 0) setCloseCooldownUntil(0)
-    }
-    tick()
-    const timer = setInterval(tick, 250)
-    return () => clearInterval(timer)
-  }, [closeCooldownUntil])
-
-  const handleCloseServerButton = async () => {
-    if (!reelm?.id || closeBusy) return
-    if (!closeArmed) {
-      setCloseArmed(true)
-      setCloseCooldownUntil(Date.now() + 5000)
-      return
-    }
-    if (closeCountdown > 0 || closeCooldownUntil > Date.now()) return
-    setCloseBusy(true)
-    try { await onCloseReelm?.(reelm.id, true) }
-    finally { setCloseBusy(false); setCloseArmed(false); setCloseCooldownUntil(0) }
-  }
 
   const normalizeRoleMemberDraft = (updatedRoles, updatedMembers) => {
     const normalizedRoles = (updatedRoles || []).map((role, i) => normalizeRoleForClient(role, `role-${i}`, canManageFullRoles)).slice(0, 12)
@@ -3274,21 +3239,11 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
     onInviteFriend?.(reelm.id, friend.id)
   }
 
-  const removeMember = async (userId) => {
-    const member = members.find(m => String(m.userId) === String(userId))
+  const removeMember = (userId) => {
+    const member = members.find(m => m.userId === userId)
     if (!canActOnMember(member)) return
-    const nextMembers = members.filter(m => String(m.userId) !== String(userId))
-    setMembers(nextMembers)
-    setRoleMemberDirty(false)
-    setRoleMemberStatus('Removing member…')
-    try {
-      await onRemoveMember?.(reelm.id, userId, 'removed from server settings')
-      setRoleMemberStatus('Member removed')
-      window.setTimeout(() => setRoleMemberStatus(''), 1800)
-    } catch {
-      setMembers(reelm.members || [])
-      setRoleMemberStatus('Could not remove member')
-    }
+    memberRemovalIntentRef.current = true
+    saveAll(roles, members.filter(m => m.userId !== userId))
   }
 
   const nonMembers = friends.filter(f => !members.find(m => m.userId === f.id))
@@ -3345,14 +3300,16 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
               {canManageFullRoles && !reelm.isDefault && (
                 <div className="rs-danger-zone">
                   <span className="rs-section-title">Danger zone</span>
-                  <p className="rs-section-hint">Closing a server removes it from members and disables its invite code. Press once to arm it, wait 5 seconds, then press again.</p>
+                  <p className="rs-section-hint">Closing a server removes it from members and disables its invite code. Type the exact server name to confirm.</p>
                   <button
                     type="button"
                     className="rs-member-remove rs-danger-close"
-                    disabled={closeBusy || closeCountdown > 0}
-                    onClick={handleCloseServerButton}
+                    onClick={() => {
+                      const typed = window.prompt(`Type ${reelm.name} to close this server.`)
+                      if (typed === reelm.name) onCloseReelm?.(reelm.id, typed)
+                    }}
                   >
-                    {closeBusy ? 'Closing…' : closeCountdown > 0 ? `Close available in ${closeCountdown}s` : closeArmed ? 'Close server now' : 'Close server'}
+                    Close server
                   </button>
                 </div>
               )}
@@ -5818,45 +5775,19 @@ function getPersonCover(person) {
   return person.cover || person.coverImage || person.coverUrl || person.headerImage || person.banner || person.bannerImage || person.backgroundCover || null
 }
 
-
-function safeDisplayText(value, fallback = 'Member') {
-  const text = String(value ?? '').trim()
-  return text || fallback
-}
-
-function safeRoleColor(value, fallback = '#94a3b8') {
-  const color = String(value || '')
-  return /^#[0-9a-fA-F]{6}$/.test(color) ? color : fallback
-}
-
-function normalizeFriendProfileTarget(friend = {}) {
-  const id = String(friend?.id || friend?.uid || friend?.userId || '').trim()
-  return {
-    ...friend,
-    id,
-    name: safeDisplayText(friend?.name || friend?.displayName || friend?.userName || friend?.username, 'Member'),
-    username: friend?.username ? String(friend.username) : undefined,
-    photo: getPersonPhoto(friend) || null,
-  }
-}
-
 function buildProfileThemeStyle(person) {
   const cfg = person?.profileTheme || person?.customization || null
-  const theme = (cfg && typeof cfg === 'object' && THEMES.find(th => th.id === cfg.themeId)) || THEMES[0]
-  const accent = (cfg && typeof cfg === 'object' && cfg.customAccent) || theme.accent || '#b99887'
-  const base = (cfg && typeof cfg === 'object' && cfg.customBase) || theme.base || '#120e1e'
-  const toRgbCss = (value, fallback) => {
-    if (Array.isArray(value)) return value.join(',')
-    const text = String(value || '').trim()
-    if (/^#[0-9a-fA-F]{6}$/.test(text)) return hexToRgb(text)
-    if (/^\d+\s*,\s*\d+\s*,\s*\d+$/.test(text)) return text
-    return fallback
-  }
+  if (!cfg || typeof cfg !== 'object') return undefined
+  const theme = THEMES.find(th => th.id === cfg.themeId) || THEMES[0]
+  const accent = cfg.customAccent || theme.accent || '#b99887'
+  const base = cfg.customBase || theme.base || '#120e1e'
+  const accentRgb = hexToRgb(accent) || theme.accentRgb || [185, 152, 135]
+  const baseRgb = hexToRgb(base) || theme.baseRgb || [18, 14, 30]
   return {
-    '--fpp-theme-accent': /^#[0-9a-fA-F]{6}$/.test(String(accent || '')) ? accent : '#b99887',
-    '--fpp-theme-accent-rgb': toRgbCss(accent, toRgbCss(theme.accentRgb, '185,152,135')),
-    '--fpp-theme-base': /^#[0-9a-fA-F]{6}$/.test(String(base || '')) ? base : '#120e1e',
-    '--fpp-theme-base-rgb': toRgbCss(base, toRgbCss(theme.baseRgb, '18,14,30')),
+    '--fpp-theme-accent': accent,
+    '--fpp-theme-accent-rgb': accentRgb.join(','),
+    '--fpp-theme-base': base,
+    '--fpp-theme-base-rgb': baseRgb.join(','),
   }
 }
 
@@ -5948,36 +5879,6 @@ function stableDocKey(value) {
 
 function sameDocValue(a, b) {
   return stableDocKey(a) === stableDocKey(b)
-}
-
-function mergeReelmListsPreserveOrder(prevList = [], incomingList = [], options = {}) {
-  const prev = Array.isArray(prevList) ? prevList : []
-  const incoming = Array.isArray(incomingList) ? incomingList.filter(r => r && r.id) : []
-  const incomingById = new Map(incoming.map(r => [String(r.id), r]))
-  const used = new Set()
-  const merged = []
-  for (const old of prev) {
-    const id = String(old?.id || '')
-    if (!id) continue
-    const fresh = incomingById.get(id)
-    if (fresh) {
-      used.add(id)
-      const item = { ...old, ...fresh }
-      const localImagePending = Number(old?.__localImagePendingAt || 0)
-      if (localImagePending && Date.now() - localImagePending < 45_000 && old?.image && String(old.image) !== String(fresh?.image || '')) {
-        item.image = old.image
-        item.__localImagePendingAt = localImagePending
-      }
-      merged.push(item)
-    } else if (!options.removeMissing) {
-      merged.push(old)
-    }
-  }
-  for (const fresh of incoming) {
-    const id = String(fresh?.id || '')
-    if (id && !used.has(id) && !merged.some(r => String(r?.id || '') === id)) merged.push(fresh)
-  }
-  return merged
 }
 
 function sameMessageList(a, b) {
@@ -6117,7 +6018,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const [customization, setCustomization] = useState(() => ({ ...DEFAULT_CUSTOMIZATION }))
   useEffect(() => {
-    if (!uid || uid === 'guest') return undefined
+    if (!uid || uid === 'guest') return
     let cancel = false
     try {
       const cached = localStorage.getItem(`reelms:customization:${uid}`)
@@ -6126,73 +6027,50 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         if (parsed && typeof parsed === 'object') setCustomization(prev => sameDocValue(prev, { ...DEFAULT_CUSTOMIZATION, ...parsed }) ? prev : { ...DEFAULT_CUSTOMIZATION, ...parsed })
       }
     } catch {}
-    // Bootstrap carries these docs. Only run this slower fallback if bootstrap did not land.
-    const timer = setTimeout(() => {
-      if (cancel || bootstrapHydratedRef.current || bootstrapPendingRef.current) return
-      Promise.all([userGetDoc('customization'), userGetDoc('bg_image'), userGetDoc('body_font')])
-        .then(([cust, bg, bf]) => {
-          if (cancel || bootstrapHydratedRef.current || bootstrapPendingRef.current) return
-          const base = cust && typeof cust === 'object' ? cust : {}
-          const nextCustomization = {
-            ...DEFAULT_CUSTOMIZATION,
-            ...base,
-            bgImage: typeof bg === 'string' ? bg : (base.bgImage ?? null),
-          }
-          setCustomization(prev => sameDocValue(prev, nextCustomization) ? prev : nextCustomization)
-          try { localStorage.setItem(`reelms:customization:${uid}`, JSON.stringify(nextCustomization)) } catch {}
-          if (typeof bf === 'string' && bf) setBodyFont(prev => prev === bf ? prev : bf)
-        })
-        .catch(() => {})
-    }, 1200)
-    return () => { cancel = true; clearTimeout(timer) }
+    Promise.all([userGetDoc('customization'), userGetDoc('bg_image'), userGetDoc('body_font')])
+      .then(([cust, bg, bf]) => {
+        if (cancel) return
+        const base = cust && typeof cust === 'object' ? cust : {}
+        const nextCustomization = {
+          ...DEFAULT_CUSTOMIZATION,
+          ...base,
+          bgImage: typeof bg === 'string' ? bg : (base.bgImage ?? null),
+        }
+        setCustomization(prev => sameDocValue(prev, nextCustomization) ? prev : nextCustomization)
+        try { localStorage.setItem(`reelms:customization:${uid}`, JSON.stringify(nextCustomization)) } catch {}
+        if (typeof bf === 'string' && bf) setBodyFont(prev => prev === bf ? prev : bf)
+      })
+      .catch(() => {})
+    return () => { cancel = true }
   }, [uid])
 
   const [env, setEnv] = useState({})
   useEffect(() => {
-    if (!uid || uid === 'guest') return undefined
+    if (!uid || uid === 'guest') return
     let cancel = false
-    const timer = setTimeout(() => {
-      if (cancel || bootstrapHydratedRef.current || bootstrapPendingRef.current) return
-      userGetDoc('environment').then((d) => {
-        if (cancel || bootstrapHydratedRef.current || bootstrapPendingRef.current) return
-        setEnv(d && typeof d === 'object' ? d : {})
-      }).catch(() => {})
-    }, 1200)
-    return () => { cancel = true; clearTimeout(timer) }
+    userGetDoc('environment').then((d) => {
+      if (cancel) return
+      setEnv(d && typeof d === 'object' ? d : {})
+    }).catch(() => {})
+    return () => { cancel = true }
   }, [uid])
   const v = (key, def) => env[key] ?? def
-
-  const profilePatchQueueRef = useRef({ timer: null, patch: {} })
-  const queueProfilePatch = (patch, ms = 900) => {
-    if (!patch || typeof patch !== 'object') return
-    const state = profilePatchQueueRef.current || { timer: null, patch: {} }
-    state.patch = { ...(state.patch || {}), ...patch }
-    if (state.timer) clearTimeout(state.timer)
-    state.timer = window.setTimeout(() => {
-      const payload = state.patch || {}
-      state.patch = {}
-      state.timer = null
-      if (Object.keys(payload).length) userProfilePatch(payload).catch(() => {})
-    }, ms)
-    profilePatchQueueRef.current = state
-  }
-  useEffect(() => () => {
-    const state = profilePatchQueueRef.current
-    if (state?.timer) clearTimeout(state.timer)
-  }, [])
 
   const updateCustomization = (updates) => {
     setCustomization(prev => {
       const updated = { ...prev, ...updates }
       const { bgImage: _b, ...toSave } = updated
       try { if (uid && uid !== 'guest') localStorage.setItem(`reelms:customization:${uid}`, JSON.stringify(updated)) } catch {}
-      scheduleUserPersist('customization', toSave, 900)
-      queueProfilePatch({ profileTheme: toSave }, 1000)
+      scheduleUserPersist('customization', toSave)
+      // Keep account customization durable even if the app is closed shortly after a change.
+      userPutDoc('customization', toSave).catch(() => {})
+      userProfilePatch({ profileTheme: toSave }).catch(() => {})
       if ('bgImage' in updates) {
         if (updates.bgImage) {
-          scheduleUserPersist('bg_image', updates.bgImage, 900)
+          scheduleUserPersist('bg_image', updates.bgImage)
+          userPutDoc('bg_image', updates.bgImage).catch(() => {})
         } else {
-          scheduleUserPersist('bg_image', null, 900)
+          userPutDoc('bg_image', null).catch(() => {})
         }
       }
       return updated
@@ -6257,10 +6135,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }, [customization.bgImage])
 
   useEffect(() => {
-    if (!uid || uid === 'guest') return undefined
-    const first = setTimeout(() => touchUserSession().catch(() => {}), 60 * 1000)
-    const interval = setInterval(() => touchUserSession().catch(() => {}), 10 * 60 * 1000)
-    return () => { clearTimeout(first); clearInterval(interval) }
+    touchUserSession().catch(() => {})
+    const interval = setInterval(() => touchUserSession().catch(() => {}), 5 * 60 * 1000)
+    return () => clearInterval(interval)
   }, [uid])
 
   useEffect(() => {
@@ -6280,8 +6157,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }, [effectiveAccent, effectiveAccentRgb, effectiveBase, effectiveBaseRgb, effectiveTextColor])
 
   const [chats, setChats] = useState([])
-  const chatsPersistReadyRef = useRef({ uid: null, ready: false })
-  useEffect(() => { chatsPersistReadyRef.current = { uid, ready: false } }, [uid])
   const chatsRef = useRef([])
   useEffect(() => { chatsRef.current = chats }, [chats])
   const [reelms, setReelms] = useState([])
@@ -6291,7 +6166,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const selectedChannelRef = useRef(null)
   const selectedChatRef = useRef(null)
   const [reelmLoading, setReelmLoading] = useState(false)
-  const reelmCoreSelectSeqRef = useRef(0)
 
   // Instant local cache: prevents the Reelm bar/home list from looking empty while the API/bootstrap round-trip completes.
   useEffect(() => {
@@ -6307,25 +6181,24 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     try { localStorage.setItem(reelmsLocalCacheKey, JSON.stringify(reelms.slice(0, 80))) } catch { /* noop */ }
   }, [reelmsLocalCacheKey, reelms])
 
-  // Bootstrap is the main login load. This fallback waits briefly so it does not duplicate /bootstrap.
+  // Load reelms + chats from Firestore on mount
   useEffect(() => {
-    if (!uid || uid === 'guest') return undefined
-    let cancel = false
-    const timer = setTimeout(() => {
-      if (cancel || bootstrapHydratedRef.current || bootstrapPendingRef.current) return
-      if (currentUser?.isModerator) {
-        adminAllReelms()
-          .then(all => { if (!cancel && all.length > 0) setReelms(all.map(r => ({ ...r, _godMode: true }))) })
-          .catch(() => {
-            if (cancel) return
-            userGetDoc('reelms').then(v => { if (!cancel && Array.isArray(v)) setReelms(prev => mergeReelmListsPreserveOrder(prev, v, { removeMissing: false })) }).catch(() => {})
-          })
-      } else {
-        userGetDoc('reelms').then(v => { if (!cancel && Array.isArray(v)) setReelms(prev => mergeReelmListsPreserveOrder(prev, v, { removeMissing: false })) }).catch(() => {})
-        userGetDoc('chats').then(v => { if (!cancel && Array.isArray(v)) { setChats(v); v.forEach(c => { if (c.id) socketJoinChannel(c.id) }) } }).catch(() => {})
-      }
-    }, 1300)
-    return () => { cancel = true; clearTimeout(timer) }
+    if (!uid) return
+    if (currentUser?.isModerator) {
+      // God-mode: load all reelms from DynamoDB registry
+      adminAllReelms()
+        .then(all => {
+          if (all.length > 0) setReelms(all.map(r => ({ ...r, _godMode: true })))
+        })
+        .catch(() => {
+          // Fallback to own reelms
+          userGetDoc('reelms').then(v => { if (Array.isArray(v)) setReelms(v) }).catch(() => {})
+        })
+      // Mod account has no DMs — skip loading chats
+    } else {
+      userGetDoc('reelms').then(v => { if (Array.isArray(v)) setReelms(v) }).catch(() => {})
+      userGetDoc('chats').then(v => { if (Array.isArray(v)) { setChats(v); v.forEach(c => { if (c.id) socketJoinChannel(c.id) }) } }).catch(() => {})
+    }
   }, [uid, currentUser?.isModerator])
   const [createReelmStep, setCreateReelmStep] = useState(null)
   const [selectedTemplateId, setSelectedTemplateId] = useState(null)
@@ -6336,21 +6209,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [openCategoryMenu, setOpenCategoryMenu] = useState(null)
   const [selectedChannel, setSelectedChannel] = useState(null)
   useEffect(() => { selectedReelmRef.current = selectedReelm }, [selectedReelm])
-  useEffect(() => {
-    const id = selectedReelm?.id
-    if (!id || selectedReelm?.__coreHydrated || selectedReelm?.coreHydrated || selectedReelm?.__coreHydrating) return undefined
-    if (Array.isArray(selectedReelm?.members) && selectedReelm.members.length > 0) return undefined
-    let cancelled = false
-    const selectSeq = ++reelmCoreSelectSeqRef.current
-    setReelmLoading(true)
-    setSelectedReelm(prev => String(prev?.id || '') === String(id) ? { ...prev, __coreHydrating: true } : prev)
-    hydrateReelmCore(id).then(core => {
-      if (!cancelled && core?.id && reelmCoreSelectSeqRef.current === selectSeq) mergeReelmIntoState({ ...core, __coreHydrated: true })
-    }).catch(() => {}).finally(() => {
-      if (!cancelled && reelmCoreSelectSeqRef.current === selectSeq) setReelmLoading(false)
-    })
-    return () => { cancelled = true }
-  }, [selectedReelm?.id])
   useEffect(() => { selectedChannelRef.current = selectedChannel }, [selectedChannel])
   const [lastChannels, setLastChannels] = useState({})
   const [sessionsList, setSessionsList] = useState([])
@@ -6526,12 +6384,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [isShaking, setIsShaking] = useState(false)
   const [showDiscover, setShowDiscover] = useState(false)
   const [discoverQuery, setDiscoverQuery] = useState('')
-  const [debouncedDiscoverQuery, setDebouncedDiscoverQuery] = useState('')
   const [discoverUsers, setDiscoverUsers] = useState([])
   const [discoverReelmsList, setDiscoverReelmsList] = useState([])
-  const [discoverRemoteQuery, setDiscoverRemoteQuery] = useState('')
-  const [discoverSearchState, setDiscoverSearchState] = useState({ query: '', loading: false, error: null })
-  const discoverSearchSeqRef = useRef(0)
   const [pendingReelmJoinIds, setPendingReelmJoinIds] = useState([])
   const [showFriendsPopup, setShowFriendsPopup] = useState(false)
   const [showNotificationsPopup, setShowNotificationsPopup] = useState(false)
@@ -6542,13 +6396,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [helpForm, setHelpForm] = useState({ name: '', email: '', message: '' })
   const [helpStatus, setHelpStatus] = useState('idle')
   const soundPrevRef = useRef({ notifs: -1, friendReqs: -1, friends: -1 })
-  const bootstrapHydratedRef = useRef(false)
-  const bootstrapPendingRef = useRef(false)
-  const bootstrapLastAppliedAtRef = useRef(0)
-  const reconnectSyncTimerRef = useRef(null)
   const activeMsgKeyRef = useRef(null)
   const reelmRealtimeHydrateTimersRef = useRef({})
-  const reelmSyncVersionsRef = useRef({})
   const [soundSettings, setSoundSettings] = useState(SOUND_DEFAULTS)
   const [availableSounds, setAvailableSounds] = useState([])
   const reelmTemplates = getReelmTemplates(getT(language))
@@ -6572,17 +6421,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bodyFont])
 
-  useEffect(() => { applySoundSettings(soundSettings); preloadSounds() }, [soundSettings])
-
-  useEffect(() => {
-    const unlock = () => unlockSounds()
-    window.addEventListener('pointerdown', unlock, { passive: true })
-    window.addEventListener('keydown', unlock)
-    return () => {
-      window.removeEventListener('pointerdown', unlock)
-      window.removeEventListener('keydown', unlock)
-    }
-  }, [])
+  useEffect(() => { applySoundSettings(soundSettings) }, [soundSettings])
 
   useEffect(() => {
     if (selectedSettingsCategory !== 'usage' || availableSounds.length > 0) return
@@ -6590,7 +6429,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       if (Array.isArray(d.files)) setAvailableSounds(d.files)
     }).catch(() => {})
   }, [selectedSettingsCategory])
-  const updateBodyFont = (id) => { setBodyFont(id); scheduleUserPersist('body_font', id, 900) }
+  const updateBodyFont = (id) => { setBodyFont(id); scheduleUserPersist('body_font', id); userPutDoc('body_font', id).catch(() => {}) }
   const t = getT(language)
   const [spotifyConnected, setSpotifyConnected] = useState(false)
   const [spotifyNowPlaying, setSpotifyNowPlaying] = useState(null)
@@ -6630,6 +6469,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       const next = prev.filter(c => String(c.friendId || '') !== tid)
       if (!sameDocValue(prev, next)) {
         scheduleUserPersist('chats', next)
+        userPutDoc('chats', next).catch(() => {})
       }
       return next
     })
@@ -6667,6 +6507,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         if (prev.some(c => String(c.id) === chatId)) return prev
         const next = [restoredChat, ...prev]
         scheduleUserPersist('chats', next)
+        userPutDoc('chats', next).catch(() => {})
         return next
       })
       setSelectedChat(prev => prev?.id === chatId ? { ...prev, blockedOnly: false, photo: getPersonPhoto(restoredChat) || prev.photo } : prev)
@@ -6787,10 +6628,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   useEffect(() => {
     if (!uid || uid === 'guest') return undefined
     let cancel = false
-    bootstrapHydratedRef.current = false
-    bootstrapPendingRef.current = true
     userBootstrap().then((data) => {
-      bootstrapPendingRef.current = false
       if (cancel || !data) return
       if (Array.isArray(data.friends)) setFriends(data.friends)
       if (Array.isArray(data.friend_requests)) setFriendRequests(data.friend_requests)
@@ -6802,41 +6640,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       if (data.nicknames && typeof data.nicknames === 'object') setNicknames(data.nicknames)
       if (data.unread_counts && typeof data.unread_counts === 'object') setUnreadCounts(data.unread_counts)
       if (Array.isArray(data.pinned_items)) setPinnedItemIds(data.pinned_items)
-      if (Array.isArray(data.bar_order)) setBarOrderIds(data.bar_order.map(String))
       if (Array.isArray(data.muted_reelms)) setMutedReelmIds(data.muted_reelms.map(String))
       if (Array.isArray(data.feed_nav) && data.feed_nav.length === ALL_FEED_NAV.length) setFeedNavOrder(data.feed_nav)
       if (typeof data.landing_view === 'string') setReelmLandingView(data.landing_view)
-      if (data.environment && typeof data.environment === 'object') setEnv(data.environment)
-      const baseCustomization = data.customization && typeof data.customization === 'object' ? data.customization : null
-      if (baseCustomization || typeof data.bg_image === 'string') {
-        const nextCustomization = {
-          ...DEFAULT_CUSTOMIZATION,
-          ...(baseCustomization || {}),
-          bgImage: typeof data.bg_image === 'string' ? data.bg_image : ((baseCustomization || {}).bgImage ?? null),
-        }
-        setCustomization(prev => sameDocValue(prev, nextCustomization) ? prev : nextCustomization)
-        try { localStorage.setItem(`reelms:customization:${uid}`, JSON.stringify(nextCustomization)) } catch {}
-      }
-      if (typeof data.body_font === 'string' && data.body_font) setBodyFont(prev => prev === data.body_font ? prev : data.body_font)
       if (data.lpw != null) setLeftWidth(parseInt(String(data.lpw), 10) || PANEL_DEFAULT)
       if (data.rpw != null) setRightWidth(parseInt(String(data.rpw), 10) || PANEL_DEFAULT)
-      if (data.sociallinks && typeof data.sociallinks === 'object') {
-        profileSocialLinksSavedRef.current = JSON.stringify(data.sociallinks)
-        setProfileSocialLinks(data.sociallinks)
-      } else {
-        profileSocialLinksSavedRef.current = JSON.stringify(profileSocialLinks)
-      }
-      if (Array.isArray(data.socialorder)) {
-        profileSocialOrderSavedRef.current = JSON.stringify(data.socialorder)
-        setProfileActivePlatforms(data.socialorder)
-      } else {
-        profileSocialOrderSavedRef.current = JSON.stringify(profileActivePlatforms)
-      }
+      if (data.sociallinks && typeof data.sociallinks === 'object') setProfileSocialLinks(data.sociallinks)
+      if (Array.isArray(data.socialorder)) setProfileActivePlatforms(data.socialorder)
       setProfilePrefsLoaded(true)
       if (data.spotify_connected === true || data.spotify_connected === 'true') setSpotifyConnected(true)
       if (data.last_channels && typeof data.last_channels === 'object') setLastChannels(data.last_channels)
       if (Array.isArray(data.sessions)) setSessionsList(data.sessions)
-      if (Array.isArray(data.reelms)) setReelms(prev => mergeReelmListsPreserveOrder(prev, data.reelms, { removeMissing: false }))
+      if (Array.isArray(data.reelms)) setReelms(data.reelms)
       if (Array.isArray(data.chats)) { setChats(data.chats); data.chats.forEach(c => { if (c?.id) socketJoinChannel(c.id) }) }
       if (data.sounds && typeof data.sounds === 'object') setSoundSettings(s => ({ ...s, ...data.sounds }))
       soundPrevRef.current = {
@@ -6844,10 +6659,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         friendReqs: Array.isArray(data.friend_requests) ? data.friend_requests.length : 0,
         friends: Array.isArray(data.friends) ? data.friends.length : 0,
       }
-      bootstrapHydratedRef.current = true
-      bootstrapLastAppliedAtRef.current = Date.now()
-    }).catch(() => { bootstrapHydratedRef.current = false; bootstrapPendingRef.current = false })
-    return () => { cancel = true; bootstrapPendingRef.current = false }
+    }).catch(() => {})
+    return () => { cancel = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [uid])
 
@@ -6878,25 +6691,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       else if (sk === 'nicknames') setStableObject(setNicknames, v && typeof v === 'object' ? v : {})
       else if (sk === 'unread_counts') setStableObject(setUnreadCounts, v && typeof v === 'object' ? v : {})
       else if (sk === 'pinned_items') setStableArray(setPinnedItemIds, Array.isArray(v) ? v : [])
-      else if (sk === 'bar_order') setStableArray(setBarOrderIds, Array.isArray(v) ? v.map(String) : [])
       else if (sk === 'muted_reelms') setStableArray(setMutedReelmIds, Array.isArray(v) ? v.map(String) : [])
       else if (sk === 'spotify_connected') setSpotifyConnected(v === true || v === 'true')
       else if (sk === 'last_channels') setStableObject(setLastChannels, v && typeof v === 'object' ? v : {})
       else if (sk === 'sessions') setStableArray(setSessionsList, Array.isArray(v) ? v : [])
       else if (sk === 'body_font') { if (typeof v === 'string' && v && v !== 'style2') setBodyFont(v) }
-      else if (sk === 'environment') setStableObject(setEnv, v && typeof v === 'object' ? v : {})
-      else if (sk === 'customization') {
-        if (v && typeof v === 'object') setCustomization(prev => {
-          const next = { ...DEFAULT_CUSTOMIZATION, ...v, bgImage: prev.bgImage ?? v.bgImage ?? null }
-          return sameDocValue(prev, next) ? prev : next
-        })
-      }
-      else if (sk === 'bg_image') setCustomization(prev => {
-        const next = { ...prev, bgImage: typeof v === 'string' ? v : null }
-        return sameDocValue(prev, next) ? prev : next
-      })
-      else if (sk === 'sociallinks') { if (v && typeof v === 'object') setProfileSocialLinks(prev => sameDocValue(prev, v) ? prev : v) }
-      else if (sk === 'socialorder') { if (Array.isArray(v)) setProfileActivePlatforms(prev => sameDocValue(prev, v) ? prev : v) }
       else if (sk === 'sounds') { if (v && typeof v === 'object') setSoundSettings(prev => sameDocValue(prev, { ...prev, ...v }) ? prev : { ...prev, ...v }) }
       else if (sk === 'profile') { if (v && typeof v === 'object') setCurrentUser(prev => sameLegacyProfile(prev, v) ? prev : v) }
       else if (sk === 'reelms') {
@@ -6910,14 +6709,17 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             if (!Array.isArray(next.timeoutList) && Array.isArray(existing.timeoutList)) next.timeoutList = existing.timeoutList
             return next
           })
-          const currentSelected = selectedReelmRef.current
-          const mergedServer = mergeReelmListsPreserveOrder(reelmsRef.current, serverReelms, { removeMissing: false })
-          const nextReelms = currentSelected && !mergedServer.some(r => String(r?.id || '') === String(currentSelected.id || ''))
-            ? mergeReelmListsPreserveOrder(mergedServer, [currentSelected], { removeMissing: false })
-            : mergedServer
-          // Do not reorder/kick the UI out of a Reelm only because a stale user/reelms copy changed.
-          // Real removals are handled by explicit access-revoked / banned / closed socket events.
-          setReelms(prev => sameDocValue(prev, nextReelms) ? prev : nextReelms)
+          setReelms(prev => sameDocValue(prev, serverReelms) ? prev : serverReelms)
+          const allowedIds = new Set(serverReelms.map(r => String(r?.id || '')).filter(Boolean))
+          const currentSelectedId = String(selectedReelmRef.current?.id || '')
+          if (currentSelectedId && !allowedIds.has(currentSelectedId)) {
+            socketLeaveReelm(currentSelectedId)
+            setSelectedReelm(null)
+            setSelectedChannel(null)
+            setShowFeed(false)
+            setShowReelmSettings(false)
+            setShowReelmMenu(false)
+          }
         }
       }
       else if (sk === 'chats') { if (Array.isArray(v)) { setChats(prev => sameDocValue(prev, v) ? prev : v); v.forEach(c => { if (c.id) socketJoinChannel(c.id) }) } }
@@ -7012,56 +6814,25 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     }
 
     const off = connectReelmsSocket({
-      onUserDoc: (sk, data) => {
-        if (typeof data !== 'undefined') { applyUserDoc(sk, data); return }
-        userGetDoc(sk).then((v) => applyUserDoc(sk, v)).catch(() => {})
-      },
-      onReelmDoc: (reelmId, sk, data, version) => {
-        const coreSk = ['meta', 'structure', 'roles', 'members', 'join_requests', 'ban_list', 'timeout_list'].includes(sk)
-        if (typeof data !== 'undefined') applyReelmRealtimeDoc(reelmId, sk, data, version)
-        if (coreSk) {
-          // If the event carried the changed document, the eventual core snapshot
-          // will follow from the server. Fallback hydrate only when old servers emit
-          // doc invalidations without payloads.
-          if (typeof data === 'undefined') scheduleReelmCoreHydrate(reelmId, 180)
+      onUserDoc: (sk) => { userGetDoc(sk).then((v) => applyUserDoc(sk, v)).catch(() => {}) },
+      onReelmDoc: (reelmId, sk) => {
+        if (['meta', 'structure', 'roles', 'members', 'join_requests', 'ban_list', 'timeout_list'].includes(sk)) {
+          scheduleReelmCoreHydrate(reelmId, 120)
         } else {
           loadReelmDocuments(reelmId).then(() => setModDeleteTick((t) => t + 1)).catch(() => {})
         }
       },
-      onReelmManagerDoc: (reelmId, sk, data, version) => {
-        applyReelmRealtimeDoc(reelmId, sk, data, version)
-        if (typeof data === 'undefined') scheduleReelmCoreHydrate(reelmId, 350)
-      },
-      onReelmCoreSnapshot: ({ reelm, version }) => {
-        if (!reelm?.id) return
-        const id = String(reelm.id)
-        const nextVersion = Number(version || reelm.syncVersion || Date.now())
-        const currentVersion = Number(reelmSyncVersionsRef.current[id] || 0)
-        if (nextVersion && currentVersion && nextVersion < currentVersion) return
-        reelmSyncVersionsRef.current[id] = nextVersion || Date.now()
-        mergeReelmIntoState(reelm)
+      onReelmManagerDoc: (reelmId, sk, data) => {
+        applyReelmRealtimeDoc(reelmId, sk, data)
+        scheduleReelmCoreHydrate(reelmId, 350)
       },
       onReelmMemberJoined: ({ reelmId }) => {
         scheduleReelmCoreHydrate(reelmId, 60)
       },
-      onReelmMemberRemoved: ({ reelmId, userId }) => {
-        const id = String(reelmId || '')
-        const targetUid = String(userId || '')
-        if (id && targetUid) {
-          setReelms(prev => prev.map(r => String(r.id) === id ? { ...r, members: (r.members || []).filter(m => String(m.userId || m.id || '') !== targetUid) } : r))
-          setSelectedReelm(prev => String(prev?.id || '') === id ? { ...prev, members: (prev.members || []).filter(m => String(m.userId || m.id || '') !== targetUid) } : prev)
-        }
+      onReelmMemberRemoved: ({ reelmId }) => {
         scheduleReelmCoreHydrate(reelmId, 60)
       },
-      onReelmMemberLeft: ({ reelmId }) => {
-        scheduleReelmCoreHydrate(reelmId, 60)
-      },
-      onAppDoc: (sk, data) => {
-        if (typeof data !== 'undefined') {
-          if (sk === 'reports' && currentUserRef.current?.isModerator) setReports(Array.isArray(data) ? data : [])
-          if (sk === 'stories') setAppStoriesTick((t) => t + 1)
-          return
-        }
+      onAppDoc: (sk) => {
         if (sk === 'reports' && currentUserRef.current?.isModerator) appGetDoc('reports').then((r) => setReports(Array.isArray(r) ? r : [])).catch(() => {})
         if (sk === 'stories') setAppStoriesTick((t) => t + 1)
       },
@@ -7186,6 +6957,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           const myUsername = currentUserRef.current?.username || ''
           const hasMention = myUsername && msg.text && msg.text.toLowerCase().includes(`@${myUsername.toLowerCase()}`)
           const isActiveThread = msgKey === activeMsgKeyRef.current && !document.hidden
+          if (hasMention) playSound.mention()
           const mutedReelmId = !isDmKey ? reelmsRef.current.find(r => String(msgKey).startsWith(`${r.id}_`))?.id : null
           const reelmMuted = mutedReelmId && mutedReelmIdsRef.current.includes(String(mutedReelmId))
           if (hasMention && !reelmMuted) playSound.mention()
@@ -7315,21 +7087,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         })
       },
       onConnect: () => {
-        // One throttled bootstrap refresh is much cheaper than 7 parallel doc GETs on every reconnect.
-        const now = Date.now()
-        if (bootstrapPendingRef.current || now - bootstrapLastAppliedAtRef.current < 5000) return
-        if (reconnectSyncTimerRef.current) clearTimeout(reconnectSyncTimerRef.current)
-        reconnectSyncTimerRef.current = setTimeout(() => {
-          reconnectSyncTimerRef.current = null
-          bootstrapPendingRef.current = true
-          userBootstrap().then((data) => {
-            bootstrapPendingRef.current = false
-            if (!data) return
-            Object.entries(data).forEach(([sk, value]) => applyUserDoc(sk, value))
-            bootstrapHydratedRef.current = true
-            bootstrapLastAppliedAtRef.current = Date.now()
-          }).catch(() => { bootstrapPendingRef.current = false })
-        }, 800)
+        // Re-fetch critical user docs after reconnect so we don't miss anything
+        const keys = ['chats', 'reelms', 'friends', 'friend_requests', 'notifications', 'message_requests', 'unread_counts']
+        keys.forEach(sk => userGetDoc(sk).then(v => applyUserDoc(sk, v)).catch(() => {}))
       },
     })
     return off
@@ -7406,60 +7166,36 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }, [showReelmSettings, selectedReelm?.id])
 
 
+  // Discover: fetch public reelms + users from backend on query change
   useEffect(() => {
-    const trimmed = discoverQuery.trim()
-    const delay = trimmed.length <= 1 ? 180 : 320
-    const timer = setTimeout(() => setDebouncedDiscoverQuery(trimmed), delay)
-    return () => clearTimeout(timer)
-  }, [discoverQuery])
-
-  // Discover: one combined, cancellable search request. Local reelms/chats still
-  // render instantly; remote people/public reelm results show a spinner until the
-  // current query finishes, so users never see misleading "No results" while IO is in flight.
-  useEffect(() => {
-    const q = debouncedDiscoverQuery.trim()
-    const seq = ++discoverSearchSeqRef.current
+    const q = discoverQuery.trim()
     if (!q) {
       setDiscoverUsers([])
       setDiscoverReelmsList([])
-      setDiscoverRemoteQuery('')
-      setDiscoverSearchState({ query: '', loading: false, error: null })
       return undefined
     }
-
-    if (q.length < 2) {
-      setDiscoverUsers([])
-      setDiscoverReelmsList([])
-      setDiscoverRemoteQuery(q)
-      setDiscoverSearchState({ query: q, loading: false, error: null })
-      return undefined
-    }
-
-    const controller = new AbortController()
-    setDiscoverSearchState({ query: q, loading: true, error: null })
-
-    discoverySearch(q, { signal: controller.signal }).then((result) => {
-      if (controller.signal.aborted || discoverSearchSeqRef.current !== seq) return
-      const users = Array.isArray(result?.users) ? result.users.filter(u => !u.isSystem) : []
-      const safeReelms = Array.isArray(result?.reelms) ? result.reelms : []
-      setDiscoverUsers(users)
+    let cancelled = false
+    Promise.all([
+      usersList(q).catch(() => []),
+      discoverReelms(q).catch(() => []),
+    ]).then(([users, publicReelms]) => {
+      if (cancelled) return
+      const safeUsers = Array.isArray(users) ? users.filter(u => !u.isSystem) : []
+      const safeReelms = Array.isArray(publicReelms) ? publicReelms : []
+      setDiscoverUsers(safeUsers)
       setDiscoverReelmsList(safeReelms)
-      setDiscoverRemoteQuery(q)
       const pendingIds = safeReelms.filter(r => r?.pending).map(r => String(r.id)).filter(Boolean)
       if (pendingIds.length) {
         setPendingReelmJoinIds(prev => Array.from(new Set([...prev.map(String), ...pendingIds])))
       }
-      setDiscoverSearchState({ query: q, loading: false, error: null })
-    }).catch((err) => {
-      if (controller.signal.aborted || discoverSearchSeqRef.current !== seq) return
-      setDiscoverRemoteQuery(q)
-      setDiscoverSearchState({ query: q, loading: false, error: err?.message || 'search_failed' })
-      setDiscoverUsers([])
-      setDiscoverReelmsList([])
+    }).catch(() => {
+      if (!cancelled) {
+        setDiscoverUsers([])
+        setDiscoverReelmsList([])
+      }
     })
-
-    return () => { controller.abort() }
-  }, [debouncedDiscoverQuery])
+    return () => { cancelled = true }
+  }, [discoverQuery])
 
   const toggleFriendsPopup = () => { setShowFriendsPopup(v => !v); setShowNotificationsPopup(false) }
   const toggleNotifPopup = () => {
@@ -7498,36 +7234,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }
 
   const handleSelectReelm = (reelm) => {
-    if (!reelm?.id) {
-      setSelectedReelm(reelm || null)
-      setReelmLoading(false)
-      return
-    }
-
-    const id = String(reelm.id)
-    const cached = reelmsRef.current.find(r => String(r?.id || '') === id)
-    const initial = cached ? { ...reelm, ...cached } : reelm
-    const hasUsableMemberSnapshot = Array.isArray(initial?.members) && initial.members.length > 0
-    const hasHydratedCore = Boolean(initial?.__coreHydrated || initial?.coreHydrated || hasUsableMemberSnapshot)
-    const selectSeq = ++reelmCoreSelectSeqRef.current
-
-    setSelectedReelm(hasHydratedCore ? initial : { ...initial, __coreHydrating: true })
+    setSelectedReelm(reelm)
     setSelectedChat(null)
     setShowDiscover(false)
     setShowFriendsPanel(false)
     setShowSettings(false)
     setShowChatList(false)
-    setReelmLoading(!hasHydratedCore)
-
-    hydrateReelmCore(id).then((core) => {
-      if (!core?.id || reelmCoreSelectSeqRef.current !== selectSeq) return
-      mergeReelmIntoState({ ...core, __coreHydrated: true })
-    }).catch(() => {
-      // Keep the cached/previous selected Reelm visible. Do not show a false empty state.
-    }).finally(() => {
-      if (reelmCoreSelectSeqRef.current === selectSeq) setReelmLoading(false)
-    })
-
+    setReelmLoading(true)
+    setTimeout(() => setReelmLoading(false), 350)
     if (reelmLandingView === 'feed') {
       setShowFeed(true)
       setFeedTab('feed')
@@ -7545,7 +7259,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       if (type === 'reelm') {
         const code = String(value).toUpperCase()
         const found = reelms.find(r => r.code === code)
-        if (found) { handleSelectReelm(found); setShowFeed(false) }
+        if (found) { setSelectedReelm(found); setShowFeed(false) }
         else {
           // Not in user's list — show join modal pre-filled
           setJoinCodeInput(code)
@@ -7570,7 +7284,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           }
           if (foundChannel) break
         }
-        if (foundReelm && foundChannel) { handleSelectReelm(foundReelm); setSelectedChannel(foundChannel); setShowFeed(false) }
+        if (foundReelm && foundChannel) { setSelectedReelm(foundReelm); setSelectedChannel(foundChannel); setShowFeed(false) }
       } else if (type === 'post') {
         setShowFeed(true)
         setSelectedReelm(null)
@@ -7740,9 +7454,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     } else if (link.type === 'reelm') {
       const r = reelmsRef.current.find(x => String(x.id) === String(link.reelmId))
       if (r) {
-        handleSelectReelm(r)
+        setSelectedReelm(r)
+        setSelectedChat(null)
         setShowChatList(false)
         setShowFeed(false)
+        setShowDiscover(false)
         if (link.channelId) {
           const ch = r.categories?.flatMap(c => c.channels || []).find(c => String(c.id) === String(link.channelId))
           if (ch) {
@@ -7755,17 +7471,21 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     } else if (link.type === 'reelm_join_requests') {
       const r = reelmsRef.current.find(x => String(x.id) === String(link.reelmId))
       if (r) {
-        handleSelectReelm(r)
+        setSelectedReelm(r)
+        setSelectedChat(null)
         setShowChatList(false)
         setShowFeed(false)
+        setShowDiscover(false)
         setShowReelmSettings(true)
       }
     } else if (link.type === 'reelm_invite') {
       const r = reelmsRef.current.find(x => String(x.id) === String(link.reelmId))
       if (r) {
-        handleSelectReelm(r)
+        setSelectedReelm(r)
+        setSelectedChat(null)
         setShowChatList(false)
         setShowFeed(false)
+        setShowDiscover(false)
       } else {
         addNotification('Use Accept or Decline on the invite notification.')
       }
@@ -7792,8 +7512,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     try {
       const result = await acceptReelmInvite(reelmId)
       if (result?.reelm) {
-        mergeReelmIntoState({ ...result.reelm, __coreHydrated: true }, { persist: true })
-        handleSelectReelm(result.reelm)
+        mergeReelmIntoState(result.reelm, { persist: true })
+        setSelectedReelm(result.reelm)
+        setSelectedChat(null)
         setShowChatList(false)
         addNotification(`Joined ${result.reelm.name || 'Reelm'}.`)
       } else if (result?.pending) {
@@ -7910,6 +7631,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setChats(prev => {
       const next = prev.filter(c => String(c.id) !== id)
       scheduleUserPersist('chats', next)
+      userPutDoc('chats', next).catch(() => {})
       return next
     })
     if (selectedChat?.id === id) setSelectedChat(null)
@@ -7962,15 +7684,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [groupSideExpanded, setGroupSideExpanded] = useState(null) // null | 'permissions' | 'vapor'
   const [recentlyBumpedChatId, setRecentlyBumpedChatId] = useState(null)
   const [pinnedItemIds, setPinnedItemIds] = useState([])
-  const [barOrderIds, setBarOrderIds] = useState([])
 
   const activeDataUidRef = useRef(uid)
   useEffect(() => {
     if (activeDataUidRef.current === uid) return
     activeDataUidRef.current = uid
-    bootstrapHydratedRef.current = false
-    bootstrapLastAppliedAtRef.current = 0
-    if (reconnectSyncTimerRef.current) { clearTimeout(reconnectSyncTimerRef.current); reconnectSyncTimerRef.current = null }
     setChats([])
     let cachedReelmsForUid = []
     try {
@@ -7993,7 +7711,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setNotifications([])
     setUnreadCounts({})
     setPinnedItemIds([])
-    setBarOrderIds([])
     setLastChannels({})
     setSessionsList([])
     setChatProfileCache({})
@@ -8011,21 +7728,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }
 
   const openFriendProfile = (friend, e, opts = {}) => {
-    const normalizedFriend = normalizeFriendProfileTarget(friend || {})
-    if (!normalizedFriend.id) return
-    const fid = String(normalizedFriend.id)
-    const fallbackRect = { left: Math.max(8, window.innerWidth - 304), top: 120, right: Math.max(8, window.innerWidth - 24), bottom: 136, width: 0, height: 0 }
-    const targetEl = e?.currentTarget || null
-    const rect = typeof targetEl?.getBoundingClientRect === 'function' ? targetEl.getBoundingClientRect() : fallbackRect
-    const inServerSurface = !!(opts.serverContext || (typeof targetEl?.closest === 'function' && targetEl.closest('.rp-members-panel, .reelm-channel-voice-users, .voice-participants, .voice-bar-participants')))
+    if (!friend?.id) return
+    const fid = String(friend.id)
+    const rect = e.currentTarget.getBoundingClientRect()
+    const inServerSurface = !!(opts.serverContext || e.currentTarget.closest?.('.rp-members-panel, .reelm-channel-voice-users, .voice-participants, .voice-bar-participants'))
     const cached = profileLookupCacheRef.current.get(fid)
     const cachedProfile = cached && (Date.now() - Number(cached.at || 0) < PROFILE_LOOKUP_CACHE_TTL_MS) ? cached.profile : null
-    const target = { friend: cachedProfile ? normalizeFriendProfileTarget({ ...normalizedFriend, ...cachedProfile, id: fid }) : normalizedFriend, anchorRect: rect, serverContext: inServerSurface ? 'reelm' : null }
+    const target = { friend: cachedProfile ? { ...friend, ...cachedProfile } : friend, anchorRect: rect, serverContext: inServerSurface ? 'reelm' : null }
     setFriendProfileTarget(target)
     if (cachedProfile) return
     userProfileGetById(fid).then(data => {
       if (!data) return
-      const merged = normalizeFriendProfileTarget({ ...normalizedFriend, ...data, id: fid })
+      const merged = { ...friend, ...data, id: fid }
       profileLookupCacheRef.current.set(fid, { profile: merged, at: Date.now() })
       setChatProfileCache(prev => sameDocValue(prev?.[fid], merged) ? prev : { ...prev, [fid]: merged })
       setFriendProfileTarget(prev => prev?.friend && String(prev.friend.id || prev.friend.uid || '') === fid ? { ...prev, friend: { ...prev.friend, ...merged } } : prev)
@@ -8140,8 +7854,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [profileSocialLinks, setProfileSocialLinks] = useState({})
   const [profileActivePlatforms, setProfileActivePlatforms] = useState(['instagram', 'tiktok'])
   const [profilePrefsLoaded, setProfilePrefsLoaded] = useState(false)
-  const profileSocialLinksSavedRef = useRef('')
-  const profileSocialOrderSavedRef = useRef('')
   useEffect(() => {
     if (!currentUser?.id) return
     setProfileBio(currentUser.bio || '')
@@ -8152,52 +7864,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [rightWidth, setRightWidth] = useState(PANEL_DEFAULT)
   const dragState = useRef(null)
   const barScrollRef = useRef(null)
-  const barDragReelmIdRef = useRef(null)
-  const barDragClickSuppressRef = useRef(false)
   const barPositionsRef = useRef({})
-  const panelWidthsPersistReadyRef = useRef({ uid: null, left: false, right: false })
-  useEffect(() => {
-    panelWidthsPersistReadyRef.current = { uid, left: false, right: false }
-  }, [uid])
-  useEffect(() => {
-    if (!bootstrapHydratedRef.current || !uid || uid === 'guest') return
-    const state = panelWidthsPersistReadyRef.current
-    if (state.uid !== uid) {
-      panelWidthsPersistReadyRef.current = { uid, left: false, right: false }
-      return
-    }
-    if (!state.left) { state.left = true; return }
-    scheduleUserPersist('lpw', String(leftWidth), 900)
-  }, [leftWidth, uid])
-  useEffect(() => {
-    if (!bootstrapHydratedRef.current || !uid || uid === 'guest') return
-    const state = panelWidthsPersistReadyRef.current
-    if (state.uid !== uid) {
-      panelWidthsPersistReadyRef.current = { uid, left: false, right: false }
-      return
-    }
-    if (!state.right) { state.right = true; return }
-    scheduleUserPersist('rpw', String(rightWidth), 900)
-  }, [rightWidth, uid])
-
-  const reorderBarReelms = (sourceId, targetId) => {
-    const fromId = String(sourceId || '')
-    const toId = String(targetId || '')
-    if (!fromId || !toId || fromId === toId) return
-    const currentReelmIds = (Array.isArray(reelmsRef.current) ? reelmsRef.current : []).map(r => String(r.id || '')).filter(Boolean)
-    const currentSet = new Set(currentReelmIds)
-    const base = (Array.isArray(barOrderIds) ? barOrderIds : []).map(String).filter(id => currentSet.has(id))
-    for (const id of currentReelmIds) if (!base.includes(id)) base.push(id)
-    const fromIndex = base.indexOf(fromId)
-    const toIndex = base.indexOf(toId)
-    if (fromIndex < 0 || toIndex < 0) return
-    const next = [...base]
-    const [moved] = next.splice(fromIndex, 1)
-    next.splice(toIndex, 0, moved)
-    setBarOrderIds(next)
-    scheduleUserPersist('bar_order', next, 500)
-  }
-
+  useEffect(() => { scheduleUserPersist('lpw', String(leftWidth)) }, [leftWidth])
+  useEffect(() => { scheduleUserPersist('rpw', String(rightWidth)) }, [rightWidth])
   const barInitializedRef = useRef(false)
   const barPrevIdSetRef = useRef(null)
   useLayoutEffect(() => {
@@ -8235,30 +7904,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   // Remote control requests now arrive via socketVcSignal (vc:event), handled in handleVcEvent
   useEffect(() => {
     if (!profilePrefsLoaded) return
-    const nextJson = JSON.stringify(profileSocialLinks || {})
-    if (!profileSocialLinksSavedRef.current) { profileSocialLinksSavedRef.current = nextJson; return }
-    if (profileSocialLinksSavedRef.current === nextJson) return
-    profileSocialLinksSavedRef.current = nextJson
-    scheduleUserPersist('sociallinks', profileSocialLinks, 900)
-    queueProfilePatch({ sociallinks: profileSocialLinks }, 900)
+    scheduleUserPersist('sociallinks', profileSocialLinks)
+    userProfilePatch({ sociallinks: profileSocialLinks }).catch(() => {})
   }, [profileSocialLinks, profilePrefsLoaded])
   useEffect(() => {
     if (!profilePrefsLoaded) return
-    const nextJson = JSON.stringify(profileActivePlatforms || [])
-    if (!profileSocialOrderSavedRef.current) { profileSocialOrderSavedRef.current = nextJson; return }
-    if (profileSocialOrderSavedRef.current === nextJson) return
-    profileSocialOrderSavedRef.current = nextJson
-    scheduleUserPersist('socialorder', profileActivePlatforms, 900)
-    queueProfilePatch({ socialorder: profileActivePlatforms }, 900)
+    scheduleUserPersist('socialorder', profileActivePlatforms)
+    userProfilePatch({ socialorder: profileActivePlatforms }).catch(() => {})
   }, [profileActivePlatforms, profilePrefsLoaded])
   useEffect(() => {
-    if (!uid || uid === 'guest' || chats.length === 0 || !bootstrapHydratedRef.current) return
-    const state = chatsPersistReadyRef.current
-    if (state.uid !== uid) {
-      chatsPersistReadyRef.current = { uid, ready: false }
-      return
-    }
-    if (!state.ready) { state.ready = true; return }
+    if (!uid || chats.length === 0) return
     const toSave = chats.map(c => {
       const clean = { ...c }
       if (clean.photo?.startsWith('data:')) clean.photo = null
@@ -8267,9 +7922,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       }))
       return clean
     })
-    scheduleUserPersist('chats', toSave, 900)
+    scheduleUserPersist('chats', toSave)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chats, uid])
+  }, [chats])
   const [messages, setMessages] = useState({})
   const [messageInput, setMessageInput] = useState('')
   const messageInputRef = useRef('')
@@ -8878,12 +8533,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       return
     }
     if (type === 'join') {
-      const fk = String(from || '')
-      if (fk && fk !== String(uid)) {
-        // Remote room-entry cue: everyone already in the room hears a distinct join sound.
-        // The joining user does not get this remote cue; they already clicked join.
-        playSound.voiceJoin()
-      }
       setVoiceParticipants(prev => prev.find(p => String(p.userId) === String(from)) ? prev : [...prev, { userId: from, userName: msg.userName, userPhoto: msg.userPhoto, isMuted: false, isVideoOn: false }])
       createPeer(from, localStreamRef.current, shouldInitiatePeer(from))
       // Tell the newcomer we're here
@@ -8893,10 +8542,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       createPeer(from, localStreamRef.current, shouldInitiatePeer(from))
     } else if (type === 'leave') {
       const fk = String(from)
-      if (fk && fk !== String(uid)) {
-        // Remote room-exit cue: a different sound makes leave/switch/disconnect immediately understandable.
-        playSound.voiceLeave()
-      }
       setVoiceParticipants(prev => prev.filter(p => String(p.userId) !== fk))
       const pc = peersRef.current[fk]; if (pc) { pc.close(); delete peersRef.current[fk] }
       const audioNode = remoteAudiosRef.current[fk]
@@ -8999,7 +8644,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         showMediaUnavailable('voice')
         return
       }
-      const envDoc = (env && typeof env === 'object' ? env : {})
+      const envDoc = await userGetDoc('environment').catch(() => ({})) || {}
       const noiseSuppression = envDoc.noiseSuppression ?? true
       const echoCancellation = envDoc.echoCancellation ?? true
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -9368,7 +9013,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (!voiceVideoOn) {
       try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) { showMediaUnavailable('camera'); return }
-        const envDoc = (env && typeof env === 'object' ? env : {})
+        const envDoc = await userGetDoc('environment').catch(() => ({})) || {}
         const cameraQuality = envDoc.cameraQuality || 'hd'
         const videoConstraints = cameraQuality === 'fullhd'
           ? { width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30, max: 30 } }
@@ -9407,7 +9052,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       }
       try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) { showMediaUnavailable('screen'); return }
-        const envDoc = (env && typeof env === 'object' ? env : {})
+        const envDoc = await userGetDoc('environment').catch(() => ({})) || {}
         const resolution = envDoc.screenResolution || '1080p'
         const displayVideo = resolution === '720p'
           ? { width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30, max: 30 }, cursor: 'always' }
@@ -9476,14 +9121,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     }
   }, [expandedVideoUser, expandedScreenUser, voiceParticipants, voiceScreenFullscreen])
 
-  const applyReelmRealtimeDoc = (reelmId, sk, data, version = 0) => {
+  const applyReelmRealtimeDoc = (reelmId, sk, data) => {
     const id = String(reelmId || '')
     if (!id || !sk) return
-    const stamp = Number(version || Date.now())
-    const versionKey = `${id}:${sk}`
-    const currentStamp = Number(reelmSyncVersionsRef.current[versionKey] || 0)
-    if (stamp && currentStamp && stamp < currentStamp) return
-    reelmSyncVersionsRef.current[versionKey] = stamp || Date.now()
     let patch = null
     if (sk === 'join_requests') patch = { joinRequests: Array.isArray(data) ? data : [] }
     else if (sk === 'ban_list') patch = { banList: Array.isArray(data) ? data : [] }
@@ -9512,34 +9152,35 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const hydrateReelmCore = async (reelmId) => {
     if (!reelmId) return null
-    try {
-      const core = await reelmGetCore(reelmId)
-      if (core?.id) return { ...core, joined: core.joined !== false, __coreHydrated: true, __coreHydrating: false }
-    } catch (_) {}
-    // Do not fall back to the old fan-out of meta/structure/roles/members/
-    // moderation docs. That legacy path was the source of 20-90 second request
-    // storms under Supabase. The server emits core snapshots and exposes one
-    // core endpoint; if it fails, keep the current local state and retry later.
-    return null
+    const [meta, structure, roles, members, joinRequests, banList, timeoutList] = await Promise.all([
+      reelmGetDoc(reelmId, 'meta').catch(() => null),
+      reelmGetDoc(reelmId, 'structure').catch(() => null),
+      reelmGetDoc(reelmId, 'roles').catch(() => []),
+      reelmGetDoc(reelmId, 'members').catch(() => []),
+      reelmGetDoc(reelmId, 'join_requests').catch(() => []),
+      reelmGetDoc(reelmId, 'ban_list').catch(() => []),
+      reelmGetDoc(reelmId, 'timeout_list').catch(() => []),
+    ])
+    if (!meta) return null
+    return {
+      ...meta,
+      roles: Array.isArray(roles) ? roles : [],
+      members: Array.isArray(members) ? members : [],
+      categories: Array.isArray(structure?.categories) ? structure.categories : [],
+      joinRequests: Array.isArray(joinRequests) ? joinRequests : [],
+      banList: Array.isArray(banList) ? banList : [],
+      timeoutList: Array.isArray(timeoutList) ? timeoutList : [],
+      joined: true,
+    }
   }
 
   const mergeReelmIntoState = (nextReelm, { persist = false } = {}) => {
     if (!nextReelm?.id) return
-    const syncVersion = Number(nextReelm.syncVersion || Date.now())
-    const idKey = String(nextReelm.id)
-    const currentVersion = Number(reelmSyncVersionsRef.current[idKey] || 0)
-    if (syncVersion && currentVersion && syncVersion < currentVersion) return
-    reelmSyncVersionsRef.current[idKey] = syncVersion || Date.now()
     setReelms(prev => {
       const next = prev.some(r => String(r.id) === String(nextReelm.id))
         ? prev.map(r => {
             if (String(r.id) !== String(nextReelm.id)) return r
             const merged = { ...r, ...nextReelm }
-            const localImagePending = Number(r?.__localImagePendingAt || 0)
-            if (localImagePending && Date.now() - localImagePending < 45_000 && r.image && String(r.image) !== String(nextReelm.image || '')) {
-              merged.image = r.image
-              merged.__localImagePendingAt = localImagePending
-            } else if ((nextReelm.image == null || nextReelm.image === '') && r.image) merged.image = r.image
             if (!Array.isArray(nextReelm.joinRequests) && Array.isArray(r.joinRequests)) merged.joinRequests = r.joinRequests
             if (!Array.isArray(nextReelm.banList) && Array.isArray(r.banList)) merged.banList = r.banList
             if (!Array.isArray(nextReelm.timeoutList) && Array.isArray(r.timeoutList)) merged.timeoutList = r.timeoutList
@@ -9552,11 +9193,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setSelectedReelm(prev => {
       if (String(prev?.id || '') !== String(nextReelm.id) && prev) return prev
       const merged = { ...(prev || {}), ...nextReelm }
-      const localImagePending = Number(prev?.__localImagePendingAt || 0)
-      if (localImagePending && Date.now() - localImagePending < 45_000 && prev?.image && String(prev.image) !== String(nextReelm.image || '')) {
-        merged.image = prev.image
-        merged.__localImagePendingAt = localImagePending
-      } else if ((nextReelm.image == null || nextReelm.image === '') && prev?.image) merged.image = prev.image
       if (prev && !Array.isArray(nextReelm.joinRequests) && Array.isArray(prev.joinRequests)) merged.joinRequests = prev.joinRequests
       if (prev && !Array.isArray(nextReelm.banList) && Array.isArray(prev.banList)) merged.banList = prev.banList
       if (prev && !Array.isArray(nextReelm.timeoutList) && Array.isArray(prev.timeoutList)) merged.timeoutList = prev.timeoutList
@@ -9587,17 +9223,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     }
     if (!only || only.has('structure')) tasks.push(reelmPutDoc(reelm.id, 'structure', { categories: reelm.categories || [] }))
     const includeMembership = options.includeMembership === true || !!only
-    const shouldPersistRoles = (includeMembership && (!only || only.has('roles'))) && Array.isArray(reelm.roles)
-    const shouldPersistMembers = (includeMembership && (!only || only.has('members'))) && Array.isArray(reelm.members)
+    if ((includeMembership && (!only || only.has('roles'))) && Array.isArray(reelm.roles)) tasks.push(reelmPutDoc(reelm.id, 'roles', reelm.roles))
+    if ((includeMembership && (!only || only.has('members'))) && Array.isArray(reelm.members)) tasks.push(reelmPutDoc(reelm.id, 'members', reelm.members, { allowMemberRemoval: options.allowMemberRemoval === true }))
     const results = await Promise.allSettled(tasks)
     const failed = results.find((result) => result.status === 'rejected')
     if (failed) throw failed.reason || new Error('persist_reelm_failed')
-
-    // Role and member saves are deliberately sequential. If they run in
-    // parallel, a stale members save can arrive after the roles save and make
-    // edited role names/colors appear to revert on the next core refresh.
-    if (shouldPersistRoles) await reelmPutDoc(reelm.id, 'roles', reelm.roles)
-    if (shouldPersistMembers) await reelmPutDoc(reelm.id, 'members', reelm.members, { allowMemberRemoval: options.allowMemberRemoval === true })
   }
 
   const createDefaultReelm = (name, template = null, t = k => k) => {
@@ -9646,10 +9276,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       ageRating: 'under18',
       announcementChannelId,
       roles: [
-        { id: 'role-admin', name: 'Admin', color: '#f87171', position: 0, permissions: { manageReelm: true } },
-        { id: 'role-members', name: 'Members', color: '#60a5fa', position: 1, permissions: {} },
+        { id: 'role-admin-' + reelmId, name: 'Admin', color: '#f87171', position: 0, permissions: { manageReelm: true } },
+        { id: 'role-member-' + reelmId, name: 'Member', color: '#60a5fa', position: 1, permissions: {} },
       ],
-      members: [{ userId: uid, userName: currentUser.name, userPhoto: currentUser.photo || null, roleIds: ['role-admin'] }],
+      members: [{ userId: uid, userName: currentUser.name, userPhoto: currentUser.photo || null, roleIds: ['role-admin-' + reelmId] }],
       categories,
     }
   }
@@ -9671,8 +9301,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       scheduleUserPersist('reelms', next)
       return next
     })
-    handleSelectReelm({ ...newReelm, __coreHydrated: true })
+    setSelectedReelm(newReelm)
     socketJoinReelm(newReelm.id)
+    setSelectedChat(null)
     setReelmNameInput('')
     setSelectedTemplateId(null)
     setCreateReelmStep(null)
@@ -9832,8 +9463,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (!code) return
     const existing = reelms.find(r => String(r.code || '').toUpperCase() === code)
     if (existing) {
-      handleSelectReelm(existing)
+      setSelectedReelm(existing)
       socketJoinReelm(existing.id)
+      setSelectedChat(null)
       setCreateReelmStep(null)
       setShowMenu(false)
       return
@@ -9849,13 +9481,17 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         // Backward compatible fallback for older local APIs.
         const meta = await reelmByCode(code)
         if (meta?.id) {
-          const core = await hydrateReelmCore(meta.id).catch(() => null)
-          newReelm = core || {
+          const [structure, roles, members] = await Promise.all([
+            reelmGetDoc(meta.id, 'structure').catch(() => null),
+            reelmGetDoc(meta.id, 'roles').catch(() => []),
+            reelmGetDoc(meta.id, 'members').catch(() => []),
+          ])
+          newReelm = {
             ...meta,
-            roles: [],
-            members: [],
+            roles: Array.isArray(roles) ? roles : [],
+            members: Array.isArray(members) ? members : [],
             joined: true,
-            categories: meta.categories || [
+            categories: structure?.categories || meta.categories || [
               { id: 'cat-general', name: 'General', type: 'text', channels: [{ id: 'ch-general', name: 'general', type: 'text' }] },
             ],
           }
@@ -9874,8 +9510,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         scheduleUserPersist('reelms', next)
         return next
       })
-      handleSelectReelm(newReelm)
+      setSelectedReelm(newReelm)
       socketJoinReelm(newReelm.id)
+      setSelectedChat(null)
       setCreateReelmStep(null)
       setShowMenu(false)
     } catch (err) {
@@ -9996,17 +9633,15 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }
 
   const updateReelmImage = (reelmId, imageDataUrl) => {
-    const id = String(reelmId || '')
-    if (!id) return
-    const updater = r => r ? ({ ...r, image: imageDataUrl, updatedAt: Date.now(), __localImagePendingAt: Date.now() }) : r
+    const updater = r => ({ ...r, image: imageDataUrl })
     setReelms(prev => {
-      const next = prev.map(r => String(r.id) !== id ? r : updater(r))
+      const next = prev.map(r => r.id !== reelmId ? r : updater(r))
       scheduleUserPersist('reelms', next)
       return next
     })
     setSelectedReelm(prev => {
       const next = updater(prev)
-      if (next) persistReelmCore(next, { only: ['meta'] }).catch(() => {})
+      persistReelmCore(next)
       return next
     })
   }
@@ -10064,7 +9699,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       setShowReelmSettings(false)
       addNotification(`${target.name || 'Reelm'} was closed.`)
     } catch (err) {
-      if (err?.code === 'confirmation_required' || err?.message === 'confirmation_required') addNotification('Wait 5 seconds, then press the close button again.')
+      if (err?.code === 'confirmation_required' || err?.message === 'confirmation_required') addNotification('Type the exact server name to close it.')
       else if (err?.code === 'forbidden' || err?.message === 'forbidden') addNotification('Only the server owner/admin can close this server.')
       else addNotification('Could not close this server. Please try again.')
     }
@@ -10072,37 +9707,23 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const updateReelm = async (updatedReelm, options = {}) => {
     setReelms(prev => {
-      const next = prev.map(r => String(r.id) === String(updatedReelm.id) ? { ...r, ...updatedReelm } : r)
+      const next = prev.map(r => r.id === updatedReelm.id ? updatedReelm : r)
       scheduleUserPersist('reelms', next)
       return next
     })
-    setSelectedReelm(prev => String(prev?.id || '') === String(updatedReelm.id) ? { ...prev, ...updatedReelm } : updatedReelm)
+    setSelectedReelm(updatedReelm)
     const scope = options?.scope
     if (scope === 'roles-members') return persistReelmCore(updatedReelm, { only: ['roles', 'members'], allowMemberRemoval: options?.allowMemberRemoval === true })
     return persistReelmCore(updatedReelm)
   }
 
-  const removeMemberFromSelectedReelm = async (targetUid, reason = '') => {
+  const removeMemberFromSelectedReelm = (targetUid, reason = '') => {
     if (!selectedReelm || !targetUid) return
-    const reelmId = selectedReelm.id
     const member = (selectedReelm.members || []).find(m => String(m.userId) === String(targetUid))
     if (!canActOnReelmMemberClient(selectedReelm, uid, member, 'manageMembers')) { addNotification('You cannot kick this member.'); return }
-    setSelectedReelm(prev => String(prev?.id || '') === String(reelmId) ? { ...prev, members: (prev.members || []).filter(m => String(m.userId) !== String(targetUid)) } : prev)
-    setReelms(prev => prev.map(r => String(r.id) === String(reelmId) ? { ...r, members: (r.members || []).filter(m => String(m.userId) !== String(targetUid)) } : r))
-    try {
-      const result = await removeReelmMember(reelmId, targetUid, reason)
-      if (Array.isArray(result?.members)) {
-        setSelectedReelm(prev => String(prev?.id || '') === String(reelmId) ? { ...prev, members: result.members } : prev)
-        setReelms(prev => prev.map(r => String(r.id) === String(reelmId) ? { ...r, members: result.members } : r))
-      }
-      hydrateReelmCore(reelmId).then(r => r && mergeReelmIntoState(r)).catch(() => {})
-      addNotification(reason ? `Member kicked from Reelm: ${reason}` : 'Member kicked from Reelm.')
-    } catch (err) {
-      hydrateReelmCore(reelmId).then(r => r && mergeReelmIntoState(r)).catch(() => {})
-      if (err?.code === 'cannot_remove_owner' || err?.message === 'cannot_remove_owner') addNotification('You cannot kick the Reelm owner.')
-      else if (err?.code === 'cannot_remove_protected' || err?.message === 'cannot_remove_protected') addNotification('This protected member cannot be kicked.')
-      else addNotification('Could not kick this member.')
-    }
+    const next = { ...selectedReelm, members: (selectedReelm.members || []).filter(m => String(m.userId) !== String(targetUid)) }
+    updateReelm(next, { scope: 'roles-members', allowMemberRemoval: true })
+    addNotification(reason ? `Member kicked from Reelm: ${reason}` : 'Member kicked from Reelm.')
   }
 
   const openServerMemberAction = (type, reelmId, user) => {
@@ -10123,7 +9744,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     try {
       if (action.type === 'ban') await banMemberFromReelm(reelmId, targetUid, reason)
       else if (action.type === 'timeout') await timeoutMemberInReelm(reelmId, targetUid, Number(serverActionMinutes) || 10, reason)
-      else if (action.type === 'remove') await removeMemberFromSelectedReelm(targetUid, reason)
+      else if (action.type === 'remove') removeMemberFromSelectedReelm(targetUid, reason)
     } catch { addNotification('Could not complete server action.') }
   }
 
@@ -10557,19 +10178,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     )
   }
 
-
-  const safeRenderFriendProfileSurface = (embedded = false) => {
-    try {
-      return renderFriendProfileSurface(embedded)
-    } catch (err) {
-      console.error('[Reelms] member profile render isolated', err)
-      return null
-    }
-  }
-
   const renderReelmMembersPanel = (panelKey = 'reelm') => {
     if (!selectedReelm) return null
-    const members = Array.isArray(selectedReelm.members) ? selectedReelm.members : []
+    const members = selectedReelm.members || []
+    if (members.length === 0) return null
     const presence = reelmPresence[selectedReelm.id] || {}
     const { groups, getMemberPresence, getMemberStatus } = buildReelmMemberGroupsClient({
       reelm: selectedReelm,
@@ -10585,64 +10197,56 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       const roleIds = new Set(getMemberRoleIdsClient(m).map(String))
       return orderedPanelRoles.find(role => roleIds.has(String(role.id))) || null
     }
+    const selectedMemberId = friendProfileTarget?.serverContext === 'reelm'
+      ? String(friendProfileTarget?.friend?.id || '')
+      : ''
     const renderMember = (m) => {
       const info = getMemberPresence(m)
       const status = getMemberStatus(m)
       const isMe = String(m.userId) === String(uid)
-      const displayName = safeDisplayText(isMe ? currentUser.name : (info.userName || m.userName || m.name || m.username), 'Member')
-      const displayPhoto = isMe ? (currentUser.photo || info.userPhoto || m.userPhoto || m.photo || null) : (info.userPhoto || m.userPhoto || m.photo || null)
+      const displayName = isMe ? currentUser.name : (info.userName || m.userName)
+      const displayPhoto = isMe ? (currentUser.photo || info.userPhoto || m.userPhoto) : (info.userPhoto || m.userPhoto)
       const nowPlaying = !isMe ? spotifyFriendsNowPlaying[m.userId] : null
       const primaryRole = getPrimaryPanelRole(m)
+      const isSelectedMember = selectedMemberId && String(m.userId) === selectedMemberId
       return (
-        <div
-          key={m.userId}
-          className={`rp-member-card${isActiveStatus(status) ? ' rp-member-card--active' : ''}${isMainAdminMemberClient(selectedReelm, m) ? ' rp-member-card--main-admin' : ''}`}
-          onClick={e => openFriendProfile({
-            id: m.userId,
-            name: displayName,
-            username: m.username || info.username,
-            photo: displayPhoto,
-            userPhoto: displayPhoto,
-            cover: m.cover || m.coverImage || m.coverUrl || null,
-            coverImage: m.coverImage || m.cover || null,
-            coverUrl: m.coverUrl || m.cover || null,
-            bio: m.bio || '',
-            activity: m.activity || null,
-            profileTheme: m.profileTheme || null
-          }, e, { serverContext: true })}
-        >
-          <div className="rp-member-avatar-wrap">
-            <div className="rp-member-avatar">
-              {displayPhoto
-                ? <img src={displayPhoto} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-                : (displayName || '?').charAt(0).toUpperCase()
-              }
-            </div>
-            <span className="rp-member-status-dot" style={{ background: STATUS_COLORS[status] || STATUS_COLORS.offline }} />
-          </div>
-          <div className="rp-member-info">
-            <span className={`rp-member-name${nowPlaying ? ' rp-member-name--listening' : ''}`} style={primaryRole?.color ? { '--member-role-color': safeRoleColor(primaryRole.color) } : undefined}>{displayName}</span>
-            {nowPlaying && (
-              <div className="rp-member-nowplaying" aria-live="polite">
-                <span className="rp-member-nowplaying-track">{nowPlaying.name}</span>
-                <span className="rp-member-nowplaying-sep"> • </span>
-                <span className="rp-member-nowplaying-artist">{nowPlaying.artist}</span>
+        <React.Fragment key={m.userId}>
+          <div
+            className={`rp-member-card${isActiveStatus(status) ? ' rp-member-card--active' : ''}${isMainAdminMemberClient(selectedReelm, m) ? ' rp-member-card--main-admin' : ''}${isSelectedMember ? ' rp-member-card--selected' : ''}`}
+            onClick={e => openFriendProfile({ id: m.userId, name: displayName, photo: displayPhoto }, e, { serverContext: true })}
+          >
+            <div className="rp-member-avatar-wrap">
+              <div className="rp-member-avatar">
+                {displayPhoto
+                  ? <img src={displayPhoto} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                  : (displayName || '?').charAt(0).toUpperCase()
+                }
               </div>
-            )}
+              <span className="rp-member-status-dot" style={{ background: STATUS_COLORS[status] || STATUS_COLORS.offline }} />
+            </div>
+            <div className="rp-member-info">
+              <span className={`rp-member-name${nowPlaying ? ' rp-member-name--listening' : ''}`} style={primaryRole?.color ? { '--member-role-color': primaryRole.color } : undefined}>{displayName}</span>
+              {nowPlaying && (
+                <div className="rp-member-nowplaying" aria-live="polite">
+                  <span className="rp-member-nowplaying-track">{nowPlaying.name}</span>
+                  <span className="rp-member-nowplaying-sep"> • </span>
+                  <span className="rp-member-nowplaying-artist">{nowPlaying.artist}</span>
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+          {isSelectedMember && (
+            <div className="rp-member-profile-dock rp-member-profile-dock--inline">
+              {renderFriendProfileSurface(true)}
+            </div>
+          )}
+        </React.Fragment>
       )
     }
-    const selectedMemberDock = friendProfileTarget?.serverContext === 'reelm' ? safeRenderFriendProfileSurface(true) : null
-    const panelLoadingMembers = members.length === 0 && (reelmLoading || selectedReelm?.__coreHydrating || !selectedReelm?.__coreHydrated)
     return (
       <div className="rp-members-panel">
         <span className="rp-members-header">In this Reelm</span>
-        {selectedMemberDock && <div className="rp-member-profile-dock">{selectedMemberDock}</div>}
-        {members.length === 0 && panelLoadingMembers && (
-          <div className="rp-members-empty rp-members-empty--spinner" aria-label="Loading members"><span /></div>
-        )}
-        {members.length > 0 && groups.map(group => {
+        {groups.map(group => {
           const list = group.noRole && group.members.length > 18 && rightPanelNoRoleSearch.trim()
             ? group.members.filter(m => String((getMemberPresence(m).userName || m.userName || '')).toLowerCase().includes(rightPanelNoRoleSearch.trim().toLowerCase()))
             : group.members
@@ -10763,19 +10367,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   const topChatItems = (Array.isArray(chats) ? chats : [])
                     .filter(c => !(c.type === 'dm' && blockedIds.has(String(c.friendId || ''))))
                     .filter(c => pinnedItemIds.includes(c.id) || getChatUnreadCount(c) > 0 || selectedChat?.id === c.id)
-                  const reelmItems = reelms.map((r, index) => ({ ...r, itemType: 'reelm', _stableBarIndex: index }))
-                  const chatItems = topChatItems.map(c => ({ ...c, itemType: 'chat' }))
-                  const allItemsFlat = [...reelmItems, ...chatItems]
+                  const allItemsFlat = [
+                    ...reelms.map(r => ({ ...r, itemType: 'reelm' })),
+                    ...topChatItems.map(c => ({ ...c, itemType: 'chat' }))
+                  ]
                   const pinnedItems = pinnedItemIds.map(id => allItemsFlat.find(i => i.id === id)).filter(Boolean)
-                  const pinnedSet = new Set(pinnedItems.map(i => i.id))
-                  const barOrderIndex = new Map((Array.isArray(barOrderIds) ? barOrderIds : []).map((id, idx) => [String(id), idx]))
-                  const unpinnedReelms = reelmItems.filter(i => !pinnedSet.has(i.id)).sort((a, b) => {
-                    const ai = barOrderIndex.has(String(a.id)) ? barOrderIndex.get(String(a.id)) : 100000 + (a._stableBarIndex || 0)
-                    const bi = barOrderIndex.has(String(b.id)) ? barOrderIndex.get(String(b.id)) : 100000 + (b._stableBarIndex || 0)
-                    return ai - bi
-                  })
-                  const unpinnedChats = chatItems.filter(i => !pinnedSet.has(i.id)).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-                  const allItems = [...pinnedItems, ...unpinnedReelms, ...unpinnedChats]
+                  const unpinnedItems = allItemsFlat.filter(i => !pinnedItemIds.includes(i.id)).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+                  const allItems = [...pinnedItems, ...unpinnedItems]
                   if (allItems.length === 0) return <p className="no-chats-text-bar">Start a conversation</p>
                   return (
                     <div className="chats-scroll-horizontal" ref={barScrollRef}>
@@ -10784,38 +10382,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           key={item.id}
                           data-bar-id={item.id}
                           className={'bar-item bar-item--' + item.itemType + (isDefaultCommunity(item) ? ' bar-item--community-root' : '') + (item.itemType === 'reelm' && mutedReelmIds.map(String).includes(String(item.id)) ? ' bar-item--muted' : '') + (item.itemType === 'chat' && item.type === 'dm' && isUserActive(item.friendId) ? ' bar-item--online' : '') + ((item.itemType === 'reelm' ? selectedReelm?.id : selectedChat?.id) === item.id ? ' bar-item-active' : '')}
-                          draggable={item.itemType === 'reelm'}
-                          onDragStart={(e) => {
-                            if (item.itemType !== 'reelm') return
-                            barDragReelmIdRef.current = String(item.id)
-                            barDragClickSuppressRef.current = true
-                            e.dataTransfer.effectAllowed = 'move'
-                            try { e.dataTransfer.setData('text/plain', String(item.id)) } catch {}
-                          }}
-                          onDragOver={(e) => {
-                            if (item.itemType !== 'reelm' || !barDragReelmIdRef.current) return
-                            e.preventDefault()
-                            e.dataTransfer.dropEffect = 'move'
-                          }}
-                          onDrop={(e) => {
-                            if (item.itemType !== 'reelm') return
-                            e.preventDefault()
-                            reorderBarReelms(barDragReelmIdRef.current || e.dataTransfer.getData('text/plain'), item.id)
-                            barDragReelmIdRef.current = null
-                            window.setTimeout(() => { barDragClickSuppressRef.current = false }, 80)
-                          }}
-                          onDragEnd={() => {
-                            barDragReelmIdRef.current = null
-                            window.setTimeout(() => { barDragClickSuppressRef.current = false }, 80)
-                          }}
                           onClick={() => {
-                            if (barDragClickSuppressRef.current) { barDragClickSuppressRef.current = false; return }
                             if (item.itemType !== 'reelm') clearUnread(item.id)
-                            if (item.itemType === 'reelm') { handleSelectReelm(item) }
-                            else { setReelmLoading(false); setSelectedChat(item); setSelectedReelm(null); setSelectedChannel(null); setShowDiscover(false); setShowFriendsPanel(false); setShowSettings(false) }
+                            if (item.itemType === 'reelm') { setSelectedReelm(item); setSelectedChat(null); setShowDiscover(false); setShowFriendsPanel(false); setShowSettings(false); setReelmLoading(true); setTimeout(() => setReelmLoading(false), 350) }
+                            else { setSelectedChat(item); setSelectedReelm(null); setSelectedChannel(null); setShowDiscover(false); setShowFriendsPanel(false); setShowSettings(false) }
                           }}
                           onContextMenu={(e) => { e.preventDefault(); setBarCtxMenu({ x: e.clientX, y: e.clientY, item }) }}
-                          title={item.itemType === 'reelm' ? `${item.name || 'Reelm'} · drag to reorder` : item.name}
+                          title={item.name}
                         >
                           <span className={`bar-item-wrap${item.id === recentlyBumpedChatId ? ' bar-item-bumped' : ''}`}>
                             <div className={`bar-item-avatar${item.itemType === 'reelm' ? ' bar-item-avatar--server' : ' bar-item-avatar--profile'}${isDefaultCommunity(item) ? ' bar-item-avatar--community' : ''}`}>
@@ -10823,7 +10396,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 const avatarSrc = item.itemType === 'chat' ? getChatAvatarSrc(item) : item.image
                                 const label = item.itemType === 'chat' ? getChatDisplayName(item) : item.name
                                 return avatarSrc
-                                  ? <img src={avatarSrc} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: item.itemType === 'reelm' ? '12px' : '50%' }} />
+                                  ? <img src={avatarSrc} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: item._type === 'reelm' ? '12px' : '50%' }} />
                                   : isDefaultCommunity(item) ? <ReelmsCommunityGlyph /> : (label || '?').charAt(0).toUpperCase()
                               })()}
                             </div>
@@ -11097,7 +10670,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                 onApproveJoin={approveReelmJoinRequest}
                 onRejectJoin={rejectReelmJoinRequest}
                 onInviteFriend={inviteFriendToReelm}
-                onRemoveMember={(reelmId, userId, reason) => removeMemberFromSelectedReelm(userId, reason)}
                 onBanMember={banMemberFromReelm}
                 onUnbanMember={unbanMemberFromReelm}
                 onTimeoutMember={timeoutMemberInReelm}
@@ -12172,7 +11744,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           if (!reelm) return
                           const ch = reelm.categories.flatMap(c => c.channels).find(c => c.id === voiceChannel.channelId)
                           if (!ch) return
-                          handleSelectReelm(reelm); setSelectedChannel(ch); setShowSettings(false)
+                          setSelectedReelm(reelm); setSelectedChannel(ch); setShowDiscover(false); setSelectedChat(null); setShowSettings(false)
                         }}
                         title="Go to voice channel"
                       >
@@ -13202,22 +12774,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               <div className="panel panel-middle discover-panel">
                 {(() => {
                   const q = discoverQuery.trim().toLowerCase()
-                  const debouncedQ = debouncedDiscoverQuery.trim().toLowerCase()
-                  const activeRemoteQuery = String(discoverRemoteQuery || '').trim().toLowerCase()
-                  const remoteIsCurrent = activeRemoteQuery === q && q.length >= 2
-                  const isWaitingForDebounce = Boolean(q && q.length >= 2 && q !== debouncedQ)
-                  const isSearching = isWaitingForDebounce || Boolean(q && q.length >= 2 && discoverSearchState.loading && String(discoverSearchState.query || '').trim().toLowerCase() === debouncedQ)
                   const joinedReelmIds = new Set((reelms || []).map(r => String(r.id)))
-                  const publicReelms = remoteIsCurrent ? (discoverReelmsList || []).filter(r => !joinedReelmIds.has(String(r.id))) : []
-                  const localResults = q ? [
+                  const publicReelms = (discoverReelmsList || []).filter(r => !joinedReelmIds.has(String(r.id)))
+                  const results = q ? [
                     ...reelms.filter(r => r.name?.toLowerCase().includes(q)).map(r => ({ ...r, _type: 'reelm', joined: true })),
-                    ...chats.filter(c => c.name?.toLowerCase().includes(q)).map(c => ({ ...c, _type: 'chat' })),
-                  ] : []
-                  const remoteResults = q ? [
                     ...publicReelms.map(r => ({ ...r, _type: 'reelm', joined: false })),
-                    ...(remoteIsCurrent ? discoverUsers : []).map(u => ({ ...u, _type: 'user' })),
+                    ...chats.filter(c => c.name?.toLowerCase().includes(q)).map(c => ({ ...c, _type: 'chat' })),
+                    ...discoverUsers.map(u => ({ ...u, _type: 'user' })),
                   ] : []
-                  const results = [...localResults, ...remoteResults]
                   return (
                     <>
                       <button className="discover-back-btn" onClick={() => { setShowDiscover(false); setShowFeed(true) }}>
@@ -13251,37 +12815,24 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         {!q && (
                           <p className="discover-empty">Start typing to search across Reelms, chats and people.</p>
                         )}
-                        {q && q.length < 2 && (
-                          <p className="discover-empty">Type at least 2 characters to search people and public Reelms.</p>
-                        )}
-                        {q && q.length >= 2 && isSearching && (
-                          <div className="discover-search-status" role="status" aria-live="polite">
-                            <span className="discover-spinner" aria-hidden="true" />
-                            <span>{results.length ? `Still searching for "${discoverQuery.trim()}"… showing current matches.` : `Searching for "${discoverQuery.trim()}"…`}</span>
-                          </div>
-                        )}
-                        {q && q.length >= 2 && !isSearching && discoverSearchState.error && (
-                          <p className="discover-empty">Search could not refresh. Try again.</p>
-                        )}
-                        {q && q.length >= 2 && results.length === 0 && !isSearching && !discoverSearchState.error && (
+                        {q && results.length === 0 && (
                           <p className="discover-empty">No results for "{discoverQuery}"</p>
                         )}
                         {results.map((item, i) => (
-                          <div key={i} className="discover-result-row" onClick={(e) => {
+                          <div key={i} className="discover-result-row" onClick={() => {
                             if (item._type === 'reelm' && item.joined !== false) { handleSelectReelm(item) }
                             else if (item._type === 'chat') { setSelectedChat(item); setSelectedChannel(null); setSelectedReelm(null); setShowDiscover(false); setShowSettings(false) }
-                            else if (item._type === 'user') { openFriendProfile(item, e) }
-                          }} style={{ cursor: item._type === 'user' || item.joined !== false ? 'pointer' : 'default' }}>
+                          }}>
                             <div className="discover-result-avatar">
-                              {getPersonPhoto(item) || item.image
-                                ? <img src={getPersonPhoto(item) || item.image} alt={item.name || item.username || 'User'} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: item.itemType === 'reelm' ? '12px' : '50%' }} />
-                                : (item.name || item.username || item.contact || '?').charAt(0).toUpperCase()
+                              {item.image
+                                ? <img src={item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: item._type === 'reelm' ? '12px' : '50%' }} />
+                                : (item.name || item.contact || '?').charAt(0).toUpperCase()
                               }
                             </div>
                             <div className="discover-result-info">
-                              <span className="discover-result-name">{item.name || item.displayName || item.username || item.contact}</span>
+                              <span className="discover-result-name">{item.name || item.contact}</span>
                               <span className="discover-result-type">
-                                {item._type === 'reelm' ? 'Reelm' : item._type === 'chat' ? 'Chat' : item.username ? `@${item.username}` : 'User'}
+                                {item._type === 'reelm' ? 'Reelm' : item._type === 'chat' ? 'Chat' : 'User'}
                               </span>
                             </div>
                             {item._type === 'reelm' && item.joined === false && (
@@ -13489,7 +13040,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               onActivityChange={setActivity}
             />
           )}
-          {safeRenderFriendProfileSurface(false)}
+          {renderFriendProfileSurface(false)}
         </div>
         {showMenu && (
           <div className="menu-backdrop" onClick={() => { setShowMenu(false); setCreateReelmStep(null); setSelectedTemplateId(null) }}>
@@ -14174,7 +13725,9 @@ function SignUpScreen({ onSignUpComplete, onGoBack }) {
       }
 
       await userProfilePut(userData)
-      recordUserSession(parseDeviceInfo, userData.notifyNewDevice).catch(() => {})
+      try {
+        await recordUserSession(parseDeviceInfo, userData.notifyNewDevice)
+      } catch { /* noop */ }
 
       setIsCreating(false)
       onSignUpComplete()

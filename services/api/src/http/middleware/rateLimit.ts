@@ -3,20 +3,9 @@ import { env } from '../../config/env.js'
 
 type Bucket = { count: number; resetAt: number }
 const buckets = new Map<string, Bucket>()
-let lastSweepAt = 0
-
-function firstForwardedFor(req: Request) {
-  const raw = req.headers['x-forwarded-for']
-  if (Array.isArray(raw)) return raw[0]?.split(',')[0]?.trim()
-  return String(raw || '').split(',')[0]?.trim()
-}
 
 function clientKey(req: Request) {
-  // Authenticated /api/v1 traffic reaches this middleware after authenticate(),
-  // so req.userId is stable and avoids punishing all users behind the same proxy/IP.
-  const userId = String(req.userId || '').trim()
-  if (userId) return `u:${userId}`
-  return `ip:${req.ip || firstForwardedFor(req) || 'anonymous'}`
+  return String(req.userId || req.ip || req.headers['x-forwarded-for'] || 'anonymous')
 }
 
 export function createRateLimit(options: { name: string; max: number; windowMs?: number }) {
@@ -25,15 +14,6 @@ export function createRateLimit(options: { name: string; max: number; windowMs?:
 
     const now = Date.now()
     const windowMs = options.windowMs ?? env.RATE_LIMIT_WINDOW_MS
-
-    // Cheap periodic cleanup so long-running API processes do not retain old IP/user buckets forever.
-    if (now - lastSweepAt > windowMs) {
-      lastSweepAt = now
-      for (const [key, bucket] of buckets.entries()) {
-        if (bucket.resetAt <= now) buckets.delete(key)
-      }
-    }
-
     const key = `${options.name}:${clientKey(req)}`
     const bucket = buckets.get(key)
 

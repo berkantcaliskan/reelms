@@ -11,7 +11,6 @@ import { createSocialRouter } from './routes/social.routes.js'
 import { moderationRouter } from './routes/moderation.routes.js'
 import { createSpotifyRouter } from './routes/spotify.routes.js'
 import { debugRouter } from './routes/debug.routes.js'
-import { clientRouter } from './routes/client.routes.js'
 import { requestContext } from './middleware/requestContext.js'
 import { requestLogger } from './middleware/requestLogger.js'
 import { apiRateLimit, authRateLimit } from './middleware/rateLimit.js'
@@ -43,15 +42,12 @@ export function createApp(io?: Server) {
   app.use('/auth', authRateLimit, authRouter)
   app.use('/realtime', realtimeRouter)
   app.use('/api/v1/debug', debugRouter)
-  app.use('/api/v1/client', apiRateLimit, clientRouter)
   app.use(apiRateLimit, moderationRouter)
 
   if (io) {
     app.use(createSpotifyRouter(io))
-    // /api/v1 routers authenticate first, then apply apiRateLimit internally.
-    // This keeps normal app traffic user-based instead of proxy/IP-based.
-    app.use('/api/v1/social', createSocialRouter(io))
-    app.use('/api/v1', createReelmsDataRouter(io))
+    app.use('/api/v1/social', apiRateLimit, createSocialRouter(io))
+    app.use('/api/v1', apiRateLimit, createReelmsDataRouter(io))
   }
 
   // Compatibility: old web client calls /google/login and /callback/google.

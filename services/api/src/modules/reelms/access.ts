@@ -85,8 +85,8 @@ export async function canUseReelmPermission(uid: string, reelmId: string, permis
   if (uid === env.REELMS_MODERATION_UID) return true
   if (await isBannedFromReelm(uid, reelmId).catch(() => false)) return false
 
-  if (reelmId === DEFAULT_REELM_ID && await hasLeftDefaultReelm(uid).catch(() => false)) return false
   if (reelmId === DEFAULT_REELM_ID && await isCommunityAdminUid(uid).catch(() => false)) return true
+  if (reelmId === DEFAULT_REELM_ID && await hasLeftDefaultReelm(uid).catch(() => false)) return false
 
   const pk = reelmPk(reelmId)
   const meta = await getDoc<any>(pk, 'meta').catch(() => null)
@@ -136,8 +136,8 @@ export async function isReelmMember(uid: string, reelmId: string) {
   if (uid === env.REELMS_MODERATION_UID) return true
   if (await isBannedFromReelm(uid, reelmId).catch(() => false)) return false
 
-  if (reelmId === DEFAULT_REELM_ID && await hasLeftDefaultReelm(uid).catch(() => false)) return false
   if (reelmId === DEFAULT_REELM_ID && await isCommunityAdminUid(uid).catch(() => false)) return true
+  if (reelmId === DEFAULT_REELM_ID && await hasLeftDefaultReelm(uid).catch(() => false)) return false
 
   const pk = reelmPk(reelmId)
   const meta = await getDoc<any>(pk, 'meta').catch(() => null)
@@ -163,8 +163,8 @@ export async function canManageReelm(uid: string, reelmId: string) {
   if (uid === env.REELMS_MODERATION_UID) return true
   if (await isBannedFromReelm(uid, reelmId).catch(() => false)) return false
 
-  if (reelmId === DEFAULT_REELM_ID && await hasLeftDefaultReelm(uid).catch(() => false)) return false
   if (reelmId === DEFAULT_REELM_ID && await isCommunityAdminUid(uid).catch(() => false)) return true
+  if (reelmId === DEFAULT_REELM_ID && await hasLeftDefaultReelm(uid).catch(() => false)) return false
 
   const pk = reelmPk(reelmId)
   const meta = await getDoc<any>(pk, 'meta').catch(() => null)

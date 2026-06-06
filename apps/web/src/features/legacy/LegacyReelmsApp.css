@@ -5013,36 +5013,6 @@ h6 {
   margin-top: 16px;
 }
 
-.discover-search-status {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  min-height: 34px;
-  margin: 2px 0 8px;
-  padding: 8px 12px;
-  border: 1px solid rgba(var(--ta-rgb), 0.14);
-  border-radius: 14px;
-  background: rgba(255, 255, 255, 0.035);
-  color: rgba(230, 210, 200, 0.72);
-  font-size: 0.78rem;
-  text-align: center;
-}
-
-.discover-spinner {
-  width: 14px;
-  height: 14px;
-  border-radius: 999px;
-  border: 2px solid rgba(var(--ta-rgb), 0.18);
-  border-top-color: rgba(var(--ta-rgb), 0.82);
-  animation: discoverSpin 0.8s linear infinite;
-  flex: 0 0 auto;
-}
-
-@keyframes discoverSpin {
-  to { transform: rotate(360deg); }
-}
-
 .discover-result-row {
   display: flex;
   align-items: center;
@@ -6431,29 +6401,6 @@ h6 {
   height: 1px;
   background: rgba(var(--ta-rgb), 0.1);
   margin: 6px 4px;
-}
-.rp-members-empty {
-  min-height: 74px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: rgba(var(--ta-rgb), 0.48);
-  font-size: 0.82rem;
-}
-.rp-members-empty--spinner {
-  color: transparent;
-}
-.rp-members-empty--spinner span {
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  border: 2px solid rgba(var(--ta-rgb), 0.16);
-  border-top-color: rgba(var(--ta-rgb), 0.75);
-  animation: rp-members-spin 0.72s linear infinite;
-  box-shadow: 0 0 18px rgba(var(--ta-rgb), 0.18);
-}
-@keyframes rp-members-spin {
-  to { transform: rotate(360deg); }
 }
 .rp-member-card {
   display: flex;
@@ -12965,16 +12912,62 @@ button, input, select, textarea,
   color: rgba(var(--ta-rgb), 0.95);
 }
 
-/* Drag reordering for the horizontal Reelm bar */
-.bar-item--reelm[draggable="true"] {
-  cursor: grab;
+/* Server stability hardening: profile card opens next to the clicked member and
+   server UI avoids expensive janky animations during member/channel updates. */
+.rp-member-card--selected {
+  background: rgba(var(--ta-rgb), 0.10) !important;
+  border-color: rgba(var(--ta-rgb), 0.18) !important;
 }
-.bar-item--reelm[draggable="true"]:active {
-  cursor: grabbing;
+.rp-member-profile-dock--inline {
+  padding: 6px 2px 12px 8px;
+  margin: 2px 0 8px 0;
+  border-top: 1px solid rgba(var(--ta-rgb), 0.07);
+  border-bottom: 1px solid rgba(var(--ta-rgb), 0.09);
 }
-.bar-item--reelm[draggable="true"] .bar-item-avatar--server {
-  transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease;
+.rp-member-profile-dock--inline .friend-profile-popup--embedded {
+  transform: none !important;
+  animation: none !important;
 }
-.bar-item--reelm[draggable="true"]:hover .bar-item-avatar--server {
-  box-shadow: 0 0 0 1px rgba(var(--ta-rgb), 0.26), 0 10px 24px rgba(0,0,0,0.18);
+.reelm-sidebar,
+.reelm-sidebar *,
+.rp-members-panel,
+.rp-members-panel *,
+.reelm-name-menu,
+.reelm-name-menu *,
+.reelm-channel-ctx-menu,
+.reelm-channel-ctx-menu *,
+.server-action-modal,
+.server-action-modal *,
+.settings-modal .rs-panel,
+.settings-modal .rs-panel * {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  scroll-behavior: auto !important;
+}
+.reelm-sidebar *,
+.rp-members-panel *,
+.reelm-name-menu *,
+.reelm-channel-ctx-menu *,
+.server-action-modal *,
+.settings-modal .rs-panel * {
+  transition-duration: 0.08s !important;
+  transition-timing-function: ease-out !important;
+}
+.reelm-cover-blur-strip,
+.reelm-cover-img,
+.rp-member-avatar,
+.rp-member-avatar img,
+.friend-profile-popup--embedded {
+  will-change: auto !important;
+  backface-visibility: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-root *,
+  .dashboard-root *::before,
+  .dashboard-root *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
 }

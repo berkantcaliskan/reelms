@@ -1,6 +1,4 @@
 import { lazy, Suspense } from 'react'
-import { useLocation } from 'react-router-dom'
-import { AppErrorBoundary } from '../../shared/ui/AppErrorBoundary.jsx'
 
 const LegacyReelmsApp = lazy(() => import('./LegacyReelmsApp.jsx'))
 
@@ -13,17 +11,9 @@ const LegacyReelmsApp = lazy(() => import('./LegacyReelmsApp.jsx'))
  * src/features/<feature-name> and then replace the matching region here.
  */
 export function ReelmsLegacyBoundary() {
-  const location = useLocation()
   return (
-    <AppErrorBoundary
-      boundaryName="legacy-reelms"
-      resetKey={`${location.pathname}${location.search}${location.hash}`}
-      title="This Reelms panel could not render."
-      description="A stale or malformed local snapshot was blocked. Try again, or reload if the same panel keeps failing."
-    >
-      <Suspense fallback={<div className="reelms-app-loading">Loading Reelms…</div>}>
-        <LegacyReelmsApp />
-      </Suspense>
-    </AppErrorBoundary>
+    <Suspense fallback={<div className="reelms-app-loading">Loading Reelms…</div>}>
+      <LegacyReelmsApp />
+    </Suspense>
   )
 }
