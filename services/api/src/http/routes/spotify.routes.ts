@@ -18,7 +18,7 @@ export function createSpotifyRouter(io: Server) {
     const params = new URLSearchParams({
       response_type: 'code',
       client_id: env.SPOTIFY_CLIENT_ID,
-      scope: 'user-read-currently-playing user-read-playback-state',
+      scope: 'streaming user-read-email user-read-private user-read-currently-playing user-read-playback-state user-modify-playback-state',
       redirect_uri: env.SPOTIFY_REDIRECT_URI,
       state
     })
@@ -110,6 +110,19 @@ export function createSpotifyRouter(io: Server) {
         }
       })
     } catch { res.json({ connected: true, playing: false }) }
+  })
+
+  router.get('/spotify/token', authenticate, async (req, res) => {
+    const uid = String(req.userId || '')
+    const stored = spotifyTokens.get(uid)
+    if (!stored) return res.status(404).json({ error: 'not_connected' })
+    let token = stored.accessToken
+    if (Date.now() > stored.expiresAt - 30000) {
+      const refreshed = await refreshSpotifyToken(uid)
+      if (!refreshed) { spotifyTokens.delete(uid); return res.status(401).json({ error: 'token_expired' }) }
+      token = refreshed
+    }
+    res.json({ token })
   })
 
   router.post('/spotify/disconnect/:uid', authenticate, (req, res) => {
