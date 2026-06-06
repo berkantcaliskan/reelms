@@ -1067,7 +1067,8 @@ h6 {
 /* Home panel (opening screen) */
 .home-panel {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   justify-content: center;
 }
 
@@ -1194,7 +1195,6 @@ h6 {
   color: rgba(var(--ta-rgb), 0.35);
   font-style: italic;
   padding: 4px 10px;
-  padding-left: 52px;
   margin-top: 5px;
   margin-bottom: 0;
 }
