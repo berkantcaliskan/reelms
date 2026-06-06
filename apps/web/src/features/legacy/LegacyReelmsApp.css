@@ -1067,22 +1067,25 @@ h6 {
 /* Home panel (opening screen) */
 .home-panel {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  justify-content: flex-start;
+  align-items: center;
+  justify-content: center;
 }
 
 .home-sections {
   display: flex;
-  flex-direction: column;
-  gap: 32px;
-  padding: 32px 36px 24px;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 28px;
+  padding: 0 36px;
   width: 100%;
-  max-width: 520px;
+  max-width: 900px;
   box-sizing: border-box;
+  transform: translateY(-8%);
 }
 
 .home-section {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -1103,7 +1106,7 @@ h6 {
 }
 
 .home-section-title {
-  font-family: 'Dela Gothic One', sans-serif;
+  font-family: 'Dela Gothic One', sans-serif !important;
   font-size: 1rem;
   font-weight: 400;
   color: var(--ta);
@@ -1130,7 +1133,7 @@ h6 {
   width: 100%;
 }
 .home-item:hover {
-  background: rgba(var(--ta-rgb), 0.07);
+  background: none;
 }
 
 .home-item-avatar {
@@ -1161,7 +1164,7 @@ h6 {
 .home-item-name {
   flex: 1;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 700;
   color: var(--ta);
   white-space: nowrap;
   overflow: hidden;
@@ -1169,17 +1172,9 @@ h6 {
 }
 
 .home-item-badge {
-  background: var(--ta);
-  color: var(--tb);
-  font-size: 10px;
-  font-weight: 700;
-  min-width: 18px;
-  height: 18px;
-  border-radius: 9px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 5px;
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(var(--ta-rgb), 0.50);
   flex-shrink: 0;
 }
 
@@ -9629,22 +9624,6 @@ h6 {
 .fp-activity-item { padding: 4px 0; }
 .fp-activity-empty { font-size: 0.82rem; color: rgba(var(--ta-rgb),0.35); }
 
-/* "Tüm profili gör" trigger buttons */
-.profile-view-full-btn {
-  display: block;
-  width: 100%;
-  padding: 5px 8px;
-  background: none;
-  border: none;
-  border-top: 1px solid rgba(var(--ta-rgb),0.1);
-  color: rgba(var(--ta-rgb),0.45);
-  font-size: 0.72rem;
-  text-align: center;
-  cursor: pointer;
-  transition: color 0.15s, background 0.15s;
-  letter-spacing: 0.02em;
-}
-.profile-view-full-btn:hover { color: rgba(var(--ta-rgb),0.8); background: rgba(var(--ta-rgb),0.06); }
 
 .fpp-view-full-btn {
   width: 100%;
