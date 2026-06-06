@@ -4,11 +4,28 @@ import { logger } from '../../lib/logger.js'
 import type { DocStoreDriver } from './types.js'
 import { JsonDocStore } from './drivers/jsonDocStore.js'
 import { PostgresDocStore } from './drivers/postgresDocStore.js'
-import { SupabaseDocStore } from './drivers/supabaseDocStore.js'
+import { SupabaseDocStore, isRetryableSupabaseError } from './drivers/supabaseDocStore.js'
 
 export const APP_PK = 'APP#GLOBAL'
 
+type StoreStatus = {
+  configured: boolean
+  ready: boolean
+  driver: string | null
+  initializing: boolean
+  lastError: string | null
+  lastReadyAt: string | null
+  lastFailureAt: string | null
+}
+
 let driver: DocStoreDriver | null = null
+let ready = false
+let initializing: Promise<void> | null = null
+let retryTimer: NodeJS.Timeout | null = null
+let lastError: string | null = null
+let lastReadyAt: string | null = null
+let lastFailureAt: string | null = null
+const readyHandlers = new Set<() => void | Promise<void>>()
 
 function createDriver() {
   if (env.REELMS_STORAGE_DRIVER === 'postgres') {
@@ -27,10 +44,64 @@ function createDriver() {
   return new JsonDocStore(filePath)
 }
 
+function describeError(err: unknown) {
+  return err instanceof Error ? err.message : String(err || 'unknown error')
+}
+
+function isRetryableInitError(err: unknown) {
+  if (env.REELMS_STORAGE_DRIVER === 'supabase') return isRetryableSupabaseError(err)
+  const message = describeError(err)
+  return /timeout|timed out|abort|aborted|fetch failed|network|econnreset|etimedout|enotfound|eai_again/i.test(message)
+}
+
+function fireReadyHandlers() {
+  for (const handler of readyHandlers) {
+    Promise.resolve()
+      .then(handler)
+      .catch((err) => logger.error('doc store ready handler failed', err))
+  }
+}
+
+function scheduleRetry() {
+  if (retryTimer) return
+  retryTimer = setTimeout(() => {
+    retryTimer = null
+    void initDocStore()
+  }, Number(process.env.REELMS_DOCSTORE_RETRY_MS || 10_000))
+  retryTimer.unref?.()
+}
+
 export async function initDocStore() {
   if (!driver) driver = createDriver()
-  await driver.init?.()
-  logger.info(`doc store ready driver=${driver.name}`)
+  if (ready) return
+  if (initializing) return initializing
+
+  initializing = (async () => {
+    try {
+      await driver?.init?.()
+      ready = true
+      lastError = null
+      lastReadyAt = new Date().toISOString()
+      logger.info(`doc store ready driver=${driver?.name}`)
+      fireReadyHandlers()
+    } catch (err) {
+      ready = false
+      lastError = describeError(err)
+      lastFailureAt = new Date().toISOString()
+
+      if (!isRetryableInitError(err)) {
+        logger.error(`doc store init failed driver=${driver?.name}`, err)
+        throw err
+      }
+
+      logger.warn(`doc store temporarily unavailable driver=${driver?.name}; retry scheduled`, lastError)
+      scheduleRetry()
+    } finally {
+      initializing = null
+    }
+  })()
+
+  return initializing
 }
 
 function getDriver() {
@@ -38,7 +109,35 @@ function getDriver() {
   return driver
 }
 
+export function isDocStoreReady() {
+  return ready
+}
+
+export function getDocStoreStatus(): StoreStatus {
+  return {
+    configured: Boolean(driver) || Boolean(env.REELMS_STORAGE_DRIVER),
+    ready,
+    driver: driver?.name ?? env.REELMS_STORAGE_DRIVER ?? null,
+    initializing: Boolean(initializing),
+    lastError,
+    lastReadyAt,
+    lastFailureAt
+  }
+}
+
+export function onDocStoreReady(handler: () => void | Promise<void>) {
+  readyHandlers.add(handler)
+  if (ready) {
+    Promise.resolve()
+      .then(handler)
+      .catch((err) => logger.error('doc store ready handler failed', err))
+  }
+  return () => readyHandlers.delete(handler)
+}
+
 export async function closeDocStore() {
+  if (retryTimer) clearTimeout(retryTimer)
+  retryTimer = null
   await driver?.close?.()
 }
 

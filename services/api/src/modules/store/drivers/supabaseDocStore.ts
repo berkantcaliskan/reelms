@@ -7,6 +7,8 @@ async function readMaybeJson(res: Response): Promise<any | null> {
 }
 
 const TABLE = 'reelms_docs'
+const DEFAULT_TIMEOUT_MS = Math.max(3_000, Number(process.env.SUPABASE_REQUEST_TIMEOUT_MS || 12_000))
+const MAX_ERROR_BODY_CHARS = 500
 
 type SupabaseRow<T = unknown> = {
   pk: string
@@ -25,10 +27,21 @@ function assertConfigured(url: string, serviceRoleKey: string) {
   }
 }
 
+function compactBody(text: string) {
+  return text.replace(/\s+/g, ' ').trim().slice(0, MAX_ERROR_BODY_CHARS)
+}
+
+export function isRetryableSupabaseError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err || '')
+  return /\b(408|409|425|429|500|502|503|504|520|521|522|523|524)\b/i.test(message)
+    || /timeout|timed out|abort|aborted|fetch failed|network|econnreset|etimedout|enotfound|eai_again/i.test(message)
+}
+
 export class SupabaseDocStore implements DocStoreDriver {
   readonly name = 'supabase'
   private readonly restUrl: string
   private readonly headers: Record<string, string>
+  private readonly timeoutMs: number
 
   constructor(url: string, serviceRoleKey: string) {
     assertConfigured(url, serviceRoleKey)
@@ -39,17 +52,23 @@ export class SupabaseDocStore implements DocStoreDriver {
       'Content-Type': 'application/json',
       Prefer: 'return=representation'
     }
+    this.timeoutMs = DEFAULT_TIMEOUT_MS
   }
 
   private async request<T>(url: string, init: RequestInit = {}): Promise<T> {
     const method = String(init.method || 'GET').toUpperCase()
     const canRetry = ['GET', 'HEAD'].includes(method)
+    const maxAttempts = canRetry ? 4 : 1
     let lastError: unknown = null
 
-    for (let attempt = 0; attempt < (canRetry ? 3 : 1); attempt += 1) {
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const controller = new AbortController()
+      const timeout = setTimeout(() => controller.abort(), this.timeoutMs)
+
       try {
         const response = await fetch(url, {
           ...init,
+          signal: init.signal ?? controller.signal,
           headers: {
             ...this.headers,
             ...(init.headers || {})
@@ -57,12 +76,12 @@ export class SupabaseDocStore implements DocStoreDriver {
         })
 
         if (!response.ok) {
-          const text = await response.text().catch(() => '')
-          const retryableStatus = response.status === 429 || response.status >= 500
+          const text = compactBody(await response.text().catch(() => ''))
+          const retryableStatus = response.status === 408 || response.status === 429 || response.status >= 500
           const error = new Error(`Supabase request failed ${response.status}: ${text || response.statusText}`)
-          if (canRetry && retryableStatus && attempt < 2) {
+          if (canRetry && retryableStatus && attempt < maxAttempts - 1) {
             lastError = error
-            await sleep(200 * (attempt + 1))
+            await sleep(350 * (attempt + 1))
             continue
           }
           throw error
@@ -72,8 +91,15 @@ export class SupabaseDocStore implements DocStoreDriver {
         return readMaybeJson(response) as Promise<T>
       } catch (err) {
         lastError = err
-        if (!canRetry || attempt >= 2) throw err
-        await sleep(200 * (attempt + 1))
+        if (!canRetry || attempt >= maxAttempts - 1) {
+          if (err instanceof Error && err.name === 'AbortError') {
+            throw new Error(`Supabase request timed out after ${this.timeoutMs}ms`)
+          }
+          throw err
+        }
+        await sleep(350 * (attempt + 1))
+      } finally {
+        clearTimeout(timeout)
       }
     }
 
@@ -121,7 +147,7 @@ export class SupabaseDocStore implements DocStoreDriver {
     if (response.ok) return true
     if (response.status === 409) return false
 
-    const text = await response.text().catch(() => '')
+    const text = compactBody(await response.text().catch(() => ''))
     throw new Error(`Supabase insert-if-absent failed ${response.status}: ${text || response.statusText}`)
   }
 
@@ -156,4 +182,3 @@ export class SupabaseDocStore implements DocStoreDriver {
     return rows.map((row) => ({ pk: row.pk, sk: row.sk, data: row.data, updatedAt: Number(row.updated_at) }))
   }
 }
-

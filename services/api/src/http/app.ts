@@ -17,6 +17,7 @@ import { requestContext } from './middleware/requestContext.js'
 import { requestLogger } from './middleware/requestLogger.js'
 import { apiRateLimit, authRateLimit, trackingRateLimit } from './middleware/rateLimit.js'
 import { errorHandler, notFoundHandler } from './utils/errors.js'
+import { getDocStoreStatus } from '../modules/store/docStore.js'
 
 export function createApp(io?: Server) {
   const app = express()
@@ -51,6 +52,20 @@ export function createApp(io?: Server) {
   }))
 
   app.use('/health', healthRouter)
+  app.use((req, res, next) => {
+    const needsDocStore = req.path.startsWith('/api/')
+      || req.path.startsWith('/auth')
+      || req.path.startsWith('/google')
+      || req.path.startsWith('/callback')
+    if (!needsDocStore) return next()
+    const docStore = getDocStoreStatus()
+    if (docStore.ready) return next()
+    return res.status(503).json({
+      error: 'doc_store_unavailable',
+      message: 'Database connection is warming up. Please retry shortly.',
+      details: docStore
+    })
+  })
   app.use('/api/v1/track', trackingRateLimit, trackRouter)
   app.use('/auth', authRateLimit, authRouter)
   app.use('/realtime', realtimeRouter)
