@@ -9,23 +9,30 @@ export async function trackRegistration(data: {
   displayName?: string | null
   platform?: string | null
 }) {
-  if (!data.uid) return
+  const uid = String(data.uid || '').trim()
+  if (!uid) return
+
   const sk = 'tracked_accounts'
   const now = new Date().toISOString()
-  const current = (await getDoc<Record<string, JsonRecord>>(APP_PK, sk).catch(() => ({}))) || {}
-  const next = {
+  const loaded = await getDoc<Record<string, JsonRecord>>(APP_PK, sk).catch(() => null)
+  const current: Record<string, JsonRecord> = loaded && typeof loaded === 'object' && !Array.isArray(loaded) ? loaded : {}
+  const previous = current[uid]
+  const registeredAt = typeof previous?.registered_at === 'string' ? previous.registered_at : now
+
+  const next: Record<string, JsonRecord> = {
     ...current,
-    [String(data.uid)]: {
-      uid: String(data.uid),
+    [uid]: {
+      uid,
       email: String(data.email || ''),
       username: data.username ?? null,
       display_name: data.displayName ?? null,
       platform: data.platform ?? 'web',
-      registered_at: (current[String(data.uid)]?.registered_at as string) || now,
+      registered_at: registeredAt,
       updated_at: now,
-    }
+    },
   }
-  await putDoc(APP_PK, sk, next).catch(() => {})
+
+  await putDoc<Record<string, JsonRecord>>(APP_PK, sk, next).catch(() => {})
 }
 
 export interface TrackedEvent {
