@@ -38,7 +38,7 @@ async function resolveAuthorizedUid(req: any) {
   }
 }
 
-trackRouter.post('/api/v1/track', async (req, res) => {
+trackRouter.post('/', async (req, res) => {
   try {
     const uid = await resolveAuthorizedUid(req)
     if (!uid) return res.json({ ok: true, accepted: 0 })

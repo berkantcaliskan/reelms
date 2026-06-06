@@ -131,7 +131,7 @@ import {
 } from '../../reelmsAwsClient'
 import { seedModerationAccount, MODERATION_ACCOUNT_ID, isModerationSystemUser } from '../../reelmsModerationAccount'
 import { moderateText } from '../../moderationClient'
-import { playSound, applySoundSettings, previewSound, SOUND_CATEGORIES, SOUND_DEFAULTS } from '../../soundManager'
+import { playSound, applySoundSettings, previewSound, preloadSounds, SOUND_CATEGORIES, SOUND_DEFAULTS } from '../../soundManager'
 import { DesktopDownloadButton, DesktopDownloadSettingsPanel } from '../desktop-download/index.js'
 import { useAuthSession as useCentralAuthSession } from '../../app/providers/AuthSessionProvider.jsx'
 
@@ -840,13 +840,16 @@ function EnvironmentPanel({ uid }) {
   const t = useT()
   const [env, setEnv] = useState({})
   useEffect(() => {
-    if (!uid || uid === 'guest') return
+    if (!uid || uid === 'guest') return undefined
     let cancel = false
-    userGetDoc('environment').then((d) => {
+    const timer = setTimeout(() => {
       if (cancel) return
-      setEnv(d && typeof d === 'object' ? d : {})
-    }).catch(() => {})
-    return () => { cancel = true }
+      userGetDoc('environment').then((d) => {
+        if (cancel) return
+        setEnv(d && typeof d === 'object' ? d : {})
+      }).catch(() => {})
+    }, 1200)
+    return () => { cancel = true; clearTimeout(timer) }
   }, [uid])
 
   const set = (key, value) => {
@@ -2537,6 +2540,7 @@ function CachedProfileCover({ src, className = '', style = {}, ...props }) {
 
 function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBlock, onUnblock, onAddFriend, isFriend = true, isBlocked = false, isPending = false, nickname, onNicknameChange, canShare, onMessage, onCreateGroup, onRequestRemoteControl, voiceContext = null, moderationContext = null, roleContext = null, isSelf = false, embedded = false, canEditNickname = true }) {
   const popupRef = useRef(null)
+  const safeFriend = normalizeFriendProfileTarget(friend || {})
   const [editingNickname, setEditingNickname] = useState(false)
   const [nicknameInput, setNicknameInput] = useState(nickname || '')
 
@@ -2556,37 +2560,37 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
 
   const popupW = 280
   const popupH = 460
-  const friendCover = friend.cover || friend.coverImage || friend.coverUrl || null
+  const friendCover = safeFriend.cover || safeFriend.coverImage || safeFriend.coverUrl || null
   const safeRect = anchorRect || { top: 96, bottom: 112, left: Math.max(8, window.innerWidth - popupW - 18) }
   let top = safeRect.top - popupH - 8
   let left = Math.min(Math.max(8, safeRect.left), window.innerWidth - popupW - 8)
   if (top < 8) top = safeRect.bottom + 8
 
   const profileNode = (
-    <div className={`friend-profile-popup${embedded ? ' friend-profile-popup--embedded' : ''}`} style={{ ...(buildProfileThemeStyle(friend) || {}), ...(embedded ? {} : { top, left, width: popupW }) }} ref={popupRef}>
+    <div className={`friend-profile-popup${embedded ? ' friend-profile-popup--embedded' : ''}`} style={{ ...(buildProfileThemeStyle(safeFriend) || {}), ...(embedded ? {} : { top, left, width: popupW }) }} ref={popupRef}>
       <CachedProfileCover src={friendCover} className={`fpp-cover${friendCover ? ' fpp-cover--has-image' : ''}`} />
       {embedded && <button type="button" className="fpp-embedded-close" onClick={onClose} aria-label="Close profile">×</button>}
       <div className="fpp-identity">
         <div className="fpp-avatar">
-          {getPersonPhoto(friend)
-            ? <CachedProfileImage src={getPersonPhoto(friend)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-            : <span>{(friend.name || '?').charAt(0).toUpperCase()}</span>
+          {getPersonPhoto(safeFriend)
+            ? <CachedProfileImage src={getPersonPhoto(safeFriend)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+            : <span>{(safeFriend.name || '?').charAt(0).toUpperCase()}</span>
           }
         </div>
         <div className="fpp-names">
-          <span className="fpp-name">{nickname || friend.name}</span>
-          {friend.username && <span className="fpp-username">{'@' + (friend.username.startsWith('@') ? friend.username.slice(1) : friend.username)}</span>}
-          {friend.activity?.name && <ActivityBadge activity={friend.activity} />}
+          <span className="fpp-name">{nickname || safeFriend.name}</span>
+          {safeFriend.username && <span className="fpp-username">{'@' + (safeFriend.username.startsWith('@') ? safeFriend.username.slice(1) : safeFriend.username)}</span>}
+          {safeFriend.activity?.name && <ActivityBadge activity={safeFriend.activity} />}
         </div>
       </div>
-      {friend.bio && <p className="fpp-bio">{friend.bio}</p>}
+      {safeFriend.bio && <p className="fpp-bio">{safeFriend.bio}</p>}
       {voiceContext && !isSelf && (
         <div className="fpp-voice-section">
           {voiceContext.userRoom ? (
             <>
               <span className="fpp-section-label">VOICE</span>
               <div className="fpp-voice-row">
-                <span>{friend.name || 'Member'} is in <strong>{voiceContext.userRoom.channelName}</strong></span>
+                <span>{safeFriend.name || 'Member'} is in <strong>{voiceContext.userRoom.channelName}</strong></span>
                 {!voiceContext.isInSameRoom && (
                   <button className="fpp-action-btn fpp-action-btn--mini" onClick={() => { voiceContext.onJoinRoom?.(voiceContext.userRoom); onClose() }}>Join</button>
                 )}
@@ -2645,7 +2649,7 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
                 className="fpp-nickname-input"
                 value={nicknameInput}
                 onChange={e => setNicknameInput(e.target.value)}
-                placeholder={friend.name}
+                placeholder={safeFriend.name}
                 autoFocus
                 onKeyDown={e => {
                   if (e.key === 'Enter') { onNicknameChange(nicknameInput.trim()); setEditingNickname(false) }
@@ -2669,7 +2673,7 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
           <img src={channelLiveactionIcon} alt="" width="12" height="12" style={{filter:'brightness(0.8)', marginRight: 4}}/> Remote control
         </button>}
         {canShare && (
-          <button className="fpp-action-btn" onClick={() => { navigator.clipboard?.writeText(`${friend.name} (@${friend.username || friend.id})`); onClose() }}>Share Profile</button>
+          <button className="fpp-action-btn" onClick={() => { navigator.clipboard?.writeText(`${safeFriend.name} (@${safeFriend.username || friend.id})`); onClose() }}>Share Profile</button>
         )}
         {!isSelf && isBlocked && onUnblock && <button className="fpp-action-btn" onClick={() => { onUnblock(friend.id); onClose() }}>Unblock</button>}
         {!isSelf && !isBlocked && !isFriend && onAddFriend && (isPending
@@ -6050,13 +6054,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const [env, setEnv] = useState({})
   useEffect(() => {
-    if (!uid || uid === 'guest') return
+    if (!uid || uid === 'guest') return undefined
     let cancel = false
-    userGetDoc('environment').then((d) => {
+    const timer = setTimeout(() => {
       if (cancel) return
-      setEnv(d && typeof d === 'object' ? d : {})
-    }).catch(() => {})
-    return () => { cancel = true }
+      userGetDoc('environment').then((d) => {
+        if (cancel) return
+        setEnv(d && typeof d === 'object' ? d : {})
+      }).catch(() => {})
+    }, 1200)
+    return () => { cancel = true; clearTimeout(timer) }
   }, [uid])
   const v = (key, def) => env[key] ?? def
 
@@ -6431,7 +6438,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bodyFont])
 
-  useEffect(() => { applySoundSettings(soundSettings) }, [soundSettings])
+  useEffect(() => { applySoundSettings(soundSettings); preloadSounds() }, [soundSettings])
 
   useEffect(() => {
     if (selectedSettingsCategory !== 'usage' || availableSounds.length > 0) return

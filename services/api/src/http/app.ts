@@ -12,6 +12,7 @@ import { moderationRouter } from './routes/moderation.routes.js'
 import { createSpotifyRouter } from './routes/spotify.routes.js'
 import { debugRouter } from './routes/debug.routes.js'
 import { trackRouter } from './routes/track.routes.js'
+import { clientRouter } from './routes/client.routes.js'
 import { requestContext } from './middleware/requestContext.js'
 import { requestLogger } from './middleware/requestLogger.js'
 import { apiRateLimit, authRateLimit, trackingRateLimit } from './middleware/rateLimit.js'
@@ -24,7 +25,6 @@ export function createApp(io?: Server) {
   app.disable('x-powered-by')
   app.set('etag', false)
   app.use(requestContext)
-  app.use(requestLogger)
   app.use((req, res, next) => {
     if (req.path.startsWith('/api/') || req.path.startsWith('/auth') || req.path.startsWith('/realtime')) {
       res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
@@ -34,6 +34,7 @@ export function createApp(io?: Server) {
     }
     next()
   })
+  app.use(requestLogger)
   app.use(helmet({
     crossOriginResourcePolicy: false,
     contentSecurityPolicy: env.NODE_ENV === 'production' ? undefined : false
@@ -50,16 +51,19 @@ export function createApp(io?: Server) {
   }))
 
   app.use('/health', healthRouter)
-  app.use(trackingRateLimit, trackRouter)
+  app.use('/api/v1/track', trackingRateLimit, trackRouter)
   app.use('/auth', authRateLimit, authRouter)
   app.use('/realtime', realtimeRouter)
   app.use('/api/v1/debug', debugRouter)
+  app.use('/api/v1/client', apiRateLimit, clientRouter)
   app.use(apiRateLimit, moderationRouter)
 
   if (io) {
     app.use(createSpotifyRouter(io))
-    app.use('/api/v1/social', apiRateLimit, createSocialRouter(io))
-    app.use('/api/v1', apiRateLimit, createReelmsDataRouter(io))
+    // /api/v1 routers authenticate first, then apply apiRateLimit internally.
+    // This keeps normal app traffic user-based instead of proxy/IP-based.
+    app.use('/api/v1/social', createSocialRouter(io))
+    app.use('/api/v1', createReelmsDataRouter(io))
   }
 
   // Compatibility: old web client calls /google/login and /callback/google.

@@ -294,7 +294,6 @@ authRouter.post('/register', async (req, res) => {
     await autoJoinDefaultReelm(uid, profile.displayName || '', null).catch(() => {})
     await sendVerificationEmail(uid, normalized, { force: true }).catch((err) => console.warn('/auth/register verification send failed:', err))
     trackRegistration({ uid, email: normalized, username: usernameCheck.username, displayName: profile.displayName, platform: req.body?.platform ?? 'web' }).catch(() => {})
-
     const token = env.REELMS_REQUIRE_EMAIL_VERIFICATION ? null : await issueAuthSession(uid, normalized, 'register', requestClientId(req))
     res.json({ uid, email: normalized, token, emailVerificationRequired: env.REELMS_REQUIRE_EMAIL_VERIFICATION, profile })
   } catch (e) {
