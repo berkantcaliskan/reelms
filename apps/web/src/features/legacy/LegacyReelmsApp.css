@@ -1774,6 +1774,16 @@ h6 {
 .app:has(.theme-no-gradient)::before,
 .app:has(.theme-no-gradient)::after { display: none !important; }
 
+.app:has(.theme-no-accent-glow) {
+  animation: none !important;
+  background: radial-gradient(ellipse 100% 80% at 50% 50%,
+    color-mix(in srgb, var(--tb) 72%, #ffffff) 0%,
+    var(--tb) 50%,
+    color-mix(in srgb, var(--tb) 85%, #000000) 100%) !important;
+}
+.app:has(.theme-no-accent-glow)::before,
+.app:has(.theme-no-accent-glow)::after { display: none !important; }
+
 .dashboard-fg {
   display: flex;
   flex-direction: column;
