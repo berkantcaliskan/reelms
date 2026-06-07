@@ -5647,6 +5647,22 @@ h6 {
   animation: msg-appear 0.2s ease;
 }
 
+.msg-outer-row {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+  margin: 0 12px 12px;
+}
+.msg-outer-row--spotify .msg-bar {
+  flex: 2 1 0;
+  margin: 0;
+  min-width: 0;
+}
+.msg-outer-row:not(.msg-outer-row--spotify) .msg-bar {
+  flex: 1 1 auto;
+  margin: 0;
+}
+
 .msg-bar {
   display: flex;
   align-items: center;
@@ -5663,6 +5679,76 @@ h6 {
   animation: msg-bar-slide-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
   flex-wrap: wrap;
 }
+
+.msg-spotify-bar {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 12px;
+  background: rgba(var(--ta-rgb), 0.07);
+  border: 1px solid rgba(var(--ta-rgb), 0.15);
+  border-radius: 30px;
+  overflow: hidden;
+  animation: msg-bar-slide-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.msb-art {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.msb-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.msb-name {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: rgba(var(--ta-rgb), 0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.msb-artist {
+  font-size: 0.68rem;
+  color: rgba(var(--ta-rgb), 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.msb-controls {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.msb-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: none;
+  background: none;
+  color: rgba(var(--ta-rgb), 0.6);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.msb-btn:hover { background: rgba(var(--ta-rgb), 0.12); color: rgba(var(--ta-rgb), 0.95); }
+.msb-btn-play {
+  width: 32px;
+  height: 32px;
+  background: rgba(var(--ta-rgb), 0.1);
+  color: rgba(var(--ta-rgb), 0.85);
+}
+.msb-btn-play:hover { background: rgba(var(--ta-rgb), 0.2); }
 
 @media (max-width: 600px) {
   .msg-bar {
