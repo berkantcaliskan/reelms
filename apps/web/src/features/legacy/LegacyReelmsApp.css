@@ -5568,6 +5568,147 @@ h6 {
   color: rgba(224, 201, 188, 0.45);
 }
 
+/* ── Context menu (three-dot button next to messages) ── */
+.msg-ctx-menu-wrap {
+  position: relative;
+}
+.msg-ctx-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: none;
+  background: none;
+  color: rgba(224, 201, 188, 0.45);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  flex-shrink: 0;
+}
+.msg-ctx-btn:hover {
+  background: rgba(var(--ta-rgb), 0.14);
+  color: rgba(224, 201, 188, 0.9);
+}
+.msg-ctx-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  right: 0;
+  background: rgba(40, 38, 34, 0.97);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(var(--ta-rgb), 0.14);
+  border-radius: 10px;
+  box-shadow: 0 6px 24px rgba(0,0,0,0.28);
+  min-width: 120px;
+  z-index: 300;
+  overflow: hidden;
+  padding: 4px;
+}
+.msg-ctx-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 12px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: rgba(224, 201, 188, 0.85);
+  background: none;
+  border: none;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.msg-ctx-item:hover { background: rgba(var(--ta-rgb), 0.12); }
+.msg-ctx-item--danger { color: rgba(248, 113, 113, 0.9); }
+.msg-ctx-item--danger:hover { background: rgba(239, 68, 68, 0.12); }
+
+/* ── Reply quote block (inside messages) ── */
+.msg-reply-quote {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 8px;
+  margin-bottom: 4px;
+  border-left: 3px solid rgba(var(--ta-rgb), 0.55);
+  border-radius: 0 4px 4px 0;
+  background: rgba(var(--ta-rgb), 0.07);
+  max-width: 420px;
+  cursor: default;
+}
+.msg-reply-quote--bubble {
+  margin-bottom: 6px;
+  max-width: 100%;
+  border-left-color: rgba(var(--ta-rgb), 0.45);
+}
+.msg-reply-quote-name {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: rgba(var(--ta-rgb), 0.8);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.msg-reply-quote-text {
+  font-size: 0.74rem;
+  color: rgba(224, 201, 188, 0.5);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ── Reply banner (above message input) ── */
+.msg-reply-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 16px;
+  margin: 0 12px 0;
+  background: rgba(var(--ta-rgb), 0.07);
+  border: 1px solid rgba(var(--ta-rgb), 0.12);
+  border-radius: 12px 12px 0 0;
+  border-bottom: none;
+}
+.msg-reply-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: rgba(var(--ta-rgb), 0.5);
+}
+.msg-reply-banner-name {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: rgba(var(--ta-rgb), 0.75);
+  white-space: nowrap;
+}
+.msg-reply-banner-text {
+  font-size: 0.75rem;
+  color: rgba(224, 201, 188, 0.45);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+.msg-reply-banner-cancel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(var(--ta-rgb), 0.1);
+  color: rgba(224, 201, 188, 0.55);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+.msg-reply-banner-cancel:hover {
+  background: rgba(239, 68, 68, 0.18);
+  color: rgba(248, 113, 113, 0.9);
+}
+
 /* ── Message Bar ── */
 .msg-bar-wrap { position: relative; align-self: stretch; }
 
@@ -9663,7 +9804,7 @@ h6 {
 
 .fp-overlay {
   position: fixed; inset: 0; z-index: 4000;
-  background: rgba(0,0,0,0.55); backdrop-filter: blur(6px);
+  background: rgba(0,0,0,0.65); -webkit-backdrop-filter: blur(52px); backdrop-filter: blur(52px);
   opacity: 0; transition: opacity 0.32s ease; overflow-y: auto;
 }
 .fp-overlay--in { opacity: 1; }

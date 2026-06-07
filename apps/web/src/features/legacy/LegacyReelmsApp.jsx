@@ -768,7 +768,7 @@ function PillSelect({ value, onChange, options }) {
 
 const THEMES = [
   { id: 'default',  name: 'Default, Warm',   accent: '#b99887', accentRgb: '185,152,135', base: '#0c0c20', baseRgb: '12,12,32' },
-  { id: 'gece',     name: 'Night',           accent: '#b99887', accentRgb: '185,152,135', base: '#252321', baseRgb: '37,35,33', grainOpacity: 0.5, noGradient: true, noAccentGlow: true },
+  { id: 'gece',     name: 'Night',           accent: '#b99887', accentRgb: '185,152,135', base: '#32312C', baseRgb: '50,49,44', grainOpacity: 0.5, noGradient: true, noAccentGlow: true },
   { id: 'stone',    name: 'Soft Light',      accent: '#c8bfa8', accentRgb: '200,191,168', base: '#383835', baseRgb: '56,56,53', noGradient: true },
   { id: 'lavender', name: 'Purple Sunlight', accent: '#c0a8e0', accentRgb: '192,168,224', base: '#120d1a', baseRgb: '18,13,26' },
   { id: 'dusk',     name: 'Purple Nightlight', accent: '#9070c0', accentRgb: '144,112,192', base: '#0d0a18', baseRgb: '13,10,24' },
