@@ -2196,9 +2196,11 @@ h6 {
   max-height: calc(100% - 28px);
   z-index: 20;
   border-radius: 30px;
-  background: rgba(20, 14, 35, 0.96);
-  backdrop-filter: blur(18px) brightness(0.9);
-  -webkit-backdrop-filter: blur(18px) brightness(0.9);
+  background: rgba(20, 14, 35, 0.72);
+  backdrop-filter: blur(36px) saturate(1.5) brightness(0.86);
+  -webkit-backdrop-filter: blur(36px) saturate(1.5) brightness(0.86);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow: 0 8px 48px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.06);
   display: flex;
   flex-direction: column;
   overflow: hidden;
