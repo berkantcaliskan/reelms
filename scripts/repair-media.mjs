@@ -82,7 +82,7 @@ function cleanReelmList(data) {
 function cleanValue(sk, data) {
   if (sk === 'profile') return cleanProfile(data)
   if (sk === 'customization') return cleanCustomization(data)
-  if (sk === 'bg_image') return rawMedia(data) ? { data: null, changed: true } : { data, changed: false }
+  if (sk === 'bg_image') return rawMedia(data) ? { data: null, changed: true, remove: true } : { data, changed: false }
   if (sk === 'reelms') return cleanReelmList(data)
   if (sk === 'meta' && data && typeof data === 'object' && rawMedia(data.image)) return { data: { ...data, image: null }, changed: true }
   return { data, changed: false }
@@ -101,13 +101,18 @@ let changedCount = 0
 let scanned = 0
 for (const row of rows || []) {
   scanned += 1
-  const { data, changed } = cleanValue(row.sk, row.data)
+  const result = cleanValue(row.sk, row.data)
+  const { data, changed, remove } = result
   if (!changed) continue
-  await request(`reelms_docs?pk=eq.${encodeURIComponent(row.pk)}&sk=eq.${encodeURIComponent(row.sk)}`, {
-    method: 'PATCH',
-    body: JSON.stringify({ data })
-  })
+  if (remove || data == null) {
+    await request(`reelms_docs?pk=eq.${encodeURIComponent(row.pk)}&sk=eq.${encodeURIComponent(row.sk)}`, { method: 'DELETE' })
+  } else {
+    await request(`reelms_docs?pk=eq.${encodeURIComponent(row.pk)}&sk=eq.${encodeURIComponent(row.sk)}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ data })
+    })
+  }
   changedCount += 1
-  console.log(`cleaned ${row.pk} ${row.sk}`)
+  console.log(`${remove || data == null ? 'deleted' : 'cleaned'} ${row.pk} ${row.sk}`)
 }
 console.log(JSON.stringify({ ok: true, scanned, changed: changedCount }, null, 2))

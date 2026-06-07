@@ -42,7 +42,7 @@ function stableJson(value) {
 function requestCacheTtl(path, method) {
   if (method !== 'GET') return 0
   if (path === '/api/v1/user/bootstrap') return 1000
-  if (path.startsWith('/api/v1/user/profile/')) return 5 * 60 * 1000
+  if (path.startsWith('/api/v1/user/profile/')) return 15 * 1000
   if (path.startsWith('/api/v1/discovery/search')) return 30 * 1000
   if (path.startsWith('/api/v1/users')) return 30 * 1000
   if (path.startsWith('/api/v1/reelms/discover')) return 20 * 1000
@@ -71,6 +71,12 @@ function invalidateReelmResponseCache(reelmId) {
 function invalidateUserResponseCache(sk = '') {
   const key = encodeURIComponent(String(sk || ''))
   invalidateResponseCache(entry => entry.includes(`/api/v1/user/doc/${key}`) || entry.includes('/api/v1/user/bootstrap'))
+}
+
+function invalidateProfileCaches(uid = '') {
+  const id = String(uid || '')
+  if (id) profileCache.delete(id)
+  invalidateResponseCache(entry => entry.includes('/api/v1/user/profile') || entry.includes('/api/v1/user/bootstrap') || entry.includes('/api/v1/user/doc/friends') || entry.includes('/api/v1/user/doc/chats') || entry.includes('/api/v1/user/doc/reelms'))
 }
 
 function rememberUserDoc(sk, data) {
@@ -656,6 +662,7 @@ export async function userProfilePut(data) {
   const j = await api('/api/v1/user/profile', { method: 'PUT', body: JSON.stringify({ data }) })
   const saved = j?.data || data
   const id = String(saved?.id || saved?.uid || data?.id || data?.uid || '')
+  invalidateProfileCaches(id)
   if (id) profileCache.set(id, { data: saved, at: Date.now() })
   return j
 }
@@ -664,6 +671,7 @@ export async function userProfilePatch(data) {
   const j = await api('/api/v1/user/profile', { method: 'PATCH', body: JSON.stringify({ data }) })
   const saved = j?.data || null
   const id = String(saved?.id || saved?.uid || data?.id || data?.uid || '')
+  invalidateProfileCaches(id)
   if (id) profileCache.set(id, { data: saved || { ...(profileCache.get(id)?.data || {}), ...data }, at: Date.now() })
   return j
 }
@@ -937,7 +945,8 @@ export async function mediaUploadToS3(file, purpose = 'attachment') {
     body: file,
   })
   if (!res.ok) throw new Error(`Upload failed (${res.status})`)
-  return mediaCompleteUpload(upload.id, res.headers.get('etag'))
+  const completed = await mediaCompleteUpload(upload.id, res.headers.get('etag'))
+  return { ...upload, ...(completed || {}), url: completed?.url || upload.url || completed?.publicUrl || completed?.mediaUrl || null }
 }
 
 export async function mediaUploadMetadata(fileName, fileSize, mimeType, localFileId) {

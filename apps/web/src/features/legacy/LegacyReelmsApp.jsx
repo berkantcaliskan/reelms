@@ -5938,7 +5938,24 @@ function isRawMediaLike(value) {
 function safeMediaSrc(value) {
   const text = String(value || '').trim()
   if (!text || isRawMediaLike(text)) return null
-  return text
+  // Media rendered in cards must be a browser-fetchable URL. Object keys or
+  // random strings should not become broken relative <img> requests.
+  if (/^(https?:|blob:)/i.test(text)) return text
+  return null
+}
+
+function safeRgbArray(value, fallback = [185, 152, 135]) {
+  if (Array.isArray(value)) {
+    const nums = value.map((n) => Number(n)).filter((n) => Number.isFinite(n))
+    if (nums.length >= 3) return nums.slice(0, 3).map((n) => Math.max(0, Math.min(255, Math.round(n))))
+  }
+  if (typeof value === 'string') {
+    const hex = hexToRgb(value)
+    if (hex) return hex
+    const nums = value.split(/[ ,]+/).map((n) => Number(n)).filter((n) => Number.isFinite(n))
+    if (nums.length >= 3) return nums.slice(0, 3).map((n) => Math.max(0, Math.min(255, Math.round(n))))
+  }
+  return fallback
 }
 
 const PROFILE_MEDIA_LIMITS = {
@@ -6092,8 +6109,8 @@ function buildProfileThemeStyle(person) {
   const theme = THEMES.find(th => th.id === cfg.themeId) || THEMES[0]
   const accent = cfg.customAccent || theme.accent || '#b99887'
   const base = cfg.customBase || theme.base || '#120e1e'
-  const accentRgb = hexToRgb(accent) || theme.accentRgb || [185, 152, 135]
-  const baseRgb = hexToRgb(base) || theme.baseRgb || [18, 14, 30]
+  const accentRgb = safeRgbArray(hexToRgb(accent) || cfg.accentRgb || theme.accentRgb, [185, 152, 135])
+  const baseRgb = safeRgbArray(hexToRgb(base) || cfg.baseRgb || theme.baseRgb, [18, 14, 30])
   return {
     '--fpp-theme-accent': accent,
     '--fpp-theme-accent-rgb': accentRgb.join(','),

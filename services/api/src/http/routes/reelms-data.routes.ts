@@ -3228,7 +3228,9 @@ export function createReelmsDataRouter(io: Server) {
       const sk = `MEDIA#${req.params.mediaId}`
       const metadata = await getDoc<any>(userPk(uid), sk)
       if (!metadata) return res.status(404).json({ error: 'not_found' })
-      const next = { ...metadata, status: 'uploaded', uploadedAt: Date.now(), etag: req.body?.etag || metadata.etag || null }
+      const storage = getObjectStorage()
+      const publicUrl = metadata.objectKey ? storage.getPublicUrl(String(metadata.objectKey)) : (metadata.url || null)
+      const next = { ...metadata, url: publicUrl, publicUrl, mediaUrl: publicUrl, status: 'uploaded', uploadedAt: Date.now(), etag: req.body?.etag || metadata.etag || null }
       await putDoc(userPk(uid), sk, next)
       emitUser(uid, sk)
       res.json({ data: next })
