@@ -12,6 +12,7 @@ import { moderationRouter } from './routes/moderation.routes.js'
 import { createSpotifyRouter } from './routes/spotify.routes.js'
 import { debugRouter } from './routes/debug.routes.js'
 import { clientRouter } from './routes/client.routes.js'
+import { botRouter } from './routes/bot.routes.js'
 import { requestContext } from './middleware/requestContext.js'
 import { requestLogger } from './middleware/requestLogger.js'
 import { apiRateLimit, authRateLimit } from './middleware/rateLimit.js'
@@ -40,6 +41,7 @@ export function createApp(io?: Server) {
   }))
 
   app.use('/health', healthRouter)
+  app.use(botRouter)
   app.use('/auth', authRateLimit, authRouter)
   app.use('/realtime', realtimeRouter)
   app.use('/api/v1/debug', debugRouter)

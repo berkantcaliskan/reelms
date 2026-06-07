@@ -84,6 +84,9 @@ const schema = z.object({
   SPOTIFY_CLIENT_SECRET: optionalString(),
   SPOTIFY_REDIRECT_URI: optionalString(),
 
+  REELMS_BOT_UID: z.string().default('reelms-radio-bot'),
+  REELMS_BOT_SECRET: z.string().min(16).default('dev-only-bot-secret-change-me'),
+
   OPENAI_API_KEY: optionalString(),
   AWS_REGION: z.string().default('eu-central-1'),
   FEEDBACK_FROM_EMAIL: z.string().optional(),

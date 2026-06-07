@@ -11,6 +11,7 @@
   "scripts": {
     "dev:web": "npm -w @reelms/web run dev",
     "dev:api": "npm -w @reelms/api run dev",
+    "dev:bot": "npm -w @reelms/bot run dev",
     "build:packages": "npm -w @reelms/shared run build && npm -w @reelms/config run build",
     "build:web": "npm run build:packages && npm -w @reelms/web run build",
     "build:api": "npm run build:packages && npm -w @reelms/api run build",
