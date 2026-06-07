@@ -1068,7 +1068,7 @@ h6 {
 .home-panel {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+  align-items: center;
   justify-content: center;
 }
 
@@ -1076,17 +1076,14 @@ h6 {
   display: flex;
   flex-direction: row;
   align-items: flex-start;
-  gap: 16px;
-  padding: 0 36px;
-  width: 100%;
-  max-width: 900px;
-  box-sizing: border-box;
+  justify-content: center;
+  gap: 32px;
   transform: translateY(-8%);
 }
 
 .home-section {
-  flex: 1;
-  min-width: 0;
+  flex: 0 1 220px;
+  min-width: 160px;
   display: flex;
   flex-direction: column;
   gap: 4px;
