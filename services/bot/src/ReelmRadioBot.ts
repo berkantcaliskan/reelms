@@ -10,6 +10,17 @@ interface BotCredentials {
   username: string
 }
 
+interface ChannelRef {
+  channelId: string
+  msgKey: string
+}
+
+interface BotReelm {
+  id: string
+  name: string
+  channels: ChannelRef[]
+}
+
 export class ReelmRadioBot {
   private socket: Socket | null = null
   private creds: BotCredentials | null = null
@@ -32,6 +43,19 @@ export class ReelmRadioBot {
     return res.json() as Promise<BotCredentials>
   }
 
+  private async fetchBotReelms(): Promise<BotReelm[]> {
+    try {
+      const res = await fetch(`${config.API_URL}/internal/bot/reelms`, {
+        headers: { 'x-bot-secret': config.BOT_SECRET }
+      })
+      if (!res.ok) return []
+      const data = await res.json() as { reelms: BotReelm[] }
+      return data.reelms ?? []
+    } catch {
+      return []
+    }
+  }
+
   private connect() {
     if (!this.creds) throw new Error('Kimlik bilgisi yok')
 
@@ -42,8 +66,18 @@ export class ReelmRadioBot {
       reconnectionAttempts: Infinity
     })
 
-    this.socket.on('connect', () => {
+    this.socket.on('connect', async () => {
       console.log('[ReelmRadio] Socket bağlandı')
+      const reelms = await this.fetchBotReelms()
+      for (const reelm of reelms) {
+        this.joinReelmChannels(reelm.id, reelm.channels)
+      }
+      console.log(`[ReelmRadio] ${reelms.length} reelm'e katıldı`)
+    })
+
+    this.socket.on('bot:join-reelm', ({ reelmId, reelmName, channels }: { reelmId: string; reelmName: string; channels: ChannelRef[] }) => {
+      this.joinReelmChannels(reelmId, channels)
+      console.log(`[ReelmRadio] Yeni reelm'e eklendi: ${reelmName} (${channels.length} kanal)`)
     })
 
     this.socket.on('disconnect', (reason) => {
@@ -59,17 +93,14 @@ export class ReelmRadioBot {
     })
   }
 
-  joinChannel(msgKey: string) {
-    this.socket?.emit('joinChannel', msgKey)
-    console.log(`[ReelmRadio] Kanala katıldı: ${msgKey}`)
-  }
-
-  leaveChannel(msgKey: string) {
-    this.socket?.emit('leaveChannel', msgKey)
+  private joinReelmChannels(reelmId: string, channels: ChannelRef[]) {
+    for (const ch of channels) {
+      this.socket?.emit('joinChannel', ch.msgKey)
+    }
+    console.log(`[ReelmRadio] ${reelmId}: ${channels.length} kanal dinleniyor`)
   }
 
   private async onMessage({ msgKey, message }: { msgKey: string; message: any }) {
-    // Kendi mesajlarını yoksay
     if (message?.userId === this.creds?.uid || message?.sender?.id === this.creds?.uid) return
 
     const text: string = message?.text ?? ''
@@ -79,14 +110,7 @@ export class ReelmRadioBot {
     const senderName: string = message?.sender?.name ?? message?.sender?.username ?? 'Kullanıcı'
     const senderId: string = message?.userId ?? message?.sender?.id ?? ''
 
-    const response = await dispatch({
-      command: parsed.command,
-      args: parsed.args,
-      msgKey,
-      senderName,
-      senderId
-    })
-
+    const response = await dispatch({ command: parsed.command, args: parsed.args, msgKey, senderName, senderId })
     if (response) await this.sendMessage(msgKey, response)
   }
 
@@ -102,19 +126,11 @@ export class ReelmRadioBot {
         body: JSON.stringify({
           message: {
             text,
-            sender: {
-              id: this.creds.uid,
-              name: this.creds.name,
-              username: this.creds.username,
-              photo: null
-            }
+            sender: { id: this.creds.uid, name: this.creds.name, username: this.creds.username, photo: null }
           }
         })
       })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        console.error('[ReelmRadio] Mesaj gönderilemedi:', err)
-      }
+      if (!res.ok) console.error('[ReelmRadio] Mesaj gönderilemedi:', await res.json().catch(() => ({})))
     } catch (err) {
       console.error('[ReelmRadio] sendMessage hatası:', err)
     }
