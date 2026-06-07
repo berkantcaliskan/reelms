@@ -4120,7 +4120,7 @@ h6 {
 }
 
 .settings-ignite-word {
-  font-family: 'Dela Gothic One', sans-serif;
+  font-family: 'Dela Gothic One', sans-serif !important;
   font-size: 0.92rem;
   background: linear-gradient(90deg, #ff6b35, #f7c59f, #e8a87c, #ff6b9d, #a855f7, #3b82f6, #ff6b35);
   -webkit-background-clip: text;
