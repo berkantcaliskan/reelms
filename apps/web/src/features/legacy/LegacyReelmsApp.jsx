@@ -7841,6 +7841,32 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }
 
 
+  const spotifyControl = async (action) => {
+    try {
+      const authToken = await getIdToken().catch(() => null)
+      if (!authToken) return
+      const res = await fetch(`${BACKEND_URL}/spotify/token`, { headers: { Authorization: `Bearer ${authToken}` } })
+      if (!res.ok) return
+      const { token } = await res.json()
+      if (action === 'next') {
+        await fetch('https://api.spotify.com/v1/me/player/next', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+      } else if (action === 'prev') {
+        await fetch('https://api.spotify.com/v1/me/player/previous', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+      } else if (action === 'toggle') {
+        const stateRes = await fetch('https://api.spotify.com/v1/me/player', { headers: { Authorization: `Bearer ${token}` } })
+        if (stateRes.status === 204 || !stateRes.ok) return
+        const state = await stateRes.json()
+        if (state?.is_playing) {
+          await fetch('https://api.spotify.com/v1/me/player/pause', { method: 'PUT', headers: { Authorization: `Bearer ${token}` } })
+          setSpotifyInlinePaused(true)
+        } else {
+          await fetch('https://api.spotify.com/v1/me/player/play', { method: 'PUT', headers: { Authorization: `Bearer ${token}` } })
+          setSpotifyInlinePaused(false)
+        }
+      }
+    } catch (e) { console.error('[Spotify control]', e) }
+  }
+
   async function toggleRecording() {
     if (isRecording) {
       mediaRecorderRef.current?.stop()
@@ -11022,7 +11048,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 const avatarSrc = item.itemType === 'chat' ? getChatAvatarSrc(item) : safeMediaSrc(item.image)
                                 const label = item.itemType === 'chat' ? getChatDisplayName(item) : item.name
                                 return avatarSrc
-                                  ? <img src={avatarSrc} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: item.itemType === 'reelm' ? '12px' : '50%' }} />
+                                  ? <img src={avatarSrc} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
                                   : isDefaultCommunity(item) ? <ReelmsCommunityGlyph /> : (label || '?').charAt(0).toUpperCase()
                               })()}
                             </div>
@@ -13397,16 +13423,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 <span className="msb-artist">{spotifyNowPlaying.artist}</span>
                               </div>
                               <div className="msb-controls">
-                                <button className="msb-btn" onClick={() => spotifyControlsRef.current?.prevTrack()}>
+                                <button className="msb-btn" onClick={() => spotifyControl('prev')}>
                                   <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M3.3 1a.7.7 0 0 1 .7.7v5.15L14 1.108A.7.7 0 0 1 15 1.7v12.6a.7.7 0 0 1-1.05.607L4 9.149V13.3a.7.7 0 0 1-.7.7H1.7a.7.7 0 0 1-.7-.7V1.7a.7.7 0 0 1 .7-.7h1.6z"/></svg>
                                 </button>
-                                <button className="msb-btn msb-btn-play" onClick={() => spotifyControlsRef.current?.togglePlay()}>
+                                <button className="msb-btn msb-btn-play" onClick={() => spotifyControl('toggle')}>
                                   {spotifyInlinePaused
                                     ? <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3 1.713a.7.7 0 0 1 1.05-.607l10.89 6.288a.7.7 0 0 1 0 1.212L4.05 14.894A.7.7 0 0 1 3 14.288V1.713z"/></svg>
                                     : <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.7 1a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7H2.7zm8 0a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-2.6z"/></svg>
                                   }
                                 </button>
-                                <button className="msb-btn" onClick={() => spotifyControlsRef.current?.nextTrack()}>
+                                <button className="msb-btn" onClick={() => spotifyControl('next')}>
                                   <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M12.7 1a.7.7 0 0 0-.7.7v5.15L2.05 1.108A.7.7 0 0 0 1 1.7v12.6a.7.7 0 0 0 1.05.607L12 9.149V13.3a.7.7 0 0 0 .7.7h1.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-1.6z"/></svg>
                                 </button>
                               </div>
