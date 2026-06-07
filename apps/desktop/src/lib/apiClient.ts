@@ -5,13 +5,3 @@ export async function apiGet<T>(path: string): Promise<T> {
   if (!response.ok) throw new Error(`API ${response.status}`)
   return response.json() as Promise<T>
 }
-
-export async function exchangeDesktopAuthCode(code: string) {
-  const response = await fetch(`${API_BASE_URL}/auth/desktop/exchange`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ code })
-  })
-  if (!response.ok) throw new Error('Desktop auth exchange failed')
-  return response.json() as Promise<{ token: string; user?: { email?: string } }>
-}
