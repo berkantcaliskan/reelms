@@ -10,7 +10,7 @@ const getProfilePhoto = (profile: any = {}) => profile.photo || profile.profileP
 
 const compactFriend = (profile: any) => ({
   id: String(profile.id || profile.uid || ''),
-  name: profile.name || profile.displayName || profile.username || 'Member',
+  name: profile.name || profile.displayName || profile.username || 'User',
   username: profile.username || '',
   photo: getProfilePhoto(profile)
 })

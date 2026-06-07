@@ -42,7 +42,7 @@ function stableJson(value) {
 function requestCacheTtl(path, method) {
   if (method !== 'GET') return 0
   if (path === '/api/v1/user/bootstrap') return 1000
-  if (path.startsWith('/api/v1/user/profile/')) return 5 * 60 * 1000
+  if (path.startsWith('/api/v1/user/profile/')) return 15 * 1000
   if (path.startsWith('/api/v1/discovery/search')) return 30 * 1000
   if (path.startsWith('/api/v1/users')) return 30 * 1000
   if (path.startsWith('/api/v1/reelms/discover')) return 20 * 1000
@@ -71,6 +71,12 @@ function invalidateReelmResponseCache(reelmId) {
 function invalidateUserResponseCache(sk = '') {
   const key = encodeURIComponent(String(sk || ''))
   invalidateResponseCache(entry => entry.includes(`/api/v1/user/doc/${key}`) || entry.includes('/api/v1/user/bootstrap'))
+}
+
+function invalidateProfileCaches(uid = '') {
+  const id = String(uid || '')
+  if (id) profileCache.delete(id)
+  invalidateResponseCache(entry => entry.includes('/api/v1/user/profile') || entry.includes('/api/v1/user/bootstrap') || entry.includes('/api/v1/user/doc/friends') || entry.includes('/api/v1/user/doc/chats') || entry.includes('/api/v1/user/doc/reelms'))
 }
 
 function rememberUserDoc(sk, data) {
@@ -573,13 +579,15 @@ export function socketLeaveChannel(msgKey) {
 }
 
 export function socketEmitTyping(msgKey, { name = '', photo = '' } = {}) {
-  if (!socket?.connected || !msgKey) return
+  if (!socket?.connected || !msgKey) return false
   socket.emit('typing:start', { msgKey, name, photo })
+  return true
 }
 
 export function socketEmitTypingStop(msgKey) {
-  if (!socket?.connected || !msgKey) return
+  if (!socket?.connected || !msgKey) return false
   socket.emit('typing:stop', { msgKey })
+  return true
 }
 
 export function socketSetPresenceStatus(status) {
@@ -651,15 +659,21 @@ export function socketVcBroadcast(reelmId, channelId, payload) {
 // ── User profiles ─────────────────────────────────────────────────────────────
 
 export async function userProfilePut(data) {
-  await api('/api/v1/user/profile', { method: 'PUT', body: JSON.stringify({ data }) })
-  const id = String(data?.id || data?.uid || '')
-  if (id) profileCache.set(id, { data, at: Date.now() })
+  const j = await api('/api/v1/user/profile', { method: 'PUT', body: JSON.stringify({ data }) })
+  const saved = j?.data || data
+  const id = String(saved?.id || saved?.uid || data?.id || data?.uid || '')
+  invalidateProfileCaches(id)
+  if (id) profileCache.set(id, { data: saved, at: Date.now() })
+  return j
 }
 
 export async function userProfilePatch(data) {
-  await api('/api/v1/user/profile', { method: 'PATCH', body: JSON.stringify({ data }) })
-  const id = String(data?.id || data?.uid || '')
-  if (id) profileCache.set(id, { data: { ...(profileCache.get(id)?.data || {}), ...data }, at: Date.now() })
+  const j = await api('/api/v1/user/profile', { method: 'PATCH', body: JSON.stringify({ data }) })
+  const saved = j?.data || null
+  const id = String(saved?.id || saved?.uid || data?.id || data?.uid || '')
+  invalidateProfileCaches(id)
+  if (id) profileCache.set(id, { data: saved || { ...(profileCache.get(id)?.data || {}), ...data }, at: Date.now() })
+  return j
 }
 
 export async function userProfileGet() {
@@ -907,10 +921,10 @@ export async function getVoiceIceServers() {
   return j?.data?.iceServers || []
 }
 
-export async function mediaCreateUploadUrl(fileName, fileSize, mimeType) {
+export async function mediaCreateUploadUrl(fileName, fileSize, mimeType, purpose = 'attachment') {
   const j = await api('/api/v1/media/upload-url', {
     method: 'POST',
-    body: JSON.stringify({ fileName, fileSize, mimeType }),
+    body: JSON.stringify({ fileName, fileSize, mimeType, purpose }),
   })
   return j.data
 }
@@ -923,15 +937,16 @@ export async function mediaCompleteUpload(mediaId, etag = null) {
   return j.data
 }
 
-export async function mediaUploadToS3(file) {
-  const upload = await mediaCreateUploadUrl(file.name, file.size, file.type || 'application/octet-stream')
+export async function mediaUploadToS3(file, purpose = 'attachment') {
+  const upload = await mediaCreateUploadUrl(file.name, file.size, file.type || 'application/octet-stream', purpose)
   const res = await fetch(upload.upload.uploadUrl, {
     method: upload.upload.method || 'PUT',
     headers: upload.upload.headers || { 'Content-Type': file.type || 'application/octet-stream' },
     body: file,
   })
   if (!res.ok) throw new Error(`Upload failed (${res.status})`)
-  return mediaCompleteUpload(upload.id, res.headers.get('etag'))
+  const completed = await mediaCompleteUpload(upload.id, res.headers.get('etag'))
+  return { ...upload, ...(completed || {}), url: completed?.url || upload.url || completed?.publicUrl || completed?.mediaUrl || null }
 }
 
 export async function mediaUploadMetadata(fileName, fileSize, mimeType, localFileId) {

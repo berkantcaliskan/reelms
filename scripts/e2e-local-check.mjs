@@ -64,7 +64,7 @@ function connectSocket(token, label) {
   return new Promise((resolve, reject) => {
     const socket = io(api, {
       path: '/socket.io',
-      auth: { token },
+      auth: { token, clientId: `e2e-${label}-${stamp}` },
       transports: ['polling', 'websocket'],
       timeout: 4000,
       reconnection: false
@@ -111,6 +111,14 @@ async function main() {
   ])
   assert(Array.isArray(bootA.data?.reelms) && bootA.data.reelms.some((r) => r.id === 'reelms-community'), 'default Reelms Community missing from first user')
   assert(Array.isArray(bootB.data?.reelms) && bootB.data.reelms.some((r) => r.id === 'reelms-community'), 'default Reelms Community missing from second user')
+
+  const defaultCore = await request('/api/v1/reelm/reelms-community/core', {}, a.token)
+  assert(defaultCore.data?.roles?.filter((role) => String(role.name).toLowerCase().includes('admin')).length === 1, 'default community should have exactly one admin-like role')
+  assert(defaultCore.data?.roles?.some((role) => role.id === 'role-citizen-rc'), 'default community citizen role missing')
+  assert(defaultCore.data?.members?.some((m) => String(m.userId) === String(a.uid)), 'default core missing first member')
+
+  const userSearch = await request(`/api/v1/users?q=${encodeURIComponent(a.username)}`, {}, b.token)
+  assert(Array.isArray(userSearch.data) && userSearch.data.some((u) => String(u.id) === String(a.uid)), 'Discover user search did not find exact username')
 
   await request('/auth/register', {
     method: 'POST',
@@ -174,6 +182,18 @@ async function main() {
     body: JSON.stringify({ reelm: { ...reelmInput, id: `e2e-code-copy-${stamp}` } })
   }, a.token, 409)
   const joined = await request('/api/v1/reelms/join', { method: 'POST', body: JSON.stringify({ code: created.data.code }) }, b.token)
+  const createdCore = await request(`/api/v1/reelm/${encodeURIComponent(created.data.id)}/core`, {}, a.token)
+  assert(Array.isArray(createdCore.data?.members) && createdCore.data.members.some((m) => String(m.userId) === String(a.uid)) && createdCore.data.members.some((m) => String(m.userId) === String(b.uid)), 'core endpoint did not return synchronized members')
+
+  await request(`/api/v1/reelms/${encodeURIComponent(created.data.id)}/invite`, {
+    method: 'POST',
+    body: JSON.stringify({ targetUid: outsider.uid })
+  }, a.token)
+  const inviteStart = Date.now()
+  const inviteAccepted = await request(`/api/v1/reelms/${encodeURIComponent(created.data.id)}/accept-invite`, { method: 'POST' }, outsider.token)
+  const inviteMs = Date.now() - inviteStart
+  assert(inviteAccepted.data?.id === created.data.id || inviteAccepted.data?.reelm?.id === created.data.id || inviteAccepted.data?.joined === true, 'accepted invite did not return joined state')
+  assert(inviteMs < 2500, `accept invite was too slow: ${inviteMs}ms`)
 
   const msgKey = `${created.data.id}_ch-general`
   const message = {
@@ -194,6 +214,21 @@ async function main() {
   const socketB = await connectSocket(b.token, 'beta')
   try {
     await Promise.all([joinSocketRoom(socketA, created.data.id, msgKey), joinSocketRoom(socketB, created.data.id, msgKey)])
+
+    const profileRealtime = waitForSocketEvent(socketB, 'reelms:profile-updated', (payload) => String(payload?.profile?.id || payload?.profile?.uid || '') === String(a.uid) && String(payload?.profile?.name || '').includes('Alpha Live'))
+    await request('/api/v1/user/profile', {
+      method: 'PATCH',
+      body: JSON.stringify({ data: { name: `Alpha Live ${stamp}` } })
+    }, a.token)
+    await profileRealtime
+
+    const coreRealtime = waitForSocketEvent(socketB, 'reelm:core-snapshot', (payload) => String(payload?.reelm?.id || '') === String(created.data.id) && Array.isArray(payload?.reelm?.members))
+    await request(`/api/v1/reelm/${encodeURIComponent(created.data.id)}/doc/roles`, {
+      method: 'PUT',
+      body: JSON.stringify({ data: createdCore.data.roles })
+    }, a.token)
+    await coreRealtime
+
     const liveText = `live-message-${stamp}`
     const livePromise = waitForSocketEvent(socketB, 'reelms:message', (payload) => payload?.msgKey === msgKey && payload?.message?.text === liveText)
     await request(`/api/v1/messages/${encodeURIComponent(msgKey)}`, {
@@ -242,7 +277,7 @@ async function main() {
     reelm: { id: created.data.id, code: created.data.code },
     joined: joined.data.id,
     messageCount: messages.data.length,
-    securityChecks: ['duplicate credentials', 'friend spoof', 'message spoof', 'reaction spoof', 'non-member access', 'moderation auth', 'socket live message', 'voice counts/capacity']
+    securityChecks: ['duplicate credentials', 'friend spoof', 'message spoof', 'reaction spoof', 'non-member access', 'moderation auth', 'socket live message', 'voice counts/capacity', 'core endpoint', 'core snapshot realtime', 'profile realtime', 'discover exact user', 'invite accept latency']
   }, null, 2))
 }
 

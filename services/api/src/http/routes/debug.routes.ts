@@ -16,24 +16,24 @@ debugRouter.get('/state', async (_req, res) => {
   const channelsRaw = await scanByPkPrefix<any>('CHAN#')
 
   const users = usersRaw
-    .filter((item) => item.sk === 'profile')
-    .map((item) => ({ pk: item.pk, id: item.data?.id, username: item.data?.username, name: item.data?.name || item.data?.displayName, contact: item.data?.contact }))
+    .filter((item: any) => item.sk === 'profile')
+    .map((item: any) => ({ pk: item.pk, id: item.data?.id, username: item.data?.username, name: item.data?.name || item.data?.displayName, contact: item.data?.contact }))
 
   const reelms = reelmsRaw
-    .filter((item) => item.sk === 'meta')
-    .map((item) => ({ id: item.data?.id, name: item.data?.name, code: item.data?.code, ownerId: item.data?.ownerId, isDefault: Boolean(item.data?.isDefault) }))
+    .filter((item: any) => item.sk === 'meta')
+    .map((item: any) => ({ id: item.data?.id, name: item.data?.name, code: item.data?.code, ownerId: item.data?.ownerId, isDefault: Boolean(item.data?.isDefault) }))
 
   const members = reelmsRaw
-    .filter((item) => item.sk === 'members')
-    .map((item) => ({ reelmId: item.pk.replace(/^REELM#/, ''), members: Array.isArray(item.data) ? item.data : [] }))
+    .filter((item: any) => item.sk === 'members')
+    .map((item: any) => ({ reelmId: item.pk.replace(/^REELM#/, ''), members: Array.isArray(item.data) ? item.data : [] }))
 
   const userReelms = usersRaw
-    .filter((item) => item.sk === 'reelms')
-    .map((item) => ({ uid: item.pk.replace(/^USER#/, ''), reelms: Array.isArray(item.data) ? item.data.map((r: any) => ({ id: r.id, name: r.name, code: r.code })) : [] }))
+    .filter((item: any) => item.sk === 'reelms')
+    .map((item: any) => ({ uid: item.pk.replace(/^USER#/, ''), reelms: Array.isArray(item.data) ? item.data.map((r: any) => ({ id: r.id, name: r.name, code: r.code })) : [] }))
 
   const messageCounts = channelsRaw
-    .filter((item) => item.sk.startsWith('MSG#'))
-    .reduce<Record<string, number>>((acc, item) => {
+    .filter((item: any) => item.sk.startsWith('MSG#'))
+    .reduce((acc: Record<string, number>, item: any) => {
       const key = item.pk.replace(/^CHAN#/, '')
       acc[key] = (acc[key] || 0) + 1
       return acc
@@ -50,5 +50,5 @@ debugRouter.post('/sync-default-community', async (_req, res) => {
 debugRouter.get('/channel/:msgKey/messages', async (req, res) => {
   const msgKey = decodeURIComponent(req.params.msgKey)
   const items = await queryDocs(chanPk(msgKey), 'MSG#')
-  res.json({ ok: true, msgKey, count: items.length, data: items.map((item) => item.data) })
+  res.json({ ok: true, msgKey, count: items.length, data: items.map((item: any) => item.data) })
 })
