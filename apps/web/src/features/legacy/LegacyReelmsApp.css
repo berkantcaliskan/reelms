@@ -876,6 +876,7 @@ h6 {
   align-self: center;
   /* + butonunun içindeki ikon 32px iken, buton 40px olduğu için görsel hizayı dengeler. */
   margin-left: -4px;
+  margin-top: -4px;
 }
 
 .chats-row {
@@ -1050,7 +1051,6 @@ h6 {
 /* Home panel (opening screen) */
 .home-panel {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
 }
@@ -1059,17 +1059,134 @@ h6 {
   display: flex;
   flex-direction: row;
   align-items: flex-start;
-  justify-content: center;
-  gap: 32px;
+  gap: 28px;
+  padding: 0 36px;
+  width: 100%;
+  max-width: 900px;
+  box-sizing: border-box;
   transform: translateY(-8%);
 }
 
 .home-section {
-  flex: 0 1 220px;
-  min-width: 160px;
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+
+.home-section-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.home-section-icon {
+  width: 20px;
+  height: 20px;
+  opacity: 0.70;
+  flex-shrink: 0;
+}
+
+.home-section-title {
+  font-family: 'Dela Gothic One', sans-serif !important;
+  font-size: 1rem;
+  font-weight: 400;
+  color: var(--ta);
+  line-height: 1.2;
+}
+
+.home-section-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.home-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border: none;
+  background: transparent;
+  border-radius: 12px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 120ms;
+  width: 100%;
+}
+.home-item:hover {
+  background: none;
+}
+
+.home-item-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(var(--ta-rgb), 0.12);
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.home-item-avatar--server { border-radius: 10px; }
+.home-item-avatar-img { width: 100%; height: 100%; object-fit: cover; }
+.home-item-avatar-letter { font-size: 13px; font-weight: 600; color: var(--ta); }
+
+.home-item-name {
+  flex: 1;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ta);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.home-item-badge {
+  font-size: 12px;
+  font-weight: 400;
+  color: rgba(var(--ta-rgb), 0.50);
+  flex-shrink: 0;
+}
+
+.home-item--notif { padding: 6px 10px; }
+.home-item-notif-text {
+  font-size: 12.5px;
+  color: rgba(var(--ta-rgb), 0.75);
+  text-align: left;
+  line-height: 1.4;
+  white-space: normal;
+}
+
+.home-empty {
+  font-size: 12px;
+  color: rgba(var(--ta-rgb), 0.35);
+  font-style: italic;
+  padding: 4px 10px;
+  margin: 0;
+}
+
+.home-section-viewall {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(var(--ta-rgb), 0.45);
+  font-size: 11.5px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  transition: color 120ms, background 120ms;
+  margin-top: 2px;
+  align-self: flex-start;
+}
+.home-section-viewall:hover {
+  color: var(--ta);
+  background: rgba(var(--ta-rgb), 0.07);
 }
 
 @keyframes welcome-card-shift {
