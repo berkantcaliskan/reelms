@@ -432,6 +432,18 @@ h6 {
   height: 28px;
 }
 
+/* Notification icon: muted when popup closed, accent when open */
+.header-settings-btn .header-icon {
+  filter: grayscale(1) brightness(0.55);
+  transition: filter 0.18s;
+}
+.header-settings-btn:hover .header-icon {
+  filter: grayscale(0.4) brightness(0.8);
+}
+.hpopup-float-icon .header-icon {
+  filter: none;
+}
+
 .notif-icon-wrap {
   position: relative;
   display: inline-flex;
