@@ -53,6 +53,18 @@ export function createReelmsDataRouter(io: Server) {
   const publicProfileCache = new Map<string, { value: any, expiresAt: number }>()
   const defaultJoinHealLast = new Map<string, number>()
 
+  const actionLocks = new Map<string, Promise<unknown>>()
+  const withActionLock = async <T,>(key: string, fn: () => Promise<T>): Promise<T> => {
+    const normalizedKey = String(key || 'global')
+    const previous = actionLocks.get(normalizedKey) || Promise.resolve()
+    let run!: Promise<T>
+    run = previous.catch(() => undefined).then(fn).finally(() => {
+      if (actionLocks.get(normalizedKey) === run) actionLocks.delete(normalizedKey)
+    }) as Promise<T>
+    actionLocks.set(normalizedKey, run)
+    return run
+  }
+
   type SearchCacheEntry<T> = { value?: T, promise?: Promise<T>, expiresAt: number }
   const SEARCH_CACHE_TTL_MS = 30_000
   const searchProfileScanCache = new Map<string, SearchCacheEntry<any[]>>()
@@ -199,8 +211,13 @@ export function createReelmsDataRouter(io: Server) {
     return rows.filter(Boolean)
   }
 
-  const hiddenSystemMemberIds = () => new Set([String(env.REELMS_MODERATION_UID || ''), 'reelms-moderation'].filter(Boolean))
+  const hiddenSystemMemberIds = () => new Set([String(env.REELMS_MODERATION_UID || ''), 'reelms-moderation', 'system', 'reelms-system'].filter(Boolean))
   const entryUserId = (entry: any) => String(entry?.userId || entry?.id || '').trim()
+  const isSystemMemberEntry = (entry: any) => {
+    const id = entryUserId(entry)
+    const name = String(entry?.userName || entry?.name || entry?.username || '').trim().toLowerCase()
+    return hiddenSystemMemberIds().has(id) || entry?.isSystem === true || entry?.system === true || name === 'reelms system' || name === 'reelms moderation'
+  }
   const hiddenMemberIdsFromBanList = (banList: any[] = []) => new Set((Array.isArray(banList) ? banList : []).map(entryUserId).filter(Boolean))
   const filterMembersForClient = (members: any[] = [], banList: any[] = []) => {
     const hiddenIds = hiddenSystemMemberIds()
@@ -208,7 +225,7 @@ export function createReelmsDataRouter(io: Server) {
     const seen = new Set<string>()
     return (Array.isArray(members) ? members : []).filter((member: any) => {
       const id = entryUserId(member)
-      if (!id || hiddenIds.has(id) || seen.has(id)) return false
+      if (!id || hiddenIds.has(id) || seen.has(id) || isSystemMemberEntry(member)) return false
       seen.add(id)
       return true
     })
@@ -464,11 +481,28 @@ export function createReelmsDataRouter(io: Server) {
     const url = String(value || '')
     return /(^|\.)googleusercontent\.com\//i.test(url) || /lh3\.googleusercontent\.com/i.test(url)
   }
+  const isRawMediaValue = (value: unknown) => {
+    const text = String(value || '').trim()
+    if (!text) return false
+    if (/^data:image\//i.test(text)) return true
+    if (text.length > 4096 && /^[A-Za-z0-9+/=\r\n]+$/.test(text)) return true
+    return false
+  }
+  const safeMediaValue = (value: unknown) => {
+    const text = String(value || '').trim()
+    if (!text || isRawMediaValue(text)) return null
+    return text
+  }
   const getProfilePhoto = (profile: any = {}) => {
     const rawPhoto = profile.photo || profile.profilePhoto || profile.photoURL || profile.avatar || profile.image || profile.imageUrl || profile.userPhoto || null
-    return isGoogleDefaultAvatarUrl(rawPhoto) ? null : rawPhoto
+    return isGoogleDefaultAvatarUrl(rawPhoto) ? null : safeMediaValue(rawPhoto)
   }
-  const getProfileCover = (profile: any = {}) => profile.cover || profile.coverImage || profile.coverUrl || profile.headerImage || profile.banner || profile.bannerImage || profile.backgroundCover || null
+  const getProfileCover = (profile: any = {}) => safeMediaValue(profile.cover || profile.coverImage || profile.coverUrl || profile.headerImage || profile.banner || profile.bannerImage || profile.backgroundCover || null)
+  const hasOwn = (obj: any, key: string) => Object.prototype.hasOwnProperty.call(obj || {}, key)
+  const MEDIA_CLEAR_VALUES = new Set<any>([null, '', false])
+  const photoKeys = ['photo', 'profilePhoto', 'photoURL', 'avatar', 'image', 'imageUrl', 'userPhoto']
+  const coverKeys = ['cover', 'coverImage', 'coverUrl', 'headerImage', 'banner', 'bannerImage', 'backgroundCover']
+  const explicitMediaClear = (obj: any, keys: string[]) => keys.some((key) => hasOwn(obj, key) && MEDIA_CLEAR_VALUES.has(obj[key]))
   const generateInviteCode = () => Math.random().toString(36).slice(2, 8).toUpperCase()
 
   const USERNAME_RE = /^[a-z0-9._-]{3,30}$/
@@ -502,14 +536,18 @@ export function createReelmsDataRouter(io: Server) {
     if (String(owner || '') === uid) await deleteDoc(pk, 'uid').catch(() => {})
   }
 
-  const prepareProfileWrite = async (uid: string, incoming: any, existing: any = {}) => {
+  const prepareProfileWrite = async (uid: string, incoming: any, existing: any = {}, rawPatch: any = incoming) => {
+    const rawIncoming = incoming && typeof incoming === 'object' ? incoming : {}
+    const rawPatchObject = rawPatch && typeof rawPatch === 'object' ? rawPatch : rawIncoming
     const preservedEmail = existing?.contact || existing?.email || ''
-    const next = { ...(incoming || {}), id: uid, uid, updatedAt: Date.now() }
+    const next = { ...rawIncoming, id: uid, uid, updatedAt: Date.now() }
     if (next.contact == null && next.email == null && preservedEmail) next.contact = preservedEmail
     if (!next.createdAt) next.createdAt = existing?.createdAt || Date.now()
 
-    const photo = getProfilePhoto(next)
-    if (photo || ['photo', 'profilePhoto', 'photoURL', 'avatar', 'image', 'imageUrl', 'userPhoto'].some((k) => Object.prototype.hasOwnProperty.call(next, k))) {
+    const wantsPhotoClear = explicitMediaClear(rawPatchObject, photoKeys)
+    const hasPhotoPatch = photoKeys.some((k) => hasOwn(rawPatchObject, k))
+    const photo = wantsPhotoClear ? null : getProfilePhoto(next)
+    if (hasPhotoPatch || photo) {
       const existingPhoto = getProfilePhoto(existing) || null
       next.photo = photo || null
       next.profilePhoto = photo || null
@@ -526,13 +564,20 @@ export function createReelmsDataRouter(io: Server) {
         next.avatarVersion = existing?.avatarVersion || existing?.photoUpdatedAt || next.updatedAt
       }
     }
-    const cover = getProfileCover(next)
-    if (cover || ['cover', 'coverImage', 'coverUrl', 'headerImage', 'banner', 'bannerImage', 'backgroundCover'].some((k) => Object.prototype.hasOwnProperty.call(next, k))) {
+
+    const wantsCoverClear = explicitMediaClear(rawPatchObject, coverKeys)
+    const hasCoverPatch = coverKeys.some((k) => hasOwn(rawPatchObject, k))
+    const cover = wantsCoverClear ? null : getProfileCover(next)
+    if (hasCoverPatch || cover) {
       next.cover = cover || null
       next.coverImage = cover || null
       next.coverUrl = cover || null
       next.headerImage = cover || null
       next.banner = cover || null
+      next.bannerImage = cover || null
+      next.backgroundCover = cover || null
+      next.coverUpdatedAt = Date.now()
+      next.coverVersion = Date.now()
     }
 
     if (next.username != null) next.username = normalizeUsername(next.username)
@@ -555,7 +600,7 @@ export function createReelmsDataRouter(io: Server) {
 
   const getSenderProfile = async (uid: string) => {
     const profile = await getUserPublicProfile(uid)
-    return { id: uid, name: profile.name || profile.displayName || profile.username || 'Member', username: profile.username || '', photo: getProfilePhoto(profile) }
+    return { id: uid, name: profile.name || profile.displayName || profile.username || 'User', username: profile.username || '', photo: getProfilePhoto(profile) }
   }
 
   const compactPublicProfile = (uid: string, profile: any = {}) => {
@@ -564,8 +609,8 @@ export function createReelmsDataRouter(io: Server) {
     return {
       id: uid,
       uid,
-      name: profile.name || profile.displayName || profile.username || 'Member',
-      displayName: profile.displayName || profile.name || profile.username || 'Member',
+      name: profile.name || profile.displayName || profile.username || 'User',
+      displayName: profile.displayName || profile.name || profile.username || 'User',
       username: profile.username || '',
       photo,
       profilePhoto: photo,
@@ -675,7 +720,7 @@ export function createReelmsDataRouter(io: Server) {
     const convId = dmConvId(ownerUid, peerUid)
     const peer: any = String(peerUid) === String(env.REELMS_MODERATION_UID)
       ? getServerInboxProfile()
-      : await getUserPublicProfile(peerUid).catch(() => ({ id: peerUid, name: 'Member', displayName: 'Member', username: '', photo: null, cover: null }))
+      : await getUserPublicProfile(peerUid).catch(() => ({ id: peerUid, name: 'User', displayName: 'User', username: '', photo: null, cover: null }))
     const photo = getProfilePhoto(peer) || null
     const cover = getProfileCover(peer) || null
     const now = Date.now()
@@ -695,8 +740,8 @@ export function createReelmsDataRouter(io: Server) {
       canReply: String(peerUid) !== String(env.REELMS_MODERATION_UID),
       canBlock: String(peerUid) !== String(env.REELMS_MODERATION_UID),
       canDelete: String(peerUid) !== String(env.REELMS_MODERATION_UID),
-      name: peer.name || peer.displayName || peer.username || existing?.name || 'Member',
-      displayName: peer.displayName || peer.name || existing?.displayName || 'Member',
+      name: peer.name || peer.displayName || peer.username || existing?.name || 'User',
+      displayName: peer.displayName || peer.name || existing?.displayName || 'User',
       username: peer.username || existing?.username || '',
       photo,
       profilePhoto: photo,
@@ -797,13 +842,13 @@ export function createReelmsDataRouter(io: Server) {
       const alreadyRich = member?.profileTheme && (member?.username || member?.userName) && (member?.cover || member?.coverImage || member?.coverUrl || member?.bio || member?.activity)
       if (alreadyRich) return member
       const profile = await withDeadline(getUserPublicProfile(id).catch(() => null), 750, null)
-      if (!profile) return member
+      if (!profile) return { ...member, userId: id, userName: member?.userName || member?.name || member?.username || 'User', username: member?.username || '', userPhoto: safeMediaValue(member?.userPhoto || member?.photo) || null, photo: safeMediaValue(member?.photo || member?.userPhoto) || null, cover: safeMediaValue(member?.cover || member?.coverImage || member?.coverUrl) || null }
       const photo = getProfilePhoto(profile) || member?.userPhoto || member?.photo || null
       const cover = getProfileCover(profile) || member?.cover || member?.coverImage || member?.coverUrl || null
       return {
         ...member,
         userId: id,
-        userName: profile.name || profile.displayName || member?.userName || member?.name || profile.username || 'Member',
+        userName: profile.name || profile.displayName || member?.userName || member?.name || profile.username || 'User',
         username: profile.username || member?.username || '',
         userPhoto: photo,
         photo,
@@ -874,32 +919,35 @@ export function createReelmsDataRouter(io: Server) {
     return found?.data as any | null
   }
 
-  const ensureMember = async (reelmId: string, uid: string, roleIds: string[] = []) => {
+  const ensureMember = async (reelmId: string, uid: string, roleIds: string[] = []) => withActionLock(`reelm:${reelmId}:members`, async () => {
+    const userId = String(uid || '').trim()
+    if (!userId || hiddenSystemMemberIds().has(userId)) throw new Error('invalid_member')
     const pk = reelmPk(reelmId)
-    const profile = await getUserPublicProfile(uid)
-    const members = (await getDoc<any[]>(pk, 'members').catch(() => [])) || []
-    const existing = members.find((m) => String(m.userId) === String(uid))
+    const profile = await getUserPublicProfile(userId)
+    if ((profile as any)?.accountClosed === true || (profile as any)?.deletedAt) throw new Error('invalid_member')
+    const members = filterMembersForClient((await getDoc<any[]>(pk, 'members').catch(() => [])) || [], await getBanList(reelmId).catch(() => []))
+    const existing = members.find((m) => String(m.userId) === String(userId))
     const existingRoleIds = Array.isArray(existing?.roleIds) ? existing.roleIds.map(String).filter(Boolean) : []
     const fallbackRoleIds = Array.isArray(roleIds) ? roleIds.map(String).filter(Boolean) : []
     const member = {
       ...(existing || {}),
-      userId: uid,
-      userName: existing?.userName || profile.name || profile.username || 'Member',
+      userId,
+      userName: existing?.userName || profile.name || profile.displayName || profile.username || 'User',
       username: existing?.username || profile.username || '',
-      userPhoto: profile.photo || existing?.userPhoto || null,
-      photo: profile.photo || existing?.photo || null,
-      cover: profile.cover || existing?.cover || null,
-      coverImage: profile.coverImage || profile.cover || existing?.coverImage || existing?.cover || null,
-      coverUrl: profile.coverUrl || profile.cover || existing?.coverUrl || existing?.cover || null,
+      userPhoto: safeMediaValue(profile.photo || existing?.userPhoto || existing?.photo) || null,
+      photo: safeMediaValue(profile.photo || existing?.photo || existing?.userPhoto) || null,
+      cover: safeMediaValue(profile.cover || existing?.cover || existing?.coverImage || existing?.coverUrl) || null,
+      coverImage: safeMediaValue(profile.coverImage || profile.cover || existing?.coverImage || existing?.cover) || null,
+      coverUrl: safeMediaValue(profile.coverUrl || profile.cover || existing?.coverUrl || existing?.cover) || null,
       bio: profile.bio || existing?.bio || '',
       activity: profile.activity || existing?.activity || null,
       profileTheme: profile.profileTheme || existing?.profileTheme || null,
       roleIds: existingRoleIds.length ? existingRoleIds : fallbackRoleIds
     }
-    const next = [member, ...members.filter((m) => String(m.userId) !== String(uid))]
+    const next = [member, ...members.filter((m) => String(m.userId) !== String(userId))]
     await putDoc(pk, 'members', next)
     return next
-  }
+  })
 
   const memberUserId = (member: any) => String(member?.userId || member?.id || '').trim()
 
@@ -968,7 +1016,7 @@ export function createReelmsDataRouter(io: Server) {
     const id = String(reelmId || '')
     const isDefaultCommunity = id === DEFAULT_REELM_ID
     const rawRoles = Array.isArray(rolesInput) ? rolesInput : []
-    const rawMembers = Array.isArray(membersInput) ? membersInput : []
+    const rawMembers = filterMembersForClient(Array.isArray(membersInput) ? membersInput : [])
     const roleIdMap = new Map<string, string>()
 
     if (isDefaultCommunity) {
@@ -1382,7 +1430,7 @@ export function createReelmsDataRouter(io: Server) {
     }
 
     const profile = await getUserPublicProfile(uid)
-    const reqEntry = { id: uid, userId: uid, name: profile.name || profile.username || 'Member', username: profile.username || '', photo: getProfilePhoto(profile), requestedAt: Date.now(), invitedBy: pendingInvite?.invitedBy || null }
+    const reqEntry = { id: uid, userId: uid, name: profile.name || profile.username || 'User', username: profile.username || '', photo: getProfilePhoto(profile), requestedAt: Date.now(), invitedBy: pendingInvite?.invitedBy || null }
     const current = (await getDoc<any[]>(pk, 'join_requests').catch(() => [])) || []
     const next = [reqEntry, ...current.filter((r: any) => String(r?.userId || r?.id || '') !== uid)].slice(0, 200)
     await putDoc(pk, 'join_requests', next)
@@ -1467,7 +1515,7 @@ export function createReelmsDataRouter(io: Server) {
       byUser.set(userId, {
         userId,
         status: ['online', 'idle', 'busy'].includes(status) ? status : 'online',
-        userName: String(socket.data?.userName || 'Member'),
+        userName: String(socket.data?.userName || 'User'),
         userPhoto: socket.data?.userPhoto || null
       })
     }
@@ -1502,7 +1550,7 @@ export function createReelmsDataRouter(io: Server) {
           const count = (peers as any[]).length
           const participants = (peers as any[]).map((peer) => ({
             userId: String(peer.data?.uid || ''),
-            userName: String(peer.data?.userName || 'Member'),
+            userName: String(peer.data?.userName || 'User'),
             userPhoto: peer.data?.userPhoto || null
           })).filter((peer) => peer.userId)
           io.to(`reelm:${reelmId}`).emit('vc:count', { reelmId, channelId: vcChannelId, count })
@@ -1537,7 +1585,7 @@ export function createReelmsDataRouter(io: Server) {
         const count = (peers as any[]).length
         const participants = (peers as any[]).map((peer) => ({
           userId: String(peer.data?.uid || ''),
-          userName: String(peer.data?.userName || 'Member'),
+          userName: String(peer.data?.userName || 'User'),
           userPhoto: peer.data?.userPhoto || null
         })).filter((peer) => peer.userId)
         io.to(`reelm:${reelmId}`).emit('vc:count', { reelmId, channelId: vcChannelId, count })
@@ -1746,7 +1794,7 @@ export function createReelmsDataRouter(io: Server) {
       if (!data || typeof data !== 'object') return res.status(400).json({ error: 'invalid_data' })
       const uid = String(req.userId)
       const existing = (await getDoc<Record<string, unknown>>(userPk(uid), 'profile').catch(() => null)) || {}
-      const prepared = await prepareProfileWrite(uid, data, existing)
+      const prepared = await prepareProfileWrite(uid, data, existing, data)
       if (!prepared.ok) return res.status(prepared.status).json({ error: prepared.error, code: prepared.code })
 
       await putDoc(userPk(uid), 'profile', prepared.profile)
@@ -1790,8 +1838,9 @@ export function createReelmsDataRouter(io: Server) {
     try {
       const uid = String(req.userId)
       const existing = (await getDoc<Record<string, unknown>>(userPk(uid), 'profile')) || {}
-      const data = { ...existing, ...(req.body?.data || {}) }
-      const prepared = await prepareProfileWrite(uid, data, existing)
+      const patch = (req.body?.data && typeof req.body.data === 'object') ? req.body.data : {}
+      const data = { ...existing, ...patch }
+      const prepared = await prepareProfileWrite(uid, data, existing, patch)
       if (!prepared.ok) return res.status(prepared.status).json({ error: prepared.error, code: prepared.code })
 
       await putDoc(userPk(uid), 'profile', prepared.profile)
@@ -1813,13 +1862,46 @@ export function createReelmsDataRouter(io: Server) {
 
   router.delete('/user/profile', async (req, res) => {
     try {
-      const existing = await getDoc<any>(userPk(String(req.userId)), 'profile')
-      await deleteDoc(userPk(String(req.userId)), 'profile')
-      publicProfileCache.delete(String(req.userId))
-      if (existing?.username) await releaseUniqueIndex('USERNAME', existing.username, String(req.userId))
-      if (existing?.contact || existing?.email) await releaseUniqueIndex('EMAIL', existing.contact || existing.email, String(req.userId))
-      emitUser(String(req.userId), 'profile')
-      res.json({ ok: true })
+      const uid = String(req.userId)
+      const existing = await getDoc<any>(userPk(uid), 'profile').catch(() => null)
+      const now = Date.now()
+      const tombstone = {
+        ...(existing || {}),
+        id: uid,
+        uid,
+        accountClosed: true,
+        deletedAt: now,
+        updatedAt: now,
+        name: 'Deleted user',
+        displayName: 'Deleted user',
+        username: '',
+        bio: '',
+        activity: null,
+        photo: null,
+        profilePhoto: null,
+        photoURL: null,
+        avatar: null,
+        image: null,
+        imageUrl: null,
+        userPhoto: null,
+        cover: null,
+        coverImage: null,
+        coverUrl: null,
+        headerImage: null,
+        banner: null,
+        bannerImage: null,
+        backgroundCover: null,
+        sociallinks: {},
+        socialorder: [],
+        profileTheme: null
+      }
+      await putDoc(userPk(uid), 'profile', tombstone)
+      publicProfileCache.delete(uid)
+      if (existing?.username) await releaseUniqueIndex('USERNAME', existing.username, uid)
+      if (existing?.contact || existing?.email) await releaseUniqueIndex('EMAIL', existing.contact || existing.email, uid)
+      emitUser(uid, 'profile')
+      await emitProfileUpdated(uid, tombstone).catch(() => {})
+      res.json({ ok: true, closed: true })
     } catch { res.status(500).json({ error: 'delete_failed' }) }
   })
 
@@ -1949,7 +2031,7 @@ export function createReelmsDataRouter(io: Server) {
         return res.json({ data: { joined: true, pending: false, reelm: full } })
       }
       const profile = await getUserPublicProfile(uid)
-      const reqEntry = { id: uid, userId: uid, name: profile.name || profile.username || 'Member', username: profile.username || '', photo: getProfilePhoto(profile), requestedAt: Date.now(), invitedBy: pendingInvite?.invitedBy || null }
+      const reqEntry = { id: uid, userId: uid, name: profile.name || profile.username || 'User', username: profile.username || '', photo: getProfilePhoto(profile), requestedAt: Date.now(), invitedBy: pendingInvite?.invitedBy || null }
       const current = (await getDoc<any[]>(pk, 'join_requests').catch(() => [])) || []
       const alreadyPending = current.some((r: any) => String(r?.userId || r?.id || '') === uid)
       const next = [reqEntry, ...current.filter((r: any) => String(r?.userId || r?.id || '') !== uid)].slice(0, 200)
@@ -2119,12 +2201,12 @@ export function createReelmsDataRouter(io: Server) {
         if (Array.isArray(targetMember?.roleIds) && targetMember.roleIds.map(String).some((id: string) => protectedRoleIds.has(id))) return res.status(409).json({ error: 'cannot_ban_protected' })
       }
 
-      const profile = await getUserPublicProfile(targetUid).catch(() => ({ name: 'Member', username: '', photo: null }))
+      const profile = await getUserPublicProfile(targetUid).catch(() => ({ name: 'User', username: '', photo: null }))
       const currentBanList = await getBanList(reelmId)
       const banEntry = {
         id: targetUid,
         userId: targetUid,
-        name: profile.name || profile.username || 'Member',
+        name: profile.name || profile.username || 'User',
         username: profile.username || '',
         photo: getProfilePhoto(profile),
         reason,
@@ -2259,14 +2341,14 @@ export function createReelmsDataRouter(io: Server) {
         if (Array.isArray(targetMember?.roleIds) && targetMember.roleIds.map(String).some((id: string) => protectedRoleIds.has(id))) return res.status(409).json({ error: 'cannot_timeout_protected' })
       }
 
-      const profile = await getUserPublicProfile(targetUid).catch(() => ({ name: 'Member', username: '', photo: null }))
+      const profile = await getUserPublicProfile(targetUid).catch(() => ({ name: 'User', username: '', photo: null }))
       const now = Date.now()
       const expiresAt = now + durationMs
       const timeoutMessage = reason || `You are timed out in ${meta.name || 'this Reelm'} until ${new Date(expiresAt).toLocaleString('en-US')}.`
       const entry = {
         id: targetUid,
         userId: targetUid,
-        name: profile.name || profile.username || 'Member',
+        name: profile.name || profile.username || 'User',
         username: profile.username || '',
         photo: getProfilePhoto(profile),
         reason,
@@ -2484,7 +2566,7 @@ export function createReelmsDataRouter(io: Server) {
       const inviteCanAutoJoin = pendingInvite?.bypassApproval === true
       if (String(meta.id) !== DEFAULT_REELM_ID && meta.joinMode !== 'open' && meta.autoJoinOnInvite !== true && !inviteCanAutoJoin && !await isReelmMember(uid, String(meta.id))) {
         const profile = await getUserPublicProfile(uid)
-        const reqEntry = { id: uid, userId: uid, name: profile.name || profile.username || 'Member', username: profile.username || '', photo: getProfilePhoto(profile), requestedAt: Date.now(), invitedBy: pendingInvite?.invitedBy || null }
+        const reqEntry = { id: uid, userId: uid, name: profile.name || profile.username || 'User', username: profile.username || '', photo: getProfilePhoto(profile), requestedAt: Date.now(), invitedBy: pendingInvite?.invitedBy || null }
         const current = (await getDoc<any[]>(pk, 'join_requests').catch(() => [])) || []
         const next = [reqEntry, ...current.filter((r: any) => String(r?.userId || r?.id || '') !== uid)].slice(0, 200)
         await putDoc(pk, 'join_requests', next)
@@ -2652,7 +2734,7 @@ export function createReelmsDataRouter(io: Server) {
           .map((member: any) => ({
             ...member,
             userId: memberUserId(member),
-            userName: String(member?.userName || member?.name || 'Member').slice(0, 80),
+            userName: String(member?.userName || member?.name || 'User').slice(0, 80),
             userPhoto: member?.userPhoto || member?.photo || null,
             roleIds: Array.isArray(member?.roleIds) ? Array.from(new Set(member.roleIds.map((id: any) => String(id)).filter((id: string) => !validRoleIds.size || validRoleIds.has(id)))) : []
           }))

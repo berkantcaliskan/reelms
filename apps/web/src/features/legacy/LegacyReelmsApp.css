@@ -13666,3 +13666,76 @@ button, input, select, textarea,
   cursor: not-allowed;
 }
 .poll-creator-send:not(:disabled):hover { opacity: 0.82; }
+
+/* Reelms hardening additions */
+.header-icon-friends {
+  filter: brightness(0) saturate(0) opacity(0.92) drop-shadow(0 1px 4px rgba(0,0,0,0.18)) !important;
+  transform: translateZ(0);
+}
+.dashboard-root.theme-dark .header-icon-friends,
+.dashboard.theme-dark .header-icon-friends {
+  filter: brightness(0) invert(1) opacity(0.92) drop-shadow(0 1px 4px rgba(0,0,0,0.18)) !important;
+}
+.discover-loading-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+  width: 100%;
+  pointer-events: none;
+}
+.discover-spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid rgba(var(--ta-rgb), 0.18);
+  border-top-color: rgba(var(--ta-rgb), 0.88);
+  animation: reelmsSpin 0.72s linear infinite;
+  box-shadow: 0 0 16px rgba(var(--ta-rgb), 0.16);
+}
+@keyframes reelmsSpin { to { transform: rotate(360deg); } }
+.friend-add-btn:disabled,
+.invite-modal-copy-btn:disabled,
+.fpp-action-btn:disabled,
+.fp-action-btn:disabled {
+  opacity: 0.55;
+  cursor: wait;
+  transform: none !important;
+}
+.bar-item--dragging {
+  opacity: 0.58;
+  cursor: grabbing;
+}
+.bar-item--drop .bar-item-wrap {
+  outline: 1px solid rgba(var(--ta-rgb), 0.55);
+  box-shadow: 0 0 0 4px rgba(var(--ta-rgb), 0.12), 0 10px 24px rgba(0,0,0,0.22);
+}
+.reelm-channel-voice-user {
+  position: relative;
+  gap: 6px;
+}
+.voice-status-badges {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin-left: 2px;
+}
+.voice-status-badge {
+  min-width: 13px;
+  height: 13px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
+  line-height: 1;
+  color: rgba(255,255,255,0.88);
+  background: rgba(0,0,0,0.48);
+  border: 1px solid rgba(255,255,255,0.10);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.22);
+}
+.voice-status-badge--on {
+  color: rgba(var(--ta-rgb), 0.98);
+  background: rgba(var(--ta-rgb), 0.16);
+  border-color: rgba(var(--ta-rgb), 0.28);
+}

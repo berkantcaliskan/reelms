@@ -26,15 +26,34 @@ const isGoogleDefaultAvatarUrl = (value: unknown) => {
   return /(^|\.)googleusercontent\.com\//i.test(url) || /lh3\.googleusercontent\.com/i.test(url)
 }
 
+const isRawMediaValue = (value: unknown) => {
+  const text = String(value || '').trim()
+  if (!text) return false
+  if (/^data:image\//i.test(text)) return true
+  if (text.length > 4096 && /^[A-Za-z0-9+/=\r\n]+$/.test(text)) return true
+  return false
+}
+
+const safeMediaValue = (value: unknown) => {
+  const text = String(value || '').trim()
+  if (!text || isRawMediaValue(text)) return null
+  return text
+}
+
+const isClosedProfile = (profile: any = {}) => profile?.accountClosed === true || profile?.deleted === true || profile?.deletedAt != null
+
 export function publicProfileFromStored(uid: string, profile: any = {}) {
   const rawPhoto = profile.photo || profile.profilePhoto || profile.photoURL || profile.avatar || profile.image || profile.imageUrl || profile.userPhoto || null
-  const photo = isGoogleDefaultAvatarUrl(rawPhoto) ? null : rawPhoto
-  const cover = profile.cover || profile.coverImage || profile.coverUrl || profile.headerImage || profile.banner || profile.bannerImage || profile.backgroundCover || null
+  const photo = isGoogleDefaultAvatarUrl(rawPhoto) ? null : safeMediaValue(rawPhoto)
+  const cover = safeMediaValue(profile.cover || profile.coverImage || profile.coverUrl || profile.headerImage || profile.banner || profile.bannerImage || profile.backgroundCover || null)
+  const fallbackName = isClosedProfile(profile) ? 'Deleted user' : 'User'
   return {
     id: uid,
     uid,
-    name: profile.name || profile.displayName || profile.username || 'Member',
-    displayName: profile.displayName || profile.name || profile.username || 'Member',
+    accountClosed: profile.accountClosed === true,
+    deletedAt: profile.deletedAt || null,
+    name: profile.name || profile.displayName || profile.username || fallbackName,
+    displayName: profile.displayName || profile.name || profile.username || fallbackName,
     username: profile.username || '',
     photo,
     profilePhoto: photo,
@@ -85,8 +104,8 @@ export async function canUseReelmPermission(uid: string, reelmId: string, permis
   if (uid === env.REELMS_MODERATION_UID) return true
   if (await isBannedFromReelm(uid, reelmId).catch(() => false)) return false
 
-  if (reelmId === DEFAULT_REELM_ID && await isCommunityAdminUid(uid).catch(() => false)) return true
   if (reelmId === DEFAULT_REELM_ID && await hasLeftDefaultReelm(uid).catch(() => false)) return false
+  if (reelmId === DEFAULT_REELM_ID && await isCommunityAdminUid(uid).catch(() => false)) return true
 
   const pk = reelmPk(reelmId)
   const meta = await getDoc<any>(pk, 'meta').catch(() => null)
@@ -136,8 +155,8 @@ export async function isReelmMember(uid: string, reelmId: string) {
   if (uid === env.REELMS_MODERATION_UID) return true
   if (await isBannedFromReelm(uid, reelmId).catch(() => false)) return false
 
-  if (reelmId === DEFAULT_REELM_ID && await isCommunityAdminUid(uid).catch(() => false)) return true
   if (reelmId === DEFAULT_REELM_ID && await hasLeftDefaultReelm(uid).catch(() => false)) return false
+  if (reelmId === DEFAULT_REELM_ID && await isCommunityAdminUid(uid).catch(() => false)) return true
 
   const pk = reelmPk(reelmId)
   const meta = await getDoc<any>(pk, 'meta').catch(() => null)
@@ -163,8 +182,8 @@ export async function canManageReelm(uid: string, reelmId: string) {
   if (uid === env.REELMS_MODERATION_UID) return true
   if (await isBannedFromReelm(uid, reelmId).catch(() => false)) return false
 
-  if (reelmId === DEFAULT_REELM_ID && await isCommunityAdminUid(uid).catch(() => false)) return true
   if (reelmId === DEFAULT_REELM_ID && await hasLeftDefaultReelm(uid).catch(() => false)) return false
+  if (reelmId === DEFAULT_REELM_ID && await isCommunityAdminUid(uid).catch(() => false)) return true
 
   const pk = reelmPk(reelmId)
   const meta = await getDoc<any>(pk, 'meta').catch(() => null)
