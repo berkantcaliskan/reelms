@@ -11,18 +11,20 @@
   "scripts": {
     "dev:web": "npm -w @reelms/web run dev",
     "dev:api": "npm -w @reelms/api run dev",
-    "dev:bot": "npm -w @reelms/bot run dev",
+    "dev:desktop": "npm -w reelms-desktop run dev",
     "build:packages": "npm -w @reelms/shared run build && npm -w @reelms/config run build",
     "build:web": "npm run build:packages && npm -w @reelms/web run build",
     "build:api": "npm run build:packages && npm -w @reelms/api run build",
-    "build": "npm run build:web && npm run build:api",
-    "typecheck": "npm run build:packages && npm -w @reelms/web run typecheck && npm -w @reelms/api run typecheck",
+    "build:desktop": "npm run build:packages && npm -w reelms-desktop run build",
+    "build": "npm run build:web && npm run build:api && npm run build:desktop",
+    "typecheck": "npm run build:packages && npm -w @reelms/web run typecheck && npm -w @reelms/api run typecheck && npm -w reelms-desktop run typecheck",
+    "dist:win": "npm run build:packages && npm -w reelms-desktop run dist:win",
+    "release:win": "npm run build:packages && npm -w reelms-desktop run release:win",
     "docker:local": "docker compose -f infra/docker/docker-compose.local.yml up -d",
     "docker:down": "docker compose -f infra/docker/docker-compose.local.yml down",
     "dev:web:lan": "npm -w @reelms/web run dev:lan",
     "test:local:e2e": "node scripts/e2e-local-check.mjs",
-    "repair:community": "node scripts/repair-community.mjs --env=/home/ubuntu/reelms-runtime/reelms-api.env",
-    "repair:media": "node scripts/repair-media.mjs --env=/home/ubuntu/reelms-runtime/reelms-api.env"
+    "configure:s3-cors": "node scripts/configure-s3-cors.mjs"
   },
   "engines": {
     "node": ">=20.19.0"

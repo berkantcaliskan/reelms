@@ -8,58 +8,6 @@ let defaultReelmEnsurePromise: Promise<void> | null = null
 let defaultReelmEnsuredAt = 0
 const DEFAULT_REELM_ENSURE_TTL_MS = 30_000
 
-const SYSTEM_MEMBER_IDS = new Set(['reelms-moderation'])
-
-function memberUserId(member: any = {}) {
-  return String(member?.userId || member?.id || '').trim()
-}
-
-function isSystemMemberId(uid: unknown) {
-  const id = String(uid || '').trim()
-  return !id || SYSTEM_MEMBER_IDS.has(id) || id === String(process.env.REELMS_MODERATION_UID || '')
-}
-
-function isClosedProfile(profile: any = {}) {
-  return profile?.accountClosed === true || profile?.deleted === true || profile?.deletedAt != null
-}
-
-function isRawMediaValue(value: unknown) {
-  const text = String(value || '').trim()
-  if (!text) return false
-  if (/^data:image\//i.test(text)) return true
-  if (text.length > 4096 && /^[A-Za-z0-9+/=\r\n]+$/.test(text)) return true
-  return false
-}
-
-function safeMediaValue(value: unknown) {
-  const text = String(value || '').trim()
-  if (!text || isRawMediaValue(text)) return null
-  return text
-}
-
-function sanitizeMemberList(members: any[] = []) {
-  const seen = new Set<string>()
-  const out: any[] = []
-  for (const raw of Array.isArray(members) ? members : []) {
-    const uid = memberUserId(raw)
-    if (isSystemMemberId(uid) || seen.has(uid)) continue
-    seen.add(uid)
-    out.push({
-      ...raw,
-      userId: uid,
-      id: raw?.id && String(raw.id) !== uid ? raw.id : undefined,
-      userName: raw?.userName || raw?.name || raw?.username || 'User',
-      userPhoto: safeMediaValue(raw?.userPhoto || raw?.photo) || null,
-      photo: safeMediaValue(raw?.photo || raw?.userPhoto) || null,
-      cover: safeMediaValue(raw?.cover || raw?.coverImage || raw?.coverUrl) || null,
-      coverImage: safeMediaValue(raw?.coverImage || raw?.cover || raw?.coverUrl) || null,
-      coverUrl: safeMediaValue(raw?.coverUrl || raw?.cover || raw?.coverImage) || null,
-      roleIds: Array.from(new Set((Array.isArray(raw?.roleIds) ? raw.roleIds : []).map(String).filter(Boolean)))
-    })
-  }
-  return out
-}
-
 const defaultMeta = () => ({
   id: DEFAULT_REELM_ID,
   name: 'Reelms Community',
@@ -184,11 +132,11 @@ async function syncDefaultCommunityCopies() {
   if (!meta) return
   const roles = (await getDoc<any[]>(pk, 'roles').catch(() => [])) || []
   const structure = (await getDoc<any>(pk, 'structure').catch(() => null)) || defaultStructure()
-  const members = sanitizeMemberList((await getDoc<any[]>(pk, 'members').catch(() => [])) || [])
+  const members = (await getDoc<any[]>(pk, 'members').catch(() => [])) || []
   const full = toUserReelmSummary(toClientReelm(meta, structure, roles, members))
 
   await Promise.all(members.map(async (member) => {
-    if (!member?.userId || isSystemMemberId(member.userId)) return
+    if (!member?.userId) return
     const upk = userPk(String(member.userId))
     const current = (await getDoc<any[]>(upk, 'reelms').catch(() => [])) || []
     const next = mergeSummaryPreserveOrder(current, full)
@@ -234,7 +182,7 @@ async function ensureDefaultRoles() {
     const citizenLikeIds = new Set(roles.filter((role) => !isManager(role) && isMemberLike(role)).map((role) => String(role?.id || '')).filter(Boolean))
     citizenLikeIds.add(DEFAULT_CITIZEN_ROLE_ID)
     let membersChanged = false
-    const nextMembers = sanitizeMemberList(members).map((member) => {
+    const nextMembers = members.map((member) => {
       const rawIds: string[] = Array.isArray(member?.roleIds) ? member.roleIds.map(String) : []
       const hasAdmin = rawIds.some((id: string) => adminLikeIds.has(id))
       const keptCustom = rawIds.filter((id: string) => !adminLikeIds.has(id) && !citizenLikeIds.has(id) && normalizedRoles.some((role) => String(role.id) === id))
@@ -243,7 +191,6 @@ async function ensureDefaultRoles() {
       if (JSON.stringify(next) !== JSON.stringify(member)) membersChanged = true
       return next
     })
-    if (nextMembers.length !== members.length) membersChanged = true
     if (membersChanged) await putDoc(pk, 'members', nextMembers)
   }
   return normalizedRoles
@@ -274,13 +221,12 @@ async function ensureConfiguredCommunityAdmins() {
   }
   if (!activeAdminUids.length) return
 
-  const currentMembers = sanitizeMemberList((await getDoc<any[]>(pk, 'members').catch(() => [])) || [])
+  const currentMembers = (await getDoc<any[]>(pk, 'members').catch(() => [])) || []
   let nextMembers = [...currentMembers]
   let changed = false
 
   for (const uid of activeAdminUids) {
-    const profile = (await getDoc<any>(userPk(uid), 'profile').catch(() => null)) || null
-    if (!profile || isClosedProfile(profile)) continue
+    const profile = (await getDoc<any>(userPk(uid), 'profile').catch(() => null)) || {}
     const existing = nextMembers.find((member) => String(member?.userId) === String(uid))
     const existingRoleIds = Array.isArray(existing?.roleIds) ? existing.roleIds.map(String) : []
     const roleIds = normalizeRoleIdsForCommunityAdmin(existingRoleIds, adminRoleId)
@@ -350,10 +296,6 @@ async function ensureDefaultReelmInternal() {
 
   const existingMembers = await getDoc<any[]>(pk, 'members').catch(() => null)
   if (!Array.isArray(existingMembers)) await putDoc(pk, 'members', [])
-  else {
-    const normalizedMembers = sanitizeMemberList(existingMembers)
-    if (JSON.stringify(existingMembers) !== JSON.stringify(normalizedMembers)) await putDoc(pk, 'members', normalizedMembers)
-  }
 
   await ensureConfiguredCommunityAdmins().catch(() => {})
 }
@@ -368,7 +310,7 @@ export async function ensureDefaultReelm(options: { force?: boolean } = {}) {
   return defaultReelmEnsurePromise
 }
 
-const getProfilePhoto = (profile: any = {}) => safeMediaValue(profile.photo || profile.profilePhoto || profile.photoURL || profile.avatar || profile.image || profile.imageUrl || profile.userPhoto || null)
+const getProfilePhoto = (profile: any = {}) => profile.photo || profile.profilePhoto || profile.photoURL || profile.avatar || profile.image || profile.imageUrl || profile.userPhoto || null
 
 
 export async function hasLeftDefaultReelm(uid: string) {
@@ -383,7 +325,6 @@ export async function setDefaultReelmLeft(uid: string, left: boolean) {
 }
 
 export async function autoJoinDefaultReelm(uid: string, name?: string, photo?: string | null, opts: { force?: boolean } = {}) {
-  if (isSystemMemberId(uid)) return
   await ensureDefaultReelm()
   const isConfiguredAdmin = await isCommunityAdminUid(uid).catch(() => false)
   const pk = reelmPk(DEFAULT_REELM_ID)
@@ -396,12 +337,11 @@ export async function autoJoinDefaultReelm(uid: string, name?: string, photo?: s
   const roles = (await getDoc<any[]>(pk, 'roles')) || []
   if (!meta) return
 
-  const profile = (await getDoc<any>(userPk(uid), 'profile').catch(() => null)) || null
-  if (!profile || isClosedProfile(profile)) return
-  const displayName = name || profile.name || profile.displayName || profile.username || 'User'
-  const displayPhoto = safeMediaValue(photo) ?? getProfilePhoto(profile)
+  const profile = (await getDoc<any>(userPk(uid), 'profile').catch(() => null)) || {}
+  const displayName = name || profile.name || profile.displayName || profile.username || 'Member'
+  const displayPhoto = photo ?? getProfilePhoto(profile)
 
-  const members = sanitizeMemberList((await getDoc<any[]>(pk, 'members')) || [])
+  const members = (await getDoc<any[]>(pk, 'members')) || []
   const citizenRole = getDefaultMemberRole(roles)
   const adminRole = getManagerRole(roles)
   const profileEmail = profile.contact || profile.email || ''
@@ -413,7 +353,7 @@ export async function autoJoinDefaultReelm(uid: string, name?: string, photo?: s
   const member = {
     ...(existing || {}),
     userId: uid,
-    userName: displayName || existing?.userName || 'User',
+    userName: displayName || existing?.userName || 'Member',
     username: existing?.username || profile.username || '',
     userPhoto: displayPhoto || existing?.userPhoto || null,
     photo: displayPhoto || existing?.photo || null,
@@ -422,9 +362,9 @@ export async function autoJoinDefaultReelm(uid: string, name?: string, photo?: s
       ? normalizeRoleIdsForCommunityAdmin(existingRoleIds, adminRole?.id ? String(adminRole.id) : '')
       : (existingRoleIds.length ? existingRoleIds : citizenRoleIds)
   }
-  const nextMembers = sanitizeMemberList(existing
+  const nextMembers = existing
     ? members.map((m) => String(m.userId) === String(uid) ? member : m)
-    : [...members, member])
+    : [...members, member]
   if (!existing || JSON.stringify(existing) !== JSON.stringify(member)) await putDoc(pk, 'members', nextMembers)
 
   const reelmEntry = toUserReelmSummary(toClientReelm(meta, structure, roles, nextMembers))
@@ -454,7 +394,6 @@ export async function syncAllDefaultCommunityMembersFromProfiles() {
   for (const item of profiles) {
     if (item.sk !== 'profile' || !(item.data as any)?.id) continue
     const profile = item.data as any
-    if (isSystemMemberId(profile.id) || isClosedProfile(profile)) continue
     await autoJoinDefaultReelm(String(profile.id), profile.name || profile.displayName || profile.username || '', getProfilePhoto(profile))
   }
   await syncDefaultCommunityCopies()

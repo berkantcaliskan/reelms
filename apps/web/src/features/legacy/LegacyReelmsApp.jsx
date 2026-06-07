@@ -113,7 +113,6 @@ import {
   timeoutReelmMember,
   untimeoutReelmMember,
   unbanReelmMember,
-  removeReelmMember,
   leaveReelmRemote,
   closeReelmRemote,
   userProfilePut,
@@ -767,8 +766,8 @@ function PillSelect({ value, onChange, options }) {
 }
 
 const THEMES = [
-  { id: 'default',  name: 'Default, Warm',   accent: '#b99887', accentRgb: '185,152,135', base: '#0c0c20', baseRgb: '12,12,32' },
-  { id: 'gece',     name: 'Night',           accent: '#b99887', accentRgb: '185,152,135', base: '#2a2724', baseRgb: '42,39,36', grainOpacity: 0.5, noGradient: true, noAccentGlow: true },
+  { id: 'default',  name: 'Default',         accent: '#b99887', accentRgb: '185,152,135', base: '#0c0c20', baseRgb: '12,12,32' },
+  { id: 'gece',     name: 'Night',           accent: '#b99887', accentRgb: '185,152,135', base: '#1e1c1a', baseRgb: '30,28,26', grainOpacity: 0.12, noAccentGlow: true },
   { id: 'stone',    name: 'Soft Light',      accent: '#c8bfa8', accentRgb: '200,191,168', base: '#383835', baseRgb: '56,56,53', noGradient: true },
   { id: 'lavender', name: 'Purple Sunlight', accent: '#c0a8e0', accentRgb: '192,168,224', base: '#120d1a', baseRgb: '18,13,26' },
   { id: 'dusk',     name: 'Purple Nightlight', accent: '#9070c0', accentRgb: '144,112,192', base: '#0d0a18', baseRgb: '13,10,24' },
@@ -782,10 +781,113 @@ const THEMES = [
 ]
 
 function hexToRgb(hex) {
-  const r = parseInt(hex.slice(1,3), 16)
-  const g = parseInt(hex.slice(3,5), 16)
-  const b = parseInt(hex.slice(5,7), 16)
-  return `${r},${g},${b}`
+  const text = String(hex || '').trim()
+  const match = /^#?([0-9a-f]{6})$/i.exec(text)
+  if (!match) return null
+  const value = match[1]
+  return [
+    parseInt(value.slice(0, 2), 16),
+    parseInt(value.slice(2, 4), 16),
+    parseInt(value.slice(4, 6), 16),
+  ]
+}
+
+function safeRgbArray(value, fallback = [185, 152, 135]) {
+  const fb = Array.isArray(fallback) ? fallback : [185, 152, 135]
+  if (Array.isArray(value)) {
+    const nums = value.slice(0, 3).map(v => Number(v)).filter(Number.isFinite)
+    if (nums.length === 3) return nums.map(n => Math.max(0, Math.min(255, Math.round(n))))
+  }
+  if (value && typeof value === 'object') {
+    const nums = [value.r, value.g, value.b].map(v => Number(v)).filter(Number.isFinite)
+    if (nums.length === 3) return nums.map(n => Math.max(0, Math.min(255, Math.round(n))))
+  }
+  if (typeof value === 'string') {
+    const hex = hexToRgb(value)
+    if (hex) return hex
+    const nums = value.split(/[\s,]+/).map(v => Number(v)).filter(Number.isFinite)
+    if (nums.length >= 3) return nums.slice(0, 3).map(n => Math.max(0, Math.min(255, Math.round(n))))
+  }
+  return fb
+}
+
+function rgbCssValue(value, fallback = [185, 152, 135]) {
+  return safeRgbArray(value, fallback).join(',')
+}
+
+function safeImageUrl(value) {
+  if (typeof value !== 'string') return null
+  const url = value.trim()
+  if (!url) return null
+  if (/^(https?:|blob:|data:image\/)/i.test(url)) return url
+  return null
+}
+
+async function imageFileToCanvas(file, options = {}) {
+  const { maxWidth = 1600, maxHeight = 1600, square = false } = options
+  const objectUrl = URL.createObjectURL(file)
+  try {
+    const img = await new Promise((resolve, reject) => {
+      const el = new Image()
+      el.onload = () => resolve(el)
+      el.onerror = () => reject(new Error('Image decode failed'))
+      el.src = objectUrl
+    })
+    const srcW = Number(img.width) || 1
+    const srcH = Number(img.height) || 1
+    let sx = 0, sy = 0, sw = srcW, sh = srcH
+    if (square) {
+      const side = Math.min(srcW, srcH)
+      sx = Math.round((srcW - side) / 2)
+      sy = Math.round((srcH - side) / 2)
+      sw = side
+      sh = side
+    }
+    const scale = Math.min(1, maxWidth / sw, maxHeight / sh)
+    const canvas = document.createElement('canvas')
+    canvas.width = Math.max(1, Math.round(sw * scale))
+    canvas.height = Math.max(1, Math.round(sh * scale))
+    const ctx = canvas.getContext('2d')
+    if (!ctx) throw new Error('Canvas unavailable')
+    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height)
+    return canvas
+  } finally {
+    URL.revokeObjectURL(objectUrl)
+  }
+}
+
+async function canvasToFile(canvas, fileName, quality = 0.86) {
+  const blob = await new Promise(resolve => {
+    canvas.toBlob(b => resolve(b), 'image/webp', quality)
+  }) || await new Promise(resolve => {
+    canvas.toBlob(b => resolve(b), 'image/jpeg', quality)
+  })
+  if (!blob) throw new Error('Image encode failed')
+  const safeName = String(fileName || 'image').replace(/\.[a-z0-9]+$/i, '') || 'image'
+  const ext = blob.type === 'image/webp' ? 'webp' : 'jpg'
+  return new File([blob], `${safeName}.${ext}`, { type: blob.type || 'image/jpeg' })
+}
+
+async function prepareImageFile(file, kind = 'image') {
+  if (!file || !String(file.type || '').startsWith('image/')) throw new Error('Lütfen geçerli bir görsel seç.')
+  const limits = {
+    avatar: { maxBytes: 5 * 1024 * 1024, maxWidth: 512, maxHeight: 512, square: true, quality: 0.88 },
+    cover: { maxBytes: 8 * 1024 * 1024, maxWidth: 1600, maxHeight: 640, square: false, quality: 0.84 },
+    background: { maxBytes: 10 * 1024 * 1024, maxWidth: 1920, maxHeight: 1080, square: false, quality: 0.82 },
+    server: { maxBytes: 5 * 1024 * 1024, maxWidth: 768, maxHeight: 432, square: false, quality: 0.84 },
+    image: { maxBytes: 10 * 1024 * 1024, maxWidth: 1600, maxHeight: 1600, square: false, quality: 0.84 },
+  }[kind] || { maxBytes: 10 * 1024 * 1024, maxWidth: 1600, maxHeight: 1600, square: false, quality: 0.84 }
+  if (file.size > limits.maxBytes) throw new Error(`Görsel çok büyük. Maksimum ${Math.round(limits.maxBytes / 1024 / 1024)} MB yükleyebilirsin.`)
+  const canvas = await imageFileToCanvas(file, limits)
+  return canvasToFile(canvas, file.name, limits.quality)
+}
+
+async function uploadImageFile(file, kind = 'image') {
+  const processed = await prepareImageFile(file, kind)
+  const uploaded = await mediaUploadToS3(processed)
+  const url = safeImageUrl(uploaded?.url || uploaded?.publicUrl || uploaded?.fileUrl || uploaded?.mediaUrl || uploaded?.objectUrl)
+  if (!url) throw new Error('Görsel yüklendi ama public URL alınamadı.')
+  return url
 }
 // hexLum removed — unused
 function hslToHex(h, s, l) {
@@ -1038,7 +1140,7 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
   const bgInputRef = useRef(null)
   const currentTheme = THEMES.find(th => th.id === customization.themeId) || THEMES[0]
   const [openSpectrum, setOpenSpectrum] = useState(null)
-  const [bgSaveState, setBgSaveState] = useState('idle')
+  const [bgUploadState, setBgUploadState] = useState({ busy: false, error: '' })
 
   const pickSpectrum = (e, key) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -1054,8 +1156,7 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
   const compressImageToDataUrl = async (file) => {
     // Keep story background images small (payload size).
     const dataUrl = await new Promise((resolve, reject) => {
-      try { validateProfileImageFile(file, 'avatar') } catch (err) { window.alert(err?.message || 'Fotoğraf yüklenemedi.'); e.target.value = ''; return }
-    const reader = new FileReader()
+      const reader = new FileReader()
       reader.onload = () => resolve(reader.result)
       reader.onerror = () => reject(new Error('FileReader failed'))
       reader.readAsDataURL(file)
@@ -1096,8 +1197,8 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
               <button className="cust-bg-remove" onClick={() => onChange({ bgImage: null })}>{t('remove')}</button>
             </div>
           ) : (
-            <button className="cust-btn-upload" disabled={bgSaveState === 'saving'} onClick={() => bgInputRef.current?.click()}>
-              {bgSaveState === 'saving' ? 'Kaydediliyor…' : bgSaveState === 'saved' ? 'Kaydedildi ✓' : t('upload_bg')}
+            <button className="cust-btn-upload" onClick={() => bgInputRef.current?.click()}>
+              {t('upload_bg')}
             </button>
           )}
           <input
@@ -1106,21 +1207,21 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
               const file = e.target.files[0]
               if (!file) return
               ;(async () => {
-                setBgSaveState('saving')
+                setBgUploadState({ busy: true, error: '' })
                 try {
-                  const uploaded = await uploadProfileImageFile(file, 'background')
-                  onChange({ bgImage: uploaded.url })
-                  setBgSaveState('saved')
-                  setTimeout(() => setBgSaveState('idle'), 1800)
+                  const uploadedUrl = await uploadImageFile(file, 'background')
+                  onChange({ bgImage: uploadedUrl })
+                  setBgUploadState({ busy: false, error: '' })
                 } catch (err) {
                   console.warn('Background image could not be uploaded:', err)
-                  setBgSaveState('error')
-                  window.alert(err?.message || 'Background image upload failed.')
+                  setBgUploadState({ busy: false, error: err?.message || 'Background upload failed' })
                 }
               })()
               e.target.value = ''
             }}
           />
+          {bgUploadState.busy && <div className="cust-upload-status">Yükleniyor...</div>}
+          {bgUploadState.error && <div className="cust-upload-error">{bgUploadState.error}</div>}
         </div>
         {customization.bgImage && (
           <div className="cust-toggle-row" style={{ marginTop: '14px' }}>
@@ -1505,115 +1606,6 @@ function ActiveSessionsSection({ sessions, onSessionsUpdate }) {
   )
 }
 
-const REELM_RADIO_BOT = {
-  id: 'reelm-radio',
-  name: 'Reelm Radio',
-  username: 'reelm-radio',
-  description: 'Reelm kanallarında müzik çal. /play, /skip, /queue ve /stop komutlarıyla veya @reelm-radio mention\'ıyla kontrol et.',
-  tags: ['Müzik', 'YouTube', 'Ücretsiz'],
-}
-
-function CompanionsPanel({ reelms = [], authToken }) {
-  const [botStatus, setBotStatus] = useState({})
-  const [loading, setLoading] = useState({})
-
-  useEffect(() => {
-    if (!reelms.length || !authToken) return
-    const checks = reelms.map(async (r) => {
-      try {
-        const res = await fetch(`${BACKEND_URL}/api/v1/reelms/${r.id}/bot-status`, {
-          headers: { Authorization: `Bearer ${authToken}` }
-        })
-        if (res.ok) {
-          const data = await res.json()
-          return [r.id, data.hasBot]
-        }
-      } catch {}
-      return [r.id, false]
-    })
-    Promise.all(checks).then(results => {
-      const map = {}
-      results.forEach(([id, has]) => { map[id] = has })
-      setBotStatus(map)
-    })
-  }, [reelms, authToken])
-
-  async function addBot(reelmId) {
-    if (!authToken) return
-    setLoading(prev => ({ ...prev, [reelmId]: true }))
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/v1/reelms/${reelmId}/add-bot`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
-        body: JSON.stringify({ botId: 'reelm-radio' })
-      })
-      if (res.ok) setBotStatus(prev => ({ ...prev, [reelmId]: true }))
-    } catch {}
-    setLoading(prev => ({ ...prev, [reelmId]: false }))
-  }
-
-  return (
-    <div className="companions-panel">
-      <div className="companions-section-label">Reelms&apos;ten Eşlikçiler</div>
-
-      <div className="companion-card">
-        <div className="companion-card-header">
-          <div className="companion-avatar">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-              <path d="M9 18V5l12-2v13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-              <circle cx="6" cy="18" r="3" stroke="currentColor" strokeWidth="1.6"/>
-              <circle cx="18" cy="16" r="3" stroke="currentColor" strokeWidth="1.6"/>
-            </svg>
-          </div>
-          <div className="companion-info">
-            <div className="companion-name">{REELM_RADIO_BOT.name}</div>
-            <div className="companion-username">@{REELM_RADIO_BOT.username}</div>
-          </div>
-          <div className="companion-tags">
-            {REELM_RADIO_BOT.tags.map(tag => (
-              <span key={tag} className="companion-tag">{tag}</span>
-            ))}
-          </div>
-        </div>
-        <p className="companion-desc">{REELM_RADIO_BOT.description}</p>
-        <div className="companion-commands">
-          {['/play', '/skip', '/queue', '/stop'].map(cmd => (
-            <code key={cmd} className="companion-cmd">{cmd}</code>
-          ))}
-          <code className="companion-cmd">@reelm-radio</code>
-        </div>
-
-        {reelms.length > 0 && (
-          <div className="companion-reelms">
-            <div className="companion-reelms-label">Reelm&apos;lerine ekle</div>
-            <div className="companion-reelm-list">
-              {reelms.map(r => (
-                <div key={r.id} className="companion-reelm-row">
-                  <div className="companion-reelm-avatar" style={r.image ? { backgroundImage: `url(${r.image})`, backgroundSize: 'cover' } : {}}>
-                    {!r.image && (r.name || '?').charAt(0).toUpperCase()}
-                  </div>
-                  <span className="companion-reelm-name">{r.name}</span>
-                  {botStatus[r.id] ? (
-                    <span className="companion-reelm-added">Eklendi ✓</span>
-                  ) : (
-                    <button
-                      className="companion-add-btn"
-                      disabled={!!loading[r.id]}
-                      onClick={() => addBot(r.id)}
-                    >
-                      {loading[r.id] ? '...' : 'Ekle'}
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 function AccountSettingsPanel({ user, onUpdate, onLogOut, profileBio, onBioChange, spotifyConnected, onSpotifyConnect, onSpotifyDisconnect, reelms = [] }) {
   const t = useT()
   const photoInputRef = useRef(null)
@@ -1640,7 +1632,6 @@ function AccountSettingsPanel({ user, onUpdate, onLogOut, profileBio, onBioChang
   const [photoEditModal, setPhotoEditModal] = useState(null)
   const [photoScale, setPhotoScale] = useState(1)
   const [photoOffset, setPhotoOffset] = useState({ x: 0, y: 0 })
-  const [photoSaveState, setPhotoSaveState] = useState('idle')
   const [rawPhotoImg, setRawPhotoImg] = useState(null)
 
   // Load image when modal opens
@@ -1685,14 +1676,13 @@ function AccountSettingsPanel({ user, onUpdate, onLogOut, profileBio, onBioChang
     e.target.value = ''
   }
 
-  const applyPhotoEdit = async () => {
-    if (!rawPhotoImg || photoSaveState === 'saving') return
-    const OUT = 512
+  const applyPhotoEdit = () => {
+    if (!rawPhotoImg) return
+    const OUT = 400
     const PREV = 160
     const canvas = document.createElement('canvas')
     canvas.width = OUT; canvas.height = OUT
     const ctx = canvas.getContext('2d')
-    if (!ctx) return
     ctx.beginPath()
     ctx.arc(OUT / 2, OUT / 2, OUT / 2, 0, Math.PI * 2)
     ctx.clip()
@@ -1703,20 +1693,8 @@ function AccountSettingsPanel({ user, onUpdate, onLogOut, profileBio, onBioChang
     const fx = (OUT - fw) / 2 + photoOffset.x * ratio
     const fy = (OUT - fh) / 2 + photoOffset.y * ratio
     ctx.drawImage(rawPhotoImg, fx, fy, fw, fh)
-    try {
-      setPhotoSaveState('saving')
-      const file = await canvasToFile(canvas, 'profile-photo.webp', 'image/webp', 0.88)
-      const media = await mediaUploadToS3(file, 'avatar')
-      const url = safeMediaSrc(media?.url || media?.mediaUrl || media?.publicUrl || null)
-      if (!url) throw new Error('Profil fotoğrafı URL alınamadı.')
-      await onUpdate({ photo: url, avatarVersion: Date.now(), photoUpdatedAt: Date.now() })
-      setPhotoSaveState('saved')
-      setTimeout(() => setPhotoSaveState('idle'), 1600)
-      setPhotoEditModal(null)
-    } catch (err) {
-      setPhotoSaveState('error')
-      window.alert(err?.message || 'Profil fotoğrafı kaydedilemedi.')
-    }
+    onUpdate({ photo: canvas.toDataURL('image/jpeg', 0.92) })
+    setPhotoEditModal(null)
   }
 
   const onPreviewMouseDown = (e) => {
@@ -2022,13 +2000,12 @@ ${posts.length ? `<ul>${posts.map(p => { const raw = (p.text || p.content || '')
         onTouchEnd={() => { isDraggingRef.current = false }}
         onCancel={() => setPhotoEditModal(null)}
         onApply={applyPhotoEdit}
-        saveState={photoSaveState}
       />}
     </div>
   )
 }
 
-function PhotoEditModal({ previewCanvasRef, photoScale, setPhotoScale, onMouseDown, onMouseMove, onMouseUp, onTouchStart, onTouchMove, onTouchEnd, onCancel, onApply, saveState = 'idle' }) {
+function PhotoEditModal({ previewCanvasRef, photoScale, setPhotoScale, onMouseDown, onMouseMove, onMouseUp, onTouchStart, onTouchMove, onTouchEnd, onCancel, onApply }) {
   const t = useT()
   return ReactDOM.createPortal(
     <div className="photo-edit-overlay" onClick={onCancel}>
@@ -2060,8 +2037,8 @@ function PhotoEditModal({ previewCanvasRef, photoScale, setPhotoScale, onMouseDo
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="M8 11h6M11 8v6"/></svg>
         </div>
         <div className="photo-edit-actions">
-          <button className="photo-edit-cancel" disabled={saveState === 'saving'} onClick={onCancel}>{t('cancel')}</button>
-          <button className="photo-edit-apply" disabled={saveState === 'saving'} onClick={onApply}>{saveState === 'saving' ? 'Kaydediliyor…' : saveState === 'saved' ? 'Kaydedildi ✓' : t('apply')}</button>
+          <button className="photo-edit-cancel" onClick={onCancel}>{t('cancel')}</button>
+          <button className="photo-edit-apply" onClick={onApply}>{t('apply')}</button>
         </div>
       </div>
     </div>,
@@ -2069,13 +2046,12 @@ function PhotoEditModal({ previewCanvasRef, photoScale, setPhotoScale, onMouseDo
   )
 }
 
-function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChange, status, onStatusChange, bio, onBioChange, socialLinks, onSocialLinksChange, activePlatforms, onActivePlatformsChange, iconFilter, reelms, uid, spotifyConnected, spotifyNowPlaying, onSpotifyConnect, onSpotifyDisconnect, activity, onActivityChange, onViewFullProfile }) {
+function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChange, status, onStatusChange, bio, onBioChange, socialLinks, onSocialLinksChange, activePlatforms, onActivePlatformsChange, iconFilter, reelms, uid, spotifyConnected, spotifyNowPlaying, onSpotifyConnect, onSpotifyDisconnect, activity, onActivityChange }) {
   const popupRef = useRef(null)
   const ppPhotoInputRef = useRef(null)
   const ppCoverInputRef = useRef(null)
   const [statusOpen, setStatusOpen] = useState(false)
   const [headerEditOpen, setHeaderEditOpen] = useState(false)
-  const [profileMediaState, setProfileMediaState] = useState('idle')
   const [editingBio, setEditingBio] = useState(false)
   const [bioInput, setBioInput] = useState('')
   const [editingSocial, setEditingSocial] = useState(null)
@@ -2090,6 +2066,7 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
   const [showMyActivity, setShowMyActivity] = useState(false)
   const [activityItems, setActivityItems] = useState([])
   const [showActivitySetter, setShowActivitySetter] = useState(false)
+  const [profileMediaState, setProfileMediaState] = useState({ busy: false, error: '' })
 
   useEffect(() => {
     if (!showMyActivity || !reelms || !uid) return
@@ -2172,15 +2149,13 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
             const file = e.target.files[0]
             if (!file) return
             ;(async () => {
-              setProfileMediaState('saving')
+              setProfileMediaState({ busy: true, error: '' })
               try {
-                const uploaded = await uploadProfileImageFile(file, 'avatar')
-                await onPhotoChange(uploaded.url)
-                setProfileMediaState('saved')
-                setTimeout(() => setProfileMediaState('idle'), 1600)
+                const url = await uploadImageFile(file, 'avatar')
+                onPhotoChange(url)
+                setProfileMediaState({ busy: false, error: '' })
               } catch (err) {
-                setProfileMediaState('error')
-                window.alert(err?.message || 'Profil fotoğrafı kaydedilemedi.')
+                setProfileMediaState({ busy: false, error: err?.message || 'Photo upload failed' })
               }
             })()
             e.target.value = ''
@@ -2195,22 +2170,19 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
             const file = e.target.files[0]
             if (!file) return
             ;(async () => {
-              setProfileMediaState('saving')
+              setProfileMediaState({ busy: true, error: '' })
               try {
-                const uploaded = await uploadProfileImageFile(file, 'banner')
-                await onCoverChange(uploaded.url)
-                setProfileMediaState('saved')
-                setTimeout(() => setProfileMediaState('idle'), 1600)
+                const url = await uploadImageFile(file, 'cover')
+                onCoverChange(url)
+                setProfileMediaState({ busy: false, error: '' })
               } catch (err) {
-                setProfileMediaState('error')
-                window.alert(err?.message || 'Afiş kaydedilemedi.')
+                setProfileMediaState({ busy: false, error: err?.message || 'Cover upload failed' })
               }
             })()
             e.target.value = ''
           }}
         />
       </div>
-      {profileMediaState !== 'idle' && <div className={`pp-save-state pp-save-state--${profileMediaState}`}>{profileMediaState === 'saving' ? 'Kaydediliyor…' : profileMediaState === 'saved' ? 'Kaydedildi ✓' : 'Kaydetme başarısız'}</div>}
       {headerEditOpen && (
         <div className="pp-cover-menu">
           <button className="pp-cover-menu-item" onClick={() => { ppPhotoInputRef.current?.click(); setHeaderEditOpen(false) }}>Change photo</button>
@@ -2218,6 +2190,8 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
           <button className="pp-cover-menu-item" onClick={() => setHeaderEditOpen(false)}>Edit profile</button>
         </div>
       )}
+      {profileMediaState.busy && <div className="pp-media-status">Yükleniyor...</div>}
+      {profileMediaState.error && <div className="pp-media-error">{profileMediaState.error}</div>}
 
       <div className="pp-identity">
         <img src={getPersonPhoto(user) || avatarUIcon} alt="Avatar" className="pp-avatar" />
@@ -2468,11 +2442,6 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
             All activity
           </button>
         </div>
-        {onViewFullProfile && (
-          <button className="profile-view-full-btn" onClick={() => { onClose(); setTimeout(onViewFullProfile, 50) }}>
-            Tüm profili gör
-          </button>
-        )}
       </div>
     </div>
 
@@ -2719,10 +2688,9 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
   const popupW = 280
   const popupH = 460
   const friendCover = safeFriend.cover || safeFriend.coverImage || safeFriend.coverUrl || null
-  const viewportW = typeof window !== 'undefined' ? window.innerWidth : 1024
-  const safeRect = anchorRect || { top: 96, bottom: 112, left: Math.max(8, viewportW - popupW - 18) }
+  const safeRect = anchorRect || { top: 96, bottom: 112, left: Math.max(8, window.innerWidth - popupW - 18) }
   let top = safeRect.top - popupH - 8
-  let left = Math.min(Math.max(8, safeRect.left), viewportW - popupW - 8)
+  let left = Math.min(Math.max(8, safeRect.left), window.innerWidth - popupW - 8)
   if (top < 8) top = safeRect.bottom + 8
 
   const profileNode = (
@@ -2827,21 +2795,21 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
       )}
       <div className="fpp-actions">
         {!isSelf && !isBlocked && <button className="fpp-action-btn" onClick={() => { onMessage?.(); onClose() }}>Message</button>}
-        {!isSelf && !isBlocked && isFriend && onCreateGroup && <button className="fpp-action-btn" onClick={() => { onCreateGroup(safeFriend); onClose() }}>Create group</button>}
-        {!isSelf && !isBlocked && isFriend && onRequestRemoteControl && <button className="fpp-action-btn" onClick={() => { onRequestRemoteControl(safeFriend); onClose() }}>
+        {!isSelf && !isBlocked && isFriend && onCreateGroup && <button className="fpp-action-btn" onClick={() => { onCreateGroup(friend); onClose() }}>Create group</button>}
+        {!isSelf && !isBlocked && isFriend && onRequestRemoteControl && <button className="fpp-action-btn" onClick={() => { onRequestRemoteControl(friend); onClose() }}>
           <img src={channelLiveactionIcon} alt="" width="12" height="12" style={{filter:'brightness(0.8)', marginRight: 4}}/> Remote control
         </button>}
         {canShare && (
           <button className="fpp-action-btn" onClick={() => { navigator.clipboard?.writeText(`${safeFriend.name} (@${safeFriend.username || friend.id})`); onClose() }}>Share Profile</button>
         )}
-        {!isSelf && isBlocked && onUnblock && <button className="fpp-action-btn" onClick={() => { onUnblock(safeFriend.id); onClose() }}>Unblock</button>}
+        {!isSelf && isBlocked && onUnblock && <button className="fpp-action-btn" onClick={() => { onUnblock(friend.id); onClose() }}>Unblock</button>}
         {!isSelf && !isBlocked && !isFriend && onAddFriend && (isPending
           ? <button className="fpp-action-btn" disabled>Friend request sent</button>
-          : <button className="fpp-action-btn" onClick={() => { onAddFriend(safeFriend); onClose() }}>Add Friend</button>
+          : <button className="fpp-action-btn" onClick={() => { onAddFriend(friend); onClose() }}>Add Friend</button>
         )}
-        {!isSelf && !isBlocked && isFriend && <button className="fpp-action-btn fpp-action-danger" onClick={() => { onRemove(safeFriend.id); onClose() }}>Remove Friend</button>}
-        {!isSelf && !isBlocked && onBlock && <button className="fpp-action-btn fpp-action-danger" onClick={() => { onBlock(safeFriend); onClose() }}>Block</button>}
-        <button className="fpp-view-full-btn" onClick={() => { onClose(); setTimeout(() => onViewFullProfile?.(safeFriend), 50) }}>Tüm profili gör →</button>
+        {!isSelf && !isBlocked && isFriend && <button className="fpp-action-btn fpp-action-danger" onClick={() => { onRemove(friend.id); onClose() }}>Remove Friend</button>}
+        {!isSelf && !isBlocked && onBlock && <button className="fpp-action-btn fpp-action-danger" onClick={() => { onBlock(friend); onClose() }}>Block</button>}
+        <button className="fpp-view-full-btn" onClick={() => { onClose(); setTimeout(() => onViewFullProfile?.(friend), 50) }}>Tüm profili gör →</button>
       </div>
     </div>
   )
@@ -2851,12 +2819,11 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
 }
 
 function FullProfilePage({ user, isSelf, reelms = [], onClose, onMessage, onAddFriend, onRemove, onBlock, onUnblock, isFriend, isBlocked, isPending }) {
-  const safeUser = normalizeFriendProfileTarget(user || {})
   const [visible, setVisible] = useState(false)
   useEffect(() => { const t = setTimeout(() => setVisible(true), 10); return () => clearTimeout(t) }, [])
 
-  const cover = getPersonCover(safeUser)
-  const photo = getPersonPhoto(safeUser)
+  const cover = user.cover || user.coverImage || user.coverUrl || null
+  const photo = getPersonPhoto(user) || user.photo || user.photoURL || null
   const SOCIAL_ICONS = { instagram: InstagramIcon, x: XIcon, tiktok: TikTokIcon, linkedin: LinkedInIcon, whatsapp: WhatsAppIcon, discord: DiscordSocialIcon, snapchat: SnapchatIcon, custom: CustomLinkIcon }
 
   const handleClose = () => {
@@ -2880,31 +2847,31 @@ function FullProfilePage({ user, isSelf, reelms = [], onClose, onMessage, onAddF
               <div className="fp-avatar-wrap">
                 {photo
                   ? <img src={photo} alt="" className="fp-avatar" />
-                  : <div className="fp-avatar fp-avatar--text">{(safeUser.name || '?').charAt(0).toUpperCase()}</div>}
+                  : <div className="fp-avatar fp-avatar--text">{(user.name || '?').charAt(0).toUpperCase()}</div>}
               </div>
             </div>
 
             <div className="fp-identity">
               <div className="fp-identity-names">
-                <h1 className="fp-name">{safeUser.name}</h1>
-                {safeUser.username && <span className="fp-username">@{safeUser.username.startsWith('@') ? safeUser.username.slice(1) : safeUser.username}</span>}
+                <h1 className="fp-name">{user.name}</h1>
+                {user.username && <span className="fp-username">@{user.username.startsWith('@') ? user.username.slice(1) : user.username}</span>}
               </div>
-              {safeUser.activity?.name && (
-                <div className="fp-activity"><ActivityBadge activity={safeUser.activity} /></div>
+              {user.activity?.name && (
+                <div className="fp-activity"><ActivityBadge activity={user.activity} /></div>
               )}
             </div>
 
-            {safeUser.bio && (
+            {user.bio && (
               <div className="fp-section">
-                <p className="fp-bio">{safeUser.bio}</p>
+                <p className="fp-bio">{user.bio}</p>
               </div>
             )}
 
-            {safeUser.sociallinks && Object.keys(safeUser.sociallinks).some(k => (safeUser.socialorder || []).includes(k) && safeUser.sociallinks[k]) && (
+            {user.socialLinks && Object.keys(user.socialLinks).some(k => (user.activePlatforms || []).includes(k) && user.socialLinks[k]) && (
               <div className="fp-section">
                 <span className="fp-section-label">SOCIALS</span>
                 <div className="fp-socials-row">
-                  {Object.entries(safeUser.sociallinks).filter(([k, v]) => (safeUser.socialorder || []).includes(k) && v).map(([k, handle]) => {
+                  {Object.entries(user.socialLinks).filter(([k, v]) => (user.activePlatforms || []).includes(k) && v).map(([k, handle]) => {
                     const Icon = SOCIAL_ICONS[k]
                     return Icon ? (
                       <a key={k} className="fp-social-link" href={handle.startsWith('http') ? handle : `#`} target="_blank" rel="noopener noreferrer" title={handle}>
@@ -2919,11 +2886,11 @@ function FullProfilePage({ user, isSelf, reelms = [], onClose, onMessage, onAddF
             {!isSelf && (
               <div className="fp-actions">
                 {!isBlocked && onMessage && <button className="fp-action-btn fp-action-btn--primary" onClick={() => { onMessage(); handleClose() }}>Mesaj Gönder</button>}
-                {!isBlocked && !isFriend && !isPending && onAddFriend && <button className="fp-action-btn" onClick={() => { onAddFriend(safeUser); handleClose() }}>Arkadaş Ekle</button>}
+                {!isBlocked && !isFriend && !isPending && onAddFriend && <button className="fp-action-btn" onClick={() => { onAddFriend(user); handleClose() }}>Arkadaş Ekle</button>}
                 {!isBlocked && !isFriend && isPending && <button className="fp-action-btn" disabled>İstek Gönderildi</button>}
-                {!isBlocked && isFriend && onRemove && <button className="fp-action-btn fp-action-danger" onClick={() => { onRemove(safeUser.id); handleClose() }}>Arkadaşlıktan Çıkar</button>}
-                {isBlocked && onUnblock && <button className="fp-action-btn" onClick={() => { onUnblock(safeUser.id); handleClose() }}>Engeli Kaldır</button>}
-                {!isBlocked && onBlock && <button className="fp-action-btn fp-action-danger" onClick={() => { onBlock(safeUser); handleClose() }}>Engelle</button>}
+                {!isBlocked && isFriend && onRemove && <button className="fp-action-btn fp-action-danger" onClick={() => { onRemove(user.id); handleClose() }}>Arkadaşlıktan Çıkar</button>}
+                {isBlocked && onUnblock && <button className="fp-action-btn" onClick={() => { onUnblock(user.id); handleClose() }}>Engeli Kaldır</button>}
+                {!isBlocked && onBlock && <button className="fp-action-btn fp-action-danger" onClick={() => { onBlock(user); handleClose() }}>Engelle</button>}
               </div>
             )}
           </div>
@@ -2947,8 +2914,8 @@ function FullProfilePage({ user, isSelf, reelms = [], onClose, onMessage, onAddF
             <div className="fp-sidebar-card">
               <span className="fp-section-label">AKTİVİTE</span>
               <div className="fp-activity-log">
-                {safeUser.activity?.name
-                  ? <div className="fp-activity-item"><ActivityBadge activity={safeUser.activity} /></div>
+                {user.activity?.name
+                  ? <div className="fp-activity-item"><ActivityBadge activity={user.activity} /></div>
                   : <span className="fp-activity-empty">Aktif aktivite yok</span>}
               </div>
             </div>
@@ -3115,7 +3082,7 @@ function ModInboxPanel({ onClose }) {
               {isFlag ? (
                 <div className="mod-inbox-body">
                   <div className="mod-inbox-text">"{ev.text}"</div>
-                  {ev.categories?.length > 0 && (
+                  {Array.isArray(ev.categories) && ev.categories.length > 0 && (
                     <div className="mod-inbox-cats">{ev.categories.join(' · ')}</div>
                   )}
                 </div>
@@ -6041,180 +6008,15 @@ function isGoogleDefaultAvatarUrl(value) {
   return /(^|\.)googleusercontent\.com\//i.test(url) || /lh3\.googleusercontent\.com/i.test(url)
 }
 
-function isRawMediaLike(value) {
-  const text = String(value || '').trim()
-  if (!text) return false
-  if (/^data:image\//i.test(text)) return true
-  if (text.length > 4096 && /^[A-Za-z0-9+/=\r\n]+$/.test(text)) return true
-  return false
-}
-
-function safeMediaSrc(value) {
-  const text = String(value || '').trim()
-  if (!text || isRawMediaLike(text)) return null
-  // Media rendered in cards must be a browser-fetchable URL. Object keys or
-  // random strings should not become broken relative <img> requests.
-  if (/^(https?:|blob:)/i.test(text)) return text
-  return null
-}
-
-function safeRgbArray(value, fallback = [185, 152, 135]) {
-  if (Array.isArray(value)) {
-    const nums = value.map((n) => Number(n)).filter((n) => Number.isFinite(n))
-    if (nums.length >= 3) return nums.slice(0, 3).map((n) => Math.max(0, Math.min(255, Math.round(n))))
-  }
-  if (typeof value === 'string') {
-    const hex = hexToRgb(value)
-    if (hex) return hex
-    const nums = value.split(/[ ,]+/).map((n) => Number(n)).filter((n) => Number.isFinite(n))
-    if (nums.length >= 3) return nums.slice(0, 3).map((n) => Math.max(0, Math.min(255, Math.round(n))))
-  }
-  return fallback
-}
-
-const PROFILE_MEDIA_LIMITS = {
-  avatar: 5 * 1024 * 1024,
-  profile_photo: 5 * 1024 * 1024,
-  banner: 8 * 1024 * 1024,
-  cover: 8 * 1024 * 1024,
-  background: 10 * 1024 * 1024,
-  server_icon: 5 * 1024 * 1024,
-}
-const PROFILE_IMAGE_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
-
-function validateProfileImageFile(file, purpose = 'avatar') {
-  if (!file) throw new Error('Dosya seçilmedi.')
-  const type = String(file.type || '').toLowerCase()
-  if (!PROFILE_IMAGE_TYPES.has(type)) throw new Error('Sadece JPG, PNG veya WebP görsel yüklenebilir.')
-  const max = PROFILE_MEDIA_LIMITS[purpose] || PROFILE_MEDIA_LIMITS.avatar
-  if (Number(file.size || 0) > max) throw new Error(`Görsel çok büyük. Maksimum ${(max / 1024 / 1024).toFixed(0)} MB olmalı.`)
-}
-
-function loadImageFromFile(file) {
-  return new Promise((resolve, reject) => {
-    const url = URL.createObjectURL(file)
-    const img = new Image()
-    img.onload = () => { URL.revokeObjectURL(url); resolve(img) }
-    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Görsel okunamadı.')) }
-    img.src = url
-  })
-}
-
-function canvasToFile(canvas, fileName, type = 'image/webp', quality = 0.86) {
-  return new Promise((resolve, reject) => {
-    canvas.toBlob((blob) => {
-      if (!blob) return reject(new Error('Görsel işlenemedi.'))
-      resolve(new File([blob], fileName, { type: blob.type || type }))
-    }, type, quality)
-  })
-}
-
-async function resizeImageFileForUpload(file, purpose = 'avatar') {
-  validateProfileImageFile(file, purpose)
-  const img = await loadImageFromFile(file)
-  const cfg = {
-    avatar: { w: 512, h: 512, square: true, q: 0.88 },
-    profile_photo: { w: 512, h: 512, square: true, q: 0.88 },
-    banner: { w: 1600, h: 640, square: false, q: 0.84 },
-    cover: { w: 1600, h: 640, square: false, q: 0.84 },
-    background: { w: 1920, h: 1080, square: false, q: 0.82 },
-    server_icon: { w: 512, h: 512, square: true, q: 0.86 },
-  }[purpose] || { w: 1200, h: 1200, square: false, q: 0.84 }
-  let sw = img.naturalWidth || img.width
-  let sh = img.naturalHeight || img.height
-  if (!sw || !sh) throw new Error('Görsel boyutu okunamadı.')
-  let sx = 0, sy = 0
-  if (cfg.square) {
-    const side = Math.min(sw, sh)
-    sx = Math.round((sw - side) / 2)
-    sy = Math.round((sh - side) / 2)
-    sw = side
-    sh = side
-  }
-  const scale = Math.min(1, cfg.w / sw, cfg.h / sh)
-  const w = cfg.square ? cfg.w : Math.max(1, Math.round(sw * scale))
-  const h = cfg.square ? cfg.h : Math.max(1, Math.round(sh * scale))
-  const canvas = document.createElement('canvas')
-  canvas.width = w
-  canvas.height = h
-  const ctx = canvas.getContext('2d')
-  if (!ctx) throw new Error('Görsel işleme desteklenmiyor.')
-  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h)
-  const base = String(file.name || `${purpose}.webp`).replace(/\.[a-z0-9]+$/i, '')
-  return canvasToFile(canvas, `${base}-${purpose}.webp`, 'image/webp', cfg.q)
-}
-
-async function uploadProfileImageFile(file, purpose = 'avatar') {
-  const processed = await resizeImageFileForUpload(file, purpose)
-  const media = await mediaUploadToS3(processed, purpose)
-  const url = safeMediaSrc(media?.url || media?.mediaUrl || media?.publicUrl || null)
-  if (!url) throw new Error('Yükleme tamamlandı ama görsel URL alınamadı.')
-  return { url, media, file: processed }
-}
-
 function getPersonPhoto(person) {
   if (!person) return null
   const photo = person.photo || person.profilePhoto || person.photoURL || person.avatar || person.image || person.imageUrl || person.userPhoto || person.fromPhoto || null
-  return isGoogleDefaultAvatarUrl(photo) ? null : safeMediaSrc(photo)
+  return isGoogleDefaultAvatarUrl(photo) ? null : safeImageUrl(photo)
 }
 
 function getPersonCover(person) {
   if (!person) return null
-  return safeMediaSrc(person.cover || person.coverImage || person.coverUrl || person.headerImage || person.banner || person.bannerImage || person.backgroundCover || null)
-}
-
-
-function orderReelmsBySavedBarOrder(reelms = [], order = []) {
-  const list = Array.isArray(reelms) ? [...reelms] : []
-  const ids = Array.isArray(order) ? order.map(String).filter(Boolean) : []
-  if (!ids.length) return list
-  const rank = new Map(ids.map((id, index) => [id, index]))
-  return list.sort((a, b) => {
-    const ai = rank.has(String(a?.id || '')) ? rank.get(String(a?.id || '')) : Number.MAX_SAFE_INTEGER
-    const bi = rank.has(String(b?.id || '')) ? rank.get(String(b?.id || '')) : Number.MAX_SAFE_INTEGER
-    if (ai !== bi) return ai - bi
-    return 0
-  })
-}
-
-function normalizeFriendProfileTarget(person = {}) {
-  const p = person && typeof person === 'object' ? person : {}
-  const id = String(p.id || p.uid || p.userId || p.friendId || '')
-  const system = isReelmsSystemUid(id) || p.isSystem === true || p.system === true
-  const fallbackName = p.accountClosed || p.deletedAt ? 'Deleted user' : (system ? 'Reelms System' : 'User')
-  const name = p.name || p.displayName || p.userName || p.username || fallbackName
-  const cover = getPersonCover(p)
-  const photo = getPersonPhoto(p)
-  return {
-    ...p,
-    id,
-    uid: String(p.uid || id),
-    userId: String(p.userId || id),
-    name,
-    displayName: p.displayName || p.name || p.userName || p.username || name,
-    userName: p.userName || p.name || p.displayName || name,
-    username: String(p.username || '').replace(/^@/, ''),
-    photo,
-    profilePhoto: photo,
-    photoURL: photo,
-    avatar: photo,
-    image: photo,
-    userPhoto: photo,
-    cover,
-    coverImage: cover,
-    coverUrl: cover,
-    headerImage: cover,
-    banner: cover,
-    bannerImage: cover,
-    backgroundCover: cover,
-    bio: typeof p.bio === 'string' ? p.bio : '',
-    activity: p.activity && typeof p.activity === 'object' ? p.activity : null,
-    sociallinks: (p.sociallinks && typeof p.sociallinks === 'object') ? p.sociallinks : ((p.socialLinks && typeof p.socialLinks === 'object') ? p.socialLinks : {}),
-    socialorder: Array.isArray(p.socialorder) ? p.socialorder : (Array.isArray(p.socialOrder) ? p.socialOrder : (Array.isArray(p.activePlatforms) ? p.activePlatforms : [])),
-    profileTheme: p.profileTheme && typeof p.profileTheme === 'object' ? p.profileTheme : null,
-    accountClosed: p.accountClosed === true || Boolean(p.deletedAt),
-    isSystem: system
-  }
+  return safeImageUrl(person.cover || person.coverImage || person.coverUrl || person.headerImage || person.banner || person.bannerImage || person.backgroundCover || null)
 }
 
 function buildProfileThemeStyle(person) {
@@ -6223,13 +6025,13 @@ function buildProfileThemeStyle(person) {
   const theme = THEMES.find(th => th.id === cfg.themeId) || THEMES[0]
   const accent = cfg.customAccent || theme.accent || '#b99887'
   const base = cfg.customBase || theme.base || '#120e1e'
-  const accentRgb = safeRgbArray(hexToRgb(accent) || cfg.accentRgb || theme.accentRgb, [185, 152, 135])
-  const baseRgb = safeRgbArray(hexToRgb(base) || cfg.baseRgb || theme.baseRgb, [18, 14, 30])
+  const accentRgb = rgbCssValue(hexToRgb(accent) || theme.accentRgb, [185, 152, 135])
+  const baseRgb = rgbCssValue(hexToRgb(base) || theme.baseRgb, [18, 14, 30])
   return {
     '--fpp-theme-accent': accent,
-    '--fpp-theme-accent-rgb': accentRgb.join(','),
+    '--fpp-theme-accent-rgb': accentRgb,
     '--fpp-theme-base': base,
-    '--fpp-theme-base-rgb': baseRgb.join(','),
+    '--fpp-theme-base-rgb': baseRgb,
   }
 }
 
@@ -6449,24 +6251,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     return next
   }
 
-  const profileSaveKeyRef = useRef('')
-  const updateUserData = async (updates) => {
+  const updateUserData = (updates) => {
     const normalized = normalizeProfileUpdates(updates)
-    const saveKey = stableDocKey(normalized)
-    setCurrentUser(prev => ({ ...(prev || {}), ...normalized }))
-    if (profileSaveKeyRef.current === saveKey) return { ok: true, deduped: true }
-    profileSaveKeyRef.current = saveKey
-    try {
-      const result = await userProfilePatch(normalized)
-      if (result?.data) setCurrentUser(prev => sameLegacyProfile(prev, result.data) ? prev : { ...(prev || {}), ...result.data })
-      pushToast?.({ id: 'profile-saved-' + Date.now(), text: 'Profil kaydedildi.' })
-      return result || { ok: true }
-    } catch (err) {
-      pushToast?.({ id: 'profile-save-failed-' + Date.now(), text: 'Profil kaydedilemedi.' })
-      throw err
-    } finally {
-      setTimeout(() => { if (profileSaveKeyRef.current === saveKey) profileSaveKeyRef.current = '' }, 800)
-    }
+    setCurrentUser(prev => {
+      const updated = { ...(prev || {}), ...normalized }
+      userProfilePatch(normalized).catch(() => {})
+      return updated
+    })
   }
 
   const [customization, setCustomization] = useState(() => ({ ...DEFAULT_CUSTOMIZATION }))
@@ -6487,7 +6278,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         const nextCustomization = {
           ...DEFAULT_CUSTOMIZATION,
           ...base,
-          bgImage: typeof bg === 'string' ? bg : null,
+          bgImage: typeof bg === 'string' ? bg : (base.bgImage ?? null),
         }
         setCustomization(prev => sameDocValue(prev, nextCustomization) ? prev : nextCustomization)
         try { localStorage.setItem(`reelms:customization:${uid}`, JSON.stringify(nextCustomization)) } catch {}
@@ -6519,21 +6310,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       try { if (uid && uid !== 'guest') localStorage.setItem(`reelms:customization:${uid}`, JSON.stringify(updated)) } catch {}
       scheduleUserPersist('customization', toSave)
       // Keep account customization durable even if the app is closed shortly after a change.
-      userPutDoc('customization', toSave)
-        .then(() => pushToast?.({ id: 'customization-saved-' + Date.now(), text: 'Tema kaydedildi.' }))
-        .catch(() => pushToast?.({ id: 'customization-failed-' + Date.now(), text: 'Tema kaydedilemedi.' }))
-      userProfilePatch({ profileTheme: { ...toSave, bgImage: updated.bgImage || null }, bgImage: updated.bgImage || null }).catch(() => {})
+      userPutDoc('customization', toSave).catch(() => {})
+      userProfilePatch({ profileTheme: toSave }).catch(() => {})
       if ('bgImage' in updates) {
         if (updates.bgImage) {
           scheduleUserPersist('bg_image', updates.bgImage)
-          userPutDoc('bg_image', updates.bgImage)
-            .then(() => pushToast?.({ id: 'background-saved-' + Date.now(), text: 'Arka plan kaydedildi.' }))
-            .catch(() => pushToast?.({ id: 'background-failed-' + Date.now(), text: 'Arka plan kaydedilemedi.' }))
+          userPutDoc('bg_image', updates.bgImage).catch(() => {})
         } else {
-          scheduleUserPersist('bg_image', null)
-          userPutDoc('bg_image', null)
-            .then(() => pushToast?.({ id: 'background-removed-' + Date.now(), text: 'Arka plan kaldırıldı.' }))
-            .catch(() => pushToast?.({ id: 'background-remove-failed-' + Date.now(), text: 'Arka plan kaldırılamadı.' }))
+          userPutDoc('bg_image', '').catch(() => {})
         }
       }
       return updated
@@ -6541,9 +6325,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }
   const activeTheme = THEMES.find(t => t.id === customization.themeId) || THEMES[0]
   const effectiveAccent    = customization.customAccent || activeTheme.accent
-  const effectiveAccentRgb = customization.customAccent ? hexToRgb(customization.customAccent) : activeTheme.accentRgb
+  const effectiveAccentRgb = rgbCssValue(customization.customAccent ? hexToRgb(customization.customAccent) : activeTheme.accentRgb, [185, 152, 135])
   const effectiveBase      = customization.customBase   || activeTheme.base
-  const effectiveBaseRgb   = customization.customBase   ? hexToRgb(customization.customBase)   : activeTheme.baseRgb
+  const effectiveBaseRgb   = rgbCssValue(customization.customBase ? hexToRgb(customization.customBase) : activeTheme.baseRgb, [18, 14, 30])
   const effectiveTextColor = (() => {
     const tc = customization.customTextColor || 'white'
     if (tc === 'black') return 'rgba(20, 14, 30, 0.9)'
@@ -6736,20 +6520,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (!scopedKey) return []
     return Array.isArray(vcParticipantsByChannel[scopedKey]) ? vcParticipantsByChannel[scopedKey] : []
   }
-  const normalizeVoiceParticipant = (participant = {}, existing = {}) => {
-    const id = String(participant.userId || participant.id || existing.userId || '')
-    return {
-      ...existing,
-      ...participant,
-      userId: id,
-      userName: participant.userName || participant.name || existing.userName || 'User',
-      userPhoto: getPersonPhoto(participant) || participant.userPhoto || existing.userPhoto || null,
-      isMuted: participant.isMuted != null ? Boolean(participant.isMuted) : Boolean(existing.isMuted),
-      isDeafened: participant.isDeafened != null ? Boolean(participant.isDeafened) : Boolean(existing.isDeafened),
-      isVideoOn: participant.isVideoOn != null ? Boolean(participant.isVideoOn) : Boolean(existing.isVideoOn),
-      isScreenSharing: participant.isScreenSharing != null ? Boolean(participant.isScreenSharing) : Boolean(existing.isScreenSharing)
-    }
-  }
   const canManageVoiceClient = (reelm, actorUid) => hasReelmPermissionClient(reelm, actorUid, 'manageVoice') || hasReelmPermissionClient(reelm, actorUid, 'manageModeration')
   const isStageLikeChannel = (channel) => String(channel?.type || '') === 'stage'
   const canSpeakInStageClient = (reelm, channel, actorUid) => {
@@ -6870,27 +6640,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [discoverQuery, setDiscoverQuery] = useState('')
   const [discoverUsers, setDiscoverUsers] = useState([])
   const [discoverReelmsList, setDiscoverReelmsList] = useState([])
-  const [discoverLoading, setDiscoverLoading] = useState(false)
-  const discoverSeqRef = useRef(0)
   const [pendingReelmJoinIds, setPendingReelmJoinIds] = useState([])
-  const [pendingActionKeys, setPendingActionKeys] = useState([])
-  const pendingActionKeysRef = useRef(new Set())
-  const setActionPending = useCallback((key, pending) => {
-    const k = String(key || '')
-    if (!k) return
-    const next = new Set(pendingActionKeysRef.current)
-    if (pending) next.add(k)
-    else next.delete(k)
-    pendingActionKeysRef.current = next
-    setPendingActionKeys(Array.from(next))
-  }, [])
-  const runLockedAction = useCallback(async (key, fn) => {
-    const k = String(key || '')
-    if (!k || pendingActionKeysRef.current.has(k)) return null
-    setActionPending(k, true)
-    try { return await fn() } finally { setActionPending(k, false) }
-  }, [setActionPending])
-  const isActionPending = useCallback((key) => pendingActionKeys.includes(String(key || '')), [pendingActionKeys])
   const [showFriendsPopup, setShowFriendsPopup] = useState(false)
   const [showNotificationsPopup, setShowNotificationsPopup] = useState(false)
   const [showFriendsPanel, setShowFriendsPanel] = useState(false)
@@ -7167,7 +6917,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       if (data.spotify_connected === true || data.spotify_connected === 'true') setSpotifyConnected(true)
       if (data.last_channels && typeof data.last_channels === 'object') setLastChannels(data.last_channels)
       if (Array.isArray(data.sessions)) setSessionsList(data.sessions)
-      if (Array.isArray(data.reelms)) setReelms(orderReelmsBySavedBarOrder(data.reelms, data.bar_order))
+      if (Array.isArray(data.reelms)) setReelms(data.reelms)
       if (Array.isArray(data.chats)) { setChats(data.chats); data.chats.forEach(c => { if (c?.id) socketJoinChannel(c.id) }) }
       if (data.sounds && typeof data.sounds === 'object') setSoundSettings(s => ({ ...s, ...data.sounds }))
       soundPrevRef.current = {
@@ -7207,7 +6957,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       else if (sk === 'nicknames') setStableObject(setNicknames, v && typeof v === 'object' ? v : {})
       else if (sk === 'unread_counts') setStableObject(setUnreadCounts, v && typeof v === 'object' ? v : {})
       else if (sk === 'pinned_items') setStableArray(setPinnedItemIds, Array.isArray(v) ? v : [])
-      else if (sk === 'bar_order') { if (Array.isArray(v)) setReelms(prev => orderReelmsBySavedBarOrder(prev, v)) }
       else if (sk === 'muted_reelms') setStableArray(setMutedReelmIds, Array.isArray(v) ? v.map(String) : [])
       else if (sk === 'spotify_connected') setSpotifyConnected(v === true || v === 'true')
       else if (sk === 'last_channels') setStableObject(setLastChannels, v && typeof v === 'object' ? v : {})
@@ -7564,11 +7313,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           const next = { ...prev }
           if (reelmId && channelId) {
             const key = `${reelmId}:${channelId}`
-            next[key] = Array.isArray(participants) ? participants.map(p => normalizeVoiceParticipant(p)) : []
+            next[key] = Array.isArray(participants) ? participants : []
           }
           if (reelmId && channels && typeof channels === 'object') {
             Object.entries(channels).forEach(([chId, list]) => {
-              next[`${reelmId}:${chId}`] = Array.isArray(list) ? list.map(p => normalizeVoiceParticipant(p)) : []
+              next[`${reelmId}:${chId}`] = Array.isArray(list) ? list : []
             })
           }
           return next
@@ -7593,7 +7342,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           participants.forEach(p => {
             const id = String(p.userId || '')
             if (!id || id === String(uid)) return
-            byId.set(id, normalizeVoiceParticipant(p, byId.get(id) || {}))
+            if (!byId.has(id)) byId.set(id, { userId: id, userName: p.userName || 'Member', userPhoto: p.userPhoto || null, isMuted: false, isVideoOn: false })
           })
           return Array.from(byId.values())
         })
@@ -7712,23 +7461,20 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   // Debounced and min 2 characters so typing does not flood the API/rate limiter.
   useEffect(() => {
     const q = discoverQuery.trim()
-    const seq = ++discoverSeqRef.current
     if (!q || q.length < 2) {
-      setDiscoverLoading(false)
       setDiscoverUsers([])
       setDiscoverReelmsList([])
       return undefined
     }
 
     let cancelled = false
-    setDiscoverLoading(true)
     const timer = window.setTimeout(() => {
       Promise.all([
         usersList(q).catch(() => []),
         discoverReelms(q).catch(() => []),
       ]).then(([users, publicReelms]) => {
-        if (cancelled || seq !== discoverSeqRef.current) return
-        const safeUsers = Array.isArray(users) ? users.filter(u => !u.isSystem && !isReelmsSystemUid(u.id || u.uid || u.userId)) : []
+        if (cancelled) return
+        const safeUsers = Array.isArray(users) ? users.filter(u => !u.isSystem) : []
         const safeReelms = Array.isArray(publicReelms) ? publicReelms : []
         setDiscoverUsers(safeUsers)
         setDiscoverReelmsList(safeReelms)
@@ -7737,12 +7483,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           setPendingReelmJoinIds(prev => Array.from(new Set([...prev.map(String), ...pendingIds])))
         }
       }).catch(() => {
-        if (!cancelled && seq === discoverSeqRef.current) {
+        if (!cancelled) {
           setDiscoverUsers([])
           setDiscoverReelmsList([])
         }
-      }).finally(() => {
-        if (!cancelled && seq === discoverSeqRef.current) setDiscoverLoading(false)
       })
     }, 350)
 
@@ -7955,32 +7699,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }
 
 
-  const spotifyControl = async (action) => {
-    try {
-      const authToken = await getIdToken().catch(() => null)
-      if (!authToken) return
-      const res = await fetch(`${BACKEND_URL}/spotify/token`, { headers: { Authorization: `Bearer ${authToken}` } })
-      if (!res.ok) return
-      const { token } = await res.json()
-      if (action === 'next') {
-        await fetch('https://api.spotify.com/v1/me/player/next', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
-      } else if (action === 'prev') {
-        await fetch('https://api.spotify.com/v1/me/player/previous', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
-      } else if (action === 'toggle') {
-        const stateRes = await fetch('https://api.spotify.com/v1/me/player', { headers: { Authorization: `Bearer ${token}` } })
-        if (stateRes.status === 204 || !stateRes.ok) return
-        const state = await stateRes.json()
-        if (state?.is_playing) {
-          await fetch('https://api.spotify.com/v1/me/player/pause', { method: 'PUT', headers: { Authorization: `Bearer ${token}` } })
-          setSpotifyInlinePaused(true)
-        } else {
-          await fetch('https://api.spotify.com/v1/me/player/play', { method: 'PUT', headers: { Authorization: `Bearer ${token}` } })
-          setSpotifyInlinePaused(false)
-        }
-      }
-    } catch (e) { console.error('[Spotify control]', e) }
-  }
-
   async function toggleRecording() {
     if (isRecording) {
       mediaRecorderRef.current?.stop()
@@ -8177,41 +7895,35 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const isFriend = (userId) => friends.some(f => String(f.id) === String(userId))
   const hasSentRequest = (userId) => friendRequestsOut.map(String).includes(String(userId))
   const sendMsgRequest = async (targetUser, preview = '') => {
-    const targetId = String(targetUser?.id || targetUser?.uid || targetUser?.userId || '')
-    if (!targetId) return
-    await runLockedAction(`msgreq:${targetId}`, async () => {
-      try {
-        const targetUser_ = (await userProfileGetById(targetId)) || targetUser
-        if (targetUser_.allowMessageRequests === false) return
-        if (messageRequestsOut.map(String).includes(String(targetId))) return
-        await socialMessageRequest(targetId, {
-          id: uid,
-          name: currentUser.name,
-          username: currentUser.username,
-          photo: getPersonPhoto(currentUser) || null,
-        }, preview)
-        setMessageRequestsOut((o) => Array.from(new Set([...(Array.isArray(o) ? o.map(String) : []), targetId])))
-      } catch { /* noop */ }
-    })
+    try {
+      const targetUser_ = (await userProfileGetById(targetUser.id)) || targetUser
+      if (targetUser_.allowMessageRequests === false) return
+      if (messageRequestsOut.map(String).includes(String(targetUser.id))) return
+      await socialMessageRequest(targetUser.id, {
+        id: uid,
+        name: currentUser.name,
+        username: currentUser.username,
+        photo: getPersonPhoto(currentUser) || null,
+      }, preview)
+      setMessageRequestsOut((o) => [...(Array.isArray(o) ? o : []), String(targetUser.id)])
+    } catch { /* noop */ }
   }
   const hasSentMsgRequest = (targetId) => messageRequestsOut.map(String).includes(String(targetId))
 
   const sendFriendRequest = async (targetUser) => {
-    const tid = String(targetUser?.id || targetUser?.uid || targetUser?.userId || '')
-    if (!tid || tid === String(uid) || isBlocked(tid)) return
-    await runLockedAction(`friend:${tid}`, async () => {
-      try {
-        if (friendRequestsOut.map(String).includes(tid)) return
-        const result = await socialFriendRequest(tid, {
-          id: uid,
-          name: currentUser.name,
-          username: currentUser.username,
-          photo: getPersonPhoto(currentUser) || null,
-        })
-        if (result?.alreadyFriends || result?.acceptedReverse) return
-        setFriendRequestsOut((o) => Array.from(new Set([...(Array.isArray(o) ? o.map(String) : []), tid])))
-      } catch { /* noop */ }
-    })
+    try {
+      const tid = String(targetUser.id)
+      if (!tid || tid === String(uid) || isBlocked(tid)) return
+      if (friendRequestsOut.map(String).includes(tid)) return
+      const result = await socialFriendRequest(tid, {
+        id: uid,
+        name: currentUser.name,
+        username: currentUser.username,
+        photo: getPersonPhoto(currentUser) || null,
+      })
+      if (result?.alreadyFriends || result?.acceptedReverse) return
+      setFriendRequestsOut((o) => [...(Array.isArray(o) ? o : []), tid])
+    } catch { /* noop */ }
   }
   const acceptFriendRequest = async (requester) => {
     try {
@@ -8613,24 +8325,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }, [messages, selectedChat, selectedReelm])
   const [showPlusMenu, setShowPlusMenu] = useState(false)
   const [barCtxMenu, setBarCtxMenu] = useState(null) // { x, y, item }
-  const [barDragReelmId, setBarDragReelmId] = useState(null)
-  const [barDropReelmId, setBarDropReelmId] = useState(null)
-  const reorderReelmBar = useCallback((fromId, toId) => {
-    const a = String(fromId || '')
-    const b = String(toId || '')
-    if (!a || !b || a === b) return
-    setReelms(prev => {
-      const list = Array.isArray(prev) ? [...prev] : []
-      const from = list.findIndex(r => String(r.id) === a)
-      const to = list.findIndex(r => String(r.id) === b)
-      if (from < 0 || to < 0) return prev
-      const [item] = list.splice(from, 1)
-      list.splice(to, 0, item)
-      scheduleUserPersist('reelms', list)
-      scheduleUserPersist('bar_order', list.map(r => String(r.id)))
-      return list
-    })
-  }, [])
 
   useEffect(() => {
     if (!barCtxMenu) return
@@ -9186,7 +8880,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = false })
       setVoiceMuted(true)
       setVoiceParticipants(prev => prev.map(p => p.userId === uid ? { ...p, isMuted: true } : p))
-      vcBroadcast({ type: 'mute', userId: uid, isMuted: true, isDeafened: voiceDeafened })
+      vcBroadcast({ type: 'mute', userId: uid, isMuted: true })
       addNotification('A moderator muted your microphone. You can unmute yourself when ready.')
       return
     }
@@ -9212,12 +8906,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       return
     }
     if (type === 'join') {
-      setVoiceParticipants(prev => prev.find(p => String(p.userId) === String(from)) ? prev.map(p => String(p.userId) === String(from) ? normalizeVoiceParticipant(msg, p) : p) : [...prev, normalizeVoiceParticipant({ ...msg, userId: from })])
+      setVoiceParticipants(prev => prev.find(p => String(p.userId) === String(from)) ? prev : [...prev, { userId: from, userName: msg.userName, userPhoto: msg.userPhoto, isMuted: false, isVideoOn: false }])
       createPeer(from, localStreamRef.current, shouldInitiatePeer(from))
       // Tell the newcomer we're here
       socketVcSignal(from, { type: 'here', userId: uid, userName: currentUserRef.current?.name, userPhoto: getPersonPhoto(currentUserRef.current) || null })
     } else if (type === 'here') {
-      setVoiceParticipants(prev => prev.find(p => String(p.userId) === String(from)) ? prev.map(p => String(p.userId) === String(from) ? normalizeVoiceParticipant(msg, p) : p) : [...prev, normalizeVoiceParticipant({ ...msg, userId: from })])
+      setVoiceParticipants(prev => prev.find(p => String(p.userId) === String(from)) ? prev : [...prev, { userId: from, userName: msg.userName, userPhoto: msg.userPhoto, isMuted: false, isVideoOn: false }])
       createPeer(from, localStreamRef.current, shouldInitiatePeer(from))
     } else if (type === 'leave') {
       const fk = String(from)
@@ -9264,9 +8958,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         pc.addIceCandidate(new RTCIceCandidate(msg.candidate)).catch(() => {})
       }
     } else if (type === 'mute') {
-      setVoiceParticipants(prev => prev.map(p => String(p.userId) === String(from) ? { ...p, isMuted: Boolean(msg.isMuted), isDeafened: msg.isDeafened != null ? Boolean(msg.isDeafened) : p.isDeafened } : p))
-    } else if (type === 'deafen') {
-      setVoiceParticipants(prev => prev.map(p => String(p.userId) === String(from) ? { ...p, isDeafened: Boolean(msg.isDeafened), isMuted: msg.isMuted != null ? Boolean(msg.isMuted) : p.isMuted } : p))
+      setVoiceParticipants(prev => prev.map(p => String(p.userId) === String(from) ? { ...p, isMuted: msg.isMuted } : p))
     } else if (type === 'video') {
       const isOn = Boolean(msg.isVideoOn)
       setVoiceParticipants(prev => prev.map(p => String(p.userId) === String(from) ? { ...p, isVideoOn: isOn } : p))
@@ -9437,7 +9129,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = false })
       setVoiceMuted(true)
       setVoiceParticipants(prev => prev.map(p => p.userId === uid ? { ...p, isMuted: true } : p))
-      vcBroadcast({ type: 'mute', userId: uid, isMuted: true, isDeafened: voiceDeafened })
+      vcBroadcast({ type: 'mute', userId: uid, isMuted: true })
     }
     addNotification(shouldSpeak ? 'Member added as a speaker.' : 'Member moved back to listener.')
   }
@@ -9667,7 +9359,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = !next })
     setVoiceMuted(next)
     setVoiceParticipants(prev => prev.map(p => p.userId === uid ? { ...p, isMuted: next } : p))
-    vcBroadcast({ type: 'mute', userId: uid, isMuted: next, isDeafened: voiceDeafened })
+    vcBroadcast({ type: 'mute', userId: uid, isMuted: next })
   }
 
   useEffect(() => {
@@ -9678,12 +9370,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }, [voiceDeafened])
 
   const voiceToggleDeafen = () => {
-    setVoiceDeafened(prev => {
-      const next = !prev
-      setVoiceParticipants(list => list.map(p => p.userId === uid ? { ...p, isDeafened: next } : p))
-      vcBroadcast({ type: 'deafen', userId: uid, isDeafened: next, isMuted: voiceMuted })
-      return next
-    })
+    setVoiceDeafened(next => !next)
   }
 
   const voiceToggleFullMute = () => {
@@ -9691,8 +9378,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     localStreamRef.current?.getAudioTracks().forEach(t => { t.enabled = !next })
     setVoiceMuted(next)
     setVoiceDeafened(next)
-    setVoiceParticipants(prev => prev.map(p => p.userId === uid ? { ...p, isMuted: next, isDeafened: next } : p))
-    vcBroadcast({ type: 'mute', userId: uid, isMuted: next, isDeafened: next })
+    setVoiceParticipants(prev => prev.map(p => p.userId === uid ? { ...p, isMuted: next } : p))
+    vcBroadcast({ type: 'mute', userId: uid, isMuted: next })
   }
 
   const voiceToggleVideo = async () => {
@@ -10023,36 +9710,33 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const requestJoinDiscoverReelm = async (reelm) => {
     if (!reelm?.id) return
-    const lockKey = `join:${reelm.id}`
-    await runLockedAction(lockKey, async () => {
-      if (reelms.some(r => String(r.id) === String(reelm.id))) {
-        handleSelectReelm(reelms.find(r => String(r.id) === String(reelm.id)))
-        setShowDiscover(false)
-        return
-      }
-      try {
-        const result = await requestJoinReelm(reelm.id)
-        if (result?.joined) {
-          const joinedReelm = result.reelm || await hydrateReelmCore(reelm.id).catch(() => null)
-          setPendingReelmJoinIds(prev => prev.filter(id => String(id) !== String(reelm.id)))
-          if (joinedReelm) {
-            mergeReelmIntoState(joinedReelm)
-            handleSelectReelm(joinedReelm)
-            setShowDiscover(false)
-            addNotification(`Joined ${joinedReelm.name}.`, { type: 'reelm', reelmId: joinedReelm.id })
-          } else {
-            addNotification(`Joined ${reelm.name}.`, { type: 'reelm', reelmId: reelm.id })
-          }
+    if (reelms.some(r => String(r.id) === String(reelm.id))) {
+      handleSelectReelm(reelms.find(r => String(r.id) === String(reelm.id)))
+      setShowDiscover(false)
+      return
+    }
+    try {
+      const result = await requestJoinReelm(reelm.id)
+      if (result?.joined) {
+        const joinedReelm = result.reelm || await hydrateReelmCore(reelm.id).catch(() => null)
+        setPendingReelmJoinIds(prev => prev.filter(id => String(id) !== String(reelm.id)))
+        if (joinedReelm) {
+          mergeReelmIntoState(joinedReelm)
+          handleSelectReelm(joinedReelm)
+          setShowDiscover(false)
+          addNotification(`Joined ${joinedReelm.name}.`, { type: 'reelm', reelmId: joinedReelm.id })
         } else {
-          setPendingReelmJoinIds(prev => prev.includes(String(reelm.id)) ? prev : [...prev, String(reelm.id)])
-          setDiscoverReelmsList(prev => prev.map(r => String(r.id) === String(reelm.id) ? { ...r, pending: true } : r))
-          addNotification(`Join request sent to ${reelm.name}.`, { type: 'reelm_join_pending', reelmId: reelm.id })
+          addNotification(`Joined ${reelm.name}.`, { type: 'reelm', reelmId: reelm.id })
         }
-      } catch (err) {
-        if (err?.code === 'reelm/banned' || err?.message === 'reelm_banned') addNotification(err?.payload?.ban?.message || `You are banned from ${reelm.name}.`)
-        else addNotification(`Could not send join request to ${reelm.name}.`)
+      } else {
+        setPendingReelmJoinIds(prev => prev.includes(String(reelm.id)) ? prev : [...prev, String(reelm.id)])
+        setDiscoverReelmsList(prev => prev.map(r => String(r.id) === String(reelm.id) ? { ...r, pending: true } : r))
+        addNotification(`Join request sent to ${reelm.name}.`, { type: 'reelm_join_pending', reelmId: reelm.id })
       }
-    })
+    } catch (err) {
+      if (err?.code === 'reelm/banned' || err?.message === 'reelm_banned') addNotification(err?.payload?.ban?.message || `You are banned from ${reelm.name}.`)
+      else addNotification(`Could not send join request to ${reelm.name}.`)
+    }
   }
 
   const approveReelmJoinRequest = async (reelmId, requesterId) => {
@@ -10077,19 +9761,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }
 
   const inviteFriendToReelm = async (reelmId, targetUid) => {
-    if (!reelmId || !targetUid) return
-    await runLockedAction(`invite:${reelmId}:${targetUid}`, async () => {
-      try {
-        const result = await inviteReelmFriend(reelmId, targetUid)
-        if (result?.alreadyMember) addNotification('This user is already in this Reelm.', { type: 'reelm_invite_sent', reelmId })
-        else if (result?.bypassApproval) addNotification('Invite sent. They can join directly.', { type: 'reelm_invite_sent', reelmId })
-        else addNotification('Invite sent. The owner/admin will approve after they accept.', { type: 'reelm_invite_sent', reelmId })
-      } catch (err) {
-        if (err?.code === 'reelm/banned' || err?.message === 'reelm_banned') addNotification('This user is banned from this Reelm.')
-        else if (err?.message === 'forbidden' || err?.code === 'forbidden') addNotification('You do not have permission to invite members here.')
-        else addNotification('Could not send invite.')
-      }
-    })
+    try {
+      const result = await inviteReelmFriend(reelmId, targetUid)
+      if (result?.alreadyMember) addNotification('This user is already in this Reelm.', { type: 'reelm_invite_sent', reelmId })
+      else if (result?.bypassApproval) addNotification('Invite sent. They can join directly.', { type: 'reelm_invite_sent', reelmId })
+      else addNotification('Invite sent. The owner/admin will approve after they accept.', { type: 'reelm_invite_sent', reelmId })
+    } catch (err) {
+      if (err?.code === 'reelm/banned' || err?.message === 'reelm_banned') addNotification('This user is banned from this Reelm.')
+      else if (err?.message === 'forbidden' || err?.code === 'forbidden') addNotification('You do not have permission to invite members here.')
+      else addNotification('Could not send invite.')
+    }
   }
 
   const banMemberFromReelm = async (reelmId, targetUid, providedReason = null) => {
@@ -10337,9 +10018,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (selectedChannel?.id === chId) setSelectedChannel(null)
   }
 
-  const updateReelmImage = (reelmId, imageUrl) => {
-    const safeUrl = safeMediaSrc(imageUrl) || null
-    const updater = r => ({ ...r, image: safeUrl })
+  const updateReelmImage = (reelmId, imageDataUrl) => {
+    const updater = r => ({ ...r, image: imageDataUrl })
     setReelms(prev => {
       const next = prev.map(r => r.id !== reelmId ? r : updater(r))
       scheduleUserPersist('reelms', next)
@@ -10347,9 +10027,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     })
     setSelectedReelm(prev => {
       const next = updater(prev)
-      persistReelmCore(next, { only: ['meta'] })
-        .then(() => pushToast?.({ id: 'reelm-image-saved-' + Date.now(), text: 'Sunucu görseli kaydedildi.' }))
-        .catch(() => pushToast?.({ id: 'reelm-image-failed-' + Date.now(), text: 'Sunucu görseli kaydedilemedi.' }))
+      persistReelmCore(next)
       return next
     })
   }
@@ -10425,23 +10103,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     return persistReelmCore(updatedReelm)
   }
 
-  const removeMemberFromSelectedReelm = async (targetUid, reason = '') => {
+  const removeMemberFromSelectedReelm = (targetUid, reason = '') => {
     if (!selectedReelm || !targetUid) return
-    const reelmId = selectedReelm.id
     const member = (selectedReelm.members || []).find(m => String(m.userId) === String(targetUid))
     if (!canActOnReelmMemberClient(selectedReelm, uid, member, 'manageMembers')) { addNotification('You cannot kick this member.'); return }
-    await runLockedAction(`kick:${reelmId}:${targetUid}`, async () => {
-      try {
-        const result = await removeReelmMember(reelmId, targetUid, reason)
-        const members = Array.isArray(result?.members) ? result.members : (selectedReelmRef.current?.members || []).filter(m => String(m.userId) !== String(targetUid))
-        setSelectedReelm(prev => String(prev?.id || '') === String(reelmId) ? { ...prev, members } : prev)
-        setReelms(prev => prev.map(r => String(r.id) === String(reelmId) ? { ...r, members } : r))
-        hydrateReelmCore(reelmId).then(r => r && mergeReelmIntoState(r)).catch(() => {})
-        addNotification(reason ? `Member kicked from Reelm: ${reason}` : 'Member kicked from Reelm.')
-      } catch (err) {
-        addNotification(err?.message === 'forbidden' ? 'You cannot kick this member.' : 'Could not kick member.')
-      }
-    })
+    const next = { ...selectedReelm, members: (selectedReelm.members || []).filter(m => String(m.userId) !== String(targetUid)) }
+    updateReelm(next, { scope: 'roles-members', allowMemberRemoval: true })
+    addNotification(reason ? `Member kicked from Reelm: ${reason}` : 'Member kicked from Reelm.')
   }
 
   const openServerMemberAction = (type, reelmId, user) => {
@@ -11050,7 +10718,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       {customization.bgImage && (
         <div className="dashboard-bg" key={customization.bgImage} />
       )}
-      <div className="grain-layer" />
       <div className="dashboard-fg">
         <header className="app-header" style={showMenu ? { filter: 'blur(4px)' } : {}}>
           <div className="logo-area" style={{ cursor: 'pointer' }} onClick={goHome}>
@@ -11059,11 +10726,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           </div>
           <div className="header-icons-group">
             <button className="header-settings-btn" onClick={toggleFriendsPopup} style={{ opacity: showFriendsPopup ? 0 : 1 }}>
-              <img src={friendsIcon} alt="Friends" className="header-icon header-icon-friends" />
+              <img src={friendsIcon} alt="Friends" className="header-icon" style={{ filter: 'hue-rotate(220deg) saturate(1.96) brightness(0.14)' }} />
             </button>
             <button className="header-settings-btn" onClick={toggleNotifPopup} style={{ opacity: showNotificationsPopup ? 0 : 1 }}>
               <span className="notif-icon-wrap">
-                <img src={notificationIcon} alt="Notifications" className="header-icon" />
+                <img src={notificationIcon} alt="Notifications" className="header-icon" style={{ filter: 'hue-rotate(220deg) saturate(1.96) brightness(0.14)' }} />
                 {notifications.length > notifSeenCount && (
                   <span className="notif-badge">{capBadge(notifications.length - notifSeenCount)}</span>
                 )}
@@ -11110,14 +10777,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     ...topChatItems.map(c => ({ ...c, itemType: 'chat' }))
                   ]
                   const pinnedItems = pinnedItemIds.map(id => allItemsFlat.find(i => i.id === id)).filter(Boolean)
-                  const unpinnedItems = allItemsFlat
-                    .filter(i => !pinnedItemIds.includes(i.id))
-                    .sort((a, b) => {
-                      if (a.itemType === 'reelm' && b.itemType === 'reelm') return 0
-                      if (a.itemType === 'reelm') return -1
-                      if (b.itemType === 'reelm') return 1
-                      return (b.updatedAt || 0) - (a.updatedAt || 0)
-                    })
+                  const unpinnedItems = allItemsFlat.filter(i => !pinnedItemIds.includes(i.id)).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
                   const allItems = [...pinnedItems, ...unpinnedItems]
                   if (allItems.length === 0) return <p className="no-chats-text-bar">Start a conversation</p>
                   return (
@@ -11126,44 +10786,22 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         <div
                           key={item.id}
                           data-bar-id={item.id}
-                          className={'bar-item bar-item--' + item.itemType + (item.itemType === 'reelm' && barDragReelmId === String(item.id) ? ' bar-item--dragging' : '') + (item.itemType === 'reelm' && barDropReelmId === String(item.id) ? ' bar-item--drop' : '') + (isDefaultCommunity(item) ? ' bar-item--community-root' : '') + (item.itemType === 'reelm' && mutedReelmIds.map(String).includes(String(item.id)) ? ' bar-item--muted' : '') + (item.itemType === 'chat' && item.type === 'dm' && isUserActive(item.friendId) ? ' bar-item--online' : '') + ((item.itemType === 'reelm' ? selectedReelm?.id : selectedChat?.id) === item.id ? ' bar-item-active' : '')}
+                          className={'bar-item bar-item--' + item.itemType + (isDefaultCommunity(item) ? ' bar-item--community-root' : '') + (item.itemType === 'reelm' && mutedReelmIds.map(String).includes(String(item.id)) ? ' bar-item--muted' : '') + (item.itemType === 'chat' && item.type === 'dm' && isUserActive(item.friendId) ? ' bar-item--online' : '') + ((item.itemType === 'reelm' ? selectedReelm?.id : selectedChat?.id) === item.id ? ' bar-item-active' : '')}
                           onClick={() => {
                             if (item.itemType !== 'reelm') clearUnread(item.id)
                             if (item.itemType === 'reelm') { setSelectedReelm(item); setSelectedChat(null); setShowDiscover(false); setShowFriendsPanel(false); setShowSettings(false); setReelmLoading(true); setTimeout(() => setReelmLoading(false), 350) }
                             else { setSelectedChat(item); setSelectedReelm(null); setSelectedChannel(null); setShowDiscover(false); setShowFriendsPanel(false); setShowSettings(false) }
                           }}
                           onContextMenu={(e) => { e.preventDefault(); setBarCtxMenu({ x: e.clientX, y: e.clientY, item }) }}
-                          draggable={item.itemType === 'reelm'}
-                          onDragStart={(e) => {
-                            if (item.itemType !== 'reelm') return
-                            setBarDragReelmId(String(item.id))
-                            e.dataTransfer.effectAllowed = 'move'
-                            e.dataTransfer.setData('text/plain', String(item.id))
-                          }}
-                          onDragOver={(e) => {
-                            if (item.itemType !== 'reelm' || !barDragReelmId || barDragReelmId === String(item.id)) return
-                            e.preventDefault()
-                            setBarDropReelmId(String(item.id))
-                          }}
-                          onDragLeave={() => { if (barDropReelmId === String(item.id)) setBarDropReelmId(null) }}
-                          onDrop={(e) => {
-                            if (item.itemType !== 'reelm') return
-                            e.preventDefault()
-                            const fromId = e.dataTransfer.getData('text/plain') || barDragReelmId
-                            reorderReelmBar(fromId, item.id)
-                            setBarDragReelmId(null)
-                            setBarDropReelmId(null)
-                          }}
-                          onDragEnd={() => { setBarDragReelmId(null); setBarDropReelmId(null) }}
                           title={item.name}
                         >
                           <span className={`bar-item-wrap${item.id === recentlyBumpedChatId ? ' bar-item-bumped' : ''}`}>
                             <div className={`bar-item-avatar${item.itemType === 'reelm' ? ' bar-item-avatar--server' : ' bar-item-avatar--profile'}${isDefaultCommunity(item) ? ' bar-item-avatar--community' : ''}`}>
                               {(() => {
-                                const avatarSrc = item.itemType === 'chat' ? getChatAvatarSrc(item) : safeMediaSrc(item.image)
+                                const avatarSrc = item.itemType === 'chat' ? getChatAvatarSrc(item) : item.image
                                 const label = item.itemType === 'chat' ? getChatDisplayName(item) : item.name
                                 return avatarSrc
-                                  ? <img src={avatarSrc} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                                  ? <img src={avatarSrc} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: item._type === 'reelm' ? '12px' : '50%' }} />
                                   : isDefaultCommunity(item) ? <ReelmsCommunityGlyph /> : (label || '?').charAt(0).toUpperCase()
                               })()}
                             </div>
@@ -11204,6 +10842,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   {currentActivity?.name && <ActivityBadge activity={currentActivity} />}
                 </div>
               </div>
+              <button className="profile-view-full-btn" onClick={e => { e.stopPropagation(); setFullProfileTarget({ isSelf: true, user: currentUser }) }}>
+                Tüm profili gör
+              </button>
             </div>
           </div>
 
@@ -11343,7 +10984,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           <img src={getPersonPhoto(f) || avatarUIcon} alt="" className="invite-modal-friend-avatar" />
                           <span>{f.name || f.username || 'Friend'}</span>
                         </div>
-                        <button className="invite-modal-copy-btn" disabled={isActionPending(`invite:${selectedReelm.id}:${f.id}`)} onClick={() => inviteFriendToReelm(selectedReelm.id, f.id)}>{isActionPending(`invite:${selectedReelm.id}:${f.id}`) ? 'Sent' : 'Invite'}</button>
+                        <button className="invite-modal-copy-btn" onClick={() => inviteFriendToReelm(selectedReelm.id, f.id)}>Invite</button>
                       </div>
                     ))}
                   {friends.filter(f => f?.id && !(selectedReelm.members || []).some(m => String(m.userId) === String(f.id))).length === 0 && (
@@ -11461,7 +11102,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       { id: 'desktop',       label: 'Desktop App' },
                       { id: 'privacy',       label: t('privacy_safety') },
                       { id: 'environment',   label: t('environment') },
-                      { id: 'companions',    label: t('companions') },
                       { id: 'about',         label: t('about') },
                     ].map(item => (
                       <button
@@ -11684,9 +11324,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     {selectedSettingsCategory === 'desktop' && (
                       <DesktopDownloadSettingsPanel />
                     )}
-                    {selectedSettingsCategory === 'companions' && (
-                      <CompanionsPanel reelms={reelms} authToken={localStorage.getItem('reelms.token')} />
-                    )}
                     {selectedSettingsCategory === 'about' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
                         <div className="accs-section">
@@ -11746,14 +11383,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               <>
                 <div className="panel panel-left" style={{ flex: `0 0 ${leftWidth}px` }}>
                   <div className="reelm-sidebar">
-                    <div className={`reelm-cover-wrap${safeMediaSrc(selectedReelm.image) ? ' reelm-cover-wrap--has-image' : ''}${isDefaultCommunity(selectedReelm) ? ' reelm-cover-wrap--community' : ''}`}>
-                      {safeMediaSrc(selectedReelm.image)
-                        ? <img src={safeMediaSrc(selectedReelm.image)} alt="cover" className="reelm-cover-img" />
+                    <div className={`reelm-cover-wrap${selectedReelm.image ? ' reelm-cover-wrap--has-image' : ''}${isDefaultCommunity(selectedReelm) ? ' reelm-cover-wrap--community' : ''}`}>
+                      {selectedReelm.image
+                        ? <img src={selectedReelm.image} alt="cover" className="reelm-cover-img" />
                         : isDefaultCommunity(selectedReelm)
                           ? <div className="reelm-cover-community-art"><ReelmsCommunityGlyph /><span>Reelms Community</span></div>
                           : <div className="reelm-cover-placeholder"></div>
                       }
-                      {safeMediaSrc(selectedReelm.image) && <div className="reelm-cover-blur-strip" />}
+                      {selectedReelm.image && <div className="reelm-cover-blur-strip" />}
                       <div className="reelm-sidebar-name-row" onClick={e => e.stopPropagation()}>
                         <span className="reelm-sidebar-name" onClick={() => setShowReelmMenu(v => !v)}>{selectedReelm.name}</span>
                         {showReelmMenu && (
@@ -12295,14 +11932,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   })()}
                   {selectedReelm && (
                     <div className="reelm-sidebar">
-                      <div className={`reelm-cover-wrap${safeMediaSrc(selectedReelm.image) ? ' reelm-cover-wrap--has-image' : ''}${isDefaultCommunity(selectedReelm) ? ' reelm-cover-wrap--community' : ''}`} onClick={() => { if ((!isDefaultCommunity(selectedReelm) && hasReelmPermissionClient(selectedReelm, uid, 'manageOverview')) || canManageReelmClient(selectedReelm, uid)) reelmImageInputRef.current?.click() }}>
-                        {safeMediaSrc(selectedReelm.image)
-                          ? <img src={safeMediaSrc(selectedReelm.image)} alt="cover" className="reelm-cover-img" />
+                      <div className={`reelm-cover-wrap${selectedReelm.image ? ' reelm-cover-wrap--has-image' : ''}${isDefaultCommunity(selectedReelm) ? ' reelm-cover-wrap--community' : ''}`} onClick={() => { if ((!isDefaultCommunity(selectedReelm) && hasReelmPermissionClient(selectedReelm, uid, 'manageOverview')) || canManageReelmClient(selectedReelm, uid)) reelmImageInputRef.current?.click() }}>
+                        {selectedReelm.image
+                          ? <img src={selectedReelm.image} alt="cover" className="reelm-cover-img" />
                           : isDefaultCommunity(selectedReelm)
                             ? <div className="reelm-cover-community-art"><ReelmsCommunityGlyph /><span>Reelms Community</span></div>
                             : <div className="reelm-cover-placeholder"><span>+</span></div>
                         }
-                        {safeMediaSrc(selectedReelm.image) && <div className="reelm-cover-blur-strip" />}
+                        {selectedReelm.image && <div className="reelm-cover-blur-strip" />}
                         <div className="reelm-sidebar-name-row" onClick={e => e.stopPropagation()}>
                           <span className="reelm-sidebar-name" onClick={() => setShowReelmMenu(v => !v)}>{selectedReelm.name}</span>
                           {showReelmMenu && (
@@ -12340,10 +11977,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             if (!file) return
                             ;(async () => {
                               try {
-                                const uploaded = await uploadProfileImageFile(file, 'server_icon')
-                                updateReelmImage(selectedReelm.id, uploaded.url)
+                                const url = await uploadImageFile(file, 'server')
+                                updateReelmImage(selectedReelm.id, url)
+                                addNotification('Sunucu görseli kaydedildi.')
                               } catch (err) {
-                                window.alert(err?.message || 'Sunucu görseli kaydedilemedi.')
+                                console.warn('Reelm image upload failed:', err)
+                                addNotification(err?.message || 'Sunucu görseli yüklenemedi.')
                               }
                             })()
                             e.target.value = ''
@@ -12477,13 +12116,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                                 <span className="reelm-channel-voice-avatar">
                                                   {p.userPhoto ? <img src={p.userPhoto} alt="" /> : <span>{(p.userName || '?').charAt(0).toUpperCase()}</span>}
                                                 </span>
-                                                <span className="reelm-channel-voice-name">{p.userName || 'User'}</span>
-                                                <span className="voice-status-badges">
-                                                  {p.isMuted && <span className="voice-status-badge" title="Muted">µ</span>}
-                                                  {p.isDeafened && <span className="voice-status-badge" title="Deafened">◌</span>}
-                                                  {p.isVideoOn && <span className="voice-status-badge voice-status-badge--on" title="Camera on">▣</span>}
-                                                  {p.isScreenSharing && <span className="voice-status-badge voice-status-badge--on" title="Sharing screen">▱</span>}
-                                                </span>
+                                                <span className="reelm-channel-voice-name">{p.userName || 'Member'}</span>
                                               </span>
                                             ))}
                                             {participants.length > 3 && <span className="reelm-channel-voice-more">+{participants.length - 3}</span>}
@@ -13539,16 +13172,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 <span className="msb-artist">{spotifyNowPlaying.artist}</span>
                               </div>
                               <div className="msb-controls">
-                                <button className="msb-btn" onClick={() => spotifyControl('prev')}>
+                                <button className="msb-btn" onClick={() => spotifyControlsRef.current?.prevTrack()}>
                                   <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M3.3 1a.7.7 0 0 1 .7.7v5.15L14 1.108A.7.7 0 0 1 15 1.7v12.6a.7.7 0 0 1-1.05.607L4 9.149V13.3a.7.7 0 0 1-.7.7H1.7a.7.7 0 0 1-.7-.7V1.7a.7.7 0 0 1 .7-.7h1.6z"/></svg>
                                 </button>
-                                <button className="msb-btn msb-btn-play" onClick={() => spotifyControl('toggle')}>
+                                <button className="msb-btn msb-btn-play" onClick={() => spotifyControlsRef.current?.togglePlay()}>
                                   {spotifyInlinePaused
                                     ? <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3 1.713a.7.7 0 0 1 1.05-.607l10.89 6.288a.7.7 0 0 1 0 1.212L4.05 14.894A.7.7 0 0 1 3 14.288V1.713z"/></svg>
                                     : <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.7 1a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7H2.7zm8 0a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-2.6z"/></svg>
                                   }
                                 </button>
-                                <button className="msb-btn" onClick={() => spotifyControl('next')}>
+                                <button className="msb-btn" onClick={() => spotifyControlsRef.current?.nextTrack()}>
                                   <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M12.7 1a.7.7 0 0 0-.7.7v5.15L2.05 1.108A.7.7 0 0 0 1 1.7v12.6a.7.7 0 0 0 1.05.607L12 9.149V13.3a.7.7 0 0 0 .7.7h1.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-1.6z"/></svg>
                                 </button>
                               </div>
@@ -13776,7 +13409,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         {!q && (
                           <p className="discover-empty">Start typing to search across Reelms, chats and people.</p>
                         )}
-                        {q && results.length === 0 && !discoverLoading && (
+                        {q && results.length === 0 && (
                           <p className="discover-empty">No results for "{discoverQuery}"</p>
                         )}
                         {results.map((item, i) => (
@@ -13785,8 +13418,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             else if (item._type === 'chat') { setSelectedChat(item); setSelectedChannel(null); setSelectedReelm(null); setShowDiscover(false); setShowSettings(false) }
                           }}>
                             <div className="discover-result-avatar">
-                              {safeMediaSrc(item.image)
-                                ? <img src={safeMediaSrc(item.image)} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: item.itemType === 'reelm' ? '12px' : '50%' }} />
+                              {item.image
+                                ? <img src={item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: item._type === 'reelm' ? '12px' : '50%' }} />
                                 : (item.name || item.contact || '?').charAt(0).toUpperCase()
                               }
                             </div>
@@ -13801,7 +13434,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 {(item.pending || pendingReelmJoinIds.includes(String(item.id))) ? (
                                   <span className="friend-badge-label friend-badge-pending">Requested</span>
                                 ) : (
-                                  <button className="friend-add-btn" disabled={isActionPending(`join:${item.id}`)} onClick={() => requestJoinDiscoverReelm(item)}>{isActionPending(`join:${item.id}`) ? '...' : (item.joinMode === 'open' ? 'Join' : 'Request')}</button>
+                                  <button className="friend-add-btn" onClick={() => requestJoinDiscoverReelm(item)}>{item.joinMode === 'open' ? 'Join' : 'Request'}</button>
                                 )}
                               </div>
                             )}
@@ -13817,21 +13450,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 ) : hasSentRequest(item.id) ? (
                                   <span className="friend-badge-label friend-badge-pending">Pending</span>
                                 ) : (
-                                  <button className="friend-add-btn" disabled={isActionPending(`friend:${item.id}`)} onClick={() => sendFriendRequest(item)}>{isActionPending(`friend:${item.id}`) ? '...' : 'Add Friend'}</button>
+                                  <button className="friend-add-btn" onClick={() => sendFriendRequest(item)}>Add Friend</button>
                                 )}
                                 {!isBlocked(item.id) && !isFriend(item.id) && (
                                   hasSentMsgRequest(item.id)
                                     ? <span className="friend-badge-label friend-badge-pending" style={{fontSize:'11px'}}>Requested</span>
-                                    : <button className="friend-add-btn friend-msg-btn" disabled={isActionPending(`msgreq:${item.id}`)} onClick={() => sendMsgRequest(item)}>{isActionPending(`msgreq:${item.id}`) ? '...' : 'Message'}</button>
+                                    : <button className="friend-add-btn friend-msg-btn" onClick={() => sendMsgRequest(item)}>Message</button>
                                 )}
                                 {!isBlocked(item.id) && <button className="friend-reject-btn" onClick={() => blockUserFn(item)}>Block</button>}
                               </div>
                             )}
                           </div>
                         ))}
-                        {q && discoverLoading && (
-                          <div className="discover-loading-row" aria-label="Searching"><span className="discover-spinner" /></div>
-                        )}
                       </div>
                     </>
                   )
@@ -13917,8 +13547,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             {sortedReelms.slice(0, 5).map(r => (
                               <button key={r.id} className="home-item" onClick={() => handleSelectReelm(r)}>
                                 <div className="home-item-avatar home-item-avatar--server">
-                                  {safeMediaSrc(r.image)
-                                    ? <img src={safeMediaSrc(r.image)} alt={r.name} className="home-item-avatar-img" />
+                                  {r.image
+                                    ? <img src={r.image} alt={r.name} className="home-item-avatar-img" />
                                     : <span className="home-item-avatar-letter">{(r.name || '?').charAt(0)}</span>
                                   }
                                 </div>
@@ -14040,7 +13670,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               onSpotifyDisconnect={disconnectSpotify}
               activity={currentActivity}
               onActivityChange={setActivity}
-              onViewFullProfile={() => setFullProfileTarget({ isSelf: true, user: currentUser })}
             />
           )}
           {renderFriendProfileSurface(false)}
@@ -14339,12 +13968,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         )}
         {showFriendsPopup && (
           <button className="hpopup-float-icon" style={{ right: '120px' }} onClick={toggleFriendsPopup}>
-            <img src={friendsIcon} alt="Friends" className="header-icon header-icon-friends" />
+            <img src={friendsIcon} alt="Friends" className="header-icon" style={{ filter: headerIconThemeFilter(effectiveAccent) }} />
           </button>
         )}
         {showNotificationsPopup && (
           <button className="hpopup-float-icon" style={{ right: '74px' }} onClick={toggleNotifPopup}>
-            <img src={notificationIcon} alt="Notifications" className="header-icon" />
+            <img src={notificationIcon} alt="Notifications" className="header-icon" style={{ filter: headerIconThemeFilter(effectiveAccent) }} />
           </button>
         )}
         {showFriendsPopup && (

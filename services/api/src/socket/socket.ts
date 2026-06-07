@@ -8,7 +8,7 @@ import { canUseReelmPermission, getActiveReelmTimeout, getMessageKeyAccess, getR
 import { getDoc, putDoc, reelmPk, userPk } from '../modules/store/docStore.js'
 import { logger } from '../lib/logger.js'
 
-type ReelmsSocket = Socket & { uid?: string; clientId?: string | null; _vcRoom?: string | null; _vcReelmId?: string | null; _vcChannelId?: string | null; _vcUserName?: string | null; _vcUserPhoto?: string | null; _vcLastSeenAt?: number | null; _vcMuted?: boolean | null; _vcDeafened?: boolean | null; _vcVideoOn?: boolean | null; _vcScreenSharing?: boolean | null }
+type ReelmsSocket = Socket & { uid?: string; clientId?: string | null; _vcRoom?: string | null; _vcReelmId?: string | null; _vcChannelId?: string | null; _vcUserName?: string | null; _vcUserPhoto?: string | null; _vcLastSeenAt?: number | null }
 
 const STATUS_VALUES = new Set(['online', 'idle', 'busy', 'invisible', 'offline'])
 const VOICE_HEARTBEAT_TIMEOUT_MS = 45_000
@@ -90,18 +90,14 @@ export function attachSocketServer(httpServer?: HttpServer) {
 
   const getVoiceParticipants = async (reelmId: string, channelId: string) => {
     const peers = await io.in(`vc:${reelmId}_${channelId}`).fetchSockets()
-    const byUser = new Map<string, { userId: string; userName: string; userPhoto: any; isMuted: boolean; isDeafened: boolean; isVideoOn: boolean; isScreenSharing: boolean }>()
+    const byUser = new Map<string, { userId: string; userName: string; userPhoto: any }>()
     for (const peer of peers) {
       const userId = String(peer.data?.uid || '')
       if (!userId || byUser.has(userId)) continue
       byUser.set(userId, {
         userId,
-        userName: String(peer.data?.userName || (peer as any)._vcUserName || 'User'),
-        userPhoto: peer.data?.userPhoto || (peer as any)._vcUserPhoto || null,
-        isMuted: Boolean((peer as any)._vcMuted),
-        isDeafened: Boolean((peer as any)._vcDeafened),
-        isVideoOn: Boolean((peer as any)._vcVideoOn),
-        isScreenSharing: Boolean((peer as any)._vcScreenSharing)
+        userName: String(peer.data?.userName || (peer as any)._vcUserName || 'Member'),
+        userPhoto: peer.data?.userPhoto || (peer as any)._vcUserPhoto || null
       })
     }
     return Array.from(byUser.values())
@@ -109,7 +105,7 @@ export function attachSocketServer(httpServer?: HttpServer) {
 
   const getVoiceParticipantsByChannel = async (reelmId: string) => {
     const voiceChannelIds = await getVoiceChannelIds(reelmId)
-    const channels: Record<string, { userId: string; userName: string; userPhoto: any; isMuted: boolean; isDeafened: boolean; isVideoOn: boolean; isScreenSharing: boolean }[]> = {}
+    const channels: Record<string, { userId: string; userName: string; userPhoto: any }[]> = {}
     await Promise.all(voiceChannelIds.map(async (channelId) => {
       channels[channelId] = await getVoiceParticipants(reelmId, channelId)
     }))
@@ -152,7 +148,7 @@ export function attachSocketServer(httpServer?: HttpServer) {
       byUser.set(userId, {
         userId,
         status: STATUS_VALUES.has(status) ? status : 'online',
-        userName: String(peer.data?.userName || 'User'),
+        userName: String(peer.data?.userName || 'Member'),
         userPhoto: peer.data?.userPhoto || null,
         sockets: 1
       })
@@ -215,10 +211,6 @@ export function attachSocketServer(httpServer?: HttpServer) {
     socket._vcUserName = null
     socket._vcUserPhoto = null
     socket._vcLastSeenAt = null
-    socket._vcMuted = false
-    socket._vcDeafened = false
-    socket._vcVideoOn = false
-    socket._vcScreenSharing = false
     if (reelmId && channelId) await emitVcCount(reelmId, channelId, room).catch((err) => logger.warn('vc:count emit failed', err))
   }
 
@@ -246,7 +238,7 @@ export function attachSocketServer(httpServer?: HttpServer) {
     socket.data.presenceStatus = 'online'
     socket.data.joinedReelms = new Set<string>()
     getUserPublicProfile(String(socket.uid)).then((profile) => {
-      socket.data.userName = profile.name || profile.username || 'User'
+      socket.data.userName = profile.name || profile.username || 'Member'
       socket.data.userPhoto = profile.photo || null
     }).catch(() => {})
     logger.info('socket connected', socket.id, 'uid', socket.uid)
@@ -283,7 +275,7 @@ export function attachSocketServer(httpServer?: HttpServer) {
         if (!await isReelmMember(String(socket.uid), reelmId)) return
         const profile = await getUserPublicProfile(String(socket.uid)).catch(() => null)
         if (profile) {
-          socket.data.userName = profile.name || profile.username || 'User'
+          socket.data.userName = profile.name || profile.username || 'Member'
           socket.data.userPhoto = profile.photo || null
         }
         socket.join(`reelm:${reelmId}`)
@@ -327,7 +319,6 @@ export function attachSocketServer(httpServer?: HttpServer) {
 
     socket.on('typing:stop', ({ msgKey }: { msgKey: string }) => {
       if (typeof msgKey !== 'string' || !msgKey) return
-      if (!socket.rooms.has(`chan:${msgKey}`)) return
       socket.to(`chan:${msgKey}`).emit('reelms:typing:stop', { uid: socket.uid, msgKey })
     })
 
@@ -366,7 +357,7 @@ export function attachSocketServer(httpServer?: HttpServer) {
         }
 
         const profile = await getUserPublicProfile(String(socket.uid))
-        const displayName = profile.name || profile.username || 'User'
+        const displayName = profile.name || profile.username || 'Member'
         const displayPhoto = profile.photo || null
         socket.join(`reelm:${reelmId}`)
         socket.join(`chan:${reelmId}_vc_${channelId}`)
@@ -377,10 +368,6 @@ export function attachSocketServer(httpServer?: HttpServer) {
         socket._vcUserName = displayName
         socket._vcUserPhoto = displayPhoto
         socket._vcLastSeenAt = Date.now()
-        socket._vcMuted = false
-        socket._vcDeafened = false
-        socket._vcVideoOn = false
-        socket._vcScreenSharing = false
         socket.data.userName = displayName
         socket.data.userPhoto = displayPhoto
         socket.to(room).emit('vc:event', { type: 'join', from: socket.uid, userName: displayName, userPhoto: displayPhoto })
@@ -390,12 +377,8 @@ export function attachSocketServer(httpServer?: HttpServer) {
           channelId,
           participants: peers.map((peer) => ({
             userId: String(peer.data?.uid || ''),
-            userName: String(peer.data?.userName || 'User'),
-            userPhoto: peer.data?.userPhoto || null,
-            isMuted: Boolean((peer as any)._vcMuted),
-            isDeafened: Boolean((peer as any)._vcDeafened),
-            isVideoOn: Boolean((peer as any)._vcVideoOn),
-            isScreenSharing: Boolean((peer as any)._vcScreenSharing)
+            userName: String(peer.data?.userName || 'Member'),
+            userPhoto: peer.data?.userPhoto || null
           })).filter((peer) => peer.userId)
         })
         await emitVcCount(reelmId, channelId, room, socket)
@@ -597,20 +580,7 @@ export function attachSocketServer(httpServer?: HttpServer) {
       if (typeof reelmId !== 'string' || typeof channelId !== 'string' || !payload || typeof payload !== 'object') return
       const room = `vc:${reelmId}_${channelId}`
       if (socket._vcRoom !== room) return
-      const type = String((payload as any).type || '')
-      if (type === 'mute') {
-        socket._vcMuted = Boolean((payload as any).isMuted)
-        if (typeof (payload as any).isDeafened !== 'undefined') socket._vcDeafened = Boolean((payload as any).isDeafened)
-      } else if (type === 'deafen') {
-        socket._vcDeafened = Boolean((payload as any).isDeafened)
-        if (typeof (payload as any).isMuted !== 'undefined') socket._vcMuted = Boolean((payload as any).isMuted)
-      } else if (type === 'video' || type === 'camera') {
-        socket._vcVideoOn = Boolean((payload as any).isVideoOn ?? (payload as any).enabled)
-      } else if (type === 'screen' || type === 'screen_share') {
-        socket._vcScreenSharing = Boolean((payload as any).isScreenSharing ?? (payload as any).enabled)
-      }
       socket.to(room).emit('vc:event', { ...payload, from: socket.uid })
-      void emitVcParticipants(reelmId, channelId).catch((err) => logger.warn('vc:participants broadcast state failed', err))
     })
 
     socket.on('disconnecting', () => {

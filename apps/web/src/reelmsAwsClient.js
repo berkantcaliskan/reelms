@@ -30,6 +30,7 @@ const userDocCache = new Map()
 const userPersistLastJson = new Map()
 const userPersistPendingJson = new Map()
 const profileCache = new Map()
+const profilePatchDedup = new Map()
 // Server-owned documents must only be refreshed from the API. Letting the
 // client PUT these snapshots back creates stale role/member copies and is the
 // root cause of phantom members, duplicate roles, and slow login fan-out.
@@ -42,7 +43,7 @@ function stableJson(value) {
 function requestCacheTtl(path, method) {
   if (method !== 'GET') return 0
   if (path === '/api/v1/user/bootstrap') return 1000
-  if (path.startsWith('/api/v1/user/profile/')) return 15 * 1000
+  if (path.startsWith('/api/v1/user/profile/')) return 5 * 60 * 1000
   if (path.startsWith('/api/v1/discovery/search')) return 30 * 1000
   if (path.startsWith('/api/v1/users')) return 30 * 1000
   if (path.startsWith('/api/v1/reelms/discover')) return 20 * 1000
@@ -73,10 +74,25 @@ function invalidateUserResponseCache(sk = '') {
   invalidateResponseCache(entry => entry.includes(`/api/v1/user/doc/${key}`) || entry.includes('/api/v1/user/bootstrap'))
 }
 
-function invalidateProfileCaches(uid = '') {
+function invalidateProfileResponseCache(uid = '') {
   const id = String(uid || '')
+  invalidateResponseCache(entry => {
+    const text = String(entry)
+    if (text.includes('/api/v1/user/profile')) return true
+    if (id && text.includes(`/api/v1/user/profile/${encodeURIComponent(id)}`)) return true
+    return false
+  })
   if (id) profileCache.delete(id)
-  invalidateResponseCache(entry => entry.includes('/api/v1/user/profile') || entry.includes('/api/v1/user/bootstrap') || entry.includes('/api/v1/user/doc/friends') || entry.includes('/api/v1/user/doc/chats') || entry.includes('/api/v1/user/doc/reelms'))
+  else profileCache.clear()
+}
+
+function rememberProfilePatch(id, data) {
+  if (!id) {
+    invalidateProfileResponseCache()
+    return
+  }
+  const prev = profileCache.get(id)?.data || {}
+  profileCache.set(id, { data: { ...prev, ...data, id, uid: id }, at: Date.now() })
 }
 
 function rememberUserDoc(sk, data) {
@@ -579,15 +595,13 @@ export function socketLeaveChannel(msgKey) {
 }
 
 export function socketEmitTyping(msgKey, { name = '', photo = '' } = {}) {
-  if (!socket?.connected || !msgKey) return false
+  if (!socket?.connected || !msgKey) return
   socket.emit('typing:start', { msgKey, name, photo })
-  return true
 }
 
 export function socketEmitTypingStop(msgKey) {
-  if (!socket?.connected || !msgKey) return false
+  if (!socket?.connected || !msgKey) return
   socket.emit('typing:stop', { msgKey })
-  return true
 }
 
 export function socketSetPresenceStatus(status) {
@@ -659,21 +673,24 @@ export function socketVcBroadcast(reelmId, channelId, payload) {
 // ── User profiles ─────────────────────────────────────────────────────────────
 
 export async function userProfilePut(data) {
-  const j = await api('/api/v1/user/profile', { method: 'PUT', body: JSON.stringify({ data }) })
-  const saved = j?.data || data
-  const id = String(saved?.id || saved?.uid || data?.id || data?.uid || '')
-  invalidateProfileCaches(id)
-  if (id) profileCache.set(id, { data: saved, at: Date.now() })
-  return j
+  await api('/api/v1/user/profile', { method: 'PUT', body: JSON.stringify({ data }) })
+  const id = String(data?.id || data?.uid || '')
+  invalidateProfileResponseCache(id)
+  if (id) profileCache.set(id, { data, at: Date.now() })
 }
 
 export async function userProfilePatch(data) {
-  const j = await api('/api/v1/user/profile', { method: 'PATCH', body: JSON.stringify({ data }) })
-  const saved = j?.data || null
-  const id = String(saved?.id || saved?.uid || data?.id || data?.uid || '')
-  invalidateProfileCaches(id)
-  if (id) profileCache.set(id, { data: saved || { ...(profileCache.get(id)?.data || {}), ...data }, at: Date.now() })
-  return j
+  const body = stableJson(data || {})
+  const now = Date.now()
+  const lastAt = profilePatchDedup.get(body) || 0
+  if (now - lastAt < 1200) return null
+  profilePatchDedup.set(body, now)
+  await api('/api/v1/user/profile', { method: 'PATCH', body: JSON.stringify({ data }) })
+  const id = String(data?.id || data?.uid || '')
+  invalidateProfileResponseCache(id)
+  rememberProfilePatch(id, data || {})
+  setTimeout(() => { if (profilePatchDedup.get(body) === now) profilePatchDedup.delete(body) }, 3000)
+  return null
 }
 
 export async function userProfileGet() {
@@ -921,10 +938,10 @@ export async function getVoiceIceServers() {
   return j?.data?.iceServers || []
 }
 
-export async function mediaCreateUploadUrl(fileName, fileSize, mimeType, purpose = 'attachment') {
+export async function mediaCreateUploadUrl(fileName, fileSize, mimeType) {
   const j = await api('/api/v1/media/upload-url', {
     method: 'POST',
-    body: JSON.stringify({ fileName, fileSize, mimeType, purpose }),
+    body: JSON.stringify({ fileName, fileSize, mimeType }),
   })
   return j.data
 }
@@ -937,8 +954,8 @@ export async function mediaCompleteUpload(mediaId, etag = null) {
   return j.data
 }
 
-export async function mediaUploadToS3(file, purpose = 'attachment') {
-  const upload = await mediaCreateUploadUrl(file.name, file.size, file.type || 'application/octet-stream', purpose)
+export async function mediaUploadToS3(file) {
+  const upload = await mediaCreateUploadUrl(file.name, file.size, file.type || 'application/octet-stream')
   const res = await fetch(upload.upload.uploadUrl, {
     method: upload.upload.method || 'PUT',
     headers: upload.upload.headers || { 'Content-Type': file.type || 'application/octet-stream' },
@@ -946,7 +963,8 @@ export async function mediaUploadToS3(file, purpose = 'attachment') {
   })
   if (!res.ok) throw new Error(`Upload failed (${res.status})`)
   const completed = await mediaCompleteUpload(upload.id, res.headers.get('etag'))
-  return { ...upload, ...(completed || {}), url: completed?.url || upload.url || completed?.publicUrl || completed?.mediaUrl || null }
+  if (!completed?.url) completed.url = upload.url || upload.upload?.url || null
+  return completed
 }
 
 export async function mediaUploadMetadata(fileName, fileSize, mimeType, localFileId) {

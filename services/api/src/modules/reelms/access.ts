@@ -26,35 +26,23 @@ const isGoogleDefaultAvatarUrl = (value: unknown) => {
   return /(^|\.)googleusercontent\.com\//i.test(url) || /lh3\.googleusercontent\.com/i.test(url)
 }
 
-const isRawMediaValue = (value: unknown) => {
-  const text = String(value || '').trim()
-  if (!text) return false
-  if (/^data:image\//i.test(text)) return true
-  if (text.length > 4096 && /^[A-Za-z0-9+/=\r\n]+$/.test(text)) return true
-  return false
+const safePublicMediaUrl = (value: unknown) => {
+  if (typeof value !== 'string') return null
+  const url = value.trim()
+  if (!url || isGoogleDefaultAvatarUrl(url)) return null
+  return /^https?:\/\//i.test(url) ? url : null
 }
-
-const safeMediaValue = (value: unknown) => {
-  const text = String(value || '').trim()
-  if (!text || isRawMediaValue(text)) return null
-  return text
-}
-
-const isClosedProfile = (profile: any = {}) => profile?.accountClosed === true || profile?.deleted === true || profile?.deletedAt != null
 
 export function publicProfileFromStored(uid: string, profile: any = {}) {
   const rawPhoto = profile.photo || profile.profilePhoto || profile.photoURL || profile.avatar || profile.image || profile.imageUrl || profile.userPhoto || null
-  const photo = isGoogleDefaultAvatarUrl(rawPhoto) ? null : safeMediaValue(rawPhoto)
-  const cover = safeMediaValue(profile.cover || profile.coverImage || profile.coverUrl || profile.headerImage || profile.banner || profile.bannerImage || profile.backgroundCover || null)
-  const background = safeMediaValue(profile.bgImage || profile.bg_image || profile.backgroundImage || profile.backgroundUrl || null)
-  const fallbackName = isClosedProfile(profile) ? 'Deleted user' : 'User'
+  const photo = safePublicMediaUrl(rawPhoto)
+  const cover = safePublicMediaUrl(profile.cover || profile.coverImage || profile.coverUrl || profile.headerImage || profile.banner || profile.bannerImage || profile.backgroundCover || null)
+  const background = safePublicMediaUrl(profile.backgroundUrl || profile.backgroundImage || profile.bgImage || profile.bg_image || null)
   return {
     id: uid,
     uid,
-    accountClosed: profile.accountClosed === true,
-    deletedAt: profile.deletedAt || null,
-    name: profile.name || profile.displayName || profile.username || fallbackName,
-    displayName: profile.displayName || profile.name || profile.username || fallbackName,
+    name: profile.name || profile.displayName || profile.username || 'Member',
+    displayName: profile.displayName || profile.name || profile.username || 'Member',
     username: profile.username || '',
     photo,
     profilePhoto: photo,
@@ -67,13 +55,9 @@ export function publicProfileFromStored(uid: string, profile: any = {}) {
     coverUrl: cover,
     headerImage: cover,
     banner: cover,
-    bannerImage: cover,
-    backgroundCover: cover,
-    bgImage: background,
-    bg_image: background,
-    backgroundImage: background,
     backgroundUrl: background,
-    bodyFont: typeof profile.bodyFont === 'string' ? profile.bodyFont : null,
+    backgroundImage: background,
+    bgImage: background,
     bio: profile.bio || '',
     activity: profile.activity || null,
     sociallinks: profile.sociallinks || {},
@@ -113,8 +97,8 @@ export async function canUseReelmPermission(uid: string, reelmId: string, permis
   if (uid === env.REELMS_MODERATION_UID) return true
   if (await isBannedFromReelm(uid, reelmId).catch(() => false)) return false
 
-  if (reelmId === DEFAULT_REELM_ID && await hasLeftDefaultReelm(uid).catch(() => false)) return false
   if (reelmId === DEFAULT_REELM_ID && await isCommunityAdminUid(uid).catch(() => false)) return true
+  if (reelmId === DEFAULT_REELM_ID && await hasLeftDefaultReelm(uid).catch(() => false)) return false
 
   const pk = reelmPk(reelmId)
   const meta = await getDoc<any>(pk, 'meta').catch(() => null)
@@ -132,21 +116,13 @@ export async function canUseReelmPermission(uid: string, reelmId: string, permis
 }
 
 export async function getUserPublicProfile(uid: string) {
-  const [profile, customization, bgImage, bodyFont] = await Promise.all([
+  const [profile, customization, bgImage] = await Promise.all([
     getDoc<any>(userPk(uid), 'profile').catch(() => null),
     getDoc<any>(userPk(uid), 'customization').catch(() => null),
-    getDoc<any>(userPk(uid), 'bg_image').catch(() => null),
-    getDoc<any>(userPk(uid), 'body_font').catch(() => null)
+    getDoc<any>(userPk(uid), 'bg_image').catch(() => null)
   ])
-  const mergedCustomization = customization && typeof customization === 'object'
-    ? { ...customization, bgImage: typeof bgImage === 'string' ? bgImage : (customization as any).bgImage ?? null }
-    : (typeof bgImage === 'string' ? { bgImage } : null)
-  return publicProfileFromStored(uid, {
-    ...(profile || {}),
-    bgImage: typeof bgImage === 'string' ? bgImage : (profile as any)?.bgImage || null,
-    bodyFont: typeof bodyFont === 'string' ? bodyFont : null,
-    profileTheme: (profile as any)?.profileTheme || mergedCustomization || null
-  })
+  const bg = typeof bgImage === 'string' ? bgImage : ((customization as any)?.bgImage || null)
+  return publicProfileFromStored(uid, { ...(profile || {}), profileTheme: (profile as any)?.profileTheme || customization || null, backgroundUrl: bg, bgImage: bg })
 }
 
 async function isBannedFromReelm(uid: string, reelmId: string) {
@@ -174,8 +150,8 @@ export async function isReelmMember(uid: string, reelmId: string) {
   if (uid === env.REELMS_MODERATION_UID) return true
   if (await isBannedFromReelm(uid, reelmId).catch(() => false)) return false
 
-  if (reelmId === DEFAULT_REELM_ID && await hasLeftDefaultReelm(uid).catch(() => false)) return false
   if (reelmId === DEFAULT_REELM_ID && await isCommunityAdminUid(uid).catch(() => false)) return true
+  if (reelmId === DEFAULT_REELM_ID && await hasLeftDefaultReelm(uid).catch(() => false)) return false
 
   const pk = reelmPk(reelmId)
   const meta = await getDoc<any>(pk, 'meta').catch(() => null)
@@ -201,8 +177,8 @@ export async function canManageReelm(uid: string, reelmId: string) {
   if (uid === env.REELMS_MODERATION_UID) return true
   if (await isBannedFromReelm(uid, reelmId).catch(() => false)) return false
 
-  if (reelmId === DEFAULT_REELM_ID && await hasLeftDefaultReelm(uid).catch(() => false)) return false
   if (reelmId === DEFAULT_REELM_ID && await isCommunityAdminUid(uid).catch(() => false)) return true
+  if (reelmId === DEFAULT_REELM_ID && await hasLeftDefaultReelm(uid).catch(() => false)) return false
 
   const pk = reelmPk(reelmId)
   const meta = await getDoc<any>(pk, 'meta').catch(() => null)

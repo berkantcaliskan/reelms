@@ -81,4 +81,12 @@ export class JsonDocStore implements DocStoreDriver {
       .filter((item) => item.pk.startsWith(prefix))
       .map((item) => ({ ...item, data: item.data as T }))
   }
+
+  async scanByPkPrefixAndSk<T = unknown>(prefix: string, sk: string, limit = 1000): Promise<Array<StoreItem<T>>> {
+    await this.ensureLoaded()
+    return Object.values(this.store)
+      .filter((item) => item.pk.startsWith(prefix) && item.sk === sk)
+      .slice(0, limit)
+      .map((item) => ({ ...item, data: item.data as T }))
+  }
 }

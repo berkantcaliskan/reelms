@@ -11,19 +11,30 @@ import { createSocialRouter } from './routes/social.routes.js'
 import { moderationRouter } from './routes/moderation.routes.js'
 import { createSpotifyRouter } from './routes/spotify.routes.js'
 import { debugRouter } from './routes/debug.routes.js'
+import { trackRouter } from './routes/track.routes.js'
 import { clientRouter } from './routes/client.routes.js'
-import { createBotRouter } from './routes/bot.routes.js'
 import { requestContext } from './middleware/requestContext.js'
 import { requestLogger } from './middleware/requestLogger.js'
-import { apiRateLimit, authRateLimit } from './middleware/rateLimit.js'
+import { apiRateLimit, authRateLimit, trackingRateLimit } from './middleware/rateLimit.js'
 import { errorHandler, notFoundHandler } from './utils/errors.js'
+import { getDocStoreStatus } from '../modules/store/docStore.js'
 
 export function createApp(io?: Server) {
   const app = express()
 
   app.set('trust proxy', 1)
   app.disable('x-powered-by')
+  app.set('etag', false)
   app.use(requestContext)
+  app.use((req, res, next) => {
+    if (req.path.startsWith('/api/') || req.path.startsWith('/auth') || req.path.startsWith('/realtime')) {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+      res.setHeader('Pragma', 'no-cache')
+      res.setHeader('Expires', '0')
+      res.setHeader('Surrogate-Control', 'no-store')
+    }
+    next()
+  })
   app.use(requestLogger)
   app.use(helmet({
     crossOriginResourcePolicy: false,
@@ -41,6 +52,21 @@ export function createApp(io?: Server) {
   }))
 
   app.use('/health', healthRouter)
+  app.use((req, res, next) => {
+    const needsDocStore = req.path.startsWith('/api/')
+      || req.path.startsWith('/auth')
+      || req.path.startsWith('/google')
+      || req.path.startsWith('/callback')
+    if (!needsDocStore) return next()
+    const docStore = getDocStoreStatus()
+    if (docStore.ready) return next()
+    return res.status(503).json({
+      error: 'doc_store_unavailable',
+      message: 'Database connection is warming up. Please retry shortly.',
+      details: docStore
+    })
+  })
+  app.use('/api/v1/track', trackingRateLimit, trackRouter)
   app.use('/auth', authRateLimit, authRouter)
   app.use('/realtime', realtimeRouter)
   app.use('/api/v1/debug', debugRouter)
@@ -48,7 +74,6 @@ export function createApp(io?: Server) {
   app.use(apiRateLimit, moderationRouter)
 
   if (io) {
-    app.use(createBotRouter(io))
     app.use(createSpotifyRouter(io))
     // /api/v1 routers authenticate first, then apply apiRateLimit internally.
     // This keeps normal app traffic user-based instead of proxy/IP-based.

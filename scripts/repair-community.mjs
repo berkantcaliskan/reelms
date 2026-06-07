@@ -1,105 +1,102 @@
 #!/usr/bin/env node
 import fs from 'node:fs'
 
-const envFile = process.argv.find((arg) => arg.startsWith('--env='))?.slice(6)
-if (envFile && fs.existsSync(envFile)) {
-  for (const line of fs.readFileSync(envFile, 'utf8').split(/\r?\n/)) {
-    const trimmed = line.trim()
-    if (!trimmed || trimmed.startsWith('#') || !trimmed.includes('=')) continue
-    const [key, ...rest] = trimmed.split('=')
-    if (!process.env[key]) process.env[key] = rest.join('=').trim().replace(/^['"]|['"]$/g, '')
+function parseArgs() {
+  const out = {}
+  for (const arg of process.argv.slice(2)) {
+    if (arg.startsWith('--env=')) out.env = arg.slice(6)
+    if (arg === '--dry-run') out.dryRun = true
+  }
+  return out
+}
+function loadEnv(path) {
+  if (!path || !fs.existsSync(path)) return
+  const text = fs.readFileSync(path, 'utf8')
+  for (const rawLine of text.split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (!line || line.startsWith('#')) continue
+    const idx = line.indexOf('=')
+    if (idx < 0) continue
+    const key = line.slice(0, idx).trim()
+    let value = line.slice(idx + 1).trim()
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1)
+    if (!(key in process.env)) process.env[key] = value
   }
 }
-
-const SUPABASE_URL = process.env.SUPABASE_URL
-const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY
+const args = parseArgs()
+loadEnv(args.env)
+const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/+$/, '')
+const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY
+if (!SUPABASE_URL || !KEY) throw new Error('SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are required')
+const restUrl = `${SUPABASE_URL}/rest/v1/reelms_docs`
+const headers = { apikey: KEY, Authorization: `Bearer ${KEY}`, 'Content-Type': 'application/json' }
 const DEFAULT_REELM_ID = process.env.REELMS_DEFAULT_REELM_ID || 'reelms-community'
-const ADMIN_UIDS = String(process.env.REELMS_COMMUNITY_ADMIN_UIDS || '').split(',').map((v) => v.trim()).filter(Boolean)
-const SYSTEM_IDS = new Set([process.env.REELMS_MODERATION_UID, 'reelms-moderation', 'system', 'reelms-system'].filter(Boolean))
+const MOD_UID = process.env.REELMS_MODERATION_UID || 'reelms-moderation'
+const ADMIN_UIDS = String(process.env.REELMS_COMMUNITY_ADMIN_UIDS || '')
+  .split(',').map(s => s.trim()).filter(Boolean)
 
-if (!SUPABASE_URL || !KEY) {
-  console.error('Missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY')
-  process.exit(1)
-}
-
-const headers = {
-  apikey: KEY,
-  Authorization: `Bearer ${KEY}`,
-  'Content-Type': 'application/json',
-  Prefer: 'return=representation'
-}
-const api = `${SUPABASE_URL.replace(/\/$/, '')}/rest/v1/reelms_docs`
-const enc = encodeURIComponent
-
-async function req(path, options = {}) {
-  const res = await fetch(`${api}${path}`, { ...options, headers: { ...headers, ...(options.headers || {}) } })
+async function request(path, options = {}) {
+  const res = await fetch(`${restUrl}${path}`, { ...options, headers: { ...headers, ...(options.headers || {}) } })
+  if (!res.ok) throw new Error(`${options.method || 'GET'} ${path} failed ${res.status}: ${await res.text()}`)
+  if (res.status === 204) return null
   const text = await res.text()
-  if (!res.ok) throw new Error(`${res.status} ${res.statusText}: ${text.slice(0, 500)}`)
   return text ? JSON.parse(text) : null
 }
-
-const pk = `REELM#${DEFAULT_REELM_ID}`
-const [membersRow] = await req(`?pk=eq.${enc(pk)}&sk=eq.members&select=data`)
-const [banRow] = await req(`?pk=eq.${enc(pk)}&sk=eq.ban_list&select=data`)
-const [rolesRow] = await req(`?pk=eq.${enc(pk)}&sk=eq.roles&select=data`)
-const members = Array.isArray(membersRow?.data) ? membersRow.data : []
-const bans = Array.isArray(banRow?.data) ? banRow.data : []
-const roles = Array.isArray(rolesRow?.data) ? rolesRow.data : []
-const banned = new Set(bans.map((b) => String(b?.userId || b?.id || '')).filter(Boolean))
-const adminRole = roles.find((r) => String(r?.id || '') === 'role-admin-rc') || roles.find((r) => /admin|owner|founder|moderator/i.test(String(r?.name || '')))
-const adminRoleId = String(adminRole?.id || 'role-admin-rc')
-
-async function getProfile(uid) {
-  const rows = await req(`?pk=eq.${enc(`USER#${uid}`)}&sk=eq.profile&select=data`)
-  return rows?.[0]?.data || null
+async function getDoc(pk, sk) {
+  const rows = await request(`?select=data&pk=eq.${encodeURIComponent(pk)}&sk=eq.${encodeURIComponent(sk)}&limit=1`)
+  return Array.isArray(rows) && rows[0] ? rows[0].data : null
 }
+async function putDoc(pk, sk, data) {
+  if (args.dryRun) return
+  await request('', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' }, body: JSON.stringify({ pk, sk, data, updated_at: Date.now() }) })
+}
+const reelmPk = (id) => `REELM#${id}`
+const userPk = (id) => `USER#${id}`
+const uidOf = (m) => String(m?.userId || m?.id || '').trim()
+const isBadUid = (id) => !id || id === 'admin-user-uid-buraya' || id === 'member' || id === 'undefined' || id === 'null' || id === MOD_UID
+const isSystemLike = (m) => m?.isSystem === true || m?.system === true || /reelms[-_ ]?(system|moderation)/i.test(String(m?.username || m?.userName || m?.name || ''))
+const getManagerRole = (roles) => (roles || []).find(r => r?.permissions?.manageReelm === true || /admin|owner|founder|moderator/i.test(String(r?.name || '')))
+const getMemberRole = (roles) => (roles || []).find(r => /member|citizen|everyone/i.test(String(r?.name || ''))) || roles?.[0]
 
+const pk = reelmPk(DEFAULT_REELM_ID)
+const [meta, rolesRaw, membersRaw, banRaw] = await Promise.all([
+  getDoc(pk, 'meta'),
+  getDoc(pk, 'roles'),
+  getDoc(pk, 'members'),
+  getDoc(pk, 'ban_list')
+])
+if (!meta) throw new Error(`default community ${DEFAULT_REELM_ID} not found`)
+const roles = Array.isArray(rolesRaw) ? rolesRaw : []
+const banned = new Set((Array.isArray(banRaw) ? banRaw : []).map(e => String(e?.userId || e?.id || '')).filter(Boolean))
+const before = Array.isArray(membersRaw) ? membersRaw : []
 const seen = new Set()
-const next = []
-for (const raw of members) {
-  const uid = String(raw?.userId || raw?.id || '').trim()
-  if (!uid || seen.has(uid) || SYSTEM_IDS.has(uid) || banned.has(uid)) continue
-  const profile = await getProfile(uid)
-  if (!profile || profile.accountClosed === true || profile.deleted === true || profile.deletedAt) continue
-  seen.add(uid)
-  const roleIds = Array.isArray(raw.roleIds) ? raw.roleIds.map(String).filter(Boolean) : []
-  next.push({
-    ...raw,
-    userId: uid,
-    userName: raw.userName || profile.name || profile.displayName || profile.username || 'User',
-    username: raw.username || profile.username || '',
-    userPhoto: profile.photo || raw.userPhoto || raw.photo || null,
-    photo: profile.photo || raw.photo || raw.userPhoto || null,
-    cover: profile.cover || profile.coverImage || profile.coverUrl || raw.cover || null,
-    coverImage: profile.coverImage || profile.cover || raw.coverImage || null,
-    coverUrl: profile.coverUrl || profile.cover || raw.coverUrl || null,
-    bio: profile.bio || raw.bio || '',
-    activity: profile.activity || raw.activity || null,
-    profileTheme: profile.profileTheme || raw.profileTheme || null,
-    roleIds
-  })
+let after = []
+for (const member of before) {
+  const id = uidOf(member)
+  if (isBadUid(id) || isSystemLike(member) || banned.has(id) || seen.has(id)) continue
+  seen.add(id)
+  after.push({ ...member, userId: id, id: undefined })
 }
-
-for (const uid of ADMIN_UIDS) {
-  if (!uid || seen.has(uid) || SYSTEM_IDS.has(uid) || banned.has(uid)) continue
-  const profile = await getProfile(uid)
-  if (!profile || profile.accountClosed === true || profile.deleted === true || profile.deletedAt) continue
-  seen.add(uid)
-  next.unshift({
-    userId: uid,
-    userName: profile.name || profile.displayName || profile.username || 'User',
-    username: profile.username || '',
-    userPhoto: profile.photo || null,
-    photo: profile.photo || null,
-    cover: profile.cover || profile.coverImage || profile.coverUrl || null,
-    coverImage: profile.coverImage || profile.cover || null,
-    coverUrl: profile.coverUrl || profile.cover || null,
-    bio: profile.bio || '',
-    activity: profile.activity || null,
-    profileTheme: profile.profileTheme || null,
-    roleIds: [adminRoleId]
-  })
+const adminRole = getManagerRole(roles)
+const memberRole = getMemberRole(roles)
+for (const adminUid of ADMIN_UIDS) {
+  if (!adminUid || banned.has(adminUid)) continue
+  const profile = await getDoc(userPk(adminUid), 'profile').catch(() => null)
+  if (!profile?.uid && !profile?.id && !profile?.username && !profile?.name) continue
+  const existing = after.find(m => uidOf(m) === adminUid)
+  const roleIds = new Set([...(Array.isArray(existing?.roleIds) ? existing.roleIds.map(String) : []), ...(adminRole?.id ? [String(adminRole.id)] : []), ...(memberRole?.id ? [String(memberRole.id)] : [])])
+  const photo = profile.photo || profile.profilePhoto || profile.avatar || profile.image || profile.imageUrl || null
+  const adminMember = {
+    ...(existing || {}),
+    userId: adminUid,
+    userName: existing?.userName || profile.name || profile.displayName || profile.username || 'Admin',
+    username: existing?.username || profile.username || '',
+    userPhoto: existing?.userPhoto || photo || null,
+    photo: existing?.photo || photo || null,
+    profileTheme: existing?.profileTheme || profile.profileTheme || null,
+    roleIds: [...roleIds].filter(Boolean)
+  }
+  after = [adminMember, ...after.filter(m => uidOf(m) !== adminUid)]
 }
-
-await req(`?pk=eq.${enc(pk)}&sk=eq.members`, { method: 'PATCH', body: JSON.stringify({ data: next }) })
-console.log(JSON.stringify({ ok: true, reelmId: DEFAULT_REELM_ID, before: members.length, after: next.length, adminRoleId }, null, 2))
+if (JSON.stringify(before) !== JSON.stringify(after)) await putDoc(pk, 'members', after)
+console.log(JSON.stringify({ ok: true, reelmId: DEFAULT_REELM_ID, before: before.length, after: after.length, adminRoleId: adminRole?.id || null, dryRun: Boolean(args.dryRun) }, null, 2))

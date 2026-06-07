@@ -4,18 +4,24 @@ import { createApp } from './http/app.js'
 import { attachSocketServer } from './socket/socket.js'
 import { logger } from './lib/logger.js'
 import { ensureDefaultReelm } from './modules/reelms/defaultReelm.js'
-import { closeDocStore, initDocStore } from './modules/store/docStore.js'
+import { closeDocStore, initDocStore, isDocStoreReady, onDocStoreReady } from './modules/store/docStore.js'
 
 const io = attachSocketServer()
 const app = createApp(io)
 const server = http.createServer(app)
 io.attach(server)
 
-await initDocStore()
-await ensureDefaultReelm().catch((err) => logger.error('[DefaultReelm] startup error:', err))
+let defaultReelmEnsured = false
+
+onDocStoreReady(async () => {
+  if (defaultReelmEnsured) return
+  await ensureDefaultReelm().catch((err) => logger.error('[DefaultReelm] startup error:', err))
+  if (isDocStoreReady()) defaultReelmEnsured = true
+})
 
 server.listen(env.PORT, env.HOST, () => {
   logger.info(`API listening on ${env.PUBLIC_API_URL} host=${env.HOST} port=${env.PORT} env=${env.NODE_ENV}`)
+  void initDocStore()
 })
 
 async function shutdown(signal: string) {
