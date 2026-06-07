@@ -1038,6 +1038,7 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
   const bgInputRef = useRef(null)
   const currentTheme = THEMES.find(th => th.id === customization.themeId) || THEMES[0]
   const [openSpectrum, setOpenSpectrum] = useState(null)
+  const [bgSaveState, setBgSaveState] = useState('idle')
 
   const pickSpectrum = (e, key) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -1053,7 +1054,8 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
   const compressImageToDataUrl = async (file) => {
     // Keep story background images small (payload size).
     const dataUrl = await new Promise((resolve, reject) => {
-      const reader = new FileReader()
+      try { validateProfileImageFile(file, 'avatar') } catch (err) { window.alert(err?.message || 'Fotoğraf yüklenemedi.'); e.target.value = ''; return }
+    const reader = new FileReader()
       reader.onload = () => resolve(reader.result)
       reader.onerror = () => reject(new Error('FileReader failed'))
       reader.readAsDataURL(file)
@@ -1094,8 +1096,8 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
               <button className="cust-bg-remove" onClick={() => onChange({ bgImage: null })}>{t('remove')}</button>
             </div>
           ) : (
-            <button className="cust-btn-upload" onClick={() => bgInputRef.current?.click()}>
-              {t('upload_bg')}
+            <button className="cust-btn-upload" disabled={bgSaveState === 'saving'} onClick={() => bgInputRef.current?.click()}>
+              {bgSaveState === 'saving' ? 'Kaydediliyor…' : bgSaveState === 'saved' ? 'Kaydedildi ✓' : t('upload_bg')}
             </button>
           )}
           <input
@@ -1104,11 +1106,16 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
               const file = e.target.files[0]
               if (!file) return
               ;(async () => {
+                setBgSaveState('saving')
                 try {
-                  const safeDataUrl = await compressImageToDataUrl(file)
-                  onChange({ bgImage: safeDataUrl })
+                  const uploaded = await uploadProfileImageFile(file, 'background')
+                  onChange({ bgImage: uploaded.url })
+                  setBgSaveState('saved')
+                  setTimeout(() => setBgSaveState('idle'), 1800)
                 } catch (err) {
-                  console.warn('Background image could not be processed:', err)
+                  console.warn('Background image could not be uploaded:', err)
+                  setBgSaveState('error')
+                  window.alert(err?.message || 'Background image upload failed.')
                 }
               })()
               e.target.value = ''
@@ -1524,6 +1531,7 @@ function AccountSettingsPanel({ user, onUpdate, onLogOut, profileBio, onBioChang
   const [photoEditModal, setPhotoEditModal] = useState(null)
   const [photoScale, setPhotoScale] = useState(1)
   const [photoOffset, setPhotoOffset] = useState({ x: 0, y: 0 })
+  const [photoSaveState, setPhotoSaveState] = useState('idle')
   const [rawPhotoImg, setRawPhotoImg] = useState(null)
 
   // Load image when modal opens
@@ -1568,13 +1576,14 @@ function AccountSettingsPanel({ user, onUpdate, onLogOut, profileBio, onBioChang
     e.target.value = ''
   }
 
-  const applyPhotoEdit = () => {
-    if (!rawPhotoImg) return
-    const OUT = 400
+  const applyPhotoEdit = async () => {
+    if (!rawPhotoImg || photoSaveState === 'saving') return
+    const OUT = 512
     const PREV = 160
     const canvas = document.createElement('canvas')
     canvas.width = OUT; canvas.height = OUT
     const ctx = canvas.getContext('2d')
+    if (!ctx) return
     ctx.beginPath()
     ctx.arc(OUT / 2, OUT / 2, OUT / 2, 0, Math.PI * 2)
     ctx.clip()
@@ -1585,8 +1594,20 @@ function AccountSettingsPanel({ user, onUpdate, onLogOut, profileBio, onBioChang
     const fx = (OUT - fw) / 2 + photoOffset.x * ratio
     const fy = (OUT - fh) / 2 + photoOffset.y * ratio
     ctx.drawImage(rawPhotoImg, fx, fy, fw, fh)
-    onUpdate({ photo: canvas.toDataURL('image/jpeg', 0.92) })
-    setPhotoEditModal(null)
+    try {
+      setPhotoSaveState('saving')
+      const file = await canvasToFile(canvas, 'profile-photo.webp', 'image/webp', 0.88)
+      const media = await mediaUploadToS3(file, 'avatar')
+      const url = safeMediaSrc(media?.url || media?.mediaUrl || media?.publicUrl || null)
+      if (!url) throw new Error('Profil fotoğrafı URL alınamadı.')
+      await onUpdate({ photo: url, avatarVersion: Date.now(), photoUpdatedAt: Date.now() })
+      setPhotoSaveState('saved')
+      setTimeout(() => setPhotoSaveState('idle'), 1600)
+      setPhotoEditModal(null)
+    } catch (err) {
+      setPhotoSaveState('error')
+      window.alert(err?.message || 'Profil fotoğrafı kaydedilemedi.')
+    }
   }
 
   const onPreviewMouseDown = (e) => {
@@ -1892,12 +1913,13 @@ ${posts.length ? `<ul>${posts.map(p => { const raw = (p.text || p.content || '')
         onTouchEnd={() => { isDraggingRef.current = false }}
         onCancel={() => setPhotoEditModal(null)}
         onApply={applyPhotoEdit}
+        saveState={photoSaveState}
       />}
     </div>
   )
 }
 
-function PhotoEditModal({ previewCanvasRef, photoScale, setPhotoScale, onMouseDown, onMouseMove, onMouseUp, onTouchStart, onTouchMove, onTouchEnd, onCancel, onApply }) {
+function PhotoEditModal({ previewCanvasRef, photoScale, setPhotoScale, onMouseDown, onMouseMove, onMouseUp, onTouchStart, onTouchMove, onTouchEnd, onCancel, onApply, saveState = 'idle' }) {
   const t = useT()
   return ReactDOM.createPortal(
     <div className="photo-edit-overlay" onClick={onCancel}>
@@ -1929,8 +1951,8 @@ function PhotoEditModal({ previewCanvasRef, photoScale, setPhotoScale, onMouseDo
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="11" cy="11" r="8"/><path d="M8 11h6M11 8v6"/></svg>
         </div>
         <div className="photo-edit-actions">
-          <button className="photo-edit-cancel" onClick={onCancel}>{t('cancel')}</button>
-          <button className="photo-edit-apply" onClick={onApply}>{t('apply')}</button>
+          <button className="photo-edit-cancel" disabled={saveState === 'saving'} onClick={onCancel}>{t('cancel')}</button>
+          <button className="photo-edit-apply" disabled={saveState === 'saving'} onClick={onApply}>{saveState === 'saving' ? 'Kaydediliyor…' : saveState === 'saved' ? 'Kaydedildi ✓' : t('apply')}</button>
         </div>
       </div>
     </div>,
@@ -1938,12 +1960,13 @@ function PhotoEditModal({ previewCanvasRef, photoScale, setPhotoScale, onMouseDo
   )
 }
 
-function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChange, status, onStatusChange, bio, onBioChange, socialLinks, onSocialLinksChange, activePlatforms, onActivePlatformsChange, iconFilter, reelms, uid, spotifyConnected, spotifyNowPlaying, onSpotifyConnect, onSpotifyDisconnect, activity, onActivityChange, onViewFullProfile }) {
+function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChange, status, onStatusChange, bio, onBioChange, socialLinks, onSocialLinksChange, activePlatforms, onActivePlatformsChange, iconFilter, reelms, uid, spotifyConnected, spotifyNowPlaying, onSpotifyConnect, onSpotifyDisconnect, activity, onActivityChange }) {
   const popupRef = useRef(null)
   const ppPhotoInputRef = useRef(null)
   const ppCoverInputRef = useRef(null)
   const [statusOpen, setStatusOpen] = useState(false)
   const [headerEditOpen, setHeaderEditOpen] = useState(false)
+  const [profileMediaState, setProfileMediaState] = useState('idle')
   const [editingBio, setEditingBio] = useState(false)
   const [bioInput, setBioInput] = useState('')
   const [editingSocial, setEditingSocial] = useState(null)
@@ -2039,9 +2062,18 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
           onChange={e => {
             const file = e.target.files[0]
             if (!file) return
-            const reader = new FileReader()
-            reader.onload = ev => onPhotoChange(ev.target.result)
-            reader.readAsDataURL(file)
+            ;(async () => {
+              setProfileMediaState('saving')
+              try {
+                const uploaded = await uploadProfileImageFile(file, 'avatar')
+                await onPhotoChange(uploaded.url)
+                setProfileMediaState('saved')
+                setTimeout(() => setProfileMediaState('idle'), 1600)
+              } catch (err) {
+                setProfileMediaState('error')
+                window.alert(err?.message || 'Profil fotoğrafı kaydedilemedi.')
+              }
+            })()
             e.target.value = ''
           }}
         />
@@ -2053,13 +2085,23 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
           onChange={e => {
             const file = e.target.files[0]
             if (!file) return
-            const reader = new FileReader()
-            reader.onload = ev => onCoverChange(ev.target.result)
-            reader.readAsDataURL(file)
+            ;(async () => {
+              setProfileMediaState('saving')
+              try {
+                const uploaded = await uploadProfileImageFile(file, 'banner')
+                await onCoverChange(uploaded.url)
+                setProfileMediaState('saved')
+                setTimeout(() => setProfileMediaState('idle'), 1600)
+              } catch (err) {
+                setProfileMediaState('error')
+                window.alert(err?.message || 'Afiş kaydedilemedi.')
+              }
+            })()
             e.target.value = ''
           }}
         />
       </div>
+      {profileMediaState !== 'idle' && <div className={`pp-save-state pp-save-state--${profileMediaState}`}>{profileMediaState === 'saving' ? 'Kaydediliyor…' : profileMediaState === 'saved' ? 'Kaydedildi ✓' : 'Kaydetme başarısız'}</div>}
       {headerEditOpen && (
         <div className="pp-cover-menu">
           <button className="pp-cover-menu-item" onClick={() => { ppPhotoInputRef.current?.click(); setHeaderEditOpen(false) }}>Change photo</button>
@@ -2069,7 +2111,7 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
       )}
 
       <div className="pp-identity">
-        <img src={user.photo || avatarUIcon} alt="Avatar" className="pp-avatar" />
+        <img src={getPersonPhoto(user) || avatarUIcon} alt="Avatar" className="pp-avatar" />
         <div className="pp-names">
           <span className="pp-name">{user.name}</span>
           <span className="pp-username">{'@' + (user.username || 'username')}</span>
@@ -2317,11 +2359,6 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
             All activity
           </button>
         </div>
-        {onViewFullProfile && (
-          <button className="fpp-view-full-btn" onClick={() => { onClose(); setTimeout(() => onViewFullProfile(), 50) }}>
-            Tüm profili gör →
-          </button>
-        )}
       </div>
     </div>
 
@@ -5904,6 +5941,86 @@ function safeMediaSrc(value) {
   return text
 }
 
+const PROFILE_MEDIA_LIMITS = {
+  avatar: 5 * 1024 * 1024,
+  profile_photo: 5 * 1024 * 1024,
+  banner: 8 * 1024 * 1024,
+  cover: 8 * 1024 * 1024,
+  background: 10 * 1024 * 1024,
+  server_icon: 5 * 1024 * 1024,
+}
+const PROFILE_IMAGE_TYPES = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
+
+function validateProfileImageFile(file, purpose = 'avatar') {
+  if (!file) throw new Error('Dosya seçilmedi.')
+  const type = String(file.type || '').toLowerCase()
+  if (!PROFILE_IMAGE_TYPES.has(type)) throw new Error('Sadece JPG, PNG veya WebP görsel yüklenebilir.')
+  const max = PROFILE_MEDIA_LIMITS[purpose] || PROFILE_MEDIA_LIMITS.avatar
+  if (Number(file.size || 0) > max) throw new Error(`Görsel çok büyük. Maksimum ${(max / 1024 / 1024).toFixed(0)} MB olmalı.`)
+}
+
+function loadImageFromFile(file) {
+  return new Promise((resolve, reject) => {
+    const url = URL.createObjectURL(file)
+    const img = new Image()
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img) }
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Görsel okunamadı.')) }
+    img.src = url
+  })
+}
+
+function canvasToFile(canvas, fileName, type = 'image/webp', quality = 0.86) {
+  return new Promise((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (!blob) return reject(new Error('Görsel işlenemedi.'))
+      resolve(new File([blob], fileName, { type: blob.type || type }))
+    }, type, quality)
+  })
+}
+
+async function resizeImageFileForUpload(file, purpose = 'avatar') {
+  validateProfileImageFile(file, purpose)
+  const img = await loadImageFromFile(file)
+  const cfg = {
+    avatar: { w: 512, h: 512, square: true, q: 0.88 },
+    profile_photo: { w: 512, h: 512, square: true, q: 0.88 },
+    banner: { w: 1600, h: 640, square: false, q: 0.84 },
+    cover: { w: 1600, h: 640, square: false, q: 0.84 },
+    background: { w: 1920, h: 1080, square: false, q: 0.82 },
+    server_icon: { w: 512, h: 512, square: true, q: 0.86 },
+  }[purpose] || { w: 1200, h: 1200, square: false, q: 0.84 }
+  let sw = img.naturalWidth || img.width
+  let sh = img.naturalHeight || img.height
+  if (!sw || !sh) throw new Error('Görsel boyutu okunamadı.')
+  let sx = 0, sy = 0
+  if (cfg.square) {
+    const side = Math.min(sw, sh)
+    sx = Math.round((sw - side) / 2)
+    sy = Math.round((sh - side) / 2)
+    sw = side
+    sh = side
+  }
+  const scale = Math.min(1, cfg.w / sw, cfg.h / sh)
+  const w = cfg.square ? cfg.w : Math.max(1, Math.round(sw * scale))
+  const h = cfg.square ? cfg.h : Math.max(1, Math.round(sh * scale))
+  const canvas = document.createElement('canvas')
+  canvas.width = w
+  canvas.height = h
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('Görsel işleme desteklenmiyor.')
+  ctx.drawImage(img, sx, sy, sw, sh, 0, 0, w, h)
+  const base = String(file.name || `${purpose}.webp`).replace(/\.[a-z0-9]+$/i, '')
+  return canvasToFile(canvas, `${base}-${purpose}.webp`, 'image/webp', cfg.q)
+}
+
+async function uploadProfileImageFile(file, purpose = 'avatar') {
+  const processed = await resizeImageFileForUpload(file, purpose)
+  const media = await mediaUploadToS3(processed, purpose)
+  const url = safeMediaSrc(media?.url || media?.mediaUrl || media?.publicUrl || null)
+  if (!url) throw new Error('Yükleme tamamlandı ama görsel URL alınamadı.')
+  return { url, media, file: processed }
+}
+
 function getPersonPhoto(person) {
   if (!person) return null
   const photo = person.photo || person.profilePhoto || person.photoURL || person.avatar || person.image || person.imageUrl || person.userPhoto || person.fromPhoto || null
@@ -6201,13 +6318,24 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     return next
   }
 
-  const updateUserData = (updates) => {
+  const profileSaveKeyRef = useRef('')
+  const updateUserData = async (updates) => {
     const normalized = normalizeProfileUpdates(updates)
-    setCurrentUser(prev => {
-      const updated = { ...(prev || {}), ...normalized }
-      userProfilePatch(normalized).catch(() => {})
-      return updated
-    })
+    const saveKey = stableDocKey(normalized)
+    setCurrentUser(prev => ({ ...(prev || {}), ...normalized }))
+    if (profileSaveKeyRef.current === saveKey) return { ok: true, deduped: true }
+    profileSaveKeyRef.current = saveKey
+    try {
+      const result = await userProfilePatch(normalized)
+      if (result?.data) setCurrentUser(prev => sameLegacyProfile(prev, result.data) ? prev : { ...(prev || {}), ...result.data })
+      pushToast?.({ id: 'profile-saved-' + Date.now(), text: 'Profil kaydedildi.' })
+      return result || { ok: true }
+    } catch (err) {
+      pushToast?.({ id: 'profile-save-failed-' + Date.now(), text: 'Profil kaydedilemedi.' })
+      throw err
+    } finally {
+      setTimeout(() => { if (profileSaveKeyRef.current === saveKey) profileSaveKeyRef.current = '' }, 800)
+    }
   }
 
   const [customization, setCustomization] = useState(() => ({ ...DEFAULT_CUSTOMIZATION }))
@@ -6260,15 +6388,21 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       try { if (uid && uid !== 'guest') localStorage.setItem(`reelms:customization:${uid}`, JSON.stringify(updated)) } catch {}
       scheduleUserPersist('customization', toSave)
       // Keep account customization durable even if the app is closed shortly after a change.
-      userPutDoc('customization', toSave).catch(() => {})
-      userProfilePatch({ profileTheme: toSave }).catch(() => {})
+      userPutDoc('customization', toSave)
+        .then(() => pushToast?.({ id: 'customization-saved-' + Date.now(), text: 'Tema kaydedildi.' }))
+        .catch(() => pushToast?.({ id: 'customization-failed-' + Date.now(), text: 'Tema kaydedilemedi.' }))
+      userProfilePatch({ profileTheme: { ...toSave, bgImage: updated.bgImage || null }, bgImage: updated.bgImage || null }).catch(() => {})
       if ('bgImage' in updates) {
         if (updates.bgImage) {
           scheduleUserPersist('bg_image', updates.bgImage)
-          userPutDoc('bg_image', updates.bgImage).catch(() => {})
+          userPutDoc('bg_image', updates.bgImage)
+            .then(() => pushToast?.({ id: 'background-saved-' + Date.now(), text: 'Arka plan kaydedildi.' }))
+            .catch(() => pushToast?.({ id: 'background-failed-' + Date.now(), text: 'Arka plan kaydedilemedi.' }))
         } else {
           scheduleUserPersist('bg_image', null)
-          userPutDoc('bg_image', null).catch(() => {})
+          userPutDoc('bg_image', null)
+            .then(() => pushToast?.({ id: 'background-removed-' + Date.now(), text: 'Arka plan kaldırıldı.' }))
+            .catch(() => pushToast?.({ id: 'background-remove-failed-' + Date.now(), text: 'Arka plan kaldırılamadı.' }))
         }
       }
       return updated
@@ -10046,8 +10180,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (selectedChannel?.id === chId) setSelectedChannel(null)
   }
 
-  const updateReelmImage = (reelmId, imageDataUrl) => {
-    const updater = r => ({ ...r, image: imageDataUrl })
+  const updateReelmImage = (reelmId, imageUrl) => {
+    const safeUrl = safeMediaSrc(imageUrl) || null
+    const updater = r => ({ ...r, image: safeUrl })
     setReelms(prev => {
       const next = prev.map(r => r.id !== reelmId ? r : updater(r))
       scheduleUserPersist('reelms', next)
@@ -10055,7 +10190,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     })
     setSelectedReelm(prev => {
       const next = updater(prev)
-      persistReelmCore(next)
+      persistReelmCore(next, { only: ['meta'] })
+        .then(() => pushToast?.({ id: 'reelm-image-saved-' + Date.now(), text: 'Sunucu görseli kaydedildi.' }))
+        .catch(() => pushToast?.({ id: 'reelm-image-failed-' + Date.now(), text: 'Sunucu görseli kaydedilemedi.' }))
       return next
     })
   }
@@ -10865,7 +11002,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           <span className={`bar-item-wrap${item.id === recentlyBumpedChatId ? ' bar-item-bumped' : ''}`}>
                             <div className={`bar-item-avatar${item.itemType === 'reelm' ? ' bar-item-avatar--server' : ' bar-item-avatar--profile'}${isDefaultCommunity(item) ? ' bar-item-avatar--community' : ''}`}>
                               {(() => {
-                                const avatarSrc = item.itemType === 'chat' ? getChatAvatarSrc(item) : item.image
+                                const avatarSrc = item.itemType === 'chat' ? getChatAvatarSrc(item) : safeMediaSrc(item.image)
                                 const label = item.itemType === 'chat' ? getChatDisplayName(item) : item.name
                                 return avatarSrc
                                   ? <img src={avatarSrc} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: item.itemType === 'reelm' ? '12px' : '50%' }} />
@@ -10909,6 +11046,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   {currentActivity?.name && <ActivityBadge activity={currentActivity} />}
                 </div>
               </div>
+              <button className="profile-view-full-btn" onClick={e => { e.stopPropagation(); setFullProfileTarget({ isSelf: true, user: currentUser }) }}>
+                Tüm profili gör
+              </button>
             </div>
           </div>
 
@@ -11447,14 +11587,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               <>
                 <div className="panel panel-left" style={{ flex: `0 0 ${leftWidth}px` }}>
                   <div className="reelm-sidebar">
-                    <div className={`reelm-cover-wrap${selectedReelm.image ? ' reelm-cover-wrap--has-image' : ''}${isDefaultCommunity(selectedReelm) ? ' reelm-cover-wrap--community' : ''}`}>
-                      {selectedReelm.image
-                        ? <img src={selectedReelm.image} alt="cover" className="reelm-cover-img" />
+                    <div className={`reelm-cover-wrap${safeMediaSrc(selectedReelm.image) ? ' reelm-cover-wrap--has-image' : ''}${isDefaultCommunity(selectedReelm) ? ' reelm-cover-wrap--community' : ''}`}>
+                      {safeMediaSrc(selectedReelm.image)
+                        ? <img src={safeMediaSrc(selectedReelm.image)} alt="cover" className="reelm-cover-img" />
                         : isDefaultCommunity(selectedReelm)
                           ? <div className="reelm-cover-community-art"><ReelmsCommunityGlyph /><span>Reelms Community</span></div>
                           : <div className="reelm-cover-placeholder"></div>
                       }
-                      {selectedReelm.image && <div className="reelm-cover-blur-strip" />}
+                      {safeMediaSrc(selectedReelm.image) && <div className="reelm-cover-blur-strip" />}
                       <div className="reelm-sidebar-name-row" onClick={e => e.stopPropagation()}>
                         <span className="reelm-sidebar-name" onClick={() => setShowReelmMenu(v => !v)}>{selectedReelm.name}</span>
                         {showReelmMenu && (
@@ -11996,14 +12136,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   })()}
                   {selectedReelm && (
                     <div className="reelm-sidebar">
-                      <div className={`reelm-cover-wrap${selectedReelm.image ? ' reelm-cover-wrap--has-image' : ''}${isDefaultCommunity(selectedReelm) ? ' reelm-cover-wrap--community' : ''}`} onClick={() => { if ((!isDefaultCommunity(selectedReelm) && hasReelmPermissionClient(selectedReelm, uid, 'manageOverview')) || canManageReelmClient(selectedReelm, uid)) reelmImageInputRef.current?.click() }}>
-                        {selectedReelm.image
-                          ? <img src={selectedReelm.image} alt="cover" className="reelm-cover-img" />
+                      <div className={`reelm-cover-wrap${safeMediaSrc(selectedReelm.image) ? ' reelm-cover-wrap--has-image' : ''}${isDefaultCommunity(selectedReelm) ? ' reelm-cover-wrap--community' : ''}`} onClick={() => { if ((!isDefaultCommunity(selectedReelm) && hasReelmPermissionClient(selectedReelm, uid, 'manageOverview')) || canManageReelmClient(selectedReelm, uid)) reelmImageInputRef.current?.click() }}>
+                        {safeMediaSrc(selectedReelm.image)
+                          ? <img src={safeMediaSrc(selectedReelm.image)} alt="cover" className="reelm-cover-img" />
                           : isDefaultCommunity(selectedReelm)
                             ? <div className="reelm-cover-community-art"><ReelmsCommunityGlyph /><span>Reelms Community</span></div>
                             : <div className="reelm-cover-placeholder"><span>+</span></div>
                         }
-                        {selectedReelm.image && <div className="reelm-cover-blur-strip" />}
+                        {safeMediaSrc(selectedReelm.image) && <div className="reelm-cover-blur-strip" />}
                         <div className="reelm-sidebar-name-row" onClick={e => e.stopPropagation()}>
                           <span className="reelm-sidebar-name" onClick={() => setShowReelmMenu(v => !v)}>{selectedReelm.name}</span>
                           {showReelmMenu && (
@@ -12039,21 +12179,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           onChange={e => {
                             const file = e.target.files[0]
                             if (!file) return
-                            const reader = new FileReader()
-                            reader.onload = ev => {
-                              const img = new Image()
-                              img.onload = () => {
-                                const MAX = 256
-                                const scale = Math.min(1, MAX / Math.max(img.width, img.height))
-                                const canvas = document.createElement('canvas')
-                                canvas.width = Math.round(img.width * scale)
-                                canvas.height = Math.round(img.height * scale)
-                                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
-                                updateReelmImage(selectedReelm.id, canvas.toDataURL('image/jpeg', 0.7))
+                            ;(async () => {
+                              try {
+                                const uploaded = await uploadProfileImageFile(file, 'server_icon')
+                                updateReelmImage(selectedReelm.id, uploaded.url)
+                              } catch (err) {
+                                window.alert(err?.message || 'Sunucu görseli kaydedilemedi.')
                               }
-                              img.src = ev.target.result
-                            }
-                            reader.readAsDataURL(file)
+                            })()
                             e.target.value = ''
                           }}
                         />
@@ -13493,8 +13626,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             else if (item._type === 'chat') { setSelectedChat(item); setSelectedChannel(null); setSelectedReelm(null); setShowDiscover(false); setShowSettings(false) }
                           }}>
                             <div className="discover-result-avatar">
-                              {item.image
-                                ? <img src={item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: item.itemType === 'reelm' ? '12px' : '50%' }} />
+                              {safeMediaSrc(item.image)
+                                ? <img src={safeMediaSrc(item.image)} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: item.itemType === 'reelm' ? '12px' : '50%' }} />
                                 : (item.name || item.contact || '?').charAt(0).toUpperCase()
                               }
                             </div>
@@ -13625,8 +13758,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             {sortedReelms.slice(0, 5).map(r => (
                               <button key={r.id} className="home-item" onClick={() => handleSelectReelm(r)}>
                                 <div className="home-item-avatar home-item-avatar--server">
-                                  {r.image
-                                    ? <img src={r.image} alt={r.name} className="home-item-avatar-img" />
+                                  {safeMediaSrc(r.image)
+                                    ? <img src={safeMediaSrc(r.image)} alt={r.name} className="home-item-avatar-img" />
                                     : <span className="home-item-avatar-letter">{(r.name || '?').charAt(0)}</span>
                                   }
                                 </div>
@@ -13748,7 +13881,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               onSpotifyDisconnect={disconnectSpotify}
               activity={currentActivity}
               onActivityChange={setActivity}
-              onViewFullProfile={() => { setShowProfilePopup(false); setFullProfileTarget({ isSelf: true, user: currentUser }) }}
             />
           )}
           {renderFriendProfileSurface(false)}

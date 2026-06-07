@@ -77,8 +77,6 @@
   "pin": "Fixar",
   "unpin": "Desafixar",
   "reply": "Responder",
-  "replying_to": "Respondendo a",
-  "replied_to_you": "respondeu à sua mensagem",
   "forward": "Encaminhar",
   "like": "Curtir",
   "comment": "Comentar",
@@ -112,7 +110,7 @@
   "sounds_desc": "Escolha um som para cada tipo de notificação. Clique no ícone para pré-visualizar.",
   "spectrum": "Espectro",
   "spectrum_primary": "Primário",
-  "spectrum_accent": "Secundário",
+  "spectrum_accent": "Acento",
   "msg_requests_section": "Pedidos de mensagem",
 
   "typography": "Tipografia",

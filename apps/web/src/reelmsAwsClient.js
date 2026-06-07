@@ -573,13 +573,15 @@ export function socketLeaveChannel(msgKey) {
 }
 
 export function socketEmitTyping(msgKey, { name = '', photo = '' } = {}) {
-  if (!socket?.connected || !msgKey) return
+  if (!socket?.connected || !msgKey) return false
   socket.emit('typing:start', { msgKey, name, photo })
+  return true
 }
 
 export function socketEmitTypingStop(msgKey) {
-  if (!socket?.connected || !msgKey) return
+  if (!socket?.connected || !msgKey) return false
   socket.emit('typing:stop', { msgKey })
+  return true
 }
 
 export function socketSetPresenceStatus(status) {
@@ -651,15 +653,19 @@ export function socketVcBroadcast(reelmId, channelId, payload) {
 // ── User profiles ─────────────────────────────────────────────────────────────
 
 export async function userProfilePut(data) {
-  await api('/api/v1/user/profile', { method: 'PUT', body: JSON.stringify({ data }) })
-  const id = String(data?.id || data?.uid || '')
-  if (id) profileCache.set(id, { data, at: Date.now() })
+  const j = await api('/api/v1/user/profile', { method: 'PUT', body: JSON.stringify({ data }) })
+  const saved = j?.data || data
+  const id = String(saved?.id || saved?.uid || data?.id || data?.uid || '')
+  if (id) profileCache.set(id, { data: saved, at: Date.now() })
+  return j
 }
 
 export async function userProfilePatch(data) {
-  await api('/api/v1/user/profile', { method: 'PATCH', body: JSON.stringify({ data }) })
-  const id = String(data?.id || data?.uid || '')
-  if (id) profileCache.set(id, { data: { ...(profileCache.get(id)?.data || {}), ...data }, at: Date.now() })
+  const j = await api('/api/v1/user/profile', { method: 'PATCH', body: JSON.stringify({ data }) })
+  const saved = j?.data || null
+  const id = String(saved?.id || saved?.uid || data?.id || data?.uid || '')
+  if (id) profileCache.set(id, { data: saved || { ...(profileCache.get(id)?.data || {}), ...data }, at: Date.now() })
+  return j
 }
 
 export async function userProfileGet() {
@@ -907,10 +913,10 @@ export async function getVoiceIceServers() {
   return j?.data?.iceServers || []
 }
 
-export async function mediaCreateUploadUrl(fileName, fileSize, mimeType) {
+export async function mediaCreateUploadUrl(fileName, fileSize, mimeType, purpose = 'attachment') {
   const j = await api('/api/v1/media/upload-url', {
     method: 'POST',
-    body: JSON.stringify({ fileName, fileSize, mimeType }),
+    body: JSON.stringify({ fileName, fileSize, mimeType, purpose }),
   })
   return j.data
 }
@@ -923,8 +929,8 @@ export async function mediaCompleteUpload(mediaId, etag = null) {
   return j.data
 }
 
-export async function mediaUploadToS3(file) {
-  const upload = await mediaCreateUploadUrl(file.name, file.size, file.type || 'application/octet-stream')
+export async function mediaUploadToS3(file, purpose = 'attachment') {
+  const upload = await mediaCreateUploadUrl(file.name, file.size, file.type || 'application/octet-stream', purpose)
   const res = await fetch(upload.upload.uploadUrl, {
     method: upload.upload.method || 'PUT',
     headers: upload.upload.headers || { 'Content-Type': file.type || 'application/octet-stream' },

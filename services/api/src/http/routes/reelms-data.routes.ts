@@ -6,7 +6,7 @@ import { env } from '../../config/env.js'
 import { authenticate } from '../middleware/authenticate.js'
 import { apiRateLimit } from '../middleware/rateLimit.js'
 import { verifyIdToken } from '../../modules/auth/authService.js'
-import { APP_PK, chanPk, deleteDoc, getDoc, putDoc, putDocIfAbsent, queryDocs, reelmPk, scanByPkPrefix, scanByPkPrefixAndSk, userPk } from '../../modules/store/docStore.js'
+import { APP_PK, chanPk, deleteDoc, getDoc, putDoc, putDocIfAbsent, queryDocs, reelmPk, scanByPkPrefix, userPk } from '../../modules/store/docStore.js'
 import { canManageReelm, canUseReelmPermission, getActiveReelmTimeout, getMessageKeyAccess, getUserPublicProfile as getStoredPublicProfile, isReelmMember, normalizeEmail, normalizeUsername, publicProfileFromStored } from '../../modules/reelms/access.js'
 import { autoJoinDefaultReelm, DEFAULT_REELM_ID, hasLeftDefaultReelm, setDefaultReelmLeft } from '../../modules/reelms/defaultReelm.js'
 import { isCommunityAdminUid, resolveCommunityAdminUids } from '../../modules/reelms/communityAdmins.js'
@@ -88,17 +88,17 @@ export function createReelmsDataRouter(io: Server) {
   }
 
   const getSearchProfiles = () => readSearchCache(searchProfileScanCache, 'profiles', async () => {
-    const items = await scanByPkPrefixAndSk<any>('USER#', 'profile', 2500)
+    const items = await scanByPkPrefix<any>('USER#')
     return items
-      .filter((item: any) => item.data && !(item.data as any).isSystem)
+      .filter((item: any) => item.sk === 'profile' && item.data && !(item.data as any).isSystem)
       .map((item: any) => ({ uid: String(item.pk || '').replace(/^USER#/, ''), data: item.data as any }))
       .filter((row: any) => Boolean(row.uid))
   }, SEARCH_CACHE_TTL_MS)
 
   const getSearchReelmMetas = () => readSearchCache(searchReelmMetaScanCache, 'metas', async () => {
-    const items = await scanByPkPrefixAndSk<any>('REELM#', 'meta', 1500)
+    const items = await scanByPkPrefix<any>('REELM#')
     return items
-      .filter((item: any) => item.data && (item.data as any).id)
+      .filter((item: any) => item.sk === 'meta' && item.data && (item.data as any).id)
       .map((item: any) => item.data as any)
   }, SEARCH_CACHE_TTL_MS)
 
@@ -200,7 +200,7 @@ export function createReelmsDataRouter(io: Server) {
         name: meta.name,
         code: meta.code,
         ownerId: meta.ownerId || null,
-        image: meta.image || null,
+        image: sanitizeMediaUrl(meta.image) || null,
         joinMode: id === DEFAULT_REELM_ID ? 'open' : (meta.joinMode || 'request'),
         showInDiscover: id === DEFAULT_REELM_ID ? true : meta.showInDiscover === true,
         isDefault: id === DEFAULT_REELM_ID,
@@ -252,7 +252,7 @@ export function createReelmsDataRouter(io: Server) {
       code: reelm?.code,
       ownerId: reelm?.ownerId || null,
       announcementChannelId: reelm?.announcementChannelId || null,
-      image: reelm?.image || null,
+      image: sanitizeMediaUrl(reelm?.image) || null,
       showInDiscover: reelm?.showInDiscover === true,
       joinMode: reelm?.joinMode || 'request',
       autoJoinOnInvite: reelm?.autoJoinOnInvite === true,
@@ -502,7 +502,45 @@ export function createReelmsDataRouter(io: Server) {
   const MEDIA_CLEAR_VALUES = new Set<any>([null, '', false])
   const photoKeys = ['photo', 'profilePhoto', 'photoURL', 'avatar', 'image', 'imageUrl', 'userPhoto']
   const coverKeys = ['cover', 'coverImage', 'coverUrl', 'headerImage', 'banner', 'bannerImage', 'backgroundCover']
+  const backgroundKeys = ['bgImage', 'bg_image', 'backgroundImage', 'backgroundUrl']
   const explicitMediaClear = (obj: any, keys: string[]) => keys.some((key) => hasOwn(obj, key) && MEDIA_CLEAR_VALUES.has(obj[key]))
+  const imageMimeTypes = new Set(['image/jpeg', 'image/jpg', 'image/png', 'image/webp'])
+  const mediaPurposeLimits: Record<string, number> = {
+    avatar: 5 * 1024 * 1024,
+    profile_photo: 5 * 1024 * 1024,
+    banner: 8 * 1024 * 1024,
+    cover: 8 * 1024 * 1024,
+    background: 10 * 1024 * 1024,
+    server_icon: 5 * 1024 * 1024,
+    reelm_icon: 5 * 1024 * 1024,
+    attachment: env.S3_MAX_UPLOAD_BYTES
+  }
+  const normalizeMediaPurpose = (value: unknown) => String(value || 'attachment').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '') || 'attachment'
+  const maxUploadBytesForPurpose = (purpose: string) => Math.min(mediaPurposeLimits[purpose] || env.S3_MAX_UPLOAD_BYTES, env.S3_MAX_UPLOAD_BYTES)
+  const isProfileImagePurpose = (purpose: string) => ['avatar', 'profile_photo', 'banner', 'cover', 'background', 'server_icon', 'reelm_icon'].includes(purpose)
+  const sanitizeMediaUrl = (value: unknown) => {
+    const safe = safeMediaValue(value)
+    if (!safe) return null
+    if (/^https?:\/\//i.test(safe)) return safe
+    return null
+  }
+  const sanitizeCustomizationDoc = (value: any) => {
+    if (!value || typeof value !== 'object') return value
+    const next = { ...value }
+    const bg = sanitizeMediaUrl(next.bgImage ?? next.bg_image ?? next.backgroundImage ?? next.backgroundUrl ?? null)
+    if (bg) {
+      next.bgImage = bg
+      next.backgroundImage = bg
+      next.backgroundUrl = bg
+      delete next.bg_image
+    } else {
+      delete next.bgImage
+      delete next.bg_image
+      delete next.backgroundImage
+      delete next.backgroundUrl
+    }
+    return next
+  }
   const generateInviteCode = () => Math.random().toString(36).slice(2, 8).toUpperCase()
 
   const USERNAME_RE = /^[a-z0-9._-]{3,30}$/
@@ -580,6 +618,18 @@ export function createReelmsDataRouter(io: Server) {
       next.coverVersion = Date.now()
     }
 
+    const background = explicitMediaClear(rawPatchObject, backgroundKeys) ? null : sanitizeMediaUrl(next.bgImage || next.bg_image || next.backgroundImage || next.backgroundUrl || null)
+    if (background || backgroundKeys.some((k) => hasOwn(rawPatchObject, k))) {
+      next.bgImage = background
+      next.bg_image = background
+      next.backgroundImage = background
+      next.backgroundUrl = background
+    } else {
+      for (const key of [...photoKeys, ...coverKeys, ...backgroundKeys]) {
+        if (isRawMediaValue(next[key])) next[key] = null
+      }
+    }
+
     if (next.username != null) next.username = normalizeUsername(next.username)
     if (next.contact != null) next.contact = normalizeEmail(next.contact)
     if (next.email != null) next.email = normalizeEmail(next.email)
@@ -606,6 +656,7 @@ export function createReelmsDataRouter(io: Server) {
   const compactPublicProfile = (uid: string, profile: any = {}) => {
     const photo = getProfilePhoto(profile)
     const cover = getProfileCover(profile)
+    const background = sanitizeMediaUrl(profile.bgImage || profile.bg_image || profile.backgroundImage || profile.backgroundUrl || null)
     return {
       id: uid,
       uid,
@@ -622,6 +673,14 @@ export function createReelmsDataRouter(io: Server) {
       coverImage: cover,
       coverUrl: cover,
       headerImage: cover,
+      banner: cover,
+      bannerImage: cover,
+      backgroundCover: cover,
+      bgImage: background,
+      bg_image: background,
+      backgroundImage: background,
+      backgroundUrl: background,
+      bodyFont: typeof profile.bodyFont === 'string' ? profile.bodyFont : null,
       bio: profile.bio || '',
       activity: profile.activity || null,
       sociallinks: profile.sociallinks || {},
@@ -1316,7 +1375,7 @@ export function createReelmsDataRouter(io: Server) {
       : {
           ...base,
           name: Object.prototype.hasOwnProperty.call(src, 'name') ? String(src.name || base.name || 'Reelm').trim().slice(0, 80) || base.name : base.name,
-          image: Object.prototype.hasOwnProperty.call(src, 'image') ? (src.image || null) : base.image,
+          image: Object.prototype.hasOwnProperty.call(src, 'image') ? sanitizeMediaUrl(src.image) : sanitizeMediaUrl(base.image),
           showInDiscover: Object.prototype.hasOwnProperty.call(src, 'showInDiscover') ? src.showInDiscover === true : base.showInDiscover,
           joinMode: Object.prototype.hasOwnProperty.call(src, 'joinMode') ? (['open', 'request', 'closed'].includes(String(src.joinMode)) ? String(src.joinMode) : base.joinMode) : base.joinMode,
           autoJoinOnInvite: Object.prototype.hasOwnProperty.call(src, 'autoJoinOnInvite') ? src.autoJoinOnInvite === true : base.autoJoinOnInvite,
@@ -1325,6 +1384,7 @@ export function createReelmsDataRouter(io: Server) {
           ageRating: Object.prototype.hasOwnProperty.call(src, 'ageRating') ? (String(src.ageRating) === 'adults' ? 'adults' : 'under18') : base.ageRating,
           announcementChannelId: Object.prototype.hasOwnProperty.call(src, 'announcementChannelId') ? String(src.announcementChannelId || '') : base.announcementChannelId
         }
+    next.image = Object.prototype.hasOwnProperty.call(src, 'image') ? sanitizeMediaUrl(src.image) : sanitizeMediaUrl(base.image)
     return {
       ...next,
       id: base.id,
@@ -1758,33 +1818,73 @@ export function createReelmsDataRouter(io: Server) {
         const current = await getDoc<any[]>(userPk(uid), 'reelms').catch(() => [])
         return res.json({ ok: true, ignored: true, data: Array.isArray(current) ? current : [] })
       }
-      await putDoc(userPk(uid), sk, req.body?.data)
+      let nextData = req.body?.data
+      if (sk === 'bg_image') {
+        if (nextData == null || nextData === '') nextData = null
+        else {
+          const url = sanitizeMediaUrl(nextData)
+          if (!url) return res.status(400).json({ error: 'media_must_be_uploaded', code: 'media/upload-required' })
+          nextData = url
+        }
+        publicProfileCache.delete(uid)
+      } else if (sk === 'customization') {
+        nextData = sanitizeCustomizationDoc(nextData)
+        publicProfileCache.delete(uid)
+      }
+      await putDoc(userPk(uid), sk, nextData)
       emitUser(uid, sk)
-      res.json({ ok: true })
+      res.json({ ok: true, data: nextData })
     } catch { res.status(500).json({ error: 'put_failed' }) }
   })
 
   const getPublicProfileForRoute = async (requestedUid: string, requesterUid: string) => {
-    const cached = publicProfileCache.get(requestedUid)
-    if (cached && cached.expiresAt > Date.now()) return cached.value
-    const profile = await withDeadline(getDoc<any>(userPk(requestedUid), 'profile').catch(() => null), 1500, null)
-    if (!profile) return cached?.value || null
-    if (requestedUid === requesterUid) {
-      publicProfileCache.set(requestedUid, { value: profile, expiresAt: Date.now() + 30_000 })
-      return profile
+    const uid = String(requestedUid || '')
+    if (!uid || isSystemInboxUid(uid)) {
+      return {
+        id: uid || env.REELMS_MODERATION_UID,
+        uid: uid || env.REELMS_MODERATION_UID,
+        isSystem: true,
+        name: 'Reelms System',
+        displayName: 'Reelms System',
+        username: 'reelms-system',
+        photo: null,
+        profilePhoto: null,
+        avatar: null,
+        image: null,
+        cover: null,
+        coverImage: null,
+        coverUrl: null,
+        profileTheme: null,
+        sociallinks: {},
+        socialorder: []
+      }
     }
-    const [sociallinks, socialorder, customization] = await Promise.all([
-      withDeadline(getDoc<any>(userPk(requestedUid), 'sociallinks').catch(() => ({})), 900, {}),
-      withDeadline(getDoc<any>(userPk(requestedUid), 'socialorder').catch(() => []), 900, []),
-      withDeadline(getDoc<any>(userPk(requestedUid), 'customization').catch(() => null), 900, null)
+    const cached = publicProfileCache.get(uid)
+    if (cached && cached.expiresAt > Date.now()) return cached.value
+    const [profile, sociallinks, socialorder, customization, bgImage, bodyFont] = await Promise.all([
+      withDeadline(getDoc<any>(userPk(uid), 'profile').catch(() => null), 1500, null),
+      withDeadline(getDoc<any>(userPk(uid), 'sociallinks').catch(() => ({})), 900, {}),
+      withDeadline(getDoc<any>(userPk(uid), 'socialorder').catch(() => []), 900, []),
+      withDeadline(getDoc<any>(userPk(uid), 'customization').catch(() => null), 900, null),
+      withDeadline(getDoc<any>(userPk(uid), 'bg_image').catch(() => null), 900, null),
+      withDeadline(getDoc<any>(userPk(uid), 'body_font').catch(() => null), 900, null)
     ])
-    const value = publicProfileFromStored(requestedUid, {
+    if (!profile) return cached?.value || null
+    const safeBg = typeof bgImage === 'string' ? sanitizeMediaUrl(bgImage) : null
+    const safeCustomization = sanitizeCustomizationDoc(customization || {}) || {}
+    const profileTheme = profile.profileTheme || {
+      ...(safeCustomization || {}),
+      bgImage: safeBg || (safeCustomization as any).bgImage || null
+    }
+    const value = publicProfileFromStored(uid, {
       ...profile,
       sociallinks: sociallinks || profile.sociallinks || {},
       socialorder: Array.isArray(socialorder) ? socialorder : (profile.socialorder || []),
-      profileTheme: profile.profileTheme || customization || null
+      bgImage: safeBg || profile.bgImage || null,
+      bodyFont: typeof bodyFont === 'string' ? bodyFont : null,
+      profileTheme
     })
-    publicProfileCache.set(requestedUid, { value, expiresAt: Date.now() + 60_000 })
+    publicProfileCache.set(uid, { value, expiresAt: Date.now() + 60_000 })
     return value
   }
 
@@ -1811,7 +1911,7 @@ export function createReelmsDataRouter(io: Server) {
 
       emitUser(uid, 'profile')
       await syncProfileToRelationshipCaches(uid, prepared.profile).catch((err) => console.error('profile sync failed:', err))
-      res.json({ ok: true })
+      res.json({ ok: true, data: await getPublicProfileForRoute(uid, uid).catch(() => compactPublicProfile(uid, prepared.profile)) })
     } catch (err) {
       console.error('/api/v1/user/profile put error:', err)
       res.status(500).json({ error: 'put_failed' })
@@ -1853,7 +1953,7 @@ export function createReelmsDataRouter(io: Server) {
 
       emitUser(uid, 'profile')
       await syncProfileToRelationshipCaches(uid, prepared.profile).catch((err) => console.error('profile sync failed:', err))
-      res.json({ ok: true })
+      res.json({ ok: true, data: await getPublicProfileForRoute(uid, uid).catch(() => compactPublicProfile(uid, prepared.profile)) })
     } catch (err) {
       console.error('/api/v1/user/profile patch error:', err)
       res.status(500).json({ error: 'patch_failed' })
@@ -2520,7 +2620,7 @@ export function createReelmsDataRouter(io: Server) {
         createdAt: Number(input.createdAt || Date.now()),
         updatedAt: Date.now(),
         announcementChannelId: input.announcementChannelId || null,
-        image: input.image || null,
+        image: sanitizeMediaUrl(input.image) || null,
         showInDiscover: input.showInDiscover === true,
         joinMode: input.joinMode === 'open' ? 'open' : 'request',
         autoJoinOnInvite: input.autoJoinOnInvite === true,
@@ -2707,7 +2807,7 @@ export function createReelmsDataRouter(io: Server) {
           name: 'Reelms Community',
           code: 'REELMS',
           isDefault: true,
-          image: hasIncomingImage ? (incomingData?.image || null) : (existingMeta.image || null),
+          image: hasIncomingImage ? sanitizeMediaUrl(incomingData?.image) : sanitizeMediaUrl(existingMeta.image),
           communityArtLocked: existingMeta.communityArtLocked === true
         }
       }
@@ -3087,9 +3187,12 @@ export function createReelmsDataRouter(io: Server) {
       const uid = String(req.userId)
       const fileName = String(req.body?.fileName || '').trim()
       const fileSize = Number(req.body?.fileSize || 0)
-      const mimeType = String(req.body?.mimeType || 'application/octet-stream').trim() || 'application/octet-stream'
+      const mimeType = String(req.body?.mimeType || 'application/octet-stream').trim().toLowerCase() || 'application/octet-stream'
+      const purpose = normalizeMediaPurpose(req.body?.purpose)
       if (!fileName || !Number.isFinite(fileSize) || fileSize <= 0) return res.status(400).json({ error: 'missing_fields' })
-      if (fileSize > env.S3_MAX_UPLOAD_BYTES) return res.status(413).json({ error: 'file_too_large', maxBytes: env.S3_MAX_UPLOAD_BYTES })
+      const maxBytes = maxUploadBytesForPurpose(purpose)
+      if (fileSize > maxBytes) return res.status(413).json({ error: 'file_too_large', maxBytes, purpose })
+      if (isProfileImagePurpose(purpose) && !imageMimeTypes.has(mimeType)) return res.status(415).json({ error: 'unsupported_image_type', allowed: Array.from(imageMimeTypes) })
       const fileId = `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`
       const objectKey = buildUserUploadKey(uid, fileName)
       const storage = getObjectStorage()
@@ -3099,6 +3202,7 @@ export function createReelmsDataRouter(io: Server) {
         fileName,
         fileSize,
         mimeType,
+        purpose,
         objectKey,
         url: presigned.url,
         uploadedAt: null,

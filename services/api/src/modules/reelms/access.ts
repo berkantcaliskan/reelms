@@ -46,6 +46,7 @@ export function publicProfileFromStored(uid: string, profile: any = {}) {
   const rawPhoto = profile.photo || profile.profilePhoto || profile.photoURL || profile.avatar || profile.image || profile.imageUrl || profile.userPhoto || null
   const photo = isGoogleDefaultAvatarUrl(rawPhoto) ? null : safeMediaValue(rawPhoto)
   const cover = safeMediaValue(profile.cover || profile.coverImage || profile.coverUrl || profile.headerImage || profile.banner || profile.bannerImage || profile.backgroundCover || null)
+  const background = safeMediaValue(profile.bgImage || profile.bg_image || profile.backgroundImage || profile.backgroundUrl || null)
   const fallbackName = isClosedProfile(profile) ? 'Deleted user' : 'User'
   return {
     id: uid,
@@ -65,6 +66,14 @@ export function publicProfileFromStored(uid: string, profile: any = {}) {
     coverImage: cover,
     coverUrl: cover,
     headerImage: cover,
+    banner: cover,
+    bannerImage: cover,
+    backgroundCover: cover,
+    bgImage: background,
+    bg_image: background,
+    backgroundImage: background,
+    backgroundUrl: background,
+    bodyFont: typeof profile.bodyFont === 'string' ? profile.bodyFont : null,
     bio: profile.bio || '',
     activity: profile.activity || null,
     sociallinks: profile.sociallinks || {},
@@ -123,11 +132,21 @@ export async function canUseReelmPermission(uid: string, reelmId: string, permis
 }
 
 export async function getUserPublicProfile(uid: string) {
-  const [profile, customization] = await Promise.all([
+  const [profile, customization, bgImage, bodyFont] = await Promise.all([
     getDoc<any>(userPk(uid), 'profile').catch(() => null),
-    getDoc<any>(userPk(uid), 'customization').catch(() => null)
+    getDoc<any>(userPk(uid), 'customization').catch(() => null),
+    getDoc<any>(userPk(uid), 'bg_image').catch(() => null),
+    getDoc<any>(userPk(uid), 'body_font').catch(() => null)
   ])
-  return publicProfileFromStored(uid, { ...(profile || {}), profileTheme: (profile as any)?.profileTheme || customization || null })
+  const mergedCustomization = customization && typeof customization === 'object'
+    ? { ...customization, bgImage: typeof bgImage === 'string' ? bgImage : (customization as any).bgImage ?? null }
+    : (typeof bgImage === 'string' ? { bgImage } : null)
+  return publicProfileFromStored(uid, {
+    ...(profile || {}),
+    bgImage: typeof bgImage === 'string' ? bgImage : (profile as any)?.bgImage || null,
+    bodyFont: typeof bodyFont === 'string' ? bodyFont : null,
+    profileTheme: (profile as any)?.profileTheme || mergedCustomization || null
+  })
 }
 
 async function isBannedFromReelm(uid: string, reelmId: string) {

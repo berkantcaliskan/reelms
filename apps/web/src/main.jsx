@@ -3,7 +3,6 @@ import { createRoot } from 'react-dom/client'
 import { HashRouter } from 'react-router-dom'
 import './index.css'
 import AppShell from './app/AppShell.jsx'
-import { initTracker } from './shared/lib/tracker.js'
 
 
 const REELMS_CLIENT_CACHE_VERSION = '2026-06-05-render-hardening-v2'
@@ -26,8 +25,6 @@ try {
     localStorage.setItem(key, REELMS_CLIENT_CACHE_VERSION)
   }
 } catch { /* ignore cache guard errors */ }
-
-initTracker()
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>

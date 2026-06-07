@@ -77,8 +77,6 @@
   "pin": "Pin",
   "unpin": "Unpin",
   "reply": "Reply",
-  "replying_to": "Replying to",
-  "replied_to_you": "replied to your message",
   "forward": "Forward",
   "like": "Like",
   "comment": "Comment",
@@ -113,7 +111,7 @@
   "sounds_desc": "Choose a sound for each notification type. Click the icon to preview.",
   "spectrum": "Spectrum",
   "spectrum_primary": "Primary",
-  "spectrum_accent": "Secondary",
+  "spectrum_accent": "Accent",
   "msg_requests_section": "Message requests",
 
   "typography": "Typography",

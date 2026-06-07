@@ -327,6 +327,7 @@ export function attachSocketServer(httpServer?: HttpServer) {
 
     socket.on('typing:stop', ({ msgKey }: { msgKey: string }) => {
       if (typeof msgKey !== 'string' || !msgKey) return
+      if (!socket.rooms.has(`chan:${msgKey}`)) return
       socket.to(`chan:${msgKey}`).emit('reelms:typing:stop', { uid: socket.uid, msgKey })
     })
 

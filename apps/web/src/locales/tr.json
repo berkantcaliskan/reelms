@@ -77,8 +77,6 @@
   "pin": "Sabitle",
   "unpin": "Sabitlemeyi kaldır",
   "reply": "Yanıtla",
-  "replying_to": "Yanıtlanıyor:",
-  "replied_to_you": "mesajına yanıt verdi",
   "forward": "İlet",
   "like": "Beğen",
   "comment": "Yorum yap",
@@ -113,7 +111,7 @@
   "sounds_desc": "Her bildirim türü için bir ses seç. Önizlemek için ikona tıkla.",
   "spectrum": "Spektrum",
   "spectrum_primary": "Birincil",
-  "spectrum_accent": "İkincil",
+  "spectrum_accent": "Vurgu",
   "msg_requests_section": "Mesaj istekleri",
 
   "typography": "Tipografi",
