@@ -432,13 +432,13 @@ h6 {
   height: 28px;
 }
 
-/* Notification icon: muted when popup closed, accent when open */
+/* Notification icon: same treatment as friends icon when closed, accent when open */
 .header-settings-btn .header-icon {
-  filter: grayscale(1) brightness(0.55);
+  filter: brightness(0) saturate(0) opacity(0.75);
   transition: filter 0.18s;
 }
 .header-settings-btn:hover .header-icon {
-  filter: grayscale(0.4) brightness(0.8);
+  filter: brightness(0) saturate(0) opacity(1);
 }
 .hpopup-float-icon .header-icon {
   filter: none;
