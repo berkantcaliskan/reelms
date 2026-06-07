@@ -11461,7 +11461,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       { id: 'desktop',       label: 'Desktop App' },
                       { id: 'privacy',       label: t('privacy_safety') },
                       { id: 'environment',   label: t('environment') },
-                      { id: 'companions',    label: 'Eşlikçiler' },
+                      { id: 'companions',    label: t('companions') },
                       { id: 'about',         label: t('about') },
                     ].map(item => (
                       <button
