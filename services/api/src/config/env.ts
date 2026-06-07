@@ -1,4 +1,10 @@
-import 'dotenv/config'
+import { config } from 'dotenv'
+import { resolve, dirname } from 'node:path'
+import { fileURLToPath } from 'node:url'
+
+const __dirname = dirname(fileURLToPath(import.meta.url))
+config({ path: resolve(__dirname, '../../.env'), override: false })
+
 import { z } from 'zod'
 
 const emptyToUndefined = (value: unknown) => {
@@ -40,6 +46,8 @@ const schema = z.object({
   REELMS_STORAGE_DRIVER: z.enum(['json', 'postgres', 'supabase']).default('json'),
   REELMS_DATA_DIR: z.string().default('./data'),
   REELMS_MODERATION_UID: z.string().default('reelms-moderation'),
+  REELMS_BOT_UID: z.string().default('reelms-bot'),
+  REELMS_BOT_SECRET: optionalString(),
   // Production beta should grant privileged admin rights by stable internal UID.
   // E-mail/username based admin grants are unsafe without e-mail verification, so
   // they are blocked in production unless explicitly acknowledged.
@@ -83,9 +91,6 @@ const schema = z.object({
   SPOTIFY_CLIENT_ID: optionalString(),
   SPOTIFY_CLIENT_SECRET: optionalString(),
   SPOTIFY_REDIRECT_URI: optionalString(),
-
-  REELMS_BOT_UID: z.string().default('reelms-radio-bot'),
-  REELMS_BOT_SECRET: z.string().min(16).default('dev-only-bot-secret-change-me'),
 
   OPENAI_API_KEY: optionalString(),
   AWS_REGION: z.string().default('eu-central-1'),
