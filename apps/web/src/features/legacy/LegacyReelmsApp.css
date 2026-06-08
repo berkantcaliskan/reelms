@@ -1,4 +1,4 @@
-/* Legacy visual system isolated under features/legacy. New feature CSS should not be added here. */
+﻿/* Legacy visual system isolated under features/legacy. New feature CSS should not be added here. */
 @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600&family=Inclusive+Sans:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700&family=Mona+Sans:wght@300;400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600&family=Akt:wght@300;400;500;600;700&family=Sour+Gummy:wght@400;500;600;700&family=LINE+Seed+JP:wght@300;400;700&family=Dela+Gothic+One&display=swap');
 
 :root {
@@ -62,7 +62,7 @@ html {
   background-color: var(--tb);
 }
 
-/* ── Grain doku katmanı ── */
+/* â”€â”€ Grain doku katmanÄ± â”€â”€ */
 body::before {
   content: '';
   position: fixed;
@@ -180,7 +180,7 @@ h6 {
   pointer-events: none;
 }
 
-/* ── Auth floating shapes ── */
+/* â”€â”€ Auth floating shapes â”€â”€ */
 .auth-shapes {
   position: absolute;
   inset: 0;
@@ -888,7 +888,7 @@ h6 {
   background: rgba(var(--ta-rgb), 0.4);
   flex-shrink: 0;
   align-self: center;
-  /* + butonunun içindeki ikon 32px iken, buton 40px olduğu için görsel hizayı dengeler. */
+  /* + butonunun iÃ§indeki ikon 32px iken, buton 40px olduÄŸu iÃ§in gÃ¶rsel hizayÄ± dengeler. */
   margin-left: -4px;
   margin-top: -4px;
 }
@@ -1049,7 +1049,7 @@ h6 {
 }
 
 
-/* ── Drop-in animation ── */
+/* â”€â”€ Drop-in animation â”€â”€ */
 @keyframes su-drop-in {
   0%   { opacity: 0; transform: translateY(-28px) scale(0.97); }
   60%  { opacity: 1; }
@@ -1580,7 +1580,7 @@ h6 {
 }
 .update-banner-dismiss:hover { color: rgba(255, 255, 255, 0.75); }
 
-/* ── Toast pill notification system ─────────────────────────────────────── */
+/* â”€â”€ Toast pill notification system â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .toast-stack {
   position: fixed;
   bottom: 24px;
@@ -1835,11 +1835,11 @@ h6 {
 
 
 
-/* (Removed) extra veil layer — it caused visible top banding. */
+/* (Removed) extra veil layer â€” it caused visible top banding. */
 
 /* Semi-transparent overlays when background image is active */
 
-/* Header and chats-row are outside panel-system — they see dashboard-bg directly */
+/* Header and chats-row are outside panel-system â€” they see dashboard-bg directly */
 .dashboard-root.has-bg .app-header {
   background: transparent;
   -webkit-backdrop-filter: none;
@@ -1854,7 +1854,7 @@ h6 {
 
 /*
  * panel-system creates its own stacking context (z-index:1 + position:relative).
- * backdrop-filter on panel-system itself sees dashboard-bg directly — this is the
+ * backdrop-filter on panel-system itself sees dashboard-bg directly â€” this is the
  * correct place to apply the panel blur. Child panels cannot independently blur
  * through the stacking context boundary; they differentiate by background opacity only.
  */
@@ -2488,7 +2488,7 @@ h6 {
 .reelm-channel-ctx-cap-btn.active { background: rgba(185,152,135,0.18); border-color: rgba(185,152,135,0.45); color: #b99887; }
 .reelm-channel-ctx-cap-unlimited { grid-column: 1 / -1; }
 
-/* ── Vapor Rooms ──────────────────────────────────── */
+/* â”€â”€ Vapor Rooms â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .reelm-category-menu-flying { color: var(--ta) !important; }
 .reelm-category-menu-flying:hover { background: rgba(var(--ta-rgb), 0.12) !important; }
 
@@ -2712,7 +2712,7 @@ h6 {
   color: var(--ta);
 }
 
-/* ── Profile Popup: Spotify Connect ── */
+/* â”€â”€ Profile Popup: Spotify Connect â”€â”€ */
 .pp-spotify-section {
   padding: 10px 0 4px;
   border-top: 1px solid rgba(var(--ta-rgb), 0.08);
@@ -2837,7 +2837,7 @@ h6 {
   color: rgba(var(--ta-rgb), 0.8);
 }
 
-/* ── Profile Popup: Action count badge ── */
+/* â”€â”€ Profile Popup: Action count badge â”€â”€ */
 .pp-action-count {
   display: inline-flex;
   align-items: center;
@@ -2851,7 +2851,7 @@ h6 {
   min-width: 18px;
 }
 
-/* ── Profile Popup: Reelms / Activity Panel ── */
+/* â”€â”€ Profile Popup: Reelms / Activity Panel â”€â”€ */
 .pp-panel-overlay {
   position: fixed;
   inset: 0;
@@ -3003,7 +3003,7 @@ h6 {
   margin-top: 3px;
 }
 
-/* ── Create Reelm Form ── */
+/* â”€â”€ Create Reelm Form â”€â”€ */
 .create-reelm-form {
   display: flex;
   flex-direction: column;
@@ -3131,7 +3131,7 @@ h6 {
   overflow: hidden;
 }
 
-/* ── Reelm Sidebar ── */
+/* â”€â”€ Reelm Sidebar â”€â”€ */
 .reelm-sidebar {
   display: flex;
   flex-direction: column;
@@ -3802,7 +3802,7 @@ h6 {
   color: rgba(230, 210, 200, 0.92);
 }
 
-/* ── Help Center modal ── */
+/* â”€â”€ Help Center modal â”€â”€ */
 @keyframes hc-in {
   0%   { transform: scale(0.93) translateY(12px); opacity: 0; }
   100% { transform: scale(1)    translateY(0);    opacity: 1; }
@@ -4011,7 +4011,7 @@ h6 {
   animation: ignite-flow 3s linear infinite;
 }
 
-/* ── Eşlikçiler (Companions) Panel ────────────────────────────── */
+/* â”€â”€ EÅŸlikÃ§iler (Companions) Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .companions-panel {
   display: flex;
   flex-direction: column;
@@ -4191,7 +4191,7 @@ h6 {
   cursor: not-allowed;
 }
 
-/* ─── Mobile responsive layout ──────────────────────────────────────────── */
+/* â”€â”€â”€ Mobile responsive layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .mobile-bottom-nav { display: none; }
 
 @media (max-width: 768px) {
@@ -4345,7 +4345,7 @@ h6 {
     max-width: 100% !important;
   }
 
-  /* ─── Mobile bottom nav ─── */
+  /* â”€â”€â”€ Mobile bottom nav â”€â”€â”€ */
   .mobile-bottom-nav {
     display: flex;
     position: fixed;
@@ -4407,7 +4407,7 @@ h6 {
   }
 }
 
-/* ─── Auth page footer bar ──────────────────────────────────────────────── */
+/* â”€â”€â”€ Auth page footer bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .auth-footer-bar {
   position: absolute;
   bottom: 28px;
@@ -4445,7 +4445,7 @@ h6 {
   color: rgba(var(--ta-rgb), 0.75);
 }
 
-/* ─── Settings legal section ─────────────────────────────────────────────── */
+/* â”€â”€â”€ Settings legal section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .accs-legal-links {
   display: flex;
   gap: 10px;
@@ -4469,7 +4469,7 @@ h6 {
   color: rgba(var(--ta-rgb), 0.9);
 }
 
-/* ─── Auth page language picker ─────────────────────────────────────────── */
+/* â”€â”€â”€ Auth page language picker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .auth-lang-picker {
   position: relative;
   font-size: 12px;
@@ -4587,7 +4587,7 @@ h6 {
   color: var(--ta);
 }
 
-/* ── Account Settings Panel ── */
+/* â”€â”€ Account Settings Panel â”€â”€ */
 .accs-panel {
   display: flex;
   flex-direction: column;
@@ -4640,7 +4640,7 @@ h6 {
   gap: 8px;
 }
 
-/* ── Photo Edit Modal ── */
+/* â”€â”€ Photo Edit Modal â”€â”€ */
 .photo-edit-overlay {
   position: fixed;
   inset: 0;
@@ -4871,7 +4871,7 @@ h6 {
   color: rgba(var(--ta-rgb), 0.38);
 }
 
-/* ── Environment Panel: Sliders ── */
+/* â”€â”€ Environment Panel: Sliders â”€â”€ */
 .env-slider-row {
   display: flex;
   flex-direction: column;
@@ -5049,7 +5049,7 @@ h6 {
   color: var(--ta);
 }
 
-/* ── Pill Select ─────────────────────────────────────────── */
+/* â”€â”€ Pill Select â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .pill-select {
   display: flex;
   align-items: center;
@@ -5167,7 +5167,7 @@ h6 {
   border-color: rgba(var(--ta-rgb), 0.35);
 }
 
-/* ── Customization Panel ── */
+/* â”€â”€ Customization Panel â”€â”€ */
 .cust-bg-area {
   display: flex;
   flex-direction: column;
@@ -5257,8 +5257,8 @@ h6 {
   box-shadow: 0 0 0 3px rgba(255,255,255,0.12);
 }
 
-/* ── Tayf color pickers ── */
-/* ── Tayf ── */
+/* â”€â”€ Tayf color pickers â”€â”€ */
+/* â”€â”€ Tayf â”€â”€ */
 .cust-tayf-row {
   display: flex;
   align-items: flex-start;
@@ -5318,7 +5318,7 @@ h6 {
   color: rgba(185,152,135,0.55);
   letter-spacing: 0.02em;
 }
-/* Spectrum strip — pill, same height as swatch; width anim (max-width + flex min-width:auto breaks opening) */
+/* Spectrum strip â€” pill, same height as swatch; width anim (max-width + flex min-width:auto breaks opening) */
 .cust-tayf-strip {
   width: 0;
   min-width: 0;
@@ -5726,7 +5726,7 @@ h6 {
   background: rgba(var(--ta-rgb), 0.12) !important;
 }
 
-/* ── Message System ── */
+/* â”€â”€ Message System â”€â”€ */
 .channel-header-float {
   position: absolute;
   top: 15px;
@@ -5944,7 +5944,7 @@ h6 {
   color: rgba(224, 201, 188, 0.45);
 }
 
-/* ── Message Bar ── */
+/* â”€â”€ Message Bar â”€â”€ */
 .msg-bar-wrap { position: relative; align-self: stretch; }
 
 @keyframes typing-wave {
@@ -6075,7 +6075,7 @@ h6 {
   color: rgba(var(--ta-rgb), 0.45);
 }
 
-/* ── Mention spans in messages ── */
+/* â”€â”€ Mention spans in messages â”€â”€ */
 .mention {
   display: inline;
   border-radius: 4px;
@@ -6257,7 +6257,7 @@ h6 {
   color: #0c0c20;
 }
 
-/* ── Reaction controls (+ and emoji, visible on hover) ── */
+/* â”€â”€ Reaction controls (+ and emoji, visible on hover) â”€â”€ */
 .msg-react-ctrl {
   display: flex;
   align-items: center;
@@ -6306,7 +6306,7 @@ h6 {
   z-index: 200;
 }
 
-/* ── Reaction pills ── */
+/* â”€â”€ Reaction pills â”€â”€ */
 .msg-reactions {
   display: flex;
   flex-wrap: wrap;
@@ -6363,7 +6363,7 @@ h6 {
 .reaction-pill--plus:hover { color: rgba(var(--ta-rgb), 0.9); }
 .reaction-pill--plus span { font-size: 0.72rem; font-weight: 600; }
 
-/* ── Input area emoji picker ── */
+/* â”€â”€ Input area emoji picker â”€â”€ */
 .msg-action-emoji-wrap {
   position: relative;
 }
@@ -6374,7 +6374,7 @@ h6 {
   z-index: 200;
 }
 
-/* ── Emoji picker theming (hpopup-style glass) ── */
+/* â”€â”€ Emoji picker theming (hpopup-style glass) â”€â”€ */
 @keyframes epr-popup-in {
   0%   { transform: scale(0.88) translateY(10px); opacity: 0; }
   100% { transform: scale(1)    translateY(0);    opacity: 1; }
@@ -6469,7 +6469,7 @@ h6 {
 }
 .msg-plus-menu-item:hover { background: rgba(var(--ta-rgb), 0.14); }
 
-/* ── Friend Profile Popup ── */
+/* â”€â”€ Friend Profile Popup â”€â”€ */
 .friend-profile-popup {
   position: fixed;
   background: rgba(var(--tb-rgb), 0.92);
@@ -6593,7 +6593,7 @@ h6 {
 .fpp-action-danger { color: #f87171; }
 .fpp-action-danger:hover { background: rgba(248, 113, 113, 0.1); }
 
-/* ── DM Sidebar ── */
+/* â”€â”€ DM Sidebar â”€â”€ */
 .dm-sidebar {
   padding: 10px 12px 12px;
   display: flex;
@@ -6826,7 +6826,7 @@ h6 {
   text-align: center;
 }
 
-/* ── Chat Side Tabs (DM & Group) ── */
+/* â”€â”€ Chat Side Tabs (DM & Group) â”€â”€ */
 .chat-side-tabs {
   display: flex;
   gap: 2px;
@@ -6853,7 +6853,7 @@ h6 {
 .chat-side-tab:hover { color: var(--ta); background: rgba(var(--ta-rgb), 0.07); }
 .chat-side-tab--active { background: rgba(var(--ta-rgb), 0.14); color: var(--ta); }
 
-/* ── Chat Side Section ── */
+/* â”€â”€ Chat Side Section â”€â”€ */
 .chat-side-section {
   display: flex;
   flex-direction: column;
@@ -6869,7 +6869,7 @@ h6 {
   margin: 0;
 }
 
-/* ── Vapor Chat ── */
+/* â”€â”€ Vapor Chat â”€â”€ */
 .vapor-chat-header {
   display: flex;
   flex-direction: column;
@@ -6926,7 +6926,7 @@ h6 {
   font-style: italic;
 }
 
-/* ── Friend Selector ── */
+/* â”€â”€ Friend Selector â”€â”€ */
 .friend-selector-panel { width: 316px; }
 .friend-selector-panel .menu-card { gap: 10px; width: 100%; }
 .friend-selector-title {
@@ -6988,7 +6988,7 @@ h6 {
 .friend-selector-username { font-size: 0.68rem; color: rgba(var(--ta-rgb), 0.5); }
 .friend-selector-empty { font-size: 0.78rem; color: rgba(var(--ta-rgb), 0.4); padding: 8px 4px; margin: 0; }
 
-/* ── Reelm Categories Scroll ── */
+/* â”€â”€ Reelm Categories Scroll â”€â”€ */
 .reelm-categories-scroll {
   flex: 1;
   overflow-y: auto;
@@ -6997,7 +6997,7 @@ h6 {
 }
 .reelm-categories-scroll::-webkit-scrollbar { display: none; }
 
-/* ── Right Panel: Member List ── */
+/* â”€â”€ Right Panel: Member List â”€â”€ */
 .rp-members-panel {
   display: flex;
   flex-direction: column;
@@ -7124,7 +7124,7 @@ h6 {
   letter-spacing: 0.02em;
 }
 
-/* ── Reelm Settings Overlay ── */
+/* â”€â”€ Reelm Settings Overlay â”€â”€ */
 .reelm-settings-overlay {
   position: absolute;
   inset: 0;
@@ -7239,7 +7239,7 @@ h6 {
   background: rgba(var(--ta-rgb), 0.16);
 }
 
-/* ── Reelm Settings: Roles Section ── */
+/* â”€â”€ Reelm Settings: Roles Section â”€â”€ */
 .rs-section {
   flex: 1;
   overflow-y: auto;
@@ -7431,7 +7431,7 @@ h6 {
   padding: 8px 4px;
 }
 
-/* ── Reelm Settings: Members Section ── */
+/* â”€â”€ Reelm Settings: Members Section â”€â”€ */
 .rs-members-list {
   display: flex;
   flex-direction: column;
@@ -7536,7 +7536,7 @@ h6 {
 .rs-search-input:focus { border-color: rgba(var(--ta-rgb), 0.4); }
 .rs-search-input::placeholder { color: rgba(var(--ta-rgb), 0.35); }
 
-/* ── Voice Channel ──────────────────────────────────── */
+/* â”€â”€ Voice Channel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .voice-panel {
   flex: 1;
   display: flex;
@@ -7597,7 +7597,7 @@ h6 {
   min-height: 0;
 }
 
-/* ── Video expand popup ──────────────────────────────────────────────────── */
+/* â”€â”€ Video expand popup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .video-expand-overlay {
   position: fixed;
   inset: 0;
@@ -7853,7 +7853,7 @@ h6 {
 .vmb-btn-muted:hover { background: rgba(248, 113, 113, 0.1); color: rgba(248, 113, 113, 1); }
 .vmb-btn-leave:hover { background: rgba(248, 113, 113, 0.12); color: rgba(248, 113, 113, 0.9); }
 
-/* ── Spatial Room ─────────────────────────────────────────────────────────── */
+/* â”€â”€ Spatial Room â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .spatial-room {
   display: flex;
   flex-direction: column;
@@ -8422,7 +8422,7 @@ h6 {
   gap: 18px;
 }
 
-/* ── Stories Row ── */
+/* â”€â”€ Stories Row â”€â”€ */
 .feed-stories-wrap {
   overflow: hidden;
 }
@@ -8521,7 +8521,7 @@ h6 {
   white-space: nowrap;
 }
 
-/* ── Story Viewer Overlay ── */
+/* â”€â”€ Story Viewer Overlay â”€â”€ */
 .story-viewer-overlay {
   position: fixed;
   inset: 0;
@@ -8724,7 +8724,7 @@ h6 {
 .story-like-btn:hover { transform: scale(1.18); }
 .story-like-btn.liked { color: #f87171; }
 
-/* ── Add Story Modal ── */
+/* â”€â”€ Add Story Modal â”€â”€ */
 .add-story-modal {
   position: relative;
   width: min(400px, 90vw);
@@ -8881,7 +8881,7 @@ h6 {
 .add-story-submit:disabled { opacity: 0.38; cursor: default; }
 .add-story-submit:not(:disabled):hover { opacity: 0.86; }
 
-/* ── Context Bar ── */
+/* â”€â”€ Context Bar â”€â”€ */
 .feed-context-bar {
   border: 1.5px solid rgba(var(--ta-rgb), 0.28);
   border-radius: 28px;
@@ -8997,7 +8997,7 @@ h6 {
   background: rgba(var(--ta-rgb), 0.12);
 }
 
-/* ── Feed Filter Bars ── */
+/* â”€â”€ Feed Filter Bars â”€â”€ */
 .feed-filter-bars {
   display: flex;
   flex-direction: column;
@@ -9034,7 +9034,7 @@ h6 {
   color: rgba(var(--ta-rgb), 0.8);
 }
 
-/* ── Cross-type feed cards ── */
+/* â”€â”€ Cross-type feed cards â”€â”€ */
 .feed-cross-card {
   cursor: pointer;
   border: 1px solid rgba(255,255,255,0.06);
@@ -9055,7 +9055,7 @@ h6 {
   margin-bottom: 8px;
 }
 
-/* ── Feed Posts ── */
+/* â”€â”€ Feed Posts â”€â”€ */
 .feed-posts {
   display: flex;
   flex-direction: column;
@@ -9120,7 +9120,7 @@ h6 {
   background: none !important;
 }
 
-/* ── Feed Posts ── */
+/* â”€â”€ Feed Posts â”€â”€ */
 .feed-posts {
   display: flex;
   flex-direction: column;
@@ -9974,7 +9974,7 @@ h6 {
 .forum-card-action:hover { color: rgba(185,152,135,1); }
 .forum-card-action.liked { color: #f87171; }
 
-/* ── Full Profile Page ─────────────────────────────────────────── */
+/* â”€â”€ Full Profile Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @keyframes fp-fade-in  { from { opacity: 0 } to { opacity: 1 } }
 @keyframes fp-slide-up { from { opacity: 0; transform: translateY(28px) } to { opacity: 1; transform: translateY(0) } }
 
@@ -10150,7 +10150,7 @@ h6 {
 .fp-activity-item { padding: 4px 0; }
 .fp-activity-empty { font-size: 0.82rem; color: rgba(var(--ta-rgb),0.35); }
 
-/* "Tüm profili gör" trigger buttons */
+/* "TÃ¼m profili gÃ¶r" trigger buttons */
 .profile-view-full-btn {
   display: block;
   width: 100%;
@@ -10368,7 +10368,7 @@ h6 {
 }
 .forum-reply-btn:hover { color: rgba(185,152,135,0.8); }
 
-/* ── News Page ─────────────────────────────────── */
+/* â”€â”€ News Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .news-page { position: relative; }
 
 .news-compose-card {
@@ -10458,7 +10458,7 @@ h6 {
   z-index: 0; width: 100%; height: 100%; opacity: 0;
 }
 
-/* ── Bubble Messages ─────────────────────────────────────── */
+/* â”€â”€ Bubble Messages â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .bubble-row {
   display: flex;
   align-items: flex-end;
@@ -10562,7 +10562,7 @@ h6 {
   letter-spacing: 0.03em;
 }
 
-/* ── Group Chat Left Panel ────────────────────────────────── */
+/* â”€â”€ Group Chat Left Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .dm-group-members-label {
   font-size: 0.68rem;
   color: rgba(var(--ta-rgb), 0.4);
@@ -10609,7 +10609,7 @@ h6 {
   text-overflow: ellipsis;
 }
 
-/* ── Group Sidebar (new design) ────────────────────────────── */
+/* â”€â”€ Group Sidebar (new design) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .group-sidebar {
   flex: 1;
   min-height: 0;
@@ -10732,7 +10732,7 @@ h6 {
   line-height: 1.5;
 }
 
-/* ── Group Creator UI ─────────────────────────────────────── */
+/* â”€â”€ Group Creator UI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .friend-selector-item--selected {
   background: rgba(var(--ta-rgb), 0.12) !important;
 }
@@ -10816,7 +10816,7 @@ h6 {
   line-height: 1;
 }
 
-/* ── Top bar bump animation ───────────────────────────────── */
+/* â”€â”€ Top bar bump animation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 @keyframes barItemBump {
   0%   { transform: scale(1) translateY(0); }
   40%  { transform: scale(1.18) translateY(-5px); }
@@ -10828,7 +10828,7 @@ h6 {
   display: inline-flex;
 }
 
-/* ── Live Action Channel ──────────────────────────────────── */
+/* â”€â”€ Live Action Channel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .live-screen-area {
   flex: 1;
   display: flex;
@@ -10938,7 +10938,7 @@ h6 {
   height: 180px;
 }
 
-/* ── Voice room screen share ──────────────────────────────────── */
+/* â”€â”€ Voice room screen share â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .voice-screen-area {
   position: relative;
   background: rgba(0,0,0,0.35);
@@ -11023,7 +11023,7 @@ h6 {
 .voice-strip-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .voice-strip-avatar-speaking { border-color: #68c586; }
 
-/* ── Bottom-bar participants (when screen sharing active) ── */
+/* â”€â”€ Bottom-bar participants (when screen sharing active) â”€â”€ */
 .voice-controls-left {
   display: flex;
   align-items: center;
@@ -11075,7 +11075,7 @@ h6 {
   position: relative;
 }
 
-/* ── Card / stack view (>8 participants) ── */
+/* â”€â”€ Card / stack view (>8 participants) â”€â”€ */
 .voice-participants--card-mode {
   position: relative;
   align-items: center;
@@ -11312,7 +11312,7 @@ h6 {
   width: 64px;
 }
 
-/* ── Remote Control Request Notification ─────────────────── */
+/* â”€â”€ Remote Control Request Notification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .remote-ctrl-req-overlay {
   position: fixed;
   bottom: 80px;
@@ -11382,7 +11382,7 @@ h6 {
 }
 .remote-ctrl-req-decline:hover { border-color: rgba(248,113,113,0.4); color: rgba(248,113,113,0.7); }
 
-/* ─── Bar Context Menu ───────────────────────────────────────────────────── */
+/* â”€â”€â”€ Bar Context Menu â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .bar-ctx-menu {
   background: rgba(var(--tb-rgb), 0.55);
   -webkit-backdrop-filter: blur(28px) saturate(1.6) brightness(0.85);
@@ -11427,7 +11427,7 @@ h6 {
   pointer-events: none;
 }
 
-/* ─── DM / Group Right Panel ─────────────────────────────────────────────── */
+/* â”€â”€â”€ DM / Group Right Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .rp-chat-panel {
   display: flex;
   flex-direction: column;
@@ -11463,7 +11463,7 @@ h6 {
   color: var(--ta);
 }
 
-/* ─── ShareModal ─────────────────────────────────────────────────────────── */
+/* â”€â”€â”€ ShareModal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .share-modal {
   background: rgba(18, 14, 30, 0.98);
   border: 1px solid rgba(var(--ta-rgb), 0.2);
@@ -11576,7 +11576,7 @@ h6 {
 }
 .bar-item:hover .bar-item-share-btn { opacity: 1; }
 
-/* ── Mod Inbox Panel ── */
+/* â”€â”€ Mod Inbox Panel â”€â”€ */
 .mod-inbox-panel {
   display: flex;
   flex-direction: column;
@@ -11678,7 +11678,7 @@ h6 {
   letter-spacing: 0.03em;
 }
 
-/* ── Activity Badge ─────────────────────────────────────────────────────────── */
+/* â”€â”€ Activity Badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .activity-badge {
   display: flex;
   align-items: center;
@@ -11695,7 +11695,7 @@ h6 {
 .activity-badge-name { font-weight: 500; color: rgba(var(--ta-rgb), 0.8); }
 .activity-badge-detail { opacity: 0.6; }
 
-/* ── Activity Row in ProfilePopup ───────────────────────────────────────────── */
+/* â”€â”€ Activity Row in ProfilePopup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .pp-activity-row {
   display: flex;
   align-items: center;
@@ -11736,7 +11736,7 @@ h6 {
 }
 .pp-activity-clear-btn:hover { color: rgba(var(--ta-rgb), 0.75); }
 
-/* ── Activity Setter Modal ──────────────────────────────────────────────────── */
+/* â”€â”€ Activity Setter Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .activity-setter-overlay {
   position: fixed;
   inset: 0;
@@ -11851,7 +11851,7 @@ h6 {
 }
 .activity-set-btn:hover { opacity: 0.88; }
 
-/* ── Channel full pill toast ──────────────────────────────────── */
+/* â”€â”€ Channel full pill toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .channel-full-toast {
   position: fixed;
   bottom: 28px;
@@ -11875,7 +11875,7 @@ h6 {
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
-/* ── Inline creation capacity picker ──────────────────────────── */
+/* â”€â”€ Inline creation capacity picker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .reelm-ch-capacity-picker {
   display: flex;
   gap: 4px;
@@ -11901,7 +11901,7 @@ h6 {
 .reelm-ch-cap-pick-btn.active { background: rgba(185,152,135,0.18); border-color: rgba(185,152,135,0.45); color: #b99887; }
 .activity-set-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* ── Selection: Only allow on specific text content ────────────────────────*/
+/* â”€â”€ Selection: Only allow on specific text content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/
 /* Messages */
 .msg-text,
 .msg-body,
@@ -11914,7 +11914,7 @@ h6 {
   -ms-user-select: text;
 }
 
-/* ── Global Body Font Enforcer ── */
+/* â”€â”€ Global Body Font Enforcer â”€â”€ */
 button, input, select, textarea, 
 .reelm-channel-ctx-item, .bar-ctx-menu-item, 
 .pp-status-option, .rp-chat-action-btn, 
@@ -11923,7 +11923,7 @@ button, input, select, textarea,
   font-family: var(--body-font) !important;
 }
 
-/* ── Live Action Channel Layout ── */
+/* â”€â”€ Live Action Channel Layout â”€â”€ */
 .voice-panel.live-action-layout {
   flex-direction: column;
 }
@@ -12038,7 +12038,7 @@ button, input, select, textarea,
   flex: 1;
 }
 
-/* ── Nudge Feature Styles & Animations ── */
+/* â”€â”€ Nudge Feature Styles & Animations â”€â”€ */
 @keyframes app-nudge-shake {
   0%, 100% { transform: translateX(0); }
   10%, 30%, 50%, 70%, 90% { transform: translateX(-12px) rotate(-1.5deg); }
@@ -12151,7 +12151,7 @@ button, input, select, textarea,
   -ms-user-select: text;
 }
 
-/* ── Global Body Font Enforcer ── */
+/* â”€â”€ Global Body Font Enforcer â”€â”€ */
 button, input, select, textarea, 
 .reelm-channel-ctx-item, .bar-ctx-menu-item, 
 .pp-status-option, .rp-chat-action-btn, 
@@ -12162,7 +12162,7 @@ button, input, select, textarea,
   font-family: var(--body-font) !important;
 }
 
-/* (duplicate block removed — see first occurrence above) */
+/* (duplicate block removed â€” see first occurrence above) */
 .voice-stacked-sidebar {
   display: none;
 }
@@ -12250,7 +12250,7 @@ button, input, select, textarea,
   flex: 1;
 }
 
-/* ── Nudge Feature Styles & Animations ── */
+/* â”€â”€ Nudge Feature Styles & Animations â”€â”€ */
 @keyframes app-nudge-shake {
   0%, 100% { transform: translateX(0); }
   10%, 30%, 50%, 70%, 90% { transform: translateX(-12px) rotate(-1.5deg); }
@@ -12812,7 +12812,7 @@ button, input, select, textarea,
   text-align: center;
 }
 
-/* ── Reelm Settings: Role permissions ── */
+/* â”€â”€ Reelm Settings: Role permissions â”€â”€ */
 .rs-role-main {
   flex: 1;
   min-width: 0;
@@ -13108,7 +13108,7 @@ button, input, select, textarea,
   color: #6ee7b7;
 }
 
-/* ── Final voice/member/role polish ── */
+/* â”€â”€ Final voice/member/role polish â”€â”€ */
 .reelm-channel {
   align-items: flex-start;
   flex-wrap: wrap;
@@ -13283,7 +13283,7 @@ button, input, select, textarea,
   left: 8px;
 }
 
-/* ── Polish v2: server actions, voice tiles, cached Reelm UX ───────────── */
+/* â”€â”€ Polish v2: server actions, voice tiles, cached Reelm UX â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 .header-server-mute {
   margin-left: 10px;
   display: inline-flex;
@@ -13483,7 +13483,7 @@ button, input, select, textarea,
 .voice-room-user-menu-action + .voice-room-user-menu-action,
 .voice-tile-menu-action + .voice-tile-menu-action { margin-top: 6px; }
 
-/* ── Production polish: embedded member profile + fullscreen media controls ── */
+/* â”€â”€ Production polish: embedded member profile + fullscreen media controls â”€â”€ */
 .rp-member-profile-dock {
   flex-shrink: 0;
   padding: 0 2px 10px;
@@ -13629,7 +13629,7 @@ button, input, select, textarea,
   user-select: none;
 }
 
-/* ── Final polish: safer server mute, profile themes, member readability ───── */
+/* â”€â”€ Final polish: safer server mute, profile themes, member readability â”€â”€â”€â”€â”€ */
 .hpopup-notifs .hpopup-content {
   max-height: min(56vh, 420px);
   overflow-y: auto;
@@ -13709,7 +13709,7 @@ button, input, select, textarea,
   z-index: 3;
 }
 .bar-item-muted-dot::before {
-  content: '🔕';
+  content: 'ğŸ”•';
   font-size: 8px;
   line-height: 1;
   opacity: 0.74;
@@ -13817,9 +13817,9 @@ button, input, select, textarea,
   }
 }
 
-/* ── Message reply ────────────────────────────────────────── */
+/* â”€â”€ Message reply â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
-/* Context menu button (⋮) on messages */
+/* Context menu button (â‹®) on messages */
 .msg-ctx-menu-wrap {
   position: relative;
   display: inline-flex;
@@ -13903,7 +13903,7 @@ button, input, select, textarea,
   max-width: 300px;
 }
 
-/* Reply banner above message input — pill shape */
+/* Reply banner above message input â€” pill shape */
 .msg-reply-banner {
   display: flex;
   align-items: center;
