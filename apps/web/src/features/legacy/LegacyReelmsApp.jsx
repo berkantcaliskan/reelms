@@ -1378,6 +1378,7 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
 
 function PrivacySafetyPanel({ user, onUpdate, onUnblock, blockedList, sessionsList, onSessionsUpdate }) {
   const t = useT()
+  const [legalModal, setLegalModal] = useState(null)
 
   if (!user) {
     return (
@@ -1525,6 +1526,17 @@ function PrivacySafetyPanel({ user, onUpdate, onUnblock, blockedList, sessionsLi
 
       <BlockedAccountsSection blockedList={blockedList} onUnblock={onUnblock || (() => {})} />
 
+      <div className="accs-section accs-section-legal">
+        <div className="accs-section-title">{t('legal_documents')}</div>
+        <p className="accs-note" style={{ marginBottom: '12px' }}>{t('legal_documents_desc')}</p>
+        <div className="accs-legal-links">
+          <button className="accs-legal-btn" onClick={() => setLegalModal('terms')}>{t('terms_of_service')}</button>
+          <button className="accs-legal-btn" onClick={() => setLegalModal('privacy')}>{t('privacy_policy')}</button>
+        </div>
+        <p className="accs-note" style={{ marginTop: '16px' }}>© 2026 Reelm, LLC. All rights reserved.</p>
+      </div>
+
+      <LegalModal type={legalModal} onClose={() => setLegalModal(null)} />
     </div>
   )
 }
@@ -1606,6 +1618,52 @@ function ActiveSessionsSection({ sessions, onSessionsUpdate }) {
   )
 }
 
+function useMobileBreakpoint(maxWidth = 768) {
+  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= maxWidth)
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${maxWidth}px)`)
+    const handler = (e) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [maxWidth])
+  return isMobile
+}
+
+function MobileBottomNav({ activeTab, onTabChange, msgUnread }) {
+  return (
+    <nav className="mobile-bottom-nav" role="navigation">
+      <button
+        className={`mobile-nav-btn${activeTab === 'reelms' ? ' mobile-nav-btn--active' : ''}`}
+        onClick={() => onTabChange('reelms')}
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
+        </svg>
+        <span>Reelms</span>
+      </button>
+      <button
+        className={`mobile-nav-btn${activeTab === 'messages' ? ' mobile-nav-btn--active' : ''}`}
+        onClick={() => onTabChange('messages')}
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
+        </svg>
+        <span>Messages</span>
+        {msgUnread > 0 && <span className="mobile-nav-badge">{msgUnread > 9 ? '9+' : msgUnread}</span>}
+      </button>
+      <button
+        className={`mobile-nav-btn${activeTab === 'profile' ? ' mobile-nav-btn--active' : ''}`}
+        onClick={() => onTabChange('profile')}
+      >
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
+        </svg>
+        <span>Profile</span>
+      </button>
+    </nav>
+  )
+}
+
 function AuthLangPicker({ language, onLanguageChange }) {
   const [open, setOpen] = useState(false)
   const current = LANGUAGES.find(l => l.code === language) || LANGUAGES[0]
@@ -1634,6 +1692,25 @@ function AuthLangPicker({ language, onLanguageChange }) {
         </ul>
       )}
     </div>
+  )
+}
+
+function AuthLegalFooter({ language, onLanguageChange }) {
+  const t = useT()
+  const [legalModal, setLegalModal] = useState(null)
+  return (
+    <>
+      <div className="auth-footer-bar">
+        <span className="auth-footer-copy">© 2026 Reelm, LLC. All rights reserved.</span>
+        <span className="auth-footer-sep" aria-hidden="true">·</span>
+        <button className="auth-footer-link" onClick={() => setLegalModal('terms')}>{t('terms_of_service')}</button>
+        <span className="auth-footer-sep" aria-hidden="true">·</span>
+        <button className="auth-footer-link" onClick={() => setLegalModal('privacy')}>{t('privacy_policy')}</button>
+        <span className="auth-footer-sep" aria-hidden="true">·</span>
+        <AuthLangPicker language={language} onLanguageChange={onLanguageChange} />
+      </div>
+      <LegalModal type={legalModal} onClose={() => setLegalModal(null)} />
+    </>
   )
 }
 
@@ -6035,7 +6112,7 @@ function FeedPage({ currentUser, uid, tab, selectedReelm, isMod, onReport, onMod
                             </button>
                             <div className="feed-comment-menu-wrap">
                               <button className="feed-comment-menu-btn" onClick={() => setOpenCommentMenu(openCommentMenu === comment.id ? null : comment.id)}>
-                                <svg width="3" height="12" viewBox="0 0 3 12" fill="currentColor"><circle cx="1.5" cy="1.5" r="1.5"/><circle cx="1.5" cy="6" r="1.5"/><circle cx="1.5" cy="10.5" r="1.5"/></svg>
+                                <svg width="2" height="6" viewBox="0 0 3 12" fill="currentColor"><circle cx="1.5" cy="1.5" r="1.5"/><circle cx="1.5" cy="6" r="1.5"/><circle cx="1.5" cy="10.5" r="1.5"/></svg>
                               </button>
                               {openCommentMenu === comment.id && (
                                 <div className="feed-comment-menu-dropdown">
@@ -6287,6 +6364,7 @@ function sameMessageList(a, b) {
 
 function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, updateAvailable, setUpdateAvailable: _setUA, pushToast }) {
   const navigate = useNavigate()
+  const isMobile = useMobileBreakpoint(768)
   const authSession = useCentralAuthSession()
   const [authUser, setAuthUser] = useState(() =>
     authSession.authUser || (isElectron ? getElectronCurrentUser() : getWebCurrentUser())
@@ -12915,7 +12993,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                       {!selectedChatSystemLocked && (
                                         <div className="msg-ctx-menu-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
                                           <button className="msg-ctx-btn" onClick={() => setOpenMsgCtxFor(f => f === msg.id ? null : msg.id)}>
-                                            <svg width="3" height="12" viewBox="0 0 3 12" fill="currentColor"><circle cx="1.5" cy="1.5" r="1.5"/><circle cx="1.5" cy="6" r="1.5"/><circle cx="1.5" cy="10.5" r="1.5"/></svg>
+                                            <svg width="2" height="6" viewBox="0 0 3 12" fill="currentColor"><circle cx="1.5" cy="1.5" r="1.5"/><circle cx="1.5" cy="6" r="1.5"/><circle cx="1.5" cy="10.5" r="1.5"/></svg>
                                           </button>
                                           {openMsgCtxFor === msg.id && (
                                             <div className="msg-ctx-menu">
@@ -13010,7 +13088,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                         {!selectedChatSystemLocked && <div className="msg-react-ctrl">
                                           <div className="msg-ctx-menu-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
                                             <button className="msg-ctx-btn" onClick={() => setOpenMsgCtxFor(f => f === msg.id ? null : msg.id)}>
-                                              <svg width="3" height="12" viewBox="0 0 3 12" fill="currentColor"><circle cx="1.5" cy="1.5" r="1.5"/><circle cx="1.5" cy="6" r="1.5"/><circle cx="1.5" cy="10.5" r="1.5"/></svg>
+                                              <svg width="2" height="6" viewBox="0 0 3 12" fill="currentColor"><circle cx="1.5" cy="1.5" r="1.5"/><circle cx="1.5" cy="6" r="1.5"/><circle cx="1.5" cy="10.5" r="1.5"/></svg>
                                             </button>
                                             {openMsgCtxFor === msg.id && (
                                               <div className="msg-ctx-menu">
@@ -13677,7 +13755,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   return (
                     <div className="home-sections">
                       {/* Your Reelms, recently */}
-                      <div className="home-section">
+                      <div className="home-section" style={{ marginLeft: '14px' }}>
                         <div className="home-section-header">
                           <img src={readyreelmIcon} alt="" className="home-section-icon" />
                           <span className="home-section-title">Your Reelms, recently</span>
@@ -13704,7 +13782,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       </div>
 
                       {/* Messages */}
-                      <div className="home-section">
+                      <div className="home-section" style={{ marginLeft: '14px' }}>
                         <div className="home-section-header">
                           <img src={newdmIcon} alt="" className="home-section-icon" />
                           <span className="home-section-title">Messages</span>
@@ -14442,6 +14520,47 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   )
 }
 
+function LegalModal({ type, onClose }) {
+  const t = useT()
+  if (!type) return null
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)' }} onClick={onClose}>
+      <div style={{ background: 'var(--panel-bg, #1a1a2e)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, width: '90%', maxWidth: 560, maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+          <span style={{ fontWeight: 600, fontSize: '1rem' }}>
+            {type === 'terms' ? t('terms_of_service') : t('privacy_policy')}
+          </span>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(var(--ta-rgb),0.5)', cursor: 'pointer', fontSize: '1.2rem', lineHeight: 1 }}>✕</button>
+        </div>
+        <div style={{ padding: '20px 24px', overflowY: 'auto', color: 'rgba(var(--ta-rgb),0.7)', fontSize: '0.85rem', lineHeight: 1.7 }}>
+          {type === 'terms' ? (
+            <>
+              <p>{t('last_updated')}</p>
+              <p>{t('terms_intro')}</p>
+              <p><strong>{t('terms_s1_title')}</strong><br />{t('terms_s1_body')}</p>
+              <p><strong>{t('terms_s2_title')}</strong><br />{t('terms_s2_body')}</p>
+              <p><strong>{t('terms_s3_title')}</strong><br />{t('terms_s3_body')}</p>
+              <p><strong>{t('terms_s4_title')}</strong><br />{t('terms_s4_body')}</p>
+              <p>{t('legal_contact')}</p>
+            </>
+          ) : (
+            <>
+              <p>{t('last_updated')}</p>
+              <p>{t('privacy_intro')}</p>
+              <p><strong>{t('privacy_s1_title')}</strong><br />{t('privacy_s1_body')}</p>
+              <p><strong>{t('privacy_s2_title')}</strong><br />{t('privacy_s2_body')}</p>
+              <p><strong>{t('privacy_s3_title')}</strong><br />{t('privacy_s3_body')}</p>
+              <p><strong>{t('privacy_s4_title')}</strong><br />{t('privacy_s4_body')}</p>
+              <p><strong>{t('privacy_s5_title')}</strong><br />{t('privacy_s5_body')}</p>
+              <p>{t('legal_contact')}</p>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function SignUpScreen({ onSignUpComplete, onGoBack }) {
   const t = useT()
   const [step, setStep] = useState(1)
@@ -14763,42 +14882,7 @@ function SignUpScreen({ onSignUpComplete, onGoBack }) {
       </div>
       <LegacyAuthDownloadCta compact />
 
-      {legalModal && (
-        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)' }} onClick={() => setLegalModal(null)}>
-          <div style={{ background: 'var(--panel-bg, #1a1a2e)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, width: '90%', maxWidth: 560, maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-              <span style={{ fontWeight: 600, fontSize: '1rem' }}>
-                {legalModal === 'terms' ? t('terms_of_service') : t('privacy_policy')}
-              </span>
-              <button onClick={() => setLegalModal(null)} style={{ background: 'none', border: 'none', color: 'rgba(var(--ta-rgb),0.5)', cursor: 'pointer', fontSize: '1.2rem', lineHeight: 1 }}>✕</button>
-            </div>
-            <div style={{ padding: '20px 24px', overflowY: 'auto', color: 'rgba(var(--ta-rgb),0.7)', fontSize: '0.85rem', lineHeight: 1.7 }}>
-              {legalModal === 'terms' ? (
-                <>
-                  <p>{t('last_updated')}</p>
-                  <p>{t('terms_intro')}</p>
-                  <p><strong>{t('terms_s1_title')}</strong><br />{t('terms_s1_body')}</p>
-                  <p><strong>{t('terms_s2_title')}</strong><br />{t('terms_s2_body')}</p>
-                  <p><strong>{t('terms_s3_title')}</strong><br />{t('terms_s3_body')}</p>
-                  <p><strong>{t('terms_s4_title')}</strong><br />{t('terms_s4_body')}</p>
-                  <p>{t('legal_contact')}</p>
-                </>
-              ) : (
-                <>
-                  <p>{t('last_updated')}</p>
-                  <p>{t('privacy_intro')}</p>
-                  <p><strong>{t('privacy_s1_title')}</strong><br />{t('privacy_s1_body')}</p>
-                  <p><strong>{t('privacy_s2_title')}</strong><br />{t('privacy_s2_body')}</p>
-                  <p><strong>{t('privacy_s3_title')}</strong><br />{t('privacy_s3_body')}</p>
-                  <p><strong>{t('privacy_s4_title')}</strong><br />{t('privacy_s4_body')}</p>
-                  <p><strong>{t('privacy_s5_title')}</strong><br />{t('privacy_s5_body')}</p>
-                  <p>{t('legal_contact')}</p>
-                </>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      <LegalModal type={legalModal} onClose={() => setLegalModal(null)} />
     </div>
   )
 }
@@ -15199,10 +15283,7 @@ function App() {
                   <SignInScreen onGoSignUp={() => navigateTo('/signup')} onSignInSuccess={handleSignInSuccess} />
                 </div>
               </main>
-              <div style={{ position: 'absolute', bottom: '30px', right: '30px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <AuthLangPicker language={language} onLanguageChange={updateLanguage} />
-                <span style={{ opacity: 0.4, fontSize: '12px', pointerEvents: 'none' }}>Reelm, LLC</span>
-              </div>
+              <AuthLegalFooter language={language} onLanguageChange={updateLanguage} />
             </>
           )
         } />
@@ -15227,10 +15308,7 @@ function App() {
                   <SignUpScreen onSignUpComplete={handleSignUpComplete} onGoBack={() => navigateTo('/signin')} />
                 </div>
               </main>
-              <div style={{ position: 'absolute', bottom: '30px', right: '30px', display: 'flex', alignItems: 'center', gap: '16px' }}>
-                <AuthLangPicker language={language} onLanguageChange={updateLanguage} />
-                <span style={{ opacity: 0.4, fontSize: '12px', pointerEvents: 'none' }}>Reelm, LLC</span>
-              </div>
+              <AuthLegalFooter language={language} onLanguageChange={updateLanguage} />
             </>
           )
         } />

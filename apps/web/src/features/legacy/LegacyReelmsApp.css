@@ -4191,6 +4191,68 @@ h6 {
   cursor: not-allowed;
 }
 
+/* ─── Auth page footer bar ──────────────────────────────────────────────── */
+.auth-footer-bar {
+  position: absolute;
+  bottom: 28px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  white-space: nowrap;
+}
+
+.auth-footer-copy {
+  font-size: 11px;
+  color: rgba(var(--ta-rgb), 0.35);
+  pointer-events: none;
+}
+
+.auth-footer-sep {
+  font-size: 11px;
+  color: rgba(var(--ta-rgb), 0.2);
+  pointer-events: none;
+}
+
+.auth-footer-link {
+  background: none;
+  border: none;
+  padding: 0;
+  font-size: 11px;
+  color: rgba(var(--ta-rgb), 0.45);
+  cursor: pointer;
+  font-family: var(--body-font);
+  transition: color 0.15s;
+}
+.auth-footer-link:hover {
+  color: rgba(var(--ta-rgb), 0.75);
+}
+
+/* ─── Settings legal section ─────────────────────────────────────────────── */
+.accs-legal-links {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.accs-legal-btn {
+  padding: 7px 16px;
+  border-radius: 10px;
+  border: 1px solid rgba(var(--ta-rgb), 0.15);
+  background: rgba(var(--ta-rgb), 0.06);
+  color: rgba(var(--ta-rgb), 0.7);
+  font-size: 0.82rem;
+  font-family: var(--body-font);
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.accs-legal-btn:hover {
+  background: rgba(var(--ta-rgb), 0.12);
+  border-color: rgba(var(--ta-rgb), 0.3);
+  color: rgba(var(--ta-rgb), 0.9);
+}
+
 /* ─── Auth page language picker ─────────────────────────────────────────── */
 .auth-lang-picker {
   position: relative;
