@@ -1750,7 +1750,8 @@ function CompanionsPanel({ reelms = [] }) {
     return () => { cancelled = true }
   }, [])
 
-  useEffect(() => {
+  // Fetch bot status for all reelms
+  const refreshBotStatus = useCallback(async () => {
     if (!reelms.length || !authToken) return
     const checks = reelms.map(async (r) => {
       try {
@@ -1771,6 +1772,17 @@ function CompanionsPanel({ reelms = [] }) {
     })
   }, [reelms, authToken])
 
+  useEffect(() => {
+    refreshBotStatus()
+  }, [refreshBotStatus])
+
+  // Poll bot status every 10 seconds to catch changes from other tabs/sources
+  useEffect(() => {
+    if (!authToken) return
+    const interval = setInterval(refreshBotStatus, 10000)
+    return () => clearInterval(interval)
+  }, [authToken, refreshBotStatus])
+
   async function addBot(reelmId) {
     if (!authToken) return
     setLoading(prev => ({ ...prev, [reelmId]: true }))
@@ -1780,8 +1792,17 @@ function CompanionsPanel({ reelms = [] }) {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
         body: JSON.stringify({ botId: 'reelm-radio' })
       })
-      if (res.ok) setBotStatus(prev => ({ ...prev, [reelmId]: true }))
-    } catch {}
+      if (res.ok) {
+        setBotStatus(prev => ({ ...prev, [reelmId]: true }))
+      } else {
+        const errData = await res.json().catch(() => ({}))
+        console.error('[addBot error]', res.status, errData)
+        alert(`Bot eklenemedi: ${errData.error || 'Bilinmeyen hata'}`)
+      }
+    } catch (err) {
+      console.error('[addBot error]', err)
+      alert('Bot eklenirken hata oluştu')
+    }
     setLoading(prev => ({ ...prev, [reelmId]: false }))
   }
 
