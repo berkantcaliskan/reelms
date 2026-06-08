@@ -1735,9 +1735,20 @@ const REELM_RADIO_BOT = {
   tags: ['Müzik', 'YouTube', 'Ücretsiz'],
 }
 
-function CompanionsPanel({ reelms = [], authToken }) {
+function CompanionsPanel({ reelms = [] }) {
   const [botStatus, setBotStatus] = useState({})
   const [loading, setLoading] = useState({})
+  const [authToken, setAuthToken] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const loadToken = async () => {
+      const token = await getIdToken().catch(() => null)
+      if (!cancelled) setAuthToken(token)
+    }
+    loadToken()
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     if (!reelms.length || !authToken) return
@@ -11371,6 +11382,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       { id: 'desktop',       label: 'Desktop App' },
                       { id: 'privacy',       label: t('privacy_safety') },
                       { id: 'environment',   label: t('environment') },
+                      { id: 'companions',    label: t('companions') },
                       { id: 'about',         label: t('about') },
                     ].map(item => (
                       <button
@@ -11456,6 +11468,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     )}
                     {selectedSettingsCategory === 'environment' && (
                       <EnvironmentPanel uid={uid} />
+                    )}
+                    {selectedSettingsCategory === 'companions' && (
+                      <CompanionsPanel reelms={reelms} />
                     )}
                     {selectedSettingsCategory === 'usage' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
