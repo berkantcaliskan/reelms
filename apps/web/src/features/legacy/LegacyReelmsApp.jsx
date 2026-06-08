@@ -2309,7 +2309,8 @@ function PhotoEditModal({ previewCanvasRef, photoScale, setPhotoScale, onMouseDo
   )
 }
 
-function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChange, status, onStatusChange, bio, onBioChange, socialLinks, onSocialLinksChange, activePlatforms, onActivePlatformsChange, iconFilter, reelms, uid, spotifyConnected, spotifyNowPlaying, onSpotifyConnect, onSpotifyDisconnect, activity, onActivityChange }) {
+function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChange, status, onStatusChange, bio, onBioChange, socialLinks, onSocialLinksChange, activePlatforms, onActivePlatformsChange, iconFilter, reelms, uid, spotifyConnected, spotifyNowPlaying, onSpotifyConnect, onSpotifyDisconnect, activity, onActivityChange, onViewFullProfile }) {
+  const t = useT()
   const popupRef = useRef(null)
   const ppPhotoInputRef = useRef(null)
   const ppCoverInputRef = useRef(null)
@@ -2705,6 +2706,9 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
             All activity
           </button>
         </div>
+        {onViewFullProfile && (
+          <button className="fpp-view-full-btn" onClick={() => { onClose(); onViewFullProfile() }}>{t('view_full_profile')}</button>
+        )}
       </div>
     </div>
 
@@ -2929,6 +2933,7 @@ function CachedProfileCover({ src, className = '', style = {}, ...props }) {
 }
 
 function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBlock, onUnblock, onAddFriend, isFriend = true, isBlocked = false, isPending = false, nickname, onNicknameChange, canShare, onMessage, onCreateGroup, onRequestRemoteControl, voiceContext = null, moderationContext = null, roleContext = null, isSelf = false, embedded = false, canEditNickname = true, onViewFullProfile }) {
+  const t = useT()
   const popupRef = useRef(null)
   const safeFriend = normalizeFriendProfileTarget(friend || {})
   const [editingNickname, setEditingNickname] = useState(false)
@@ -3072,7 +3077,7 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
         )}
         {!isSelf && !isBlocked && isFriend && <button className="fpp-action-btn fpp-action-danger" onClick={() => { onRemove(friend.id); onClose() }}>Remove Friend</button>}
         {!isSelf && !isBlocked && onBlock && <button className="fpp-action-btn fpp-action-danger" onClick={() => { onBlock(friend); onClose() }}>Block</button>}
-        <button className="fpp-view-full-btn" onClick={() => { onClose(); setTimeout(() => onViewFullProfile?.(friend), 50) }}>Tüm profili gör →</button>
+        <button className="fpp-view-full-btn" onClick={() => { onClose(); setTimeout(() => onViewFullProfile?.(friend), 50) }}>{t('view_full_profile')}</button>
       </div>
     </div>
   )
@@ -11139,9 +11144,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   {currentActivity?.name && <ActivityBadge activity={currentActivity} />}
                 </div>
               </div>
-              <button className="profile-view-full-btn" onClick={e => { e.stopPropagation(); setFullProfileTarget({ isSelf: true, user: currentUser }) }}>
-                Tüm profili gör
-              </button>
             </div>
           </div>
 
@@ -12199,7 +12201,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                   setFullProfileTarget({ isSelf: false, user: friend })
                                 }}
                               >
-                                Tüm profili gör →
+                                {t('view_full_profile')}
                               </button>
                             )}
                           </div>
@@ -14003,6 +14005,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               onSpotifyDisconnect={disconnectSpotify}
               activity={currentActivity}
               onActivityChange={setActivity}
+              onViewFullProfile={() => { setShowProfilePopup(false); setFullProfileTarget({ isSelf: true, user: currentUser }) }}
             />
           )}
           {renderFriendProfileSurface(false)}
