@@ -5,8 +5,8 @@ export interface ParsedCommand {
 }
 
 const COMMAND_RE = /^\/(\w+)(?:\s+(.*))?$/
-const MENTION_COMMAND_RE = /^@reelm-radio\s+(\w+)(?:\s+(.*))?$/i
-const MENTION_RE = /^@reelm-radio\s*$/i
+const MENTION_COMMAND_RE = /^@reelmradio\s+(\w+)(?:\s+(.*))?$/i
+const MENTION_RE = /^@reelmradio\s*$/i
 
 export function parse(text: string): ParsedCommand | null {
   const trimmed = text.trim()

@@ -7,7 +7,7 @@ import { authenticate } from '../middleware/authenticate.js'
 import { isReelmMember } from '../../modules/reelms/access.js'
 
 export const BOT_UID = env.REELMS_BOT_UID
-const BOT_USERNAME = 'reelm-radio'
+const BOT_USERNAME = 'reelmradio'
 const BOT_NAME = 'Reelm Radio'
 
 async function ensureBotProfile() {

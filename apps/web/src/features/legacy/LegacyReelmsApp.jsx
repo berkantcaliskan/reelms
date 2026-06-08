@@ -1730,8 +1730,8 @@ function AuthLegalFooter({ language, onLanguageChange }) {
 const REELM_RADIO_BOT = {
   id: 'reelm-radio',
   name: 'Reelm Radio',
-  username: 'reelm-radio',
-  description: 'Reelm kanallarında müzik çal. /play, /skip, /queue ve /stop komutlarıyla veya @reelm-radio mention\'ıyla kontrol et.',
+  username: 'reelmradio',
+  description: 'Reelm kanallarında müzik çal. /play, /skip, /queue ve /stop komutlarıyla veya @reelmradio mention\'ıyla kontrol et.',
   tags: ['Müzik', 'YouTube', 'Ücretsiz'],
 }
 
@@ -1834,7 +1834,7 @@ function CompanionsPanel({ reelms = [] }) {
           {['/play', '/skip', '/queue', '/stop'].map(cmd => (
             <code key={cmd} className="companion-cmd">{cmd}</code>
           ))}
-          <code className="companion-cmd">@reelm-radio</code>
+          <code className="companion-cmd">@reelmradio</code>
         </div>
 
         {reelms.length > 0 && (

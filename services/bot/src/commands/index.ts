@@ -18,7 +18,7 @@ const HELP_TEXT = [
   '`/queue` — Kuyruğu göster',
   '`/stop` — Durdur ve kuyruğu temizle',
   '',
-  'Mention ile de kullanabilirsin: `@reelm-radio play <şarkı>`'
+  'Mention ile de kullanabilirsin: `@reelmradio play <şarkı>`'
 ].join('\n')
 
 export async function dispatch(ctx: CommandContext): Promise<string | null> {
