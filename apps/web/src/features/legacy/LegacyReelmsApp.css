@@ -1068,31 +1068,55 @@ h6 {
 .home-panel {
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: stretch;
   justify-content: flex-start;
+  overflow-y: auto;
+}
+
+.home-greeting {
+  font-family: 'Dela Gothic One', sans-serif !important;
+  font-size: 1.65rem;
+  font-weight: 400;
+  color: var(--ta);
+  line-height: 1.25;
+  text-align: center;
+  padding: 52px 36px 36px;
 }
 
 .home-sections {
   display: flex;
-  flex-direction: column;
-  gap: 32px;
-  padding: 32px 36px 24px;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 0;
+  padding: 0 0 80px;
   width: 100%;
-  max-width: 520px;
+  max-width: 780px;
+  margin: 0 auto;
   box-sizing: border-box;
 }
 
 .home-section {
+  flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0;
+  padding: 0 20px;
+}
+
+.home-section:first-child {
+  flex: 1.4;
+}
+
+.home-section + .home-section {
+  border-left: 1px solid rgba(var(--ta-rgb), 0.1);
 }
 
 .home-section-header {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .home-section-icon {
@@ -1103,11 +1127,17 @@ h6 {
 }
 
 .home-section-title {
-  font-family: 'Dela Gothic One', sans-serif;
-  font-size: 1rem;
+  font-family: 'Dela Gothic One', sans-serif !important;
+  font-size: 0.95rem;
   font-weight: 400;
   color: var(--ta);
   line-height: 1.2;
+}
+
+.home-section-body {
+  display: flex;
+  flex-direction: column;
+  padding-left: 20px;
 }
 
 .home-section-list {
@@ -5607,6 +5637,27 @@ h6 {
 }
 
 @media (max-width: 600px) {
+  .home-greeting {
+    font-size: 1.35rem;
+    padding: 36px 20px 28px;
+  }
+
+  .home-sections {
+    flex-direction: column;
+    max-width: 100%;
+  }
+
+  .home-section:first-child {
+    flex: 1;
+  }
+
+  .home-section + .home-section {
+    border-left: none;
+    border-top: 1px solid rgba(var(--ta-rgb), 0.1);
+    padding-top: 20px;
+    margin-top: 20px;
+  }
+
   .msg-bar {
     flex-wrap: wrap;
   }
