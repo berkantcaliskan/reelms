@@ -13712,21 +13712,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 {isBlocked(item.id) ? (
                                   <button className="friend-add-btn" onClick={() => unblockUserFn(item.id)}>Unblock</button>
                                 ) : isFriend(item.id) ? (
-                                  <>
-                                    <span className="friend-badge-label">Friends</span>
-                                    <button className="friend-reject-btn" onClick={() => removeFriend(item.id)}>Remove</button>
-                                  </>
+                                  <button className="friend-add-btn friend-msg-btn" onClick={() => sendMsgRequest(item)}>Message</button>
                                 ) : hasSentRequest(item.id) ? (
                                   <span className="friend-badge-label friend-badge-pending">Pending</span>
                                 ) : (
-                                  <button className="friend-add-btn" onClick={() => sendFriendRequest(item)}>Add Friend</button>
+                                  <>
+                                    <button className="friend-add-btn" onClick={() => sendFriendRequest(item)}>Add Friend</button>
+                                    {hasSentMsgRequest(item.id)
+                                      ? <span className="friend-badge-label friend-badge-pending" style={{fontSize:'11px'}}>Requested</span>
+                                      : <button className="friend-add-btn friend-msg-btn" onClick={() => sendMsgRequest(item)}>Message</button>
+                                    }
+                                  </>
                                 )}
-                                {!isBlocked(item.id) && !isFriend(item.id) && (
-                                  hasSentMsgRequest(item.id)
-                                    ? <span className="friend-badge-label friend-badge-pending" style={{fontSize:'11px'}}>Requested</span>
-                                    : <button className="friend-add-btn friend-msg-btn" onClick={() => sendMsgRequest(item)}>Message</button>
-                                )}
-                                {!isBlocked(item.id) && <button className="friend-reject-btn" onClick={() => blockUserFn(item)}>Block</button>}
                               </div>
                             )}
                           </div>
