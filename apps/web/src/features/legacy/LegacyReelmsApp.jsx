@@ -13832,104 +13832,123 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                 {(() => {
                   const sortedReelms = [...reelms].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
                   const sortedChats = [...chats].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+                  const hour = new Date().getHours()
+                  const greetingWord = hour >= 5 && hour < 12 ? 'Good morning'
+                    : hour >= 12 && hour < 17 ? 'Good afternoon'
+                    : hour >= 17 && hour < 21 ? 'Good evening'
+                    : 'Good night'
+                  const greetName = currentUser?.name || currentUser?.username || ''
                   const ArrowRight = () => (
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
                       <polyline points="9 18 15 12 9 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                   )
                   return (
-                    <div className="home-sections">
-                      {/* Your Reelms, recently */}
-                      <div className="home-section" style={{ marginLeft: '14px' }}>
-                        <div className="home-section-header">
-                          <img src={readyreelmIcon} alt="" className="home-section-icon" />
-                          <span className="home-section-title">Your Reelms, recently</span>
-                        </div>
-                        {sortedReelms.length > 0 && (
-                          <div className="home-section-list">
-                            {sortedReelms.slice(0, 5).map(r => (
-                              <button key={r.id} className="home-item" onClick={() => handleSelectReelm(r)}>
-                                <div className="home-item-avatar home-item-avatar--server">
-                                  {r.image
-                                    ? <img src={r.image} alt={r.name} className="home-item-avatar-img" />
-                                    : <span className="home-item-avatar-letter">{(r.name || '?').charAt(0)}</span>
-                                  }
-                                </div>
-                                <span className="home-item-name">{r.name}</span>
-                                {unreadCounts[r.id] > 0 && <span className="home-item-badge">{unreadCounts[r.id]}</span>}
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                        <button className="home-section-viewall" onClick={() => { setShowDiscover(false); setShowFriendsPanel(false); setShowSettings(false); setShowMsgRequests(false) }}>
-                          All Reelms <ArrowRight />
-                        </button>
+                    <>
+                      <div className="home-greeting">
+                        {greetingWord}{greetName ? `, ${greetName}!` : '!'}
                       </div>
+                      <div className="home-sections">
+                        {/* Your Reelms, recently */}
+                        <div className="home-section">
+                          <div className="home-section-header">
+                            <img src={readyreelmIcon} alt="" className="home-section-icon" />
+                            <span className="home-section-title">Your Reelms, recently</span>
+                          </div>
+                          <div className="home-section-body">
+                            {sortedReelms.length > 0 ? (
+                              <div className="home-section-list">
+                                {sortedReelms.slice(0, 5).map(r => (
+                                  <button key={r.id} className="home-item" onClick={() => handleSelectReelm(r)}>
+                                    <div className="home-item-avatar home-item-avatar--server">
+                                      {r.image
+                                        ? <img src={r.image} alt={r.name} className="home-item-avatar-img" />
+                                        : <span className="home-item-avatar-letter">{(r.name || '?').charAt(0)}</span>
+                                      }
+                                    </div>
+                                    <span className="home-item-name">{r.name}</span>
+                                    {unreadCounts[r.id] > 0 && <span className="home-item-badge">{unreadCounts[r.id]}</span>}
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="home-empty">No reelms yet.</p>
+                            )}
+                            <button className="home-section-viewall" onClick={() => { setShowDiscover(false); setShowFriendsPanel(false); setShowSettings(false); setShowMsgRequests(false) }}>
+                              All Reelms <ArrowRight />
+                            </button>
+                          </div>
+                        </div>
 
-                      {/* Messages */}
-                      <div className="home-section" style={{ marginLeft: '14px' }}>
-                        <div className="home-section-header">
-                          <img src={newdmIcon} alt="" className="home-section-icon" />
-                          <span className="home-section-title">Messages</span>
-                        </div>
-                        {sortedChats.length > 0 ? (
-                          <div className="home-section-list">
-                            {sortedChats.slice(0, 5).map(c => {
-                              const avatarSrc = getChatAvatarSrc(c)
-                              const displayName = getChatDisplayName(c)
-                              return (
-                                <button key={c.id} className="home-item" onClick={() => { setSelectedChat(c); setSelectedReelm(null); setSelectedChannel(null); setShowChatList(false); setShowFeed(false); setShowDiscover(false) }}>
-                                  <div className="home-item-avatar">
-                                    {avatarSrc
-                                      ? <img src={avatarSrc} alt={displayName} className="home-item-avatar-img" />
-                                      : <span className="home-item-avatar-letter">{(displayName || '?').charAt(0)}</span>
-                                    }
-                                  </div>
-                                  <span className="home-item-name">{displayName}</span>
-                                  {unreadCounts[c.id] > 0 && <span className="home-item-badge">{unreadCounts[c.id]}</span>}
-                                </button>
-                              )
-                            })}
+                        {/* Messages */}
+                        <div className="home-section">
+                          <div className="home-section-header">
+                            <img src={newdmIcon} alt="" className="home-section-icon" />
+                            <span className="home-section-title">Messages</span>
                           </div>
-                        ) : (
-                          <p className="home-empty">You're all caught up.</p>
-                        )}
-                        <button className="home-section-viewall" onClick={() => { setSelectedChat(null); setShowChatList(true); setChatListFilter('all') }}>
-                          All Messages <ArrowRight />
-                        </button>
-                      </div>
+                          <div className="home-section-body">
+                            {sortedChats.length > 0 ? (
+                              <div className="home-section-list">
+                                {sortedChats.slice(0, 5).map(c => {
+                                  const avatarSrc = getChatAvatarSrc(c)
+                                  const displayName = getChatDisplayName(c)
+                                  return (
+                                    <button key={c.id} className="home-item" onClick={() => { setSelectedChat(c); setSelectedReelm(null); setSelectedChannel(null); setShowChatList(false); setShowFeed(false); setShowDiscover(false) }}>
+                                      <div className="home-item-avatar">
+                                        {avatarSrc
+                                          ? <img src={avatarSrc} alt={displayName} className="home-item-avatar-img" />
+                                          : <span className="home-item-avatar-letter">{(displayName || '?').charAt(0)}</span>
+                                        }
+                                      </div>
+                                      <span className="home-item-name">{displayName}</span>
+                                      {unreadCounts[c.id] > 0 && <span className="home-item-badge">{unreadCounts[c.id]}</span>}
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            ) : (
+                              <p className="home-empty">You're all caught up.</p>
+                            )}
+                            <button className="home-section-viewall" onClick={() => { setSelectedChat(null); setShowChatList(true); setChatListFilter('all') }}>
+                              All Messages <ArrowRight />
+                            </button>
+                          </div>
+                        </div>
 
-                      {/* Notifications */}
-                      <div className="home-section">
-                        <div className="home-section-header">
-                          <img src={notificationIcon} alt="" className="home-section-icon" />
-                          <span className="home-section-title">Notifications</span>
-                        </div>
-                        {notifications.length > 0 ? (
-                          <div className="home-section-list">
-                            {notifications.slice(0, 5).map(n => (
-                              <button
-                                key={n.id}
-                                className="home-item home-item--notif"
-                                onClick={() => {
-                                  if (n.link?.type !== 'reelm_invite') {
-                                    navigateToNotificationLink(n.link)
-                                    deleteNotification(n.id)
-                                  }
-                                }}
-                              >
-                                <span className="home-item-notif-text">{n.text}</span>
-                              </button>
-                            ))}
+                        {/* Notifications */}
+                        <div className="home-section">
+                          <div className="home-section-header">
+                            <img src={notificationIcon} alt="" className="home-section-icon" />
+                            <span className="home-section-title">Notifications</span>
                           </div>
-                        ) : (
-                          <p className="home-empty">You're all caught up.</p>
-                        )}
-                        <button className="home-section-viewall" onClick={toggleNotifPopup}>
-                          All Notifications <ArrowRight />
-                        </button>
+                          <div className="home-section-body">
+                            {notifications.length > 0 ? (
+                              <div className="home-section-list">
+                                {notifications.slice(0, 5).map(n => (
+                                  <button
+                                    key={n.id}
+                                    className="home-item home-item--notif"
+                                    onClick={() => {
+                                      if (n.link?.type !== 'reelm_invite') {
+                                        navigateToNotificationLink(n.link)
+                                        deleteNotification(n.id)
+                                      }
+                                    }}
+                                  >
+                                    <span className="home-item-notif-text">{n.text}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            ) : (
+                              <p className="home-empty">You're all caught up.</p>
+                            )}
+                            <button className="home-section-viewall" onClick={toggleNotifPopup}>
+                              All Notifications <ArrowRight />
+                            </button>
+                          </div>
+                        </div>
                       </div>
-                    </div>
+                    </>
                   )
                 })()}
                 <button

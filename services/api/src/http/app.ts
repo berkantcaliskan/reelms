@@ -13,6 +13,7 @@ import { createSpotifyRouter } from './routes/spotify.routes.js'
 import { debugRouter } from './routes/debug.routes.js'
 import { trackRouter } from './routes/track.routes.js'
 import { clientRouter } from './routes/client.routes.js'
+import { createBotRouter } from './routes/bot.routes.js'
 import { requestContext } from './middleware/requestContext.js'
 import { requestLogger } from './middleware/requestLogger.js'
 import { apiRateLimit, authRateLimit, trackingRateLimit } from './middleware/rateLimit.js'
@@ -79,6 +80,8 @@ export function createApp(io?: Server) {
     // This keeps normal app traffic user-based instead of proxy/IP-based.
     app.use('/api/v1/social', createSocialRouter(io))
     app.use('/api/v1', createReelmsDataRouter(io))
+    app.use('/api/v1', createBotRouter(io))
+    app.use(createBotRouter(io))
   }
 
   // Compatibility: old web client calls /google/login and /callback/google.
