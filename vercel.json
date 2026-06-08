@@ -2,5 +2,17 @@
   "buildCommand": "npm run build:web",
   "outputDirectory": "apps/web/dist",
   "installCommand": "ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm install",
-  "framework": null
+  "framework": null,
+  "rewrites": [
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "reelms.io" }],
+      "destination": "/landing.html"
+    },
+    {
+      "source": "/",
+      "has": [{ "type": "host", "value": "www.reelms.io" }],
+      "destination": "/landing.html"
+    }
+  ]
 }
