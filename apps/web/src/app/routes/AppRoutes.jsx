@@ -11,7 +11,14 @@ import { DesktopDownloadPage } from '../../features/desktop-download/index.js'
  * old centered colorful auth design is the product skeleton. The modular auth
  * experiment remains available at /auth-next without affecting the real flow.
  */
+const isMarketingDomain =
+  typeof window !== 'undefined' &&
+  (window.location.hostname === 'www.reelms.io' || window.location.hostname === 'reelms.io')
+
 export function AppRoutes() {
+  if (isMarketingDomain) {
+    return <Routes><Route path="*" element={<MarketingLanding />} /></Routes>
+  }
   return (
     <Routes>
       <Route path="/landing" element={<MarketingLanding />} />
