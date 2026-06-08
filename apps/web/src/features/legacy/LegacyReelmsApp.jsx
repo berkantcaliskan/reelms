@@ -6924,6 +6924,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [appStoriesTick, setAppStoriesTick] = useState(0)
   const [shareTarget, setShareTarget] = useState(null)
   const [showChatList, setShowChatList] = useState(false)
+  const [mobileReelmPanel, setMobileReelmPanel] = useState('chat')
+  const mobileTouchStartX = useRef(null)
   const [chatListFilter, setChatListFilter] = useState('all')
   const [chatListSearch, setChatListSearch] = useState('')
   const [mutedReelmIds, setMutedReelmIds] = useState([])
@@ -10895,6 +10897,37 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }
 
 
+  const mobileTab = showSettings ? 'profile' : (showChatList || selectedChat) ? 'messages' : 'reelms'
+
+  const onMobileTabChange = (tab) => {
+    if (tab === 'reelms') {
+      setShowSettings(false); setShowChatList(false); setSelectedChat(null)
+      setShowDiscover(false); setShowFriendsPanel(false)
+    } else if (tab === 'messages') {
+      setShowSettings(false); setSelectedReelm(null); setSelectedChat(null)
+      setShowDiscover(false); setShowFriendsPanel(false); setShowChatList(true)
+    } else if (tab === 'profile') {
+      setShowSettings(true); setSelectedReelm(null); setSelectedChat(null)
+      setShowChatList(false); setShowDiscover(false); setShowFriendsPanel(false)
+    }
+  }
+
+  const handleMobileTouchStart = (e) => {
+    mobileTouchStartX.current = e.touches[0].clientX
+  }
+
+  const handleMobileTouchEnd = (e) => {
+    if (mobileTouchStartX.current === null) return
+    const delta = e.changedTouches[0].clientX - mobileTouchStartX.current
+    mobileTouchStartX.current = null
+    if (Math.abs(delta) < 60) return
+    if (mobileReelmPanel !== 'chat') {
+      setMobileReelmPanel('chat')
+    } else if (selectedReelm) {
+      setMobileReelmPanel(delta > 0 ? 'channels' : 'members')
+    }
+  }
+
   if (!currentUser) {
     if (!authUser?.uid) return null
     return (
@@ -10960,7 +10993,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           </div>
         </header>
 
-        <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+        <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, paddingBottom: isMobile ? '60px' : 0 }}>
           <div className="dashboard-mid-row su-drop su-drop-1" style={showMenu ? { filter: 'blur(4px)' } : {}}>
             <div className="chats-row">
               <button
@@ -11284,7 +11317,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             </div>
           )}
 
-          <div className="panel-system" style={showMenu ? { filter: 'blur(4px)' } : {}}>
+          <div
+            className={`panel-system${isMobile && mobileReelmPanel === 'channels' ? ' mobile-panel--channels' : ''}${isMobile && mobileReelmPanel === 'members' ? ' mobile-panel--members' : ''}`}
+            style={showMenu ? { filter: 'blur(4px)' } : {}}
+            onTouchStart={isMobile ? handleMobileTouchStart : undefined}
+            onTouchEnd={isMobile ? handleMobileTouchEnd : undefined}
+          >
             {reelmLoading && <div className="reelm-loading-overlay" />}
             {showReelmSettings && selectedReelm ? (
               <ReelmSettings
@@ -12249,7 +12287,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             <div className="reelm-channels">
                               {cat.channels.map(ch => (
                                 <div key={ch.id} className={`reelm-channel${ch.isFlyingRoom ? ' reelm-channel-flying' : ''}${(unreadCounts[`${selectedReelm.id}_${ch.id}`] || 0) > 0 ? ' reelm-channel--unread' : ''}`} onClick={() => {
-                                    setChannelCtxMenu(null); setSelectedChannel(ch); clearReelmChannelUnread(selectedReelm.id, ch.id)
+                                    setChannelCtxMenu(null); setSelectedChannel(ch); clearReelmChannelUnread(selectedReelm.id, ch.id); setMobileReelmPanel('chat')
                                     if (['voice', 'video', 'liveaction', 'stage'].includes(ch.type) && (selectedReelm.autoJoinVoice !== false) && voiceChannel?.channelId !== ch.id) {
                                       joinVoiceChannel(selectedReelm.id, ch.id, ch.name)
                                     }
@@ -13855,7 +13893,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                 </button>
               </div>
             )}
+            {isMobile && mobileReelmPanel !== 'chat' && (
+              <div className="mobile-panel-overlay" onClick={() => setMobileReelmPanel('chat')} />
+            )}
           </div>
+
+          {isMobile && (
+            <MobileBottomNav
+              activeTab={mobileTab}
+              onTabChange={onMobileTabChange}
+              msgUnread={totalUnread}
+            />
+          )}
 
           {showProfilePopup && (
             <ProfilePopup

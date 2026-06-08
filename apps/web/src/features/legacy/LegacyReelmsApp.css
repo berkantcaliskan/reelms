@@ -4191,6 +4191,222 @@ h6 {
   cursor: not-allowed;
 }
 
+/* ─── Mobile responsive layout ──────────────────────────────────────────── */
+.mobile-bottom-nav { display: none; }
+
+@media (max-width: 768px) {
+  /* Panel system: full bleed, no radius */
+  .panel-system {
+    margin: 0 !important;
+    border-radius: 0 !important;
+    position: relative;
+    overflow: hidden;
+  }
+
+  /* Left panel: slides in from left */
+  .panel-left {
+    position: absolute !important;
+    left: 0; top: 0; bottom: 0;
+    z-index: 20;
+    flex: 0 0 84% !important;
+    width: 84% !important;
+    max-width: 320px !important;
+    transform: translateX(-100%);
+    transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+    background: rgba(10, 7, 22, 0.97) !important;
+    -webkit-backdrop-filter: blur(24px);
+    backdrop-filter: blur(24px);
+    border-right: 1px solid rgba(var(--ta-rgb), 0.1);
+    overflow-y: auto;
+  }
+
+  /* Right panel: slides in from right */
+  .panel-right {
+    position: absolute !important;
+    right: 0; top: 0; bottom: 0;
+    z-index: 20;
+    flex: 0 0 84% !important;
+    width: 84% !important;
+    max-width: 320px !important;
+    transform: translateX(100%);
+    transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
+    background: rgba(10, 7, 22, 0.97) !important;
+    -webkit-backdrop-filter: blur(24px);
+    backdrop-filter: blur(24px);
+    border-left: 1px solid rgba(var(--ta-rgb), 0.1);
+    overflow-y: auto;
+  }
+
+  /* Middle panel always full width */
+  .panel-middle {
+    flex: 1 !important;
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  /* Slide in left panel */
+  .mobile-panel--channels .panel-left {
+    transform: translateX(0);
+  }
+
+  /* Slide in right panel */
+  .mobile-panel--members .panel-right {
+    transform: translateX(0);
+  }
+
+  /* Semi-transparent overlay when side panel is open */
+  .mobile-panel-overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 15;
+    background: rgba(0, 0, 0, 0.48);
+    cursor: pointer;
+  }
+
+  /* Hide draggable dividers on mobile */
+  .panel-divider,
+  .panel-divider-draggable {
+    display: none !important;
+  }
+
+  /* Left panel bottom bar: hide on mobile (replaced by bottom nav) */
+  .left-panel-bottom-bar {
+    display: none !important;
+  }
+
+  /* Compact header */
+  .app-header {
+    padding: 10px 14px 6px;
+  }
+
+  /* Chats row: touch scroll */
+  .chats-row {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .chats-scroll-horizontal {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Settings layout: vertical stack */
+  .settings-layout {
+    flex-direction: column;
+    border-radius: 0;
+  }
+  .settings-sidebar {
+    width: 100% !important;
+    max-height: 160px;
+    overflow-y: auto;
+    border-right: none !important;
+    border-bottom: 1px solid rgba(var(--ta-rgb), 0.1);
+  }
+  .settings-nav {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px;
+    padding: 8px 12px;
+  }
+  .settings-nav-item {
+    padding: 5px 10px;
+    font-size: 0.78rem;
+  }
+  .settings-title {
+    padding: 12px 12px 6px;
+  }
+  .settings-content {
+    padding: 16px 16px 80px;
+  }
+
+  /* Message input bar */
+  .msg-input-bar {
+    padding: 8px 10px;
+  }
+
+  /* Discover panel */
+  .discover-panel {
+    padding: 12px 14px;
+  }
+
+  /* Reelm sidebar scrollable */
+  .reelm-sidebar {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Full profile: sheet from bottom */
+  .fp-overlay {
+    align-items: flex-end !important;
+  }
+  .full-profile {
+    border-radius: 20px 20px 0 0 !important;
+    max-height: 92dvh !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* ─── Mobile bottom nav ─── */
+  .mobile-bottom-nav {
+    display: flex;
+    position: fixed;
+    bottom: 0; left: 0; right: 0;
+    z-index: 1000;
+    height: 60px;
+    background: rgba(10, 7, 22, 0.95);
+    -webkit-backdrop-filter: blur(24px) saturate(1.4);
+    backdrop-filter: blur(24px) saturate(1.4);
+    border-top: 1px solid rgba(var(--ta-rgb), 0.12);
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 8px;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .mobile-nav-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    padding: 4px 20px;
+    border: none;
+    background: none;
+    color: rgba(var(--ta-rgb), 0.4);
+    font-family: var(--body-font);
+    font-size: 10px;
+    cursor: pointer;
+    position: relative;
+    transition: color 0.15s;
+    flex: 1;
+  }
+  .mobile-nav-btn svg {
+    transition: transform 0.15s;
+  }
+  .mobile-nav-btn--active {
+    color: var(--ta);
+  }
+  .mobile-nav-btn--active svg {
+    transform: scale(1.08);
+  }
+
+  .mobile-nav-badge {
+    position: absolute;
+    top: 2px;
+    right: calc(50% - 22px);
+    background: #e74c3c;
+    color: #fff;
+    font-size: 9px;
+    min-width: 15px;
+    height: 15px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0 3px;
+    font-weight: 700;
+    line-height: 1;
+  }
+}
+
 /* ─── Auth page footer bar ──────────────────────────────────────────────── */
 .auth-footer-bar {
   position: absolute;
