@@ -1104,6 +1104,10 @@ h6 {
   padding: 0 20px;
 }
 
+.home-section:first-child {
+  flex: 1.4;
+}
+
 .home-section + .home-section {
   border-left: 1px solid rgba(var(--ta-rgb), 0.1);
 }
