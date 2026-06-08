@@ -1606,6 +1606,146 @@ function ActiveSessionsSection({ sessions, onSessionsUpdate }) {
   )
 }
 
+function AuthLangPicker({ language, onLanguageChange }) {
+  const [open, setOpen] = useState(false)
+  const current = LANGUAGES.find(l => l.code === language) || LANGUAGES[0]
+  return (
+    <div className="auth-lang-picker">
+      <button
+        className="auth-lang-trigger"
+        onClick={() => setOpen(v => !v)}
+        aria-expanded={open}
+      >
+        {current.name} <span className="auth-lang-arrow">{open ? '▾' : '▸'}</span>
+      </button>
+      {open && (
+        <ul className="auth-lang-list" role="listbox">
+          {LANGUAGES.map(lang => (
+            <li
+              key={lang.code}
+              role="option"
+              aria-selected={lang.code === language}
+              className={lang.code === language ? 'active' : ''}
+              onClick={() => { onLanguageChange(lang.code); setOpen(false) }}
+            >
+              {lang.name}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+const REELM_RADIO_BOT = {
+  id: 'reelm-radio',
+  name: 'Reelm Radio',
+  username: 'reelm-radio',
+  description: 'Reelm kanallarında müzik çal. /play, /skip, /queue ve /stop komutlarıyla veya @reelm-radio mention\'ıyla kontrol et.',
+  tags: ['Müzik', 'YouTube', 'Ücretsiz'],
+}
+
+function CompanionsPanel({ reelms = [], authToken }) {
+  const [botStatus, setBotStatus] = useState({})
+  const [loading, setLoading] = useState({})
+
+  useEffect(() => {
+    if (!reelms.length || !authToken) return
+    const checks = reelms.map(async (r) => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/v1/reelms/${r.id}/bot-status`, {
+          headers: { Authorization: `Bearer ${authToken}` }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          return [r.id, data.hasBot]
+        }
+      } catch {}
+      return [r.id, false]
+    })
+    Promise.all(checks).then(results => {
+      const map = {}
+      results.forEach(([id, has]) => { map[id] = has })
+      setBotStatus(map)
+    })
+  }, [reelms, authToken])
+
+  async function addBot(reelmId) {
+    if (!authToken) return
+    setLoading(prev => ({ ...prev, [reelmId]: true }))
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/v1/reelms/${reelmId}/add-bot`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
+        body: JSON.stringify({ botId: 'reelm-radio' })
+      })
+      if (res.ok) setBotStatus(prev => ({ ...prev, [reelmId]: true }))
+    } catch {}
+    setLoading(prev => ({ ...prev, [reelmId]: false }))
+  }
+
+  return (
+    <div className="companions-panel">
+      <div className="companions-section-label">Reelms&apos;ten Eşlikçiler</div>
+
+      <div className="companion-card">
+        <div className="companion-card-header">
+          <div className="companion-avatar">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+              <path d="M9 18V5l12-2v13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+              <circle cx="6" cy="18" r="3" stroke="currentColor" strokeWidth="1.6"/>
+              <circle cx="18" cy="16" r="3" stroke="currentColor" strokeWidth="1.6"/>
+            </svg>
+          </div>
+          <div className="companion-info">
+            <div className="companion-name">{REELM_RADIO_BOT.name}</div>
+            <div className="companion-username">@{REELM_RADIO_BOT.username}</div>
+          </div>
+          <div className="companion-tags">
+            {REELM_RADIO_BOT.tags.map(tag => (
+              <span key={tag} className="companion-tag">{tag}</span>
+            ))}
+          </div>
+        </div>
+        <p className="companion-desc">{REELM_RADIO_BOT.description}</p>
+        <div className="companion-commands">
+          {['/play', '/skip', '/queue', '/stop'].map(cmd => (
+            <code key={cmd} className="companion-cmd">{cmd}</code>
+          ))}
+          <code className="companion-cmd">@reelm-radio</code>
+        </div>
+
+        {reelms.length > 0 && (
+          <div className="companion-reelms">
+            <div className="companion-reelms-label">Reelm&apos;lerine ekle</div>
+            <div className="companion-reelm-list">
+              {reelms.map(r => (
+                <div key={r.id} className="companion-reelm-row">
+                  <div className="companion-reelm-avatar" style={r.image ? { backgroundImage: `url(${r.image})`, backgroundSize: 'cover' } : {}}>
+                    {!r.image && (r.name || '?').charAt(0).toUpperCase()}
+                  </div>
+                  <span className="companion-reelm-name">{r.name}</span>
+                  {botStatus[r.id] ? (
+                    <span className="companion-reelm-added">Eklendi ✓</span>
+                  ) : (
+                    <button
+                      className="companion-add-btn"
+                      disabled={!!loading[r.id]}
+                      onClick={() => addBot(r.id)}
+                    >
+                      {loading[r.id] ? '...' : 'Ekle'}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function AccountSettingsPanel({ user, onUpdate, onLogOut, profileBio, onBioChange, spotifyConnected, onSpotifyConnect, onSpotifyDisconnect, reelms = [] }) {
   const t = useT()
   const photoInputRef = useRef(null)
@@ -15059,8 +15199,9 @@ function App() {
                   <SignInScreen onGoSignUp={() => navigateTo('/signup')} onSignInSuccess={handleSignInSuccess} />
                 </div>
               </main>
-              <div style={{ position: 'absolute', bottom: '30px', right: '30px', opacity: 0.5, fontSize: '12px', pointerEvents: 'none' }}>
-                Reelm, LLC
+              <div style={{ position: 'absolute', bottom: '30px', right: '30px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <AuthLangPicker language={language} onLanguageChange={updateLanguage} />
+                <span style={{ opacity: 0.4, fontSize: '12px', pointerEvents: 'none' }}>Reelm, LLC</span>
               </div>
             </>
           )
@@ -15086,8 +15227,9 @@ function App() {
                   <SignUpScreen onSignUpComplete={handleSignUpComplete} onGoBack={() => navigateTo('/signin')} />
                 </div>
               </main>
-              <div style={{ position: 'absolute', bottom: '30px', right: '30px', opacity: 0.5, fontSize: '12px', pointerEvents: 'none' }}>
-                Reelm, LLC
+              <div style={{ position: 'absolute', bottom: '30px', right: '30px', display: 'flex', alignItems: 'center', gap: '16px' }}>
+                <AuthLangPicker language={language} onLanguageChange={updateLanguage} />
+                <span style={{ opacity: 0.4, fontSize: '12px', pointerEvents: 'none' }}>Reelm, LLC</span>
               </div>
             </>
           )
