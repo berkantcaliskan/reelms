@@ -6,12 +6,13 @@
   "type": "module",
   "main": "electron/main.cjs",
   "scripts": {
-    "dev": "concurrently -k -n VITE,ELECTRON -c green,blue \"vite --host 127.0.0.1 --port 3105\" \"wait-on http://127.0.0.1:3105 && electron .\"",
-    "prebuild": "npm -w @reelms/shared run build && npm -w @reelms/config run build",
+    "dev": "vite --host 127.0.0.1 --port 3105",
     "build": "tsc -p tsconfig.json --noEmit && vite build",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "dist:win": "npm run build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win --publish never",
-    "release:win": "npm run build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win --publish always"
+    "tauri": "tauri",
+    "tauri:dev": "tauri dev",
+    "tauri:build": "tauri build",
+    "tauri:build:debug": "tauri build --debug"
   },
   "dependencies": {
     "@reelms/shared": "0.1.0",
