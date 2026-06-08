@@ -408,13 +408,10 @@ function SignInScreen({ onGoSignUp, onSignInSuccess }) {
           <div className="signin-card">
             <p className="legacy-auth-note">Enter your e-mail or username. If the account exists, we will send a reset link.</p>
             <input
-              id="reset-email"
-              name="email"
               type="text"
               className="pill-input"
               placeholder={t('email_or_username_ph')}
               value={loginEmail}
-              autoComplete="email"
               onChange={e => { setLoginEmail(e.target.value); clearAuthMessages() }}
               onKeyDown={e => e.key === 'Enter' && handlePasswordResetRequest()}
             />
@@ -448,8 +445,6 @@ function SignInScreen({ onGoSignUp, onSignInSuccess }) {
           <div className="signin-card">
             <p className="legacy-auth-note">Enter a new password for your Reelms account.</p>
             <input
-              id="reset-new-password"
-              name="new-password"
               type="password"
               className="pill-input"
               placeholder="New password"
@@ -459,8 +454,6 @@ function SignInScreen({ onGoSignUp, onSignInSuccess }) {
               onKeyDown={e => e.key === 'Enter' && handlePasswordResetConfirm()}
             />
             <input
-              id="reset-confirm-password"
-              name="confirm-password"
               type="password"
               className="pill-input"
               placeholder="Confirm new password"
@@ -497,26 +490,20 @@ function SignInScreen({ onGoSignUp, onSignInSuccess }) {
       <div className="signin-card-border su-drop su-drop-2">
         <div className="signin-card">
           <input
-            id="signin-email"
-            name="email"
             type="text"
             className="pill-input"
             placeholder={t('email_or_username_ph')}
             value={loginEmail}
-            autoComplete="username"
             onChange={e => { setLoginEmail(e.target.value); clearAuthMessages() }}
             onKeyDown={e => e.key === 'Enter' && handleSignIn()}
           />
           <div className="password-row">
             <div className="password-input-wrapper">
               <input
-                id="signin-password"
-                name="password"
                 type={showPassword ? 'text' : 'password'}
                 className="pill-input"
                 placeholder={t('password_placeholder')}
                 value={loginPassword}
-                autoComplete="current-password"
                 onChange={e => { setLoginPassword(e.target.value); clearAuthMessages() }}
                 onKeyDown={e => e.key === 'Enter' && handleSignIn()}
               />
@@ -793,114 +780,38 @@ const THEMES = [
   { id: 'lemon',    name: 'Lemonade',        accent: '#c8c040', accentRgb: '200,192,64',  base: '#161400', baseRgb: '22,20,0' },
 ]
 
-function hexToRgb(hex) {
-  const text = String(hex || '').trim()
-  const match = /^#?([0-9a-f]{6})$/i.exec(text)
-  if (!match) return null
-  const value = match[1]
-  return [
-    parseInt(value.slice(0, 2), 16),
-    parseInt(value.slice(2, 4), 16),
-    parseInt(value.slice(4, 6), 16),
-  ]
-}
-
-function safeRgbArray(value, fallback = [185, 152, 135]) {
-  const fb = Array.isArray(fallback) ? fallback : [185, 152, 135]
+function rgbArrayFrom(value, fallback = null) {
   if (Array.isArray(value)) {
-    const nums = value.slice(0, 3).map(v => Number(v)).filter(Number.isFinite)
-    if (nums.length === 3) return nums.map(n => Math.max(0, Math.min(255, Math.round(n))))
+    const nums = value.slice(0, 3).map(n => Number(n)).map(n => Number.isFinite(n) ? Math.max(0, Math.min(255, Math.round(n))) : NaN)
+    return nums.length === 3 && nums.every(Number.isFinite) ? nums : fallback
   }
   if (value && typeof value === 'object') {
-    const nums = [value.r, value.g, value.b].map(v => Number(v)).filter(Number.isFinite)
-    if (nums.length === 3) return nums.map(n => Math.max(0, Math.min(255, Math.round(n))))
+    const nums = [value.r, value.g, value.b].map(n => Number(n)).map(n => Number.isFinite(n) ? Math.max(0, Math.min(255, Math.round(n))) : NaN)
+    return nums.every(Number.isFinite) ? nums : fallback
   }
-  if (typeof value === 'string') {
-    const hex = hexToRgb(value)
-    if (hex) return hex
-    const nums = value.split(/[\s,]+/).map(v => Number(v)).filter(Number.isFinite)
-    if (nums.length >= 3) return nums.slice(0, 3).map(n => Math.max(0, Math.min(255, Math.round(n))))
+  const raw = String(value || '').trim()
+  if (!raw) return fallback
+  const hex = raw.startsWith('#') ? raw.slice(1) : raw
+  if (/^[0-9a-f]{3}$/i.test(hex)) {
+    return hex.split('').map(ch => parseInt(ch + ch, 16))
   }
-  return fb
-}
-
-function rgbCssValue(value, fallback = [185, 152, 135]) {
-  return safeRgbArray(value, fallback).join(',')
-}
-
-function safeImageUrl(value) {
-  if (typeof value !== 'string') return null
-  const url = value.trim()
-  if (!url) return null
-  if (/^(https?:|blob:|data:image\/)/i.test(url)) return url
-  return null
-}
-
-async function imageFileToCanvas(file, options = {}) {
-  const { maxWidth = 1600, maxHeight = 1600, square = false } = options
-  const objectUrl = URL.createObjectURL(file)
-  try {
-    const img = await new Promise((resolve, reject) => {
-      const el = new Image()
-      el.onload = () => resolve(el)
-      el.onerror = () => reject(new Error('Image decode failed'))
-      el.src = objectUrl
-    })
-    const srcW = Number(img.width) || 1
-    const srcH = Number(img.height) || 1
-    let sx = 0, sy = 0, sw = srcW, sh = srcH
-    if (square) {
-      const side = Math.min(srcW, srcH)
-      sx = Math.round((srcW - side) / 2)
-      sy = Math.round((srcH - side) / 2)
-      sw = side
-      sh = side
-    }
-    const scale = Math.min(1, maxWidth / sw, maxHeight / sh)
-    const canvas = document.createElement('canvas')
-    canvas.width = Math.max(1, Math.round(sw * scale))
-    canvas.height = Math.max(1, Math.round(sh * scale))
-    const ctx = canvas.getContext('2d')
-    if (!ctx) throw new Error('Canvas unavailable')
-    ctx.drawImage(img, sx, sy, sw, sh, 0, 0, canvas.width, canvas.height)
-    return canvas
-  } finally {
-    URL.revokeObjectURL(objectUrl)
+  if (/^[0-9a-f]{6}$/i.test(hex)) {
+    return [parseInt(hex.slice(0, 2), 16), parseInt(hex.slice(2, 4), 16), parseInt(hex.slice(4, 6), 16)]
   }
+  const m = raw.match(/rgba?\s*\(([^)]+)\)/i)
+  const csv = m ? m[1] : raw
+  const parts = csv.split(/[\s,]+/).map(part => Number(String(part).replace('%', ''))).filter(Number.isFinite)
+  if (parts.length >= 3) return parts.slice(0, 3).map(n => Math.max(0, Math.min(255, Math.round(n))))
+  return fallback
 }
 
-async function canvasToFile(canvas, fileName, quality = 0.86) {
-  const blob = await new Promise(resolve => {
-    canvas.toBlob(b => resolve(b), 'image/webp', quality)
-  }) || await new Promise(resolve => {
-    canvas.toBlob(b => resolve(b), 'image/jpeg', quality)
-  })
-  if (!blob) throw new Error('Image encode failed')
-  const safeName = String(fileName || 'image').replace(/\.[a-z0-9]+$/i, '') || 'image'
-  const ext = blob.type === 'image/webp' ? 'webp' : 'jpg'
-  return new File([blob], `${safeName}.${ext}`, { type: blob.type || 'image/jpeg' })
+function rgbCssValue(value, fallback = '185,152,135') {
+  const arr = rgbArrayFrom(value, null)
+  return arr ? arr.join(',') : fallback
 }
 
-async function prepareImageFile(file, kind = 'image') {
-  if (!file || !String(file.type || '').startsWith('image/')) throw new Error('Lütfen geçerli bir görsel seç.')
-  const limits = {
-    avatar: { maxBytes: 5 * 1024 * 1024, maxWidth: 512, maxHeight: 512, square: true, quality: 0.88 },
-    cover: { maxBytes: 8 * 1024 * 1024, maxWidth: 1600, maxHeight: 640, square: false, quality: 0.84 },
-    background: { maxBytes: 10 * 1024 * 1024, maxWidth: 1920, maxHeight: 1080, square: false, quality: 0.82 },
-    server: { maxBytes: 5 * 1024 * 1024, maxWidth: 768, maxHeight: 432, square: false, quality: 0.84 },
-    image: { maxBytes: 10 * 1024 * 1024, maxWidth: 1600, maxHeight: 1600, square: false, quality: 0.84 },
-  }[kind] || { maxBytes: 10 * 1024 * 1024, maxWidth: 1600, maxHeight: 1600, square: false, quality: 0.84 }
-  if (file.size > limits.maxBytes) throw new Error(`Görsel çok büyük. Maksimum ${Math.round(limits.maxBytes / 1024 / 1024)} MB yükleyebilirsin.`)
-  const canvas = await imageFileToCanvas(file, limits)
-  return canvasToFile(canvas, file.name, limits.quality)
-}
-
-async function uploadImageFile(file, kind = 'image') {
-  const processed = await prepareImageFile(file, kind)
-  const uploaded = await mediaUploadToS3(processed)
-  const url = safeImageUrl(uploaded?.url || uploaded?.publicUrl || uploaded?.fileUrl || uploaded?.mediaUrl || uploaded?.objectUrl)
-  if (!url) throw new Error('Görsel yüklendi ama public URL alınamadı.')
-  return url
+function hexToRgb(hex) {
+  return rgbCssValue(hex)
 }
 // hexLum removed — unused
 function hslToHex(h, s, l) {
@@ -1153,7 +1064,6 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
   const bgInputRef = useRef(null)
   const currentTheme = THEMES.find(th => th.id === customization.themeId) || THEMES[0]
   const [openSpectrum, setOpenSpectrum] = useState(null)
-  const [bgUploadState, setBgUploadState] = useState({ busy: false, error: '' })
 
   const pickSpectrum = (e, key) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -1206,7 +1116,7 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
         <div className="accs-section-title">{t('background')}</div>
         <div className="cust-bg-area">
           {customization.bgImage ? (
-            <div className="cust-bg-preview" style={{ backgroundImage: `url(${customization.bgImage})` }}>
+            <div className="cust-bg-preview" style={normalizeMediaUrl(customization.bgImage) ? { backgroundImage: `url(${normalizeMediaUrl(customization.bgImage)})` } : {}}>
               <button className="cust-bg-remove" onClick={() => onChange({ bgImage: null })}>{t('remove')}</button>
             </div>
           ) : (
@@ -1220,21 +1130,16 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
               const file = e.target.files[0]
               if (!file) return
               ;(async () => {
-                setBgUploadState({ busy: true, error: '' })
                 try {
-                  const uploadedUrl = await uploadImageFile(file, 'background')
-                  onChange({ bgImage: uploadedUrl })
-                  setBgUploadState({ busy: false, error: '' })
+                  const url = await uploadProfileImageFile(file, 'profile-background')
+                  onChange({ bgImage: url })
                 } catch (err) {
-                  console.warn('Background image could not be uploaded:', err)
-                  setBgUploadState({ busy: false, error: err?.message || 'Background upload failed' })
+                  console.warn('Background image could not be processed:', err)
                 }
               })()
               e.target.value = ''
             }}
           />
-          {bgUploadState.busy && <div className="cust-upload-status">Yükleniyor...</div>}
-          {bgUploadState.error && <div className="cust-upload-error">{bgUploadState.error}</div>}
         </div>
         {customization.bgImage && (
           <div className="cust-toggle-row" style={{ marginTop: '14px' }}>
@@ -1391,7 +1296,6 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
 
 function PrivacySafetyPanel({ user, onUpdate, onUnblock, blockedList, sessionsList, onSessionsUpdate }) {
   const t = useT()
-  const [legalModal, setLegalModal] = useState(null)
 
   if (!user) {
     return (
@@ -1539,17 +1443,6 @@ function PrivacySafetyPanel({ user, onUpdate, onUnblock, blockedList, sessionsLi
 
       <BlockedAccountsSection blockedList={blockedList} onUnblock={onUnblock || (() => {})} />
 
-      <div className="accs-section accs-section-legal">
-        <div className="accs-section-title">{t('legal_documents')}</div>
-        <p className="accs-note" style={{ marginBottom: '12px' }}>{t('legal_documents_desc')}</p>
-        <div className="accs-legal-links">
-          <button className="accs-legal-btn" onClick={() => setLegalModal('terms')}>{t('terms_of_service')}</button>
-          <button className="accs-legal-btn" onClick={() => setLegalModal('privacy')}>{t('privacy_policy')}</button>
-        </div>
-        <p className="accs-note" style={{ marginTop: '16px' }}>© 2026 Reelm, LLC. All rights reserved.</p>
-      </div>
-
-      <LegalModal type={legalModal} onClose={() => setLegalModal(null)} />
     </div>
   )
 }
@@ -1631,244 +1524,6 @@ function ActiveSessionsSection({ sessions, onSessionsUpdate }) {
   )
 }
 
-function useMobileBreakpoint(maxWidth = 768) {
-  const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth <= maxWidth)
-  useEffect(() => {
-    const mq = window.matchMedia(`(max-width: ${maxWidth}px)`)
-    const handler = (e) => setIsMobile(e.matches)
-    mq.addEventListener('change', handler)
-    return () => mq.removeEventListener('change', handler)
-  }, [maxWidth])
-  return isMobile
-}
-
-function MobileBottomNav({ activeTab, onTabChange, msgUnread }) {
-  return (
-    <nav className="mobile-bottom-nav" role="navigation">
-      <button
-        className={`mobile-nav-btn${activeTab === 'reelms' ? ' mobile-nav-btn--active' : ''}`}
-        onClick={() => onTabChange('reelms')}
-      >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>
-        </svg>
-        <span>Reelms</span>
-      </button>
-      <button
-        className={`mobile-nav-btn${activeTab === 'messages' ? ' mobile-nav-btn--active' : ''}`}
-        onClick={() => onTabChange('messages')}
-      >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/>
-        </svg>
-        <span>Messages</span>
-        {msgUnread > 0 && <span className="mobile-nav-badge">{msgUnread > 9 ? '9+' : msgUnread}</span>}
-      </button>
-      <button
-        className={`mobile-nav-btn${activeTab === 'profile' ? ' mobile-nav-btn--active' : ''}`}
-        onClick={() => onTabChange('profile')}
-      >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
-        </svg>
-        <span>Profile</span>
-      </button>
-    </nav>
-  )
-}
-
-function AuthLangPicker({ language, onLanguageChange }) {
-  const [open, setOpen] = useState(false)
-  const current = LANGUAGES.find(l => l.code === language) || LANGUAGES[0]
-  return (
-    <div className="auth-lang-picker">
-      <button
-        className="auth-lang-trigger"
-        onClick={() => setOpen(v => !v)}
-        aria-expanded={open}
-      >
-        {current.name} <span className="auth-lang-arrow">{open ? '▾' : '▸'}</span>
-      </button>
-      {open && (
-        <ul className="auth-lang-list" role="listbox">
-          {LANGUAGES.map(lang => (
-            <li
-              key={lang.code}
-              role="option"
-              aria-selected={lang.code === language}
-              className={lang.code === language ? 'active' : ''}
-              onClick={() => { onLanguageChange(lang.code); setOpen(false) }}
-            >
-              {lang.name}
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
-}
-
-function AuthLegalFooter({ language, onLanguageChange }) {
-  const t = useT()
-  const [legalModal, setLegalModal] = useState(null)
-  return (
-    <>
-      <div className="auth-footer-bar">
-        <span className="auth-footer-copy">© 2026 Reelm, LLC. All rights reserved.</span>
-        <span className="auth-footer-sep" aria-hidden="true">·</span>
-        <button className="auth-footer-link" onClick={() => setLegalModal('terms')}>{t('terms_of_service')}</button>
-        <span className="auth-footer-sep" aria-hidden="true">·</span>
-        <button className="auth-footer-link" onClick={() => setLegalModal('privacy')}>{t('privacy_policy')}</button>
-        <span className="auth-footer-sep" aria-hidden="true">·</span>
-        <AuthLangPicker language={language} onLanguageChange={onLanguageChange} />
-      </div>
-      <LegalModal type={legalModal} onClose={() => setLegalModal(null)} />
-    </>
-  )
-}
-
-const REELM_RADIO_BOT = {
-  id: 'reelm-radio',
-  name: 'Reelm Radio',
-  username: 'reelmradio',
-  description: 'Reelm kanallarında müzik çal. /play, /skip, /queue ve /stop komutlarıyla veya @reelmradio mention\'ıyla kontrol et.',
-  tags: ['Müzik', 'YouTube', 'Ücretsiz'],
-}
-
-function CompanionsPanel({ reelms = [] }) {
-  const [botStatus, setBotStatus] = useState({})
-  const [loading, setLoading] = useState({})
-  const [authToken, setAuthToken] = useState(null)
-
-  useEffect(() => {
-    let cancelled = false
-    const loadToken = async () => {
-      const token = await getIdToken().catch(() => null)
-      if (!cancelled) setAuthToken(token)
-    }
-    loadToken()
-    return () => { cancelled = true }
-  }, [])
-
-  // Fetch bot status for all reelms
-  const refreshBotStatus = useCallback(async () => {
-    if (!reelms.length || !authToken) return
-    const checks = reelms.map(async (r) => {
-      try {
-        const res = await fetch(`${BACKEND_URL}/api/v1/reelms/${r.id}/bot-status`, {
-          headers: { Authorization: `Bearer ${authToken}` }
-        })
-        if (res.ok) {
-          const data = await res.json()
-          return [r.id, data.hasBot]
-        }
-      } catch {}
-      return [r.id, false]
-    })
-    Promise.all(checks).then(results => {
-      const map = {}
-      results.forEach(([id, has]) => { map[id] = has })
-      setBotStatus(map)
-    })
-  }, [reelms, authToken])
-
-  useEffect(() => {
-    refreshBotStatus()
-  }, [refreshBotStatus])
-
-  // Poll bot status every 10 seconds to catch changes from other tabs/sources
-  useEffect(() => {
-    if (!authToken) return
-    const interval = setInterval(refreshBotStatus, 10000)
-    return () => clearInterval(interval)
-  }, [authToken, refreshBotStatus])
-
-  async function addBot(reelmId) {
-    if (!authToken) return
-    setLoading(prev => ({ ...prev, [reelmId]: true }))
-    try {
-      const res = await fetch(`${BACKEND_URL}/api/v1/reelms/${reelmId}/add-bot`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` },
-        body: JSON.stringify({ botId: 'reelm-radio' })
-      })
-      if (res.ok) {
-        setBotStatus(prev => ({ ...prev, [reelmId]: true }))
-      } else {
-        const errData = await res.json().catch(() => ({}))
-        const errorMsg = errData.details ? `${errData.error} (${errData.details})` : (errData.error || `HTTP ${res.status}`)
-        console.error('[addBot error]', res.status, errData)
-        alert(`Bot eklenemedi: ${errorMsg}`)
-      }
-    } catch (err) {
-      console.error('[addBot error]', err)
-      alert(`Bot eklenirken hata oluştu: ${err?.message || 'bilinmeyen'}`)
-    }
-    setLoading(prev => ({ ...prev, [reelmId]: false }))
-  }
-
-  return (
-    <div className="companions-panel">
-      <div className="companions-section-label">Reelms&apos;ten Eşlikçiler</div>
-
-      <div className="companion-card">
-        <div className="companion-card-header">
-          <div className="companion-avatar">
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
-              <path d="M9 18V5l12-2v13" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-              <circle cx="6" cy="18" r="3" stroke="currentColor" strokeWidth="1.6"/>
-              <circle cx="18" cy="16" r="3" stroke="currentColor" strokeWidth="1.6"/>
-            </svg>
-          </div>
-          <div className="companion-info">
-            <div className="companion-name">{REELM_RADIO_BOT.name}</div>
-            <div className="companion-username">@{REELM_RADIO_BOT.username}</div>
-          </div>
-          <div className="companion-tags">
-            {REELM_RADIO_BOT.tags.map(tag => (
-              <span key={tag} className="companion-tag">{tag}</span>
-            ))}
-          </div>
-        </div>
-        <p className="companion-desc">{REELM_RADIO_BOT.description}</p>
-        <div className="companion-commands">
-          {['/play', '/skip', '/queue', '/stop'].map(cmd => (
-            <code key={cmd} className="companion-cmd">{cmd}</code>
-          ))}
-          <code className="companion-cmd">@reelmradio</code>
-        </div>
-
-        {reelms.length > 0 && (
-          <div className="companion-reelms">
-            <div className="companion-reelms-label">Reelm&apos;lerine ekle</div>
-            <div className="companion-reelm-list">
-              {reelms.map(r => (
-                <div key={r.id} className="companion-reelm-row">
-                  <div className="companion-reelm-avatar" style={r.image ? { backgroundImage: `url(${r.image})`, backgroundSize: 'cover' } : {}}>
-                    {!r.image && (r.name || '?').charAt(0).toUpperCase()}
-                  </div>
-                  <span className="companion-reelm-name">{r.name}</span>
-                  {botStatus[r.id] ? (
-                    <span className="companion-reelm-added">Eklendi ✓</span>
-                  ) : (
-                    <button
-                      className="companion-add-btn"
-                      disabled={!!loading[r.id]}
-                      onClick={() => addBot(r.id)}
-                    >
-                      {loading[r.id] ? '...' : 'Ekle'}
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
-
 function AccountSettingsPanel({ user, onUpdate, onLogOut, profileBio, onBioChange, spotifyConnected, onSpotifyConnect, onSpotifyDisconnect, reelms = [] }) {
   const t = useT()
   const photoInputRef = useRef(null)
@@ -1939,7 +1594,7 @@ function AccountSettingsPanel({ user, onUpdate, onLogOut, profileBio, onBioChang
     e.target.value = ''
   }
 
-  const applyPhotoEdit = () => {
+  const applyPhotoEdit = async () => {
     if (!rawPhotoImg) return
     const OUT = 400
     const PREV = 160
@@ -1956,7 +1611,14 @@ function AccountSettingsPanel({ user, onUpdate, onLogOut, profileBio, onBioChang
     const fx = (OUT - fw) / 2 + photoOffset.x * ratio
     const fy = (OUT - fh) / 2 + photoOffset.y * ratio
     ctx.drawImage(rawPhotoImg, fx, fy, fw, fh)
-    onUpdate({ photo: canvas.toDataURL('image/jpeg', 0.92) })
+    try {
+      const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', 0.88))
+      const file = blob ? new File([blob], `profile-photo-${Date.now()}.webp`, { type: 'image/webp' }) : null
+      const url = file ? await uploadProfileImageFile(file, 'profile-photo') : null
+      if (url) onUpdate({ photo: url })
+    } catch (err) {
+      console.warn('Profile photo edit upload failed:', err)
+    }
     setPhotoEditModal(null)
   }
 
@@ -2127,7 +1789,7 @@ ${posts.length ? `<ul>${posts.map(p => { const raw = (p.text || p.content || '')
         <div className="accs-section-title">{t('profile_photo')}</div>
         <div className="accs-photo-row">
           <div className="accs-photo-wrap">
-            <img src={getPersonPhoto(user) || avatarUIcon} alt="Avatar" className="accs-photo" />
+            <CachedProfileImage src={getPersonPhoto(user)} alt="Avatar" className="accs-photo" fallback={<img src={avatarUIcon} alt="Avatar" className="accs-photo" />} />
           </div>
           <div className="accs-photo-btns">
             <button className="accs-btn" onClick={() => photoInputRef.current?.click()}>{t('change_photo')}</button>
@@ -2309,8 +1971,7 @@ function PhotoEditModal({ previewCanvasRef, photoScale, setPhotoScale, onMouseDo
   )
 }
 
-function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChange, status, onStatusChange, bio, onBioChange, socialLinks, onSocialLinksChange, activePlatforms, onActivePlatformsChange, iconFilter, reelms, uid, spotifyConnected, spotifyNowPlaying, onSpotifyConnect, onSpotifyDisconnect, activity, onActivityChange, onViewFullProfile }) {
-  const t = useT()
+function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChange, status, onStatusChange, bio, onBioChange, socialLinks, onSocialLinksChange, activePlatforms, onActivePlatformsChange, iconFilter, reelms, uid, spotifyConnected, spotifyNowPlaying, onSpotifyConnect, onSpotifyDisconnect, activity, onActivityChange }) {
   const popupRef = useRef(null)
   const ppPhotoInputRef = useRef(null)
   const ppCoverInputRef = useRef(null)
@@ -2330,7 +1991,7 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
   const [showMyActivity, setShowMyActivity] = useState(false)
   const [activityItems, setActivityItems] = useState([])
   const [showActivitySetter, setShowActivitySetter] = useState(false)
-  const [profileMediaState, setProfileMediaState] = useState({ busy: false, error: '' })
+  const [mediaSaving, setMediaSaving] = useState(null)
 
   useEffect(() => {
     if (!showMyActivity || !reelms || !uid) return
@@ -2400,7 +2061,7 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
   return (
     <>
     <div className="profile-popup" style={{ width }} ref={popupRef}>
-      <div className="pp-cover" style={cover ? { backgroundImage: `url(${cover})`, backgroundSize: 'cover', backgroundPosition: 'center' } : {}}>
+      <CachedProfileCover src={cover} className="pp-cover" style={{ backgroundSize: 'cover', backgroundPosition: 'center' }}>
         <button className="pp-cover-edit-btn" onClick={() => setHeaderEditOpen(v => !v)}>
           <PencilIcon />
         </button>
@@ -2410,16 +2071,17 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
           ref={ppPhotoInputRef}
           style={{ display: 'none' }}
           onChange={e => {
-            const file = e.target.files[0]
+            const file = e.target.files?.[0]
             if (!file) return
             ;(async () => {
-              setProfileMediaState({ busy: true, error: '' })
               try {
-                const url = await uploadImageFile(file, 'avatar')
+                setMediaSaving('photo')
+                const url = await uploadProfileImageFile(file, 'profile-photo')
                 onPhotoChange(url)
-                setProfileMediaState({ busy: false, error: '' })
               } catch (err) {
-                setProfileMediaState({ busy: false, error: err?.message || 'Photo upload failed' })
+                console.warn('Profile photo upload failed:', err)
+              } finally {
+                setMediaSaving(null)
               }
             })()
             e.target.value = ''
@@ -2431,22 +2093,24 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
           ref={ppCoverInputRef}
           style={{ display: 'none' }}
           onChange={e => {
-            const file = e.target.files[0]
+            const file = e.target.files?.[0]
             if (!file) return
             ;(async () => {
-              setProfileMediaState({ busy: true, error: '' })
               try {
-                const url = await uploadImageFile(file, 'cover')
+                setMediaSaving('cover')
+                const url = await uploadProfileImageFile(file, 'profile-cover')
                 onCoverChange(url)
-                setProfileMediaState({ busy: false, error: '' })
               } catch (err) {
-                setProfileMediaState({ busy: false, error: err?.message || 'Cover upload failed' })
+                console.warn('Profile cover upload failed:', err)
+              } finally {
+                setMediaSaving(null)
               }
             })()
             e.target.value = ''
           }}
         />
-      </div>
+      </CachedProfileCover>
+      {mediaSaving && <div className="pp-media-saving">Uploading {mediaSaving}…</div>}
       {headerEditOpen && (
         <div className="pp-cover-menu">
           <button className="pp-cover-menu-item" onClick={() => { ppPhotoInputRef.current?.click(); setHeaderEditOpen(false) }}>Change photo</button>
@@ -2454,11 +2118,14 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
           <button className="pp-cover-menu-item" onClick={() => setHeaderEditOpen(false)}>Edit profile</button>
         </div>
       )}
-      {profileMediaState.busy && <div className="pp-media-status">Yükleniyor...</div>}
-      {profileMediaState.error && <div className="pp-media-error">{profileMediaState.error}</div>}
 
       <div className="pp-identity">
-        <img src={getPersonPhoto(user) || avatarUIcon} alt="Avatar" className="pp-avatar" />
+        <CachedProfileImage
+          src={getPersonPhoto(user)}
+          alt="Avatar"
+          className="pp-avatar"
+          fallback={<img src={avatarUIcon} alt="Avatar" className="pp-avatar" />}
+        />
         <div className="pp-names">
           <span className="pp-name">{user.name}</span>
           <span className="pp-username">{'@' + (user.username || 'username')}</span>
@@ -2706,9 +2373,6 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
             All activity
           </button>
         </div>
-        {onViewFullProfile && (
-          <button className="fpp-view-full-btn" onClick={() => { onClose(); onViewFullProfile() }}>{t('view_full_profile')}</button>
-        )}
       </div>
     </div>
 
@@ -2903,37 +2567,79 @@ async function resolveCachedProfileMedia(src) {
 }
 
 function CachedProfileImage({ src, alt = '', className = '', style, fallback = null, ...props }) {
-  const [resolvedSrc, setResolvedSrc] = useState(src || '')
+  const safeSrc = normalizeMediaUrl(src)
+  const [resolvedSrc, setResolvedSrc] = useState(safeSrc || '')
+  const [failed, setFailed] = useState(false)
   useEffect(() => {
     let alive = true
-    setResolvedSrc(src || '')
-    if (!src) return () => { alive = false }
-    resolveCachedProfileMedia(src)
-      .then((nextSrc) => { if (alive) setResolvedSrc(nextSrc || src) })
-      .catch(() => { if (alive) setResolvedSrc(src || '') })
+    const next = normalizeMediaUrl(src) || ''
+    setFailed(false)
+    setResolvedSrc(next)
+    if (!next) return () => { alive = false }
+    resolveCachedProfileMedia(next)
+      .then((nextSrc) => { if (alive) setResolvedSrc(normalizeMediaUrl(nextSrc) || next) })
+      .catch(() => { if (alive) setResolvedSrc(next) })
     return () => { alive = false }
   }, [src])
-  if (!resolvedSrc) return fallback
-  return <img {...props} src={resolvedSrc} alt={alt} className={className} style={style} />
+  if (!resolvedSrc || failed) return fallback
+  return <img {...props} src={resolvedSrc} alt={alt} className={className} style={style} onError={(e) => { setFailed(true); props.onError?.(e) }} />
 }
 
 function CachedProfileCover({ src, className = '', style = {}, ...props }) {
-  const [resolvedSrc, setResolvedSrc] = useState(src || '')
+  const safeSrc = normalizeMediaUrl(src)
+  const [resolvedSrc, setResolvedSrc] = useState(safeSrc || '')
+  const [failed, setFailed] = useState(false)
   useEffect(() => {
     let alive = true
-    setResolvedSrc(src || '')
-    if (!src) return () => { alive = false }
-    resolveCachedProfileMedia(src)
-      .then((nextSrc) => { if (alive) setResolvedSrc(nextSrc || src) })
-      .catch(() => { if (alive) setResolvedSrc(src || '') })
+    const next = normalizeMediaUrl(src) || ''
+    setFailed(false)
+    setResolvedSrc(next)
+    if (!next) return () => { alive = false }
+    resolveCachedProfileMedia(next)
+      .then((nextSrc) => { if (alive) setResolvedSrc(normalizeMediaUrl(nextSrc) || next) })
+      .catch(() => { if (alive) setResolvedSrc(next) })
     return () => { alive = false }
   }, [src])
-  const backgroundStyle = resolvedSrc ? { backgroundImage: `url("${String(resolvedSrc).replace(/"/g, '\\"')}")` } : {}
-  return <div {...props} className={className} style={{ ...style, ...backgroundStyle }} />
+  const backgroundStyle = resolvedSrc && !failed ? { backgroundImage: `url("${String(resolvedSrc).replace(/"/g, '\\"')}")` } : {}
+  return <div {...props} className={className} style={{ ...style, ...backgroundStyle }} onError={() => setFailed(true)} />
+}
+
+function normalizeFriendProfileTarget(profile = {}) {
+  const raw = profile && typeof profile === 'object' ? profile : {}
+  const id = String(raw.id || raw.uid || raw.userId || raw.friendId || '')
+  const username = String(raw.username || raw.userName || '').replace(/^@+/, '')
+  const name = String(raw.name || raw.displayName || raw.userName || username || 'Member')
+  const photo = getPersonPhoto(raw)
+  const cover = getPersonCover(raw)
+  const socialLinks = raw.socialLinks && typeof raw.socialLinks === 'object' ? raw.socialLinks : (raw.sociallinks && typeof raw.sociallinks === 'object' ? raw.sociallinks : {})
+  const activePlatforms = Array.isArray(raw.activePlatforms) ? raw.activePlatforms : (Array.isArray(raw.socialorder) ? raw.socialorder : Object.keys(socialLinks || {}).filter(k => socialLinks[k]))
+  return {
+    ...raw,
+    id,
+    uid: String(raw.uid || id),
+    userId: String(raw.userId || id),
+    name,
+    displayName: String(raw.displayName || name),
+    username,
+    photo,
+    profilePhoto: photo,
+    photoURL: photo,
+    avatar: photo,
+    image: photo,
+    imageUrl: photo,
+    userPhoto: photo,
+    cover,
+    coverImage: cover,
+    coverUrl: cover,
+    headerImage: cover,
+    banner: cover,
+    socialLinks,
+    activePlatforms,
+    profileTheme: raw.profileTheme && typeof raw.profileTheme === 'object' ? raw.profileTheme : (raw.customization && typeof raw.customization === 'object' ? raw.customization : null),
+  }
 }
 
 function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBlock, onUnblock, onAddFriend, isFriend = true, isBlocked = false, isPending = false, nickname, onNicknameChange, canShare, onMessage, onCreateGroup, onRequestRemoteControl, voiceContext = null, moderationContext = null, roleContext = null, isSelf = false, embedded = false, canEditNickname = true, onViewFullProfile }) {
-  const t = useT()
   const popupRef = useRef(null)
   const safeFriend = normalizeFriendProfileTarget(friend || {})
   const [editingNickname, setEditingNickname] = useState(false)
@@ -3077,7 +2783,7 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
         )}
         {!isSelf && !isBlocked && isFriend && <button className="fpp-action-btn fpp-action-danger" onClick={() => { onRemove(friend.id); onClose() }}>Remove Friend</button>}
         {!isSelf && !isBlocked && onBlock && <button className="fpp-action-btn fpp-action-danger" onClick={() => { onBlock(friend); onClose() }}>Block</button>}
-        <button className="fpp-view-full-btn" onClick={() => { onClose(); setTimeout(() => onViewFullProfile?.(friend), 50) }}>{t('view_full_profile')}</button>
+        <button className="fpp-view-full-btn" onClick={() => { onClose(); setTimeout(() => onViewFullProfile?.(friend), 50) }}>Tüm profili gör →</button>
       </div>
     </div>
   )
@@ -3090,8 +2796,8 @@ function FullProfilePage({ user, isSelf, reelms = [], onClose, onMessage, onAddF
   const [visible, setVisible] = useState(false)
   useEffect(() => { const t = setTimeout(() => setVisible(true), 10); return () => clearTimeout(t) }, [])
 
-  const cover = user.cover || user.coverImage || user.coverUrl || null
-  const photo = getPersonPhoto(user) || user.photo || user.photoURL || null
+  const cover = getPersonCover(user)
+  const photo = getPersonPhoto(user)
   const SOCIAL_ICONS = { instagram: InstagramIcon, x: XIcon, tiktok: TikTokIcon, linkedin: LinkedInIcon, whatsapp: WhatsAppIcon, discord: DiscordSocialIcon, snapchat: SnapchatIcon, custom: CustomLinkIcon }
 
   const handleClose = () => {
@@ -3111,13 +2817,16 @@ function FullProfilePage({ user, isSelf, reelms = [], onClose, onMessage, onAddF
 
         <div className="fp-layout">
           <div className="fp-main">
-            <div className="fp-cover" style={cover ? { backgroundImage: `url(${cover})` } : {}}>
+            <CachedProfileCover src={cover} className="fp-cover">
               <div className="fp-avatar-wrap">
-                {photo
-                  ? <img src={photo} alt="" className="fp-avatar" />
-                  : <div className="fp-avatar fp-avatar--text">{(user.name || '?').charAt(0).toUpperCase()}</div>}
+                <CachedProfileImage
+                  src={photo}
+                  alt=""
+                  className="fp-avatar"
+                  fallback={<div className="fp-avatar fp-avatar--text">{(user.name || '?').charAt(0).toUpperCase()}</div>}
+                />
               </div>
-            </div>
+            </CachedProfileCover>
 
             <div className="fp-identity">
               <div className="fp-identity-names">
@@ -3351,7 +3060,7 @@ function ModInboxPanel({ onClose }) {
                 <div className="mod-inbox-body">
                   <div className="mod-inbox-text">"{ev.text}"</div>
                   {Array.isArray(ev.categories) && ev.categories.length > 0 && (
-                    <div className="mod-inbox-cats">{ev.categories.join(' · ')}</div>
+                    <div className="mod-inbox-cats">{ev.categories.map(String).join(' · ')}</div>
                   )}
                 </div>
               ) : (
@@ -6163,7 +5872,7 @@ function FeedPage({ currentUser, uid, tab, selectedReelm, isMod, onReport, onMod
                             </button>
                             <div className="feed-comment-menu-wrap">
                               <button className="feed-comment-menu-btn" onClick={() => setOpenCommentMenu(openCommentMenu === comment.id ? null : comment.id)}>
-                                <svg width="2" height="6" viewBox="0 0 3 12" fill="currentColor"><circle cx="1.5" cy="1.5" r="1.5"/><circle cx="1.5" cy="6" r="1.5"/><circle cx="1.5" cy="10.5" r="1.5"/></svg>
+                                <svg width="3" height="12" viewBox="0 0 3 12" fill="currentColor"><circle cx="1.5" cy="1.5" r="1.5"/><circle cx="1.5" cy="6" r="1.5"/><circle cx="1.5" cy="10.5" r="1.5"/></svg>
                               </button>
                               {openCommentMenu === comment.id && (
                                 <div className="feed-comment-menu-dropdown">
@@ -6276,30 +5985,98 @@ function isGoogleDefaultAvatarUrl(value) {
   return /(^|\.)googleusercontent\.com\//i.test(url) || /lh3\.googleusercontent\.com/i.test(url)
 }
 
+function normalizeMediaUrl(value) {
+  if (typeof value !== 'string') return null
+  const raw = value.trim()
+  if (!raw || raw === 'null' || raw === 'undefined' || raw === '[object Object]') return null
+  if (/^data:image\//i.test(raw) || /^blob:/i.test(raw)) return null
+  if (isGoogleDefaultAvatarUrl(raw)) return null
+  if (!/^https?:\/\//i.test(raw)) return null
+  // Some older profile docs accidentally stored a presigned PUT URL. The query expires;
+  // the public object URL is the stable part before the query string.
+  if (/X-Amz-Algorithm=AWS4-HMAC-SHA256/i.test(raw)) return raw.split('?')[0]
+  return raw
+}
+
+function firstMediaUrl(...values) {
+  for (const value of values) {
+    const url = normalizeMediaUrl(value)
+    if (url) return url
+  }
+  return null
+}
+
 function getPersonPhoto(person) {
-  if (!person) return null
-  const photo = person.photo || person.profilePhoto || person.photoURL || person.avatar || person.image || person.imageUrl || person.userPhoto || person.fromPhoto || null
-  return isGoogleDefaultAvatarUrl(photo) ? null : safeImageUrl(photo)
+  if (!person || typeof person !== 'object') return null
+  return firstMediaUrl(person.photo, person.profilePhoto, person.photoURL, person.avatar, person.image, person.imageUrl, person.userPhoto, person.fromPhoto)
 }
 
 function getPersonCover(person) {
-  if (!person) return null
-  return safeImageUrl(person.cover || person.coverImage || person.coverUrl || person.headerImage || person.banner || person.bannerImage || person.backgroundCover || null)
+  if (!person || typeof person !== 'object') return null
+  return firstMediaUrl(person.cover, person.coverImage, person.coverUrl, person.headerImage, person.banner, person.bannerImage, person.backgroundCover)
+}
+
+function getUploadedMediaUrl(uploaded) {
+  return firstMediaUrl(uploaded?.url, uploaded?.publicUrl, uploaded?.mediaUrl, uploaded?.href)
+}
+
+async function prepareProfileImageUpload(file, kind = 'profile-image') {
+  if (!file) return null
+  const isImage = /^image\//i.test(file.type || '')
+  if (!isImage) throw new Error('Only image files are supported')
+
+  const dataUrl = await new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = () => resolve(reader.result)
+    reader.onerror = () => reject(new Error('FileReader failed'))
+    reader.readAsDataURL(file)
+  })
+
+  const img = await new Promise((resolve, reject) => {
+    const el = new Image()
+    el.onload = () => resolve(el)
+    el.onerror = () => reject(new Error('Image decode failed'))
+    el.src = dataUrl
+  })
+
+  const maxSide = kind.includes('cover') || kind.includes('background') ? 1600 : 640
+  const scale = Math.min(1, maxSide / Math.max(img.width || 1, img.height || 1))
+  const width = Math.max(1, Math.round((img.width || 1) * scale))
+  const height = Math.max(1, Math.round((img.height || 1) * scale))
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const ctx = canvas.getContext('2d')
+  if (!ctx) return file
+  ctx.drawImage(img, 0, 0, width, height)
+
+  const blob = await new Promise(resolve => {
+    canvas.toBlob(b => resolve(b), 'image/webp', kind.includes('cover') || kind.includes('background') ? 0.84 : 0.86)
+  })
+  if (!blob) return file
+  const safeName = String(file.name || `${kind}.webp`).replace(/\.[^.]+$/, '')
+  return new File([blob], `${safeName || kind}-${Date.now()}.webp`, { type: 'image/webp' })
+}
+
+async function uploadProfileImageFile(file, kind = 'profile-image') {
+  const prepared = await prepareProfileImageUpload(file, kind)
+  const uploaded = await mediaUploadToS3(prepared || file)
+  const url = getUploadedMediaUrl(uploaded)
+  if (!url) throw new Error('Upload completed but no public media URL was returned')
+  return url
 }
 
 function buildProfileThemeStyle(person) {
   const cfg = person?.profileTheme || person?.customization || null
   if (!cfg || typeof cfg !== 'object') return undefined
   const theme = THEMES.find(th => th.id === cfg.themeId) || THEMES[0]
-  const accent = cfg.customAccent || theme.accent || '#b99887'
-  const base = cfg.customBase || theme.base || '#120e1e'
-  const accentRgb = rgbCssValue(hexToRgb(accent) || theme.accentRgb, [185, 152, 135])
-  const baseRgb = rgbCssValue(hexToRgb(base) || theme.baseRgb, [18, 14, 30])
+  const accent = typeof cfg.customAccent === 'string' && cfg.customAccent ? cfg.customAccent : (theme.accent || '#b99887')
+  const base = typeof cfg.customBase === 'string' && cfg.customBase ? cfg.customBase : (theme.base || '#120e1e')
   return {
     '--fpp-theme-accent': accent,
-    '--fpp-theme-accent-rgb': accentRgb,
+    '--fpp-theme-accent-rgb': rgbCssValue(accent, rgbCssValue(theme.accentRgb, '185,152,135')),
     '--fpp-theme-base': base,
-    '--fpp-theme-base-rgb': baseRgb,
+    '--fpp-theme-base-rgb': rgbCssValue(base, rgbCssValue(theme.baseRgb, '18,14,30')),
   }
 }
 
@@ -6415,7 +6192,6 @@ function sameMessageList(a, b) {
 
 function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, updateAvailable, setUpdateAvailable: _setUA, pushToast }) {
   const navigate = useNavigate()
-  const isMobile = useMobileBreakpoint(768)
   const authSession = useCentralAuthSession()
   const [authUser, setAuthUser] = useState(() =>
     authSession.authUser || (isElectron ? getElectronCurrentUser() : getWebCurrentUser())
@@ -6522,11 +6298,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const updateUserData = (updates) => {
     const normalized = normalizeProfileUpdates(updates)
-    setCurrentUser(prev => {
-      const updated = { ...(prev || {}), ...normalized }
-      userProfilePatch(normalized).catch(() => {})
-      return updated
-    })
+    setCurrentUser(prev => ({ ...(prev || {}), ...normalized }))
+    userProfilePatch(normalized).catch((err) => console.warn('profile patch failed:', err))
   }
 
   const [customization, setCustomization] = useState(() => ({ ...DEFAULT_CUSTOMIZATION }))
@@ -6586,7 +6359,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           scheduleUserPersist('bg_image', updates.bgImage)
           userPutDoc('bg_image', updates.bgImage).catch(() => {})
         } else {
-          userPutDoc('bg_image', '').catch(() => {})
+          userPutDoc('bg_image', null).catch(() => {})
         }
       }
       return updated
@@ -6594,9 +6367,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }
   const activeTheme = THEMES.find(t => t.id === customization.themeId) || THEMES[0]
   const effectiveAccent    = customization.customAccent || activeTheme.accent
-  const effectiveAccentRgb = rgbCssValue(customization.customAccent ? hexToRgb(customization.customAccent) : activeTheme.accentRgb, [185, 152, 135])
+  const effectiveAccentRgb = customization.customAccent ? hexToRgb(customization.customAccent) : activeTheme.accentRgb
   const effectiveBase      = customization.customBase   || activeTheme.base
-  const effectiveBaseRgb   = rgbCssValue(customization.customBase ? hexToRgb(customization.customBase) : activeTheme.baseRgb, [18, 14, 30])
+  const effectiveBaseRgb   = customization.customBase   ? hexToRgb(customization.customBase)   : activeTheme.baseRgb
   const effectiveTextColor = (() => {
     const tc = customization.customTextColor || 'white'
     if (tc === 'black') return 'rgba(20, 14, 30, 0.9)'
@@ -6975,8 +6748,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [appStoriesTick, setAppStoriesTick] = useState(0)
   const [shareTarget, setShareTarget] = useState(null)
   const [showChatList, setShowChatList] = useState(false)
-  const [mobileReelmPanel, setMobileReelmPanel] = useState('chat')
-  const mobileTouchStartX = useRef(null)
   const [chatListFilter, setChatListFilter] = useState('all')
   const [chatListSearch, setChatListSearch] = useState('')
   const [mutedReelmIds, setMutedReelmIds] = useState([])
@@ -10948,37 +10719,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }
 
 
-  const mobileTab = showSettings ? 'profile' : (showChatList || selectedChat) ? 'messages' : 'reelms'
-
-  const onMobileTabChange = (tab) => {
-    if (tab === 'reelms') {
-      setShowSettings(false); setShowChatList(false); setSelectedChat(null)
-      setShowDiscover(false); setShowFriendsPanel(false)
-    } else if (tab === 'messages') {
-      setShowSettings(false); setSelectedReelm(null); setSelectedChat(null)
-      setShowDiscover(false); setShowFriendsPanel(false); setShowChatList(true)
-    } else if (tab === 'profile') {
-      setShowSettings(true); setSelectedReelm(null); setSelectedChat(null)
-      setShowChatList(false); setShowDiscover(false); setShowFriendsPanel(false)
-    }
-  }
-
-  const handleMobileTouchStart = (e) => {
-    mobileTouchStartX.current = e.touches[0].clientX
-  }
-
-  const handleMobileTouchEnd = (e) => {
-    if (mobileTouchStartX.current === null) return
-    const delta = e.changedTouches[0].clientX - mobileTouchStartX.current
-    mobileTouchStartX.current = null
-    if (Math.abs(delta) < 60) return
-    if (mobileReelmPanel !== 'chat') {
-      setMobileReelmPanel('chat')
-    } else if (selectedReelm) {
-      setMobileReelmPanel(delta > 0 ? 'channels' : 'members')
-    }
-  }
-
   if (!currentUser) {
     if (!authUser?.uid) return null
     return (
@@ -11044,7 +10784,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           </div>
         </header>
 
-        <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, paddingBottom: isMobile ? '60px' : 0 }}>
+        <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
           <div className="dashboard-mid-row su-drop su-drop-1" style={showMenu ? { filter: 'blur(4px)' } : {}}>
             <div className="chats-row">
               <button
@@ -11144,6 +10884,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   {currentActivity?.name && <ActivityBadge activity={currentActivity} />}
                 </div>
               </div>
+              <button className="profile-view-full-btn" onClick={e => { e.stopPropagation(); setFullProfileTarget({ isSelf: true, user: currentUser }) }}>
+                Tüm profili gör
+              </button>
             </div>
           </div>
 
@@ -11365,12 +11108,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             </div>
           )}
 
-          <div
-            className={`panel-system${isMobile && mobileReelmPanel === 'channels' ? ' mobile-panel--channels' : ''}${isMobile && mobileReelmPanel === 'members' ? ' mobile-panel--members' : ''}`}
-            style={showMenu ? { filter: 'blur(4px)' } : {}}
-            onTouchStart={isMobile ? handleMobileTouchStart : undefined}
-            onTouchEnd={isMobile ? handleMobileTouchEnd : undefined}
-          >
+          <div className="panel-system" style={showMenu ? { filter: 'blur(4px)' } : {}}>
             {reelmLoading && <div className="reelm-loading-overlay" />}
             {showReelmSettings && selectedReelm ? (
               <ReelmSettings
@@ -11406,7 +11144,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       { id: 'desktop',       label: 'Desktop App' },
                       { id: 'privacy',       label: t('privacy_safety') },
                       { id: 'environment',   label: t('environment') },
-                      { id: 'companions',    label: t('companions') },
                       { id: 'about',         label: t('about') },
                     ].map(item => (
                       <button
@@ -11492,9 +11229,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     )}
                     {selectedSettingsCategory === 'environment' && (
                       <EnvironmentPanel uid={uid} />
-                    )}
-                    {selectedSettingsCategory === 'companions' && (
-                      <CompanionsPanel reelms={reelms} />
                     )}
                     {selectedSettingsCategory === 'usage' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
@@ -12201,7 +11935,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                   setFullProfileTarget({ isSelf: false, user: friend })
                                 }}
                               >
-                                {t('view_full_profile')}
+                                Tüm profili gör →
                               </button>
                             )}
                           </div>
@@ -12281,16 +12015,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           ref={reelmImageInputRef}
                           style={{ display: 'none' }}
                           onChange={e => {
-                            const file = e.target.files[0]
+                            const file = e.target.files?.[0]
                             if (!file) return
                             ;(async () => {
                               try {
-                                const url = await uploadImageFile(file, 'server')
+                                const url = await uploadProfileImageFile(file, 'reelm-icon')
                                 updateReelmImage(selectedReelm.id, url)
-                                addNotification('Sunucu görseli kaydedildi.')
                               } catch (err) {
                                 console.warn('Reelm image upload failed:', err)
-                                addNotification(err?.message || 'Sunucu görseli yüklenemedi.')
                               }
                             })()
                             e.target.value = ''
@@ -12339,7 +12071,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             <div className="reelm-channels">
                               {cat.channels.map(ch => (
                                 <div key={ch.id} className={`reelm-channel${ch.isFlyingRoom ? ' reelm-channel-flying' : ''}${(unreadCounts[`${selectedReelm.id}_${ch.id}`] || 0) > 0 ? ' reelm-channel--unread' : ''}`} onClick={() => {
-                                    setChannelCtxMenu(null); setSelectedChannel(ch); clearReelmChannelUnread(selectedReelm.id, ch.id); setMobileReelmPanel('chat')
+                                    setChannelCtxMenu(null); setSelectedChannel(ch); clearReelmChannelUnread(selectedReelm.id, ch.id)
                                     if (['voice', 'video', 'liveaction', 'stage'].includes(ch.type) && (selectedReelm.autoJoinVoice !== false) && voiceChannel?.channelId !== ch.id) {
                                       joinVoiceChannel(selectedReelm.id, ch.id, ch.name)
                                     }
@@ -13083,7 +12815,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                       {!selectedChatSystemLocked && (
                                         <div className="msg-ctx-menu-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
                                           <button className="msg-ctx-btn" onClick={() => setOpenMsgCtxFor(f => f === msg.id ? null : msg.id)}>
-                                            <svg width="2" height="6" viewBox="0 0 3 12" fill="currentColor"><circle cx="1.5" cy="1.5" r="1.5"/><circle cx="1.5" cy="6" r="1.5"/><circle cx="1.5" cy="10.5" r="1.5"/></svg>
+                                            <svg width="3" height="12" viewBox="0 0 3 12" fill="currentColor"><circle cx="1.5" cy="1.5" r="1.5"/><circle cx="1.5" cy="6" r="1.5"/><circle cx="1.5" cy="10.5" r="1.5"/></svg>
                                           </button>
                                           {openMsgCtxFor === msg.id && (
                                             <div className="msg-ctx-menu">
@@ -13178,7 +12910,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                         {!selectedChatSystemLocked && <div className="msg-react-ctrl">
                                           <div className="msg-ctx-menu-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
                                             <button className="msg-ctx-btn" onClick={() => setOpenMsgCtxFor(f => f === msg.id ? null : msg.id)}>
-                                              <svg width="2" height="6" viewBox="0 0 3 12" fill="currentColor"><circle cx="1.5" cy="1.5" r="1.5"/><circle cx="1.5" cy="6" r="1.5"/><circle cx="1.5" cy="10.5" r="1.5"/></svg>
+                                              <svg width="3" height="12" viewBox="0 0 3 12" fill="currentColor"><circle cx="1.5" cy="1.5" r="1.5"/><circle cx="1.5" cy="6" r="1.5"/><circle cx="1.5" cy="10.5" r="1.5"/></svg>
                                             </button>
                                             {openMsgCtxFor === msg.id && (
                                               <div className="msg-ctx-menu">
@@ -13751,18 +13483,21 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 {isBlocked(item.id) ? (
                                   <button className="friend-add-btn" onClick={() => unblockUserFn(item.id)}>Unblock</button>
                                 ) : isFriend(item.id) ? (
-                                  <button className="friend-add-btn friend-msg-btn" onClick={() => sendMsgRequest(item)}>Message</button>
+                                  <>
+                                    <span className="friend-badge-label">Friends</span>
+                                    <button className="friend-reject-btn" onClick={() => removeFriend(item.id)}>Remove</button>
+                                  </>
                                 ) : hasSentRequest(item.id) ? (
                                   <span className="friend-badge-label friend-badge-pending">Pending</span>
                                 ) : (
-                                  <>
-                                    <button className="friend-add-btn" onClick={() => sendFriendRequest(item)}>Add Friend</button>
-                                    {hasSentMsgRequest(item.id)
-                                      ? <span className="friend-badge-label friend-badge-pending" style={{fontSize:'11px'}}>Requested</span>
-                                      : <button className="friend-add-btn friend-msg-btn" onClick={() => sendMsgRequest(item)}>Message</button>
-                                    }
-                                  </>
+                                  <button className="friend-add-btn" onClick={() => sendFriendRequest(item)}>Add Friend</button>
                                 )}
+                                {!isBlocked(item.id) && !isFriend(item.id) && (
+                                  hasSentMsgRequest(item.id)
+                                    ? <span className="friend-badge-label friend-badge-pending" style={{fontSize:'11px'}}>Requested</span>
+                                    : <button className="friend-add-btn friend-msg-btn" onClick={() => sendMsgRequest(item)}>Message</button>
+                                )}
+                                {!isBlocked(item.id) && <button className="friend-reject-btn" onClick={() => blockUserFn(item)}>Block</button>}
                               </div>
                             )}
                           </div>
@@ -13834,123 +13569,104 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                 {(() => {
                   const sortedReelms = [...reelms].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
                   const sortedChats = [...chats].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-                  const hour = new Date().getHours()
-                  const greetingWord = hour >= 5 && hour < 12 ? 'Good morning'
-                    : hour >= 12 && hour < 17 ? 'Good afternoon'
-                    : hour >= 17 && hour < 21 ? 'Good evening'
-                    : 'Good night'
-                  const greetName = currentUser?.name || currentUser?.username || ''
                   const ArrowRight = () => (
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
                       <polyline points="9 18 15 12 9 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                   )
                   return (
-                    <>
-                      <div className="home-greeting">
-                        {greetingWord}{greetName ? `, ${greetName}!` : '!'}
+                    <div className="home-sections">
+                      {/* Your Reelms, recently */}
+                      <div className="home-section">
+                        <div className="home-section-header">
+                          <img src={readyreelmIcon} alt="" className="home-section-icon" />
+                          <span className="home-section-title">Your Reelms, recently</span>
+                        </div>
+                        {sortedReelms.length > 0 && (
+                          <div className="home-section-list">
+                            {sortedReelms.slice(0, 5).map(r => (
+                              <button key={r.id} className="home-item" onClick={() => handleSelectReelm(r)}>
+                                <div className="home-item-avatar home-item-avatar--server">
+                                  {r.image
+                                    ? <img src={r.image} alt={r.name} className="home-item-avatar-img" />
+                                    : <span className="home-item-avatar-letter">{(r.name || '?').charAt(0)}</span>
+                                  }
+                                </div>
+                                <span className="home-item-name">{r.name}</span>
+                                {unreadCounts[r.id] > 0 && <span className="home-item-badge">{unreadCounts[r.id]}</span>}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        <button className="home-section-viewall" onClick={() => { setShowDiscover(false); setShowFriendsPanel(false); setShowSettings(false); setShowMsgRequests(false) }}>
+                          All Reelms <ArrowRight />
+                        </button>
                       </div>
-                      <div className="home-sections">
-                        {/* Your Reelms, recently */}
-                        <div className="home-section">
-                          <div className="home-section-header">
-                            <img src={readyreelmIcon} alt="" className="home-section-icon" />
-                            <span className="home-section-title">Your Reelms, recently</span>
-                          </div>
-                          <div className="home-section-body">
-                            {sortedReelms.length > 0 ? (
-                              <div className="home-section-list">
-                                {sortedReelms.slice(0, 5).map(r => (
-                                  <button key={r.id} className="home-item" onClick={() => handleSelectReelm(r)}>
-                                    <div className="home-item-avatar home-item-avatar--server">
-                                      {r.image
-                                        ? <img src={r.image} alt={r.name} className="home-item-avatar-img" />
-                                        : <span className="home-item-avatar-letter">{(r.name || '?').charAt(0)}</span>
-                                      }
-                                    </div>
-                                    <span className="home-item-name">{r.name}</span>
-                                    {unreadCounts[r.id] > 0 && <span className="home-item-badge">{unreadCounts[r.id]}</span>}
-                                  </button>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="home-empty">No reelms yet.</p>
-                            )}
-                            <button className="home-section-viewall" onClick={() => { setShowDiscover(false); setShowFriendsPanel(false); setShowSettings(false); setShowMsgRequests(false) }}>
-                              All Reelms <ArrowRight />
-                            </button>
-                          </div>
-                        </div>
 
-                        {/* Messages */}
-                        <div className="home-section">
-                          <div className="home-section-header">
-                            <img src={newdmIcon} alt="" className="home-section-icon" />
-                            <span className="home-section-title">Messages</span>
-                          </div>
-                          <div className="home-section-body">
-                            {sortedChats.length > 0 ? (
-                              <div className="home-section-list">
-                                {sortedChats.slice(0, 5).map(c => {
-                                  const avatarSrc = getChatAvatarSrc(c)
-                                  const displayName = getChatDisplayName(c)
-                                  return (
-                                    <button key={c.id} className="home-item" onClick={() => { setSelectedChat(c); setSelectedReelm(null); setSelectedChannel(null); setShowChatList(false); setShowFeed(false); setShowDiscover(false) }}>
-                                      <div className="home-item-avatar">
-                                        {avatarSrc
-                                          ? <img src={avatarSrc} alt={displayName} className="home-item-avatar-img" />
-                                          : <span className="home-item-avatar-letter">{(displayName || '?').charAt(0)}</span>
-                                        }
-                                      </div>
-                                      <span className="home-item-name">{displayName}</span>
-                                      {unreadCounts[c.id] > 0 && <span className="home-item-badge">{unreadCounts[c.id]}</span>}
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                            ) : (
-                              <p className="home-empty">You're all caught up.</p>
-                            )}
-                            <button className="home-section-viewall" onClick={() => { setSelectedChat(null); setShowChatList(true); setChatListFilter('all') }}>
-                              All Messages <ArrowRight />
-                            </button>
-                          </div>
+                      {/* Messages */}
+                      <div className="home-section">
+                        <div className="home-section-header">
+                          <img src={newdmIcon} alt="" className="home-section-icon" />
+                          <span className="home-section-title">Messages</span>
                         </div>
-
-                        {/* Notifications */}
-                        <div className="home-section">
-                          <div className="home-section-header">
-                            <img src={notificationIcon} alt="" className="home-section-icon" />
-                            <span className="home-section-title">Notifications</span>
+                        {sortedChats.length > 0 ? (
+                          <div className="home-section-list">
+                            {sortedChats.slice(0, 5).map(c => {
+                              const avatarSrc = getChatAvatarSrc(c)
+                              const displayName = getChatDisplayName(c)
+                              return (
+                                <button key={c.id} className="home-item" onClick={() => { setSelectedChat(c); setSelectedReelm(null); setSelectedChannel(null); setShowChatList(false); setShowFeed(false); setShowDiscover(false) }}>
+                                  <div className="home-item-avatar">
+                                    {avatarSrc
+                                      ? <img src={avatarSrc} alt={displayName} className="home-item-avatar-img" />
+                                      : <span className="home-item-avatar-letter">{(displayName || '?').charAt(0)}</span>
+                                    }
+                                  </div>
+                                  <span className="home-item-name">{displayName}</span>
+                                  {unreadCounts[c.id] > 0 && <span className="home-item-badge">{unreadCounts[c.id]}</span>}
+                                </button>
+                              )
+                            })}
                           </div>
-                          <div className="home-section-body">
-                            {notifications.length > 0 ? (
-                              <div className="home-section-list">
-                                {notifications.slice(0, 5).map(n => (
-                                  <button
-                                    key={n.id}
-                                    className="home-item home-item--notif"
-                                    onClick={() => {
-                                      if (n.link?.type !== 'reelm_invite') {
-                                        navigateToNotificationLink(n.link)
-                                        deleteNotification(n.id)
-                                      }
-                                    }}
-                                  >
-                                    <span className="home-item-notif-text">{n.text}</span>
-                                  </button>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="home-empty">You're all caught up.</p>
-                            )}
-                            <button className="home-section-viewall" onClick={toggleNotifPopup}>
-                              All Notifications <ArrowRight />
-                            </button>
-                          </div>
-                        </div>
+                        ) : (
+                          <p className="home-empty">You're all caught up.</p>
+                        )}
+                        <button className="home-section-viewall" onClick={() => { setSelectedChat(null); setShowChatList(true); setChatListFilter('all') }}>
+                          All Messages <ArrowRight />
+                        </button>
                       </div>
-                    </>
+
+                      {/* Notifications */}
+                      <div className="home-section">
+                        <div className="home-section-header">
+                          <img src={notificationIcon} alt="" className="home-section-icon" />
+                          <span className="home-section-title">Notifications</span>
+                        </div>
+                        {notifications.length > 0 ? (
+                          <div className="home-section-list">
+                            {notifications.slice(0, 5).map(n => (
+                              <button
+                                key={n.id}
+                                className="home-item home-item--notif"
+                                onClick={() => {
+                                  if (n.link?.type !== 'reelm_invite') {
+                                    navigateToNotificationLink(n.link)
+                                    deleteNotification(n.id)
+                                  }
+                                }}
+                              >
+                                <span className="home-item-notif-text">{n.text}</span>
+                              </button>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="home-empty">You're all caught up.</p>
+                        )}
+                        <button className="home-section-viewall" onClick={toggleNotifPopup}>
+                          All Notifications <ArrowRight />
+                        </button>
+                      </div>
+                    </div>
                   )
                 })()}
                 <button
@@ -13961,18 +13677,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                 </button>
               </div>
             )}
-            {isMobile && mobileReelmPanel !== 'chat' && (
-              <div className="mobile-panel-overlay" onClick={() => setMobileReelmPanel('chat')} />
-            )}
           </div>
-
-          {isMobile && (
-            <MobileBottomNav
-              activeTab={mobileTab}
-              onTabChange={onMobileTabChange}
-              msgUnread={totalUnread}
-            />
-          )}
 
           {showProfilePopup && (
             <ProfilePopup
@@ -14005,7 +13710,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               onSpotifyDisconnect={disconnectSpotify}
               activity={currentActivity}
               onActivityChange={setActivity}
-              onViewFullProfile={() => { setShowProfilePopup(false); setFullProfileTarget({ isSelf: true, user: currentUser }) }}
             />
           )}
           {renderFriendProfileSurface(false)}
@@ -14638,47 +14342,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   )
 }
 
-function LegalModal({ type, onClose }) {
-  const t = useT()
-  if (!type) return null
-  return (
-    <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)' }} onClick={onClose}>
-      <div style={{ background: 'var(--panel-bg, #1a1a2e)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, width: '90%', maxWidth: 560, maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
-          <span style={{ fontWeight: 600, fontSize: '1rem' }}>
-            {type === 'terms' ? t('terms_of_service') : t('privacy_policy')}
-          </span>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', color: 'rgba(var(--ta-rgb),0.5)', cursor: 'pointer', fontSize: '1.2rem', lineHeight: 1 }}>✕</button>
-        </div>
-        <div style={{ padding: '20px 24px', overflowY: 'auto', color: 'rgba(var(--ta-rgb),0.7)', fontSize: '0.85rem', lineHeight: 1.7 }}>
-          {type === 'terms' ? (
-            <>
-              <p>{t('last_updated')}</p>
-              <p>{t('terms_intro')}</p>
-              <p><strong>{t('terms_s1_title')}</strong><br />{t('terms_s1_body')}</p>
-              <p><strong>{t('terms_s2_title')}</strong><br />{t('terms_s2_body')}</p>
-              <p><strong>{t('terms_s3_title')}</strong><br />{t('terms_s3_body')}</p>
-              <p><strong>{t('terms_s4_title')}</strong><br />{t('terms_s4_body')}</p>
-              <p>{t('legal_contact')}</p>
-            </>
-          ) : (
-            <>
-              <p>{t('last_updated')}</p>
-              <p>{t('privacy_intro')}</p>
-              <p><strong>{t('privacy_s1_title')}</strong><br />{t('privacy_s1_body')}</p>
-              <p><strong>{t('privacy_s2_title')}</strong><br />{t('privacy_s2_body')}</p>
-              <p><strong>{t('privacy_s3_title')}</strong><br />{t('privacy_s3_body')}</p>
-              <p><strong>{t('privacy_s4_title')}</strong><br />{t('privacy_s4_body')}</p>
-              <p><strong>{t('privacy_s5_title')}</strong><br />{t('privacy_s5_body')}</p>
-              <p>{t('legal_contact')}</p>
-            </>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 function SignUpScreen({ onSignUpComplete, onGoBack }) {
   const t = useT()
   const [step, setStep] = useState(1)
@@ -15000,7 +14663,42 @@ function SignUpScreen({ onSignUpComplete, onGoBack }) {
       </div>
       <LegacyAuthDownloadCta compact />
 
-      <LegalModal type={legalModal} onClose={() => setLegalModal(null)} />
+      {legalModal && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(6px)' }} onClick={() => setLegalModal(null)}>
+          <div style={{ background: 'var(--panel-bg, #1a1a2e)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 16, width: '90%', maxWidth: 560, maxHeight: '80vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '20px 24px 16px', borderBottom: '1px solid rgba(255,255,255,0.07)' }}>
+              <span style={{ fontWeight: 600, fontSize: '1rem' }}>
+                {legalModal === 'terms' ? t('terms_of_service') : t('privacy_policy')}
+              </span>
+              <button onClick={() => setLegalModal(null)} style={{ background: 'none', border: 'none', color: 'rgba(var(--ta-rgb),0.5)', cursor: 'pointer', fontSize: '1.2rem', lineHeight: 1 }}>✕</button>
+            </div>
+            <div style={{ padding: '20px 24px', overflowY: 'auto', color: 'rgba(var(--ta-rgb),0.7)', fontSize: '0.85rem', lineHeight: 1.7 }}>
+              {legalModal === 'terms' ? (
+                <>
+                  <p>{t('last_updated')}</p>
+                  <p>{t('terms_intro')}</p>
+                  <p><strong>{t('terms_s1_title')}</strong><br />{t('terms_s1_body')}</p>
+                  <p><strong>{t('terms_s2_title')}</strong><br />{t('terms_s2_body')}</p>
+                  <p><strong>{t('terms_s3_title')}</strong><br />{t('terms_s3_body')}</p>
+                  <p><strong>{t('terms_s4_title')}</strong><br />{t('terms_s4_body')}</p>
+                  <p>{t('legal_contact')}</p>
+                </>
+              ) : (
+                <>
+                  <p>{t('last_updated')}</p>
+                  <p>{t('privacy_intro')}</p>
+                  <p><strong>{t('privacy_s1_title')}</strong><br />{t('privacy_s1_body')}</p>
+                  <p><strong>{t('privacy_s2_title')}</strong><br />{t('privacy_s2_body')}</p>
+                  <p><strong>{t('privacy_s3_title')}</strong><br />{t('privacy_s3_body')}</p>
+                  <p><strong>{t('privacy_s4_title')}</strong><br />{t('privacy_s4_body')}</p>
+                  <p><strong>{t('privacy_s5_title')}</strong><br />{t('privacy_s5_body')}</p>
+                  <p>{t('legal_contact')}</p>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -15401,7 +15099,9 @@ function App() {
                   <SignInScreen onGoSignUp={() => navigateTo('/signup')} onSignInSuccess={handleSignInSuccess} />
                 </div>
               </main>
-              <AuthLegalFooter language={language} onLanguageChange={updateLanguage} />
+              <div style={{ position: 'absolute', bottom: '30px', right: '30px', opacity: 0.5, fontSize: '12px', pointerEvents: 'none' }}>
+                Reelm, LLC
+              </div>
             </>
           )
         } />
@@ -15426,7 +15126,9 @@ function App() {
                   <SignUpScreen onSignUpComplete={handleSignUpComplete} onGoBack={() => navigateTo('/signin')} />
                 </div>
               </main>
-              <AuthLegalFooter language={language} onLanguageChange={updateLanguage} />
+              <div style={{ position: 'absolute', bottom: '30px', right: '30px', opacity: 0.5, fontSize: '12px', pointerEvents: 'none' }}>
+                Reelm, LLC
+              </div>
             </>
           )
         } />

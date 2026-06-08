@@ -13,7 +13,6 @@ import { createSpotifyRouter } from './routes/spotify.routes.js'
 import { debugRouter } from './routes/debug.routes.js'
 import { trackRouter } from './routes/track.routes.js'
 import { clientRouter } from './routes/client.routes.js'
-import { createBotRouter } from './routes/bot.routes.js'
 import { requestContext } from './middleware/requestContext.js'
 import { requestLogger } from './middleware/requestLogger.js'
 import { apiRateLimit, authRateLimit, trackingRateLimit } from './middleware/rateLimit.js'
@@ -43,14 +42,10 @@ export function createApp(io?: Server) {
   }))
   app.use(express.json({ limit: env.JSON_BODY_LIMIT }))
   app.use(express.urlencoded({ extended: true, limit: env.JSON_BODY_LIMIT }))
-  const isDevLocalhost = (origin: string) =>
-    env.NODE_ENV !== 'production' && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)
-
   app.use(cors({
     origin(origin, callback) {
       if (!origin) return callback(null, true)
       if (corsOrigins.includes(origin)) return callback(null, true)
-      if (isDevLocalhost(origin)) return callback(null, true)
       return callback(new Error(`CORS blocked origin: ${origin}`))
     },
     credentials: true
@@ -84,7 +79,6 @@ export function createApp(io?: Server) {
     // This keeps normal app traffic user-based instead of proxy/IP-based.
     app.use('/api/v1/social', createSocialRouter(io))
     app.use('/api/v1', createReelmsDataRouter(io))
-    app.use(createBotRouter(io))
   }
 
   // Compatibility: old web client calls /google/login and /callback/google.

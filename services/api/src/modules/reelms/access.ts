@@ -26,18 +26,10 @@ const isGoogleDefaultAvatarUrl = (value: unknown) => {
   return /(^|\.)googleusercontent\.com\//i.test(url) || /lh3\.googleusercontent\.com/i.test(url)
 }
 
-const safePublicMediaUrl = (value: unknown) => {
-  if (typeof value !== 'string') return null
-  const url = value.trim()
-  if (!url || isGoogleDefaultAvatarUrl(url)) return null
-  return /^https?:\/\//i.test(url) ? url : null
-}
-
 export function publicProfileFromStored(uid: string, profile: any = {}) {
   const rawPhoto = profile.photo || profile.profilePhoto || profile.photoURL || profile.avatar || profile.image || profile.imageUrl || profile.userPhoto || null
-  const photo = safePublicMediaUrl(rawPhoto)
-  const cover = safePublicMediaUrl(profile.cover || profile.coverImage || profile.coverUrl || profile.headerImage || profile.banner || profile.bannerImage || profile.backgroundCover || null)
-  const background = safePublicMediaUrl(profile.backgroundUrl || profile.backgroundImage || profile.bgImage || profile.bg_image || null)
+  const photo = isGoogleDefaultAvatarUrl(rawPhoto) ? null : rawPhoto
+  const cover = profile.cover || profile.coverImage || profile.coverUrl || profile.headerImage || profile.banner || profile.bannerImage || profile.backgroundCover || null
   return {
     id: uid,
     uid,
@@ -54,10 +46,6 @@ export function publicProfileFromStored(uid: string, profile: any = {}) {
     coverImage: cover,
     coverUrl: cover,
     headerImage: cover,
-    banner: cover,
-    backgroundUrl: background,
-    backgroundImage: background,
-    bgImage: background,
     bio: profile.bio || '',
     activity: profile.activity || null,
     sociallinks: profile.sociallinks || {},
@@ -116,13 +104,11 @@ export async function canUseReelmPermission(uid: string, reelmId: string, permis
 }
 
 export async function getUserPublicProfile(uid: string) {
-  const [profile, customization, bgImage] = await Promise.all([
+  const [profile, customization] = await Promise.all([
     getDoc<any>(userPk(uid), 'profile').catch(() => null),
-    getDoc<any>(userPk(uid), 'customization').catch(() => null),
-    getDoc<any>(userPk(uid), 'bg_image').catch(() => null)
+    getDoc<any>(userPk(uid), 'customization').catch(() => null)
   ])
-  const bg = typeof bgImage === 'string' ? bgImage : ((customization as any)?.bgImage || null)
-  return publicProfileFromStored(uid, { ...(profile || {}), profileTheme: (profile as any)?.profileTheme || customization || null, backgroundUrl: bg, bgImage: bg })
+  return publicProfileFromStored(uid, { ...(profile || {}), profileTheme: (profile as any)?.profileTheme || customization || null })
 }
 
 async function isBannedFromReelm(uid: string, reelmId: string) {

@@ -1,4 +1,4 @@
-﻿/* Legacy visual system isolated under features/legacy. New feature CSS should not be added here. */
+/* Legacy visual system isolated under features/legacy. New feature CSS should not be added here. */
 @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600&family=Inclusive+Sans:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700&family=Mona+Sans:wght@300;400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600&family=Akt:wght@300;400;500;600;700&family=Sour+Gummy:wght@400;500;600;700&family=LINE+Seed+JP:wght@300;400;700&family=Dela+Gothic+One&display=swap');
 
 :root {
@@ -62,7 +62,7 @@ html {
   background-color: var(--tb);
 }
 
-/* â”€â”€ Grain doku katmanÄ± â”€â”€ */
+/* ── Grain doku katmanı ── */
 body::before {
   content: '';
   position: fixed;
@@ -180,7 +180,7 @@ h6 {
   pointer-events: none;
 }
 
-/* â”€â”€ Auth floating shapes â”€â”€ */
+/* ── Auth floating shapes ── */
 .auth-shapes {
   position: absolute;
   inset: 0;
@@ -888,7 +888,7 @@ h6 {
   background: rgba(var(--ta-rgb), 0.4);
   flex-shrink: 0;
   align-self: center;
-  /* + butonunun iÃ§indeki ikon 32px iken, buton 40px olduÄŸu iÃ§in gÃ¶rsel hizayÄ± dengeler. */
+  /* + butonunun içindeki ikon 32px iken, buton 40px olduğu için görsel hizayı dengeler. */
   margin-left: -4px;
   margin-top: -4px;
 }
@@ -1049,7 +1049,7 @@ h6 {
 }
 
 
-/* â”€â”€ Drop-in animation â”€â”€ */
+/* ── Drop-in animation ── */
 @keyframes su-drop-in {
   0%   { opacity: 0; transform: translateY(-28px) scale(0.97); }
   60%  { opacity: 1; }
@@ -1068,55 +1068,31 @@ h6 {
 .home-panel {
   display: flex;
   flex-direction: column;
-  align-items: stretch;
+  align-items: flex-start;
   justify-content: flex-start;
-  overflow-y: auto;
-}
-
-.home-greeting {
-  font-family: 'Dela Gothic One', sans-serif !important;
-  font-size: 1.65rem;
-  font-weight: 400;
-  color: var(--ta);
-  line-height: 1.25;
-  text-align: center;
-  padding: 52px 36px 36px;
 }
 
 .home-sections {
   display: flex;
-  flex-direction: row;
-  align-items: flex-start;
-  gap: 0;
-  padding: 0 0 80px;
+  flex-direction: column;
+  gap: 32px;
+  padding: 32px 36px 24px;
   width: 100%;
-  max-width: 780px;
-  margin: 0 auto;
+  max-width: 520px;
   box-sizing: border-box;
 }
 
 .home-section {
-  flex: 1;
-  min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 0;
-  padding: 0 20px;
-}
-
-.home-section:first-child {
-  flex: 1.4;
-}
-
-.home-section + .home-section {
-  border-left: 1px solid rgba(var(--ta-rgb), 0.1);
+  gap: 4px;
 }
 
 .home-section-header {
   display: flex;
   align-items: center;
   gap: 10px;
-  margin-bottom: 12px;
+  margin-bottom: 10px;
 }
 
 .home-section-icon {
@@ -1127,17 +1103,11 @@ h6 {
 }
 
 .home-section-title {
-  font-family: 'Dela Gothic One', sans-serif !important;
-  font-size: 0.95rem;
+  font-family: 'Dela Gothic One', sans-serif;
+  font-size: 1rem;
   font-weight: 400;
   color: var(--ta);
   line-height: 1.2;
-}
-
-.home-section-body {
-  display: flex;
-  flex-direction: column;
-  padding-left: 20px;
 }
 
 .home-section-list {
@@ -1610,7 +1580,7 @@ h6 {
 }
 .update-banner-dismiss:hover { color: rgba(255, 255, 255, 0.75); }
 
-/* â”€â”€ Toast pill notification system â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Toast pill notification system ─────────────────────────────────────── */
 .toast-stack {
   position: fixed;
   bottom: 24px;
@@ -1865,11 +1835,11 @@ h6 {
 
 
 
-/* (Removed) extra veil layer â€” it caused visible top banding. */
+/* (Removed) extra veil layer — it caused visible top banding. */
 
 /* Semi-transparent overlays when background image is active */
 
-/* Header and chats-row are outside panel-system â€” they see dashboard-bg directly */
+/* Header and chats-row are outside panel-system — they see dashboard-bg directly */
 .dashboard-root.has-bg .app-header {
   background: transparent;
   -webkit-backdrop-filter: none;
@@ -1884,7 +1854,7 @@ h6 {
 
 /*
  * panel-system creates its own stacking context (z-index:1 + position:relative).
- * backdrop-filter on panel-system itself sees dashboard-bg directly â€” this is the
+ * backdrop-filter on panel-system itself sees dashboard-bg directly — this is the
  * correct place to apply the panel blur. Child panels cannot independently blur
  * through the stacking context boundary; they differentiate by background opacity only.
  */
@@ -2518,7 +2488,7 @@ h6 {
 .reelm-channel-ctx-cap-btn.active { background: rgba(185,152,135,0.18); border-color: rgba(185,152,135,0.45); color: #b99887; }
 .reelm-channel-ctx-cap-unlimited { grid-column: 1 / -1; }
 
-/* â”€â”€ Vapor Rooms â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Vapor Rooms ──────────────────────────────────── */
 .reelm-category-menu-flying { color: var(--ta) !important; }
 .reelm-category-menu-flying:hover { background: rgba(var(--ta-rgb), 0.12) !important; }
 
@@ -2742,7 +2712,7 @@ h6 {
   color: var(--ta);
 }
 
-/* â”€â”€ Profile Popup: Spotify Connect â”€â”€ */
+/* ── Profile Popup: Spotify Connect ── */
 .pp-spotify-section {
   padding: 10px 0 4px;
   border-top: 1px solid rgba(var(--ta-rgb), 0.08);
@@ -2867,7 +2837,7 @@ h6 {
   color: rgba(var(--ta-rgb), 0.8);
 }
 
-/* â”€â”€ Profile Popup: Action count badge â”€â”€ */
+/* ── Profile Popup: Action count badge ── */
 .pp-action-count {
   display: inline-flex;
   align-items: center;
@@ -2881,7 +2851,7 @@ h6 {
   min-width: 18px;
 }
 
-/* â”€â”€ Profile Popup: Reelms / Activity Panel â”€â”€ */
+/* ── Profile Popup: Reelms / Activity Panel ── */
 .pp-panel-overlay {
   position: fixed;
   inset: 0;
@@ -3033,7 +3003,7 @@ h6 {
   margin-top: 3px;
 }
 
-/* â”€â”€ Create Reelm Form â”€â”€ */
+/* ── Create Reelm Form ── */
 .create-reelm-form {
   display: flex;
   flex-direction: column;
@@ -3161,7 +3131,7 @@ h6 {
   overflow: hidden;
 }
 
-/* â”€â”€ Reelm Sidebar â”€â”€ */
+/* ── Reelm Sidebar ── */
 .reelm-sidebar {
   display: flex;
   flex-direction: column;
@@ -3832,7 +3802,7 @@ h6 {
   color: rgba(230, 210, 200, 0.92);
 }
 
-/* â”€â”€ Help Center modal â”€â”€ */
+/* ── Help Center modal ── */
 @keyframes hc-in {
   0%   { transform: scale(0.93) translateY(12px); opacity: 0; }
   100% { transform: scale(1)    translateY(0);    opacity: 1; }
@@ -4041,546 +4011,6 @@ h6 {
   animation: ignite-flow 3s linear infinite;
 }
 
-/* â”€â”€ EÅŸlikÃ§iler (Companions) Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-.companions-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 24px;
-}
-
-.companions-section-label {
-  font-family: 'Dela Gothic One', sans-serif !important;
-  font-size: 0.7rem;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: rgba(var(--ta-rgb), 0.4);
-  margin-bottom: 4px;
-}
-
-.companion-card {
-  background: rgba(var(--ta-rgb), 0.05);
-  border: 1px solid rgba(var(--ta-rgb), 0.1);
-  border-radius: 18px;
-  padding: 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.companion-card-header {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
-.companion-avatar {
-  width: 52px;
-  height: 52px;
-  border-radius: 14px;
-  background: linear-gradient(135deg, rgba(var(--ta-rgb), 0.22), rgba(var(--ta-rgb), 0.08));
-  border: 1px solid rgba(var(--ta-rgb), 0.12);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-  color: rgba(var(--ta-rgb), 0.75);
-}
-
-.companion-info {
-  flex: 1;
-  min-width: 0;
-}
-
-.companion-name {
-  font-family: 'Dela Gothic One', sans-serif !important;
-  font-size: 1rem;
-  color: var(--ta);
-}
-
-.companion-username {
-  font-size: 0.75rem;
-  color: rgba(var(--ta-rgb), 0.45);
-  margin-top: 2px;
-}
-
-.companion-tags {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.companion-tag {
-  font-size: 0.68rem;
-  padding: 2px 8px;
-  border-radius: 99px;
-  background: rgba(var(--ta-rgb), 0.1);
-  color: rgba(var(--ta-rgb), 0.6);
-  border: 1px solid rgba(var(--ta-rgb), 0.12);
-}
-
-.companion-desc {
-  margin: 0;
-  font-size: 0.8rem;
-  color: rgba(var(--ta-rgb), 0.6);
-  line-height: 1.55;
-}
-
-.companion-commands {
-  display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-
-.companion-cmd {
-  font-size: 0.72rem;
-  padding: 3px 9px;
-  border-radius: 6px;
-  background: rgba(var(--ta-rgb), 0.08);
-  color: rgba(var(--ta-rgb), 0.7);
-  font-family: monospace;
-  border: 1px solid rgba(var(--ta-rgb), 0.1);
-}
-
-.companion-reelms {
-  border-top: 1px solid rgba(var(--ta-rgb), 0.08);
-  padding-top: 14px;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.companion-reelms-label {
-  font-size: 0.72rem;
-  color: rgba(var(--ta-rgb), 0.4);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-}
-
-.companion-reelm-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.companion-reelm-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: rgba(var(--ta-rgb), 0.04);
-  border: 1px solid rgba(var(--ta-rgb), 0.07);
-}
-
-.companion-reelm-avatar {
-  width: 32px;
-  height: 32px;
-  border-radius: 9px;
-  background: rgba(var(--ta-rgb), 0.15);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.75rem;
-  font-weight: 700;
-  color: rgba(var(--ta-rgb), 0.7);
-  flex-shrink: 0;
-}
-
-.companion-reelm-name {
-  flex: 1;
-  font-size: 0.84rem;
-  color: rgba(var(--ta-rgb), 0.85);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.companion-reelm-added {
-  font-size: 0.75rem;
-  color: rgba(var(--ta-rgb), 0.45);
-  flex-shrink: 0;
-}
-
-.companion-add-btn {
-  padding: 5px 14px;
-  border-radius: 8px;
-  border: 1px solid rgba(var(--ta-rgb), 0.3);
-  background: rgba(var(--ta-rgb), 0.08);
-  color: rgba(var(--ta-rgb), 0.85);
-  font-size: 0.78rem;
-  cursor: pointer;
-  flex-shrink: 0;
-  transition: background 0.15s, border-color 0.15s;
-}
-.companion-add-btn:hover:not(:disabled) {
-  background: rgba(var(--ta-rgb), 0.16);
-  border-color: rgba(var(--ta-rgb), 0.5);
-}
-.companion-add-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-/* â”€â”€â”€ Mobile responsive layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-.mobile-bottom-nav { display: none; }
-
-@media (max-width: 768px) {
-  /* Panel system: full bleed, no radius */
-  .panel-system {
-    margin: 0 !important;
-    border-radius: 0 !important;
-    position: relative;
-    overflow: hidden;
-  }
-
-  /* Left panel: slides in from left */
-  .panel-left {
-    position: absolute !important;
-    left: 0; top: 0; bottom: 0;
-    z-index: 20;
-    flex: 0 0 84% !important;
-    width: 84% !important;
-    max-width: 320px !important;
-    transform: translateX(-100%);
-    transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
-    background: rgba(10, 7, 22, 0.97) !important;
-    -webkit-backdrop-filter: blur(24px);
-    backdrop-filter: blur(24px);
-    border-right: 1px solid rgba(var(--ta-rgb), 0.1);
-    overflow-y: auto;
-  }
-
-  /* Right panel: slides in from right */
-  .panel-right {
-    position: absolute !important;
-    right: 0; top: 0; bottom: 0;
-    z-index: 20;
-    flex: 0 0 84% !important;
-    width: 84% !important;
-    max-width: 320px !important;
-    transform: translateX(100%);
-    transition: transform 0.26s cubic-bezier(0.4, 0, 0.2, 1);
-    background: rgba(10, 7, 22, 0.97) !important;
-    -webkit-backdrop-filter: blur(24px);
-    backdrop-filter: blur(24px);
-    border-left: 1px solid rgba(var(--ta-rgb), 0.1);
-    overflow-y: auto;
-  }
-
-  /* Middle panel always full width */
-  .panel-middle {
-    flex: 1 !important;
-    width: 100% !important;
-    min-width: 0 !important;
-  }
-
-  /* Slide in left panel */
-  .mobile-panel--channels .panel-left {
-    transform: translateX(0);
-  }
-
-  /* Slide in right panel */
-  .mobile-panel--members .panel-right {
-    transform: translateX(0);
-  }
-
-  .home-greeting {
-    font-size: 1.35rem;
-    padding: 36px 20px 28px;
-  }
-
-  .home-sections {
-    flex-direction: column;
-    padding: 0 0 80px;
-    max-width: 100%;
-    gap: 0;
-  }
-
-  .home-section + .home-section {
-    border-left: none;
-    border-top: 1px solid rgba(var(--ta-rgb), 0.1);
-    padding-top: 20px;
-    margin-top: 20px;
-  }
-
-  /* Semi-transparent overlay when side panel is open */
-  .mobile-panel-overlay {
-    position: absolute;
-    inset: 0;
-    z-index: 15;
-    background: rgba(0, 0, 0, 0.48);
-    cursor: pointer;
-  }
-
-  /* Hide draggable dividers on mobile */
-  .panel-divider,
-  .panel-divider-draggable {
-    display: none !important;
-  }
-
-  /* Left panel bottom bar: hide on mobile (replaced by bottom nav) */
-  .left-panel-bottom-bar {
-    display: none !important;
-  }
-
-  /* Compact header */
-  .app-header {
-    padding: 10px 14px 6px;
-  }
-
-  /* Chats row: touch scroll */
-  .chats-row {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-  .chats-scroll-horizontal {
-    -webkit-overflow-scrolling: touch;
-  }
-
-  /* Settings layout: vertical stack */
-  .settings-layout {
-    flex-direction: column;
-    border-radius: 0;
-  }
-  .settings-sidebar {
-    width: 100% !important;
-    max-height: 160px;
-    overflow-y: auto;
-    border-right: none !important;
-    border-bottom: 1px solid rgba(var(--ta-rgb), 0.1);
-  }
-  .settings-nav {
-    display: flex;
-    flex-direction: row;
-    flex-wrap: wrap;
-    gap: 4px;
-    padding: 8px 12px;
-  }
-  .settings-nav-item {
-    padding: 5px 10px;
-    font-size: 0.78rem;
-  }
-  .settings-title {
-    padding: 12px 12px 6px;
-  }
-  .settings-content {
-    padding: 16px 16px 80px;
-  }
-
-  /* Message input bar */
-  .msg-input-bar {
-    padding: 8px 10px;
-  }
-
-  /* Discover panel */
-  .discover-panel {
-    padding: 12px 14px;
-  }
-
-  /* Reelm sidebar scrollable */
-  .reelm-sidebar {
-    overflow-y: auto;
-    -webkit-overflow-scrolling: touch;
-  }
-
-  /* Full profile: sheet from bottom */
-  .fp-overlay {
-    align-items: flex-end !important;
-  }
-  .full-profile {
-    border-radius: 20px 20px 0 0 !important;
-    max-height: 92dvh !important;
-    width: 100% !important;
-    max-width: 100% !important;
-  }
-
-  /* â”€â”€â”€ Mobile bottom nav â”€â”€â”€ */
-  .mobile-bottom-nav {
-    display: flex;
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    z-index: 1000;
-    height: 60px;
-    background: rgba(10, 7, 22, 0.95);
-    -webkit-backdrop-filter: blur(24px) saturate(1.4);
-    backdrop-filter: blur(24px) saturate(1.4);
-    border-top: 1px solid rgba(var(--ta-rgb), 0.12);
-    align-items: center;
-    justify-content: space-around;
-    padding: 0 8px;
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-  }
-
-  .mobile-nav-btn {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 3px;
-    padding: 4px 20px;
-    border: none;
-    background: none;
-    color: rgba(var(--ta-rgb), 0.4);
-    font-family: var(--body-font);
-    font-size: 10px;
-    cursor: pointer;
-    position: relative;
-    transition: color 0.15s;
-    flex: 1;
-  }
-  .mobile-nav-btn svg {
-    transition: transform 0.15s;
-  }
-  .mobile-nav-btn--active {
-    color: var(--ta);
-  }
-  .mobile-nav-btn--active svg {
-    transform: scale(1.08);
-  }
-
-  .mobile-nav-badge {
-    position: absolute;
-    top: 2px;
-    right: calc(50% - 22px);
-    background: #e74c3c;
-    color: #fff;
-    font-size: 9px;
-    min-width: 15px;
-    height: 15px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    padding: 0 3px;
-    font-weight: 700;
-    line-height: 1;
-  }
-}
-
-/* â”€â”€â”€ Auth page footer bar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-.auth-footer-bar {
-  position: absolute;
-  bottom: 28px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  white-space: nowrap;
-}
-
-.auth-footer-copy {
-  font-size: 11px;
-  color: rgba(var(--ta-rgb), 0.35);
-  pointer-events: none;
-}
-
-.auth-footer-sep {
-  font-size: 11px;
-  color: rgba(var(--ta-rgb), 0.2);
-  pointer-events: none;
-}
-
-.auth-footer-link {
-  background: none;
-  border: none;
-  padding: 0;
-  font-size: 11px;
-  color: rgba(var(--ta-rgb), 0.45);
-  cursor: pointer;
-  font-family: var(--body-font);
-  transition: color 0.15s;
-}
-.auth-footer-link:hover {
-  color: rgba(var(--ta-rgb), 0.75);
-}
-
-/* â”€â”€â”€ Settings legal section â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-.accs-legal-links {
-  display: flex;
-  gap: 10px;
-  flex-wrap: wrap;
-}
-
-.accs-legal-btn {
-  padding: 7px 16px;
-  border-radius: 10px;
-  border: 1px solid rgba(var(--ta-rgb), 0.15);
-  background: rgba(var(--ta-rgb), 0.06);
-  color: rgba(var(--ta-rgb), 0.7);
-  font-size: 0.82rem;
-  font-family: var(--body-font);
-  cursor: pointer;
-  transition: background 0.15s, border-color 0.15s, color 0.15s;
-}
-.accs-legal-btn:hover {
-  background: rgba(var(--ta-rgb), 0.12);
-  border-color: rgba(var(--ta-rgb), 0.3);
-  color: rgba(var(--ta-rgb), 0.9);
-}
-
-/* â”€â”€â”€ Auth page language picker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
-.auth-lang-picker {
-  position: relative;
-  font-size: 12px;
-}
-
-.auth-lang-trigger {
-  background: none;
-  border: none;
-  color: rgba(var(--ta-rgb), 0.55);
-  cursor: pointer;
-  font-size: 12px;
-  font-family: var(--body-font);
-  padding: 0;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  transition: color 0.15s;
-}
-.auth-lang-trigger:hover {
-  color: rgba(var(--ta-rgb), 0.85);
-}
-
-.auth-lang-arrow {
-  font-size: 10px;
-  line-height: 1;
-}
-
-.auth-lang-list {
-  position: absolute;
-  bottom: calc(100% + 8px);
-  right: 0;
-  background: rgba(14, 10, 26, 0.92);
-  -webkit-backdrop-filter: blur(24px) saturate(1.4);
-  backdrop-filter: blur(24px) saturate(1.4);
-  border: 1px solid rgba(var(--ta-rgb), 0.12);
-  border-radius: 12px;
-  list-style: none;
-  margin: 0;
-  padding: 6px;
-  min-width: 130px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
-  z-index: 9999;
-}
-
-.auth-lang-list li {
-  padding: 7px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  color: rgba(var(--ta-rgb), 0.65);
-  transition: background 0.12s, color 0.12s;
-  font-size: 12px;
-  white-space: nowrap;
-}
-.auth-lang-list li:hover {
-  background: rgba(var(--ta-rgb), 0.1);
-  color: rgba(var(--ta-rgb), 0.9);
-}
-.auth-lang-list li.active {
-  color: var(--ta);
-  background: rgba(var(--ta-rgb), 0.1);
-}
-
 .settings-content {
   flex: 1;
   overflow-y: auto;
@@ -4636,7 +4066,7 @@ h6 {
   color: var(--ta);
 }
 
-/* â”€â”€ Account Settings Panel â”€â”€ */
+/* ── Account Settings Panel ── */
 .accs-panel {
   display: flex;
   flex-direction: column;
@@ -4689,7 +4119,7 @@ h6 {
   gap: 8px;
 }
 
-/* â”€â”€ Photo Edit Modal â”€â”€ */
+/* ── Photo Edit Modal ── */
 .photo-edit-overlay {
   position: fixed;
   inset: 0;
@@ -4920,7 +4350,7 @@ h6 {
   color: rgba(var(--ta-rgb), 0.38);
 }
 
-/* â”€â”€ Environment Panel: Sliders â”€â”€ */
+/* ── Environment Panel: Sliders ── */
 .env-slider-row {
   display: flex;
   flex-direction: column;
@@ -5098,7 +4528,7 @@ h6 {
   color: var(--ta);
 }
 
-/* â”€â”€ Pill Select â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Pill Select ─────────────────────────────────────────── */
 .pill-select {
   display: flex;
   align-items: center;
@@ -5216,7 +4646,7 @@ h6 {
   border-color: rgba(var(--ta-rgb), 0.35);
 }
 
-/* â”€â”€ Customization Panel â”€â”€ */
+/* ── Customization Panel ── */
 .cust-bg-area {
   display: flex;
   flex-direction: column;
@@ -5306,8 +4736,8 @@ h6 {
   box-shadow: 0 0 0 3px rgba(255,255,255,0.12);
 }
 
-/* â”€â”€ Tayf color pickers â”€â”€ */
-/* â”€â”€ Tayf â”€â”€ */
+/* ── Tayf color pickers ── */
+/* ── Tayf ── */
 .cust-tayf-row {
   display: flex;
   align-items: flex-start;
@@ -5367,7 +4797,7 @@ h6 {
   color: rgba(185,152,135,0.55);
   letter-spacing: 0.02em;
 }
-/* Spectrum strip â€” pill, same height as swatch; width anim (max-width + flex min-width:auto breaks opening) */
+/* Spectrum strip — pill, same height as swatch; width anim (max-width + flex min-width:auto breaks opening) */
 .cust-tayf-strip {
   width: 0;
   min-width: 0;
@@ -5775,7 +5205,7 @@ h6 {
   background: rgba(var(--ta-rgb), 0.12) !important;
 }
 
-/* â”€â”€ Message System â”€â”€ */
+/* ── Message System ── */
 .channel-header-float {
   position: absolute;
   top: 15px;
@@ -5993,7 +5423,7 @@ h6 {
   color: rgba(224, 201, 188, 0.45);
 }
 
-/* â”€â”€ Message Bar â”€â”€ */
+/* ── Message Bar ── */
 .msg-bar-wrap { position: relative; align-self: stretch; }
 
 @keyframes typing-wave {
@@ -6124,7 +5554,7 @@ h6 {
   color: rgba(var(--ta-rgb), 0.45);
 }
 
-/* â”€â”€ Mention spans in messages â”€â”€ */
+/* ── Mention spans in messages ── */
 .mention {
   display: inline;
   border-radius: 4px;
@@ -6306,7 +5736,7 @@ h6 {
   color: #0c0c20;
 }
 
-/* â”€â”€ Reaction controls (+ and emoji, visible on hover) â”€â”€ */
+/* ── Reaction controls (+ and emoji, visible on hover) ── */
 .msg-react-ctrl {
   display: flex;
   align-items: center;
@@ -6355,7 +5785,7 @@ h6 {
   z-index: 200;
 }
 
-/* â”€â”€ Reaction pills â”€â”€ */
+/* ── Reaction pills ── */
 .msg-reactions {
   display: flex;
   flex-wrap: wrap;
@@ -6412,7 +5842,7 @@ h6 {
 .reaction-pill--plus:hover { color: rgba(var(--ta-rgb), 0.9); }
 .reaction-pill--plus span { font-size: 0.72rem; font-weight: 600; }
 
-/* â”€â”€ Input area emoji picker â”€â”€ */
+/* ── Input area emoji picker ── */
 .msg-action-emoji-wrap {
   position: relative;
 }
@@ -6423,7 +5853,7 @@ h6 {
   z-index: 200;
 }
 
-/* â”€â”€ Emoji picker theming (hpopup-style glass) â”€â”€ */
+/* ── Emoji picker theming (hpopup-style glass) ── */
 @keyframes epr-popup-in {
   0%   { transform: scale(0.88) translateY(10px); opacity: 0; }
   100% { transform: scale(1)    translateY(0);    opacity: 1; }
@@ -6518,7 +5948,7 @@ h6 {
 }
 .msg-plus-menu-item:hover { background: rgba(var(--ta-rgb), 0.14); }
 
-/* â”€â”€ Friend Profile Popup â”€â”€ */
+/* ── Friend Profile Popup ── */
 .friend-profile-popup {
   position: fixed;
   background: rgba(var(--tb-rgb), 0.92);
@@ -6642,7 +6072,7 @@ h6 {
 .fpp-action-danger { color: #f87171; }
 .fpp-action-danger:hover { background: rgba(248, 113, 113, 0.1); }
 
-/* â”€â”€ DM Sidebar â”€â”€ */
+/* ── DM Sidebar ── */
 .dm-sidebar {
   padding: 10px 12px 12px;
   display: flex;
@@ -6875,7 +6305,7 @@ h6 {
   text-align: center;
 }
 
-/* â”€â”€ Chat Side Tabs (DM & Group) â”€â”€ */
+/* ── Chat Side Tabs (DM & Group) ── */
 .chat-side-tabs {
   display: flex;
   gap: 2px;
@@ -6902,7 +6332,7 @@ h6 {
 .chat-side-tab:hover { color: var(--ta); background: rgba(var(--ta-rgb), 0.07); }
 .chat-side-tab--active { background: rgba(var(--ta-rgb), 0.14); color: var(--ta); }
 
-/* â”€â”€ Chat Side Section â”€â”€ */
+/* ── Chat Side Section ── */
 .chat-side-section {
   display: flex;
   flex-direction: column;
@@ -6918,7 +6348,7 @@ h6 {
   margin: 0;
 }
 
-/* â”€â”€ Vapor Chat â”€â”€ */
+/* ── Vapor Chat ── */
 .vapor-chat-header {
   display: flex;
   flex-direction: column;
@@ -6975,7 +6405,7 @@ h6 {
   font-style: italic;
 }
 
-/* â”€â”€ Friend Selector â”€â”€ */
+/* ── Friend Selector ── */
 .friend-selector-panel { width: 316px; }
 .friend-selector-panel .menu-card { gap: 10px; width: 100%; }
 .friend-selector-title {
@@ -7037,7 +6467,7 @@ h6 {
 .friend-selector-username { font-size: 0.68rem; color: rgba(var(--ta-rgb), 0.5); }
 .friend-selector-empty { font-size: 0.78rem; color: rgba(var(--ta-rgb), 0.4); padding: 8px 4px; margin: 0; }
 
-/* â”€â”€ Reelm Categories Scroll â”€â”€ */
+/* ── Reelm Categories Scroll ── */
 .reelm-categories-scroll {
   flex: 1;
   overflow-y: auto;
@@ -7046,7 +6476,7 @@ h6 {
 }
 .reelm-categories-scroll::-webkit-scrollbar { display: none; }
 
-/* â”€â”€ Right Panel: Member List â”€â”€ */
+/* ── Right Panel: Member List ── */
 .rp-members-panel {
   display: flex;
   flex-direction: column;
@@ -7173,7 +6603,7 @@ h6 {
   letter-spacing: 0.02em;
 }
 
-/* â”€â”€ Reelm Settings Overlay â”€â”€ */
+/* ── Reelm Settings Overlay ── */
 .reelm-settings-overlay {
   position: absolute;
   inset: 0;
@@ -7288,7 +6718,7 @@ h6 {
   background: rgba(var(--ta-rgb), 0.16);
 }
 
-/* â”€â”€ Reelm Settings: Roles Section â”€â”€ */
+/* ── Reelm Settings: Roles Section ── */
 .rs-section {
   flex: 1;
   overflow-y: auto;
@@ -7480,7 +6910,7 @@ h6 {
   padding: 8px 4px;
 }
 
-/* â”€â”€ Reelm Settings: Members Section â”€â”€ */
+/* ── Reelm Settings: Members Section ── */
 .rs-members-list {
   display: flex;
   flex-direction: column;
@@ -7585,7 +7015,7 @@ h6 {
 .rs-search-input:focus { border-color: rgba(var(--ta-rgb), 0.4); }
 .rs-search-input::placeholder { color: rgba(var(--ta-rgb), 0.35); }
 
-/* â”€â”€ Voice Channel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Voice Channel ──────────────────────────────────── */
 .voice-panel {
   flex: 1;
   display: flex;
@@ -7646,7 +7076,7 @@ h6 {
   min-height: 0;
 }
 
-/* â”€â”€ Video expand popup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Video expand popup ──────────────────────────────────────────────────── */
 .video-expand-overlay {
   position: fixed;
   inset: 0;
@@ -7902,7 +7332,7 @@ h6 {
 .vmb-btn-muted:hover { background: rgba(248, 113, 113, 0.1); color: rgba(248, 113, 113, 1); }
 .vmb-btn-leave:hover { background: rgba(248, 113, 113, 0.12); color: rgba(248, 113, 113, 0.9); }
 
-/* â”€â”€ Spatial Room â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Spatial Room ─────────────────────────────────────────────────────────── */
 .spatial-room {
   display: flex;
   flex-direction: column;
@@ -8471,7 +7901,7 @@ h6 {
   gap: 18px;
 }
 
-/* â”€â”€ Stories Row â”€â”€ */
+/* ── Stories Row ── */
 .feed-stories-wrap {
   overflow: hidden;
 }
@@ -8570,7 +8000,7 @@ h6 {
   white-space: nowrap;
 }
 
-/* â”€â”€ Story Viewer Overlay â”€â”€ */
+/* ── Story Viewer Overlay ── */
 .story-viewer-overlay {
   position: fixed;
   inset: 0;
@@ -8773,7 +8203,7 @@ h6 {
 .story-like-btn:hover { transform: scale(1.18); }
 .story-like-btn.liked { color: #f87171; }
 
-/* â”€â”€ Add Story Modal â”€â”€ */
+/* ── Add Story Modal ── */
 .add-story-modal {
   position: relative;
   width: min(400px, 90vw);
@@ -8930,7 +8360,7 @@ h6 {
 .add-story-submit:disabled { opacity: 0.38; cursor: default; }
 .add-story-submit:not(:disabled):hover { opacity: 0.86; }
 
-/* â”€â”€ Context Bar â”€â”€ */
+/* ── Context Bar ── */
 .feed-context-bar {
   border: 1.5px solid rgba(var(--ta-rgb), 0.28);
   border-radius: 28px;
@@ -9046,7 +8476,7 @@ h6 {
   background: rgba(var(--ta-rgb), 0.12);
 }
 
-/* â”€â”€ Feed Filter Bars â”€â”€ */
+/* ── Feed Filter Bars ── */
 .feed-filter-bars {
   display: flex;
   flex-direction: column;
@@ -9083,7 +8513,7 @@ h6 {
   color: rgba(var(--ta-rgb), 0.8);
 }
 
-/* â”€â”€ Cross-type feed cards â”€â”€ */
+/* ── Cross-type feed cards ── */
 .feed-cross-card {
   cursor: pointer;
   border: 1px solid rgba(255,255,255,0.06);
@@ -9104,7 +8534,7 @@ h6 {
   margin-bottom: 8px;
 }
 
-/* â”€â”€ Feed Posts â”€â”€ */
+/* ── Feed Posts ── */
 .feed-posts {
   display: flex;
   flex-direction: column;
@@ -9169,7 +8599,7 @@ h6 {
   background: none !important;
 }
 
-/* â”€â”€ Feed Posts â”€â”€ */
+/* ── Feed Posts ── */
 .feed-posts {
   display: flex;
   flex-direction: column;
@@ -10023,7 +9453,7 @@ h6 {
 .forum-card-action:hover { color: rgba(185,152,135,1); }
 .forum-card-action.liked { color: #f87171; }
 
-/* â”€â”€ Full Profile Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Full Profile Page ─────────────────────────────────────────── */
 @keyframes fp-fade-in  { from { opacity: 0 } to { opacity: 1 } }
 @keyframes fp-slide-up { from { opacity: 0; transform: translateY(28px) } to { opacity: 1; transform: translateY(0) } }
 
@@ -10199,7 +9629,7 @@ h6 {
 .fp-activity-item { padding: 4px 0; }
 .fp-activity-empty { font-size: 0.82rem; color: rgba(var(--ta-rgb),0.35); }
 
-/* "TÃ¼m profili gÃ¶r" trigger buttons */
+/* "Tüm profili gör" trigger buttons */
 .profile-view-full-btn {
   display: block;
   width: 100%;
@@ -10417,7 +9847,7 @@ h6 {
 }
 .forum-reply-btn:hover { color: rgba(185,152,135,0.8); }
 
-/* â”€â”€ News Page â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── News Page ─────────────────────────────────── */
 .news-page { position: relative; }
 
 .news-compose-card {
@@ -10507,7 +9937,7 @@ h6 {
   z-index: 0; width: 100%; height: 100%; opacity: 0;
 }
 
-/* â”€â”€ Bubble Messages â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Bubble Messages ─────────────────────────────────────── */
 .bubble-row {
   display: flex;
   align-items: flex-end;
@@ -10611,7 +10041,7 @@ h6 {
   letter-spacing: 0.03em;
 }
 
-/* â”€â”€ Group Chat Left Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Group Chat Left Panel ────────────────────────────────── */
 .dm-group-members-label {
   font-size: 0.68rem;
   color: rgba(var(--ta-rgb), 0.4);
@@ -10658,7 +10088,7 @@ h6 {
   text-overflow: ellipsis;
 }
 
-/* â”€â”€ Group Sidebar (new design) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Group Sidebar (new design) ────────────────────────────── */
 .group-sidebar {
   flex: 1;
   min-height: 0;
@@ -10781,7 +10211,7 @@ h6 {
   line-height: 1.5;
 }
 
-/* â”€â”€ Group Creator UI â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Group Creator UI ─────────────────────────────────────── */
 .friend-selector-item--selected {
   background: rgba(var(--ta-rgb), 0.12) !important;
 }
@@ -10865,7 +10295,7 @@ h6 {
   line-height: 1;
 }
 
-/* â”€â”€ Top bar bump animation â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Top bar bump animation ───────────────────────────────── */
 @keyframes barItemBump {
   0%   { transform: scale(1) translateY(0); }
   40%  { transform: scale(1.18) translateY(-5px); }
@@ -10877,7 +10307,7 @@ h6 {
   display: inline-flex;
 }
 
-/* â”€â”€ Live Action Channel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Live Action Channel ──────────────────────────────────── */
 .live-screen-area {
   flex: 1;
   display: flex;
@@ -10987,7 +10417,7 @@ h6 {
   height: 180px;
 }
 
-/* â”€â”€ Voice room screen share â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Voice room screen share ──────────────────────────────────── */
 .voice-screen-area {
   position: relative;
   background: rgba(0,0,0,0.35);
@@ -11072,7 +10502,7 @@ h6 {
 .voice-strip-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .voice-strip-avatar-speaking { border-color: #68c586; }
 
-/* â”€â”€ Bottom-bar participants (when screen sharing active) â”€â”€ */
+/* ── Bottom-bar participants (when screen sharing active) ── */
 .voice-controls-left {
   display: flex;
   align-items: center;
@@ -11124,7 +10554,7 @@ h6 {
   position: relative;
 }
 
-/* â”€â”€ Card / stack view (>8 participants) â”€â”€ */
+/* ── Card / stack view (>8 participants) ── */
 .voice-participants--card-mode {
   position: relative;
   align-items: center;
@@ -11361,7 +10791,7 @@ h6 {
   width: 64px;
 }
 
-/* â”€â”€ Remote Control Request Notification â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Remote Control Request Notification ─────────────────── */
 .remote-ctrl-req-overlay {
   position: fixed;
   bottom: 80px;
@@ -11431,7 +10861,7 @@ h6 {
 }
 .remote-ctrl-req-decline:hover { border-color: rgba(248,113,113,0.4); color: rgba(248,113,113,0.7); }
 
-/* â”€â”€â”€ Bar Context Menu â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── Bar Context Menu ───────────────────────────────────────────────────── */
 .bar-ctx-menu {
   background: rgba(var(--tb-rgb), 0.55);
   -webkit-backdrop-filter: blur(28px) saturate(1.6) brightness(0.85);
@@ -11476,7 +10906,7 @@ h6 {
   pointer-events: none;
 }
 
-/* â”€â”€â”€ DM / Group Right Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── DM / Group Right Panel ─────────────────────────────────────────────── */
 .rp-chat-panel {
   display: flex;
   flex-direction: column;
@@ -11512,7 +10942,7 @@ h6 {
   color: var(--ta);
 }
 
-/* â”€â”€â”€ ShareModal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ─── ShareModal ─────────────────────────────────────────────────────────── */
 .share-modal {
   background: rgba(18, 14, 30, 0.98);
   border: 1px solid rgba(var(--ta-rgb), 0.2);
@@ -11625,7 +11055,7 @@ h6 {
 }
 .bar-item:hover .bar-item-share-btn { opacity: 1; }
 
-/* â”€â”€ Mod Inbox Panel â”€â”€ */
+/* ── Mod Inbox Panel ── */
 .mod-inbox-panel {
   display: flex;
   flex-direction: column;
@@ -11727,7 +11157,7 @@ h6 {
   letter-spacing: 0.03em;
 }
 
-/* â”€â”€ Activity Badge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Activity Badge ─────────────────────────────────────────────────────────── */
 .activity-badge {
   display: flex;
   align-items: center;
@@ -11744,7 +11174,7 @@ h6 {
 .activity-badge-name { font-weight: 500; color: rgba(var(--ta-rgb), 0.8); }
 .activity-badge-detail { opacity: 0.6; }
 
-/* â”€â”€ Activity Row in ProfilePopup â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Activity Row in ProfilePopup ───────────────────────────────────────────── */
 .pp-activity-row {
   display: flex;
   align-items: center;
@@ -11785,7 +11215,7 @@ h6 {
 }
 .pp-activity-clear-btn:hover { color: rgba(var(--ta-rgb), 0.75); }
 
-/* â”€â”€ Activity Setter Modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Activity Setter Modal ──────────────────────────────────────────────────── */
 .activity-setter-overlay {
   position: fixed;
   inset: 0;
@@ -11900,7 +11330,7 @@ h6 {
 }
 .activity-set-btn:hover { opacity: 0.88; }
 
-/* â”€â”€ Channel full pill toast â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Channel full pill toast ──────────────────────────────────── */
 .channel-full-toast {
   position: fixed;
   bottom: 28px;
@@ -11924,7 +11354,7 @@ h6 {
   to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
 
-/* â”€â”€ Inline creation capacity picker â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Inline creation capacity picker ──────────────────────────── */
 .reelm-ch-capacity-picker {
   display: flex;
   gap: 4px;
@@ -11950,7 +11380,7 @@ h6 {
 .reelm-ch-cap-pick-btn.active { background: rgba(185,152,135,0.18); border-color: rgba(185,152,135,0.45); color: #b99887; }
 .activity-set-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
-/* â”€â”€ Selection: Only allow on specific text content â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€*/
+/* ── Selection: Only allow on specific text content ────────────────────────*/
 /* Messages */
 .msg-text,
 .msg-body,
@@ -11963,7 +11393,7 @@ h6 {
   -ms-user-select: text;
 }
 
-/* â”€â”€ Global Body Font Enforcer â”€â”€ */
+/* ── Global Body Font Enforcer ── */
 button, input, select, textarea, 
 .reelm-channel-ctx-item, .bar-ctx-menu-item, 
 .pp-status-option, .rp-chat-action-btn, 
@@ -11972,7 +11402,7 @@ button, input, select, textarea,
   font-family: var(--body-font) !important;
 }
 
-/* â”€â”€ Live Action Channel Layout â”€â”€ */
+/* ── Live Action Channel Layout ── */
 .voice-panel.live-action-layout {
   flex-direction: column;
 }
@@ -12087,7 +11517,7 @@ button, input, select, textarea,
   flex: 1;
 }
 
-/* â”€â”€ Nudge Feature Styles & Animations â”€â”€ */
+/* ── Nudge Feature Styles & Animations ── */
 @keyframes app-nudge-shake {
   0%, 100% { transform: translateX(0); }
   10%, 30%, 50%, 70%, 90% { transform: translateX(-12px) rotate(-1.5deg); }
@@ -12200,7 +11630,7 @@ button, input, select, textarea,
   -ms-user-select: text;
 }
 
-/* â”€â”€ Global Body Font Enforcer â”€â”€ */
+/* ── Global Body Font Enforcer ── */
 button, input, select, textarea, 
 .reelm-channel-ctx-item, .bar-ctx-menu-item, 
 .pp-status-option, .rp-chat-action-btn, 
@@ -12211,7 +11641,7 @@ button, input, select, textarea,
   font-family: var(--body-font) !important;
 }
 
-/* (duplicate block removed â€” see first occurrence above) */
+/* (duplicate block removed — see first occurrence above) */
 .voice-stacked-sidebar {
   display: none;
 }
@@ -12299,7 +11729,7 @@ button, input, select, textarea,
   flex: 1;
 }
 
-/* â”€â”€ Nudge Feature Styles & Animations â”€â”€ */
+/* ── Nudge Feature Styles & Animations ── */
 @keyframes app-nudge-shake {
   0%, 100% { transform: translateX(0); }
   10%, 30%, 50%, 70%, 90% { transform: translateX(-12px) rotate(-1.5deg); }
@@ -12861,7 +12291,7 @@ button, input, select, textarea,
   text-align: center;
 }
 
-/* â”€â”€ Reelm Settings: Role permissions â”€â”€ */
+/* ── Reelm Settings: Role permissions ── */
 .rs-role-main {
   flex: 1;
   min-width: 0;
@@ -13157,7 +12587,7 @@ button, input, select, textarea,
   color: #6ee7b7;
 }
 
-/* â”€â”€ Final voice/member/role polish â”€â”€ */
+/* ── Final voice/member/role polish ── */
 .reelm-channel {
   align-items: flex-start;
   flex-wrap: wrap;
@@ -13332,7 +12762,7 @@ button, input, select, textarea,
   left: 8px;
 }
 
-/* â”€â”€ Polish v2: server actions, voice tiles, cached Reelm UX â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Polish v2: server actions, voice tiles, cached Reelm UX ───────────── */
 .header-server-mute {
   margin-left: 10px;
   display: inline-flex;
@@ -13532,7 +12962,7 @@ button, input, select, textarea,
 .voice-room-user-menu-action + .voice-room-user-menu-action,
 .voice-tile-menu-action + .voice-tile-menu-action { margin-top: 6px; }
 
-/* â”€â”€ Production polish: embedded member profile + fullscreen media controls â”€â”€ */
+/* ── Production polish: embedded member profile + fullscreen media controls ── */
 .rp-member-profile-dock {
   flex-shrink: 0;
   padding: 0 2px 10px;
@@ -13678,7 +13108,7 @@ button, input, select, textarea,
   user-select: none;
 }
 
-/* â”€â”€ Final polish: safer server mute, profile themes, member readability â”€â”€â”€â”€â”€ */
+/* ── Final polish: safer server mute, profile themes, member readability ───── */
 .hpopup-notifs .hpopup-content {
   max-height: min(56vh, 420px);
   overflow-y: auto;
@@ -13758,7 +13188,7 @@ button, input, select, textarea,
   z-index: 3;
 }
 .bar-item-muted-dot::before {
-  content: 'ğŸ”•';
+  content: '🔕';
   font-size: 8px;
   line-height: 1;
   opacity: 0.74;
@@ -13866,9 +13296,9 @@ button, input, select, textarea,
   }
 }
 
-/* â”€â”€ Message reply â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
+/* ── Message reply ────────────────────────────────────────── */
 
-/* Context menu button (â‹®) on messages */
+/* Context menu button (⋮) on messages */
 .msg-ctx-menu-wrap {
   position: relative;
   display: inline-flex;
@@ -13952,7 +13382,7 @@ button, input, select, textarea,
   max-width: 300px;
 }
 
-/* Reply banner above message input â€” pill shape */
+/* Reply banner above message input — pill shape */
 .msg-reply-banner {
   display: flex;
   align-items: center;
@@ -14256,28 +13686,19 @@ button, input, select, textarea,
 }
 .poll-creator-send:not(:disabled):hover { opacity: 0.82; }
 
-/* Media upload feedback / guarded profile media state */
-.cust-upload-status,
-.pp-media-status {
-  margin-top: 8px;
-  font-size: 12px;
-  line-height: 1.2;
-  color: rgba(235,225,210,0.78);
-}
-.cust-upload-error,
-.pp-media-error {
-  margin-top: 8px;
-  font-size: 12px;
-  line-height: 1.2;
-  color: #ffb4a8;
-}
-.pp-media-status,
-.pp-media-error {
-  position: relative;
-  z-index: 3;
-  margin: 8px 18px 0;
-  padding: 8px 10px;
-  border-radius: 10px;
-  background: rgba(10, 10, 18, 0.72);
-  border: 1px solid rgba(255,255,255,0.08);
+
+.pp-media-saving {
+  position: absolute;
+  top: 120px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(12, 10, 18, 0.82);
+  border: 1px solid rgba(var(--ta-rgb), 0.22);
+  color: rgba(255,255,255,0.86);
+  font-size: 0.72rem;
+  letter-spacing: 0.02em;
+  backdrop-filter: blur(10px);
 }

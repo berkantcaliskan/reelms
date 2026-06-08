@@ -15,10 +15,6 @@ dist-electron/
 win-unpacked/
 **/win-unpacked/
 
-# Tauri / Rust build artifacts
-apps/desktop/src-tauri/target/
-apps/desktop/src-tauri/gen/
-
 # desktop release artifacts
 *.exe
 *.dmg
@@ -54,4 +50,3 @@ Thumbs.db
 !.vscode/extensions.json
 !.vscode/settings.example.json
 .idea/
-.vercel

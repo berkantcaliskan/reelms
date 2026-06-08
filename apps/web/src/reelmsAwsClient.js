@@ -30,7 +30,6 @@ const userDocCache = new Map()
 const userPersistLastJson = new Map()
 const userPersistPendingJson = new Map()
 const profileCache = new Map()
-const profilePatchDedup = new Map()
 // Server-owned documents must only be refreshed from the API. Letting the
 // client PUT these snapshots back creates stale role/member copies and is the
 // root cause of phantom members, duplicate roles, and slow login fan-out.
@@ -72,27 +71,6 @@ function invalidateReelmResponseCache(reelmId) {
 function invalidateUserResponseCache(sk = '') {
   const key = encodeURIComponent(String(sk || ''))
   invalidateResponseCache(entry => entry.includes(`/api/v1/user/doc/${key}`) || entry.includes('/api/v1/user/bootstrap'))
-}
-
-function invalidateProfileResponseCache(uid = '') {
-  const id = String(uid || '')
-  invalidateResponseCache(entry => {
-    const text = String(entry)
-    if (text.includes('/api/v1/user/profile')) return true
-    if (id && text.includes(`/api/v1/user/profile/${encodeURIComponent(id)}`)) return true
-    return false
-  })
-  if (id) profileCache.delete(id)
-  else profileCache.clear()
-}
-
-function rememberProfilePatch(id, data) {
-  if (!id) {
-    invalidateProfileResponseCache()
-    return
-  }
-  const prev = profileCache.get(id)?.data || {}
-  profileCache.set(id, { data: { ...prev, ...data, id, uid: id }, at: Date.now() })
 }
 
 function rememberUserDoc(sk, data) {
@@ -675,22 +653,13 @@ export function socketVcBroadcast(reelmId, channelId, payload) {
 export async function userProfilePut(data) {
   await api('/api/v1/user/profile', { method: 'PUT', body: JSON.stringify({ data }) })
   const id = String(data?.id || data?.uid || '')
-  invalidateProfileResponseCache(id)
   if (id) profileCache.set(id, { data, at: Date.now() })
 }
 
 export async function userProfilePatch(data) {
-  const body = stableJson(data || {})
-  const now = Date.now()
-  const lastAt = profilePatchDedup.get(body) || 0
-  if (now - lastAt < 1200) return null
-  profilePatchDedup.set(body, now)
   await api('/api/v1/user/profile', { method: 'PATCH', body: JSON.stringify({ data }) })
   const id = String(data?.id || data?.uid || '')
-  invalidateProfileResponseCache(id)
-  rememberProfilePatch(id, data || {})
-  setTimeout(() => { if (profilePatchDedup.get(body) === now) profilePatchDedup.delete(body) }, 3000)
-  return null
+  if (id) profileCache.set(id, { data: { ...(profileCache.get(id)?.data || {}), ...data }, at: Date.now() })
 }
 
 export async function userProfileGet() {
@@ -962,9 +931,7 @@ export async function mediaUploadToS3(file) {
     body: file,
   })
   if (!res.ok) throw new Error(`Upload failed (${res.status})`)
-  const completed = await mediaCompleteUpload(upload.id, res.headers.get('etag'))
-  if (!completed?.url) completed.url = upload.url || upload.upload?.url || null
-  return completed
+  return mediaCompleteUpload(upload.id, res.headers.get('etag'))
 }
 
 export async function mediaUploadMetadata(fileName, fileSize, mimeType, localFileId) {

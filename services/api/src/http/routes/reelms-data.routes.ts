@@ -464,17 +464,25 @@ export function createReelmsDataRouter(io: Server) {
     const url = String(value || '')
     return /(^|\.)googleusercontent\.com\//i.test(url) || /lh3\.googleusercontent\.com/i.test(url)
   }
-  const safePublicMediaUrl = (value: unknown) => {
+  const normalizeMediaUrl = (value: unknown) => {
     if (typeof value !== 'string') return null
-    const url = value.trim()
-    if (!url || isGoogleDefaultAvatarUrl(url)) return null
-    return /^https?:\/\//i.test(url) ? url : null
+    const raw = value.trim()
+    if (!raw || raw === 'null' || raw === 'undefined' || raw === '[object Object]') return null
+    if (/^data:image\//i.test(raw) || /^blob:/i.test(raw)) return null
+    if (isGoogleDefaultAvatarUrl(raw)) return null
+    if (!/^https?:\/\//i.test(raw)) return null
+    if (/X-Amz-Algorithm=AWS4-HMAC-SHA256/i.test(raw)) return raw.split('?')[0]
+    return raw
   }
-  const getProfilePhoto = (profile: any = {}) => {
-    const rawPhoto = profile.photo || profile.profilePhoto || profile.photoURL || profile.avatar || profile.image || profile.imageUrl || profile.userPhoto || null
-    return safePublicMediaUrl(rawPhoto)
+  const firstMediaUrl = (...values: unknown[]) => {
+    for (const value of values) {
+      const url = normalizeMediaUrl(value)
+      if (url) return url
+    }
+    return null
   }
-  const getProfileCover = (profile: any = {}) => safePublicMediaUrl(profile.cover || profile.coverImage || profile.coverUrl || profile.headerImage || profile.banner || profile.bannerImage || profile.backgroundCover || null)
+  const getProfilePhoto = (profile: any = {}) => firstMediaUrl(profile.photo, profile.profilePhoto, profile.photoURL, profile.avatar, profile.image, profile.imageUrl, profile.userPhoto)
+  const getProfileCover = (profile: any = {}) => firstMediaUrl(profile.cover, profile.coverImage, profile.coverUrl, profile.headerImage, profile.banner, profile.bannerImage, profile.backgroundCover)
   const generateInviteCode = () => Math.random().toString(36).slice(2, 8).toUpperCase()
 
   const USERNAME_RE = /^[a-z0-9._-]{3,30}$/
@@ -1727,22 +1735,22 @@ export function createReelmsDataRouter(io: Server) {
     if (cached && cached.expiresAt > Date.now()) return cached.value
     const profile = await withDeadline(getDoc<any>(userPk(requestedUid), 'profile').catch(() => null), 1500, null)
     if (!profile) return cached?.value || null
-    const [sociallinks, socialorder, customization, bgImage] = await Promise.all([
+    if (requestedUid === requesterUid) {
+      publicProfileCache.set(requestedUid, { value: profile, expiresAt: Date.now() + 30_000 })
+      return profile
+    }
+    const [sociallinks, socialorder, customization] = await Promise.all([
       withDeadline(getDoc<any>(userPk(requestedUid), 'sociallinks').catch(() => ({})), 900, {}),
       withDeadline(getDoc<any>(userPk(requestedUid), 'socialorder').catch(() => []), 900, []),
-      withDeadline(getDoc<any>(userPk(requestedUid), 'customization').catch(() => null), 900, null),
-      withDeadline(getDoc<any>(userPk(requestedUid), 'bg_image').catch(() => null), 900, null)
+      withDeadline(getDoc<any>(userPk(requestedUid), 'customization').catch(() => null), 900, null)
     ])
-    const bg = typeof bgImage === 'string' ? bgImage : ((customization as any)?.bgImage || null)
     const value = publicProfileFromStored(requestedUid, {
       ...profile,
       sociallinks: sociallinks || profile.sociallinks || {},
       socialorder: Array.isArray(socialorder) ? socialorder : (profile.socialorder || []),
-      profileTheme: profile.profileTheme || customization || null,
-      backgroundUrl: bg,
-      bgImage: bg
+      profileTheme: profile.profileTheme || customization || null
     })
-    publicProfileCache.set(requestedUid, { value, expiresAt: Date.now() + (requestedUid === requesterUid ? 30_000 : 60_000) })
+    publicProfileCache.set(requestedUid, { value, expiresAt: Date.now() + 60_000 })
     return value
   }
 

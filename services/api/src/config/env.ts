@@ -46,8 +46,6 @@ const schema = z.object({
   REELMS_STORAGE_DRIVER: z.enum(['json', 'postgres', 'supabase']).default('json'),
   REELMS_DATA_DIR: z.string().default('./data'),
   REELMS_MODERATION_UID: z.string().default('reelms-moderation'),
-  REELMS_BOT_UID: z.string().default('reelms-bot'),
-  REELMS_BOT_SECRET: optionalString(),
   // Production beta should grant privileged admin rights by stable internal UID.
   // E-mail/username based admin grants are unsafe without e-mail verification, so
   // they are blocked in production unless explicitly acknowledged.
@@ -55,6 +53,8 @@ const schema = z.object({
   REELMS_COMMUNITY_ADMIN_EMAILS: z.string().default(''),
   REELMS_COMMUNITY_ADMIN_USERNAMES: z.string().default(''),
   REELMS_ALLOW_UNVERIFIED_ADMIN_IDENTIFIERS: booleanFromEnv().default(false),
+  REELMS_BOT_UID: z.string().default('reelms-moderation'),
+  REELMS_BOT_SECRET: z.string().default(''),
 
   DATABASE_URL: optionalString(),
   REDIS_URL: optionalString(),

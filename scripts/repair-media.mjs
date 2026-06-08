@@ -52,13 +52,17 @@ async function scan(prefix) {
   return rows
 }
 
-function containsInlineImage(value) {
-  try { return JSON.stringify(value).includes('data:image/') } catch { return false }
+function containsBadMedia(value) {
+  try {
+    const text = JSON.stringify(value)
+    return text.includes('data:image/') || text.includes('blob:') || text.includes('X-Amz-Algorithm=AWS4-HMAC-SHA256')
+  } catch { return false }
 }
 
 function cleanValue(value) {
   if (typeof value === 'string') {
     if (/^data:image\//i.test(value) || /^blob:/i.test(value)) return null
+    if (/X-Amz-Algorithm=AWS4-HMAC-SHA256/i.test(value)) return value.split('?')[0]
     return value
   }
   if (Array.isArray(value)) {
@@ -94,7 +98,7 @@ async function deleteDoc(pk, sk) {
 const rows = [...await scan('USER#'), ...await scan('REELM#')]
 let changed = 0
 for (const row of rows) {
-  if (!containsInlineImage(row.data)) continue
+  if (!containsBadMedia(row.data)) continue
   const cleaned = cleanValue(row.data)
   if (cleaned === null || (typeof cleaned === 'object' && !Array.isArray(cleaned) && Object.keys(cleaned).length === 0 && ['bg_image'].includes(String(row.sk)))) {
     await deleteDoc(row.pk, row.sk)
