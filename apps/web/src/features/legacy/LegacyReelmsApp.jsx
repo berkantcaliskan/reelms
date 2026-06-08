@@ -408,10 +408,13 @@ function SignInScreen({ onGoSignUp, onSignInSuccess }) {
           <div className="signin-card">
             <p className="legacy-auth-note">Enter your e-mail or username. If the account exists, we will send a reset link.</p>
             <input
+              id="reset-email"
+              name="email"
               type="text"
               className="pill-input"
               placeholder={t('email_or_username_ph')}
               value={loginEmail}
+              autoComplete="email"
               onChange={e => { setLoginEmail(e.target.value); clearAuthMessages() }}
               onKeyDown={e => e.key === 'Enter' && handlePasswordResetRequest()}
             />
@@ -445,6 +448,8 @@ function SignInScreen({ onGoSignUp, onSignInSuccess }) {
           <div className="signin-card">
             <p className="legacy-auth-note">Enter a new password for your Reelms account.</p>
             <input
+              id="reset-new-password"
+              name="new-password"
               type="password"
               className="pill-input"
               placeholder="New password"
@@ -454,6 +459,8 @@ function SignInScreen({ onGoSignUp, onSignInSuccess }) {
               onKeyDown={e => e.key === 'Enter' && handlePasswordResetConfirm()}
             />
             <input
+              id="reset-confirm-password"
+              name="confirm-password"
               type="password"
               className="pill-input"
               placeholder="Confirm new password"
@@ -490,20 +497,26 @@ function SignInScreen({ onGoSignUp, onSignInSuccess }) {
       <div className="signin-card-border su-drop su-drop-2">
         <div className="signin-card">
           <input
+            id="signin-email"
+            name="email"
             type="text"
             className="pill-input"
             placeholder={t('email_or_username_ph')}
             value={loginEmail}
+            autoComplete="username"
             onChange={e => { setLoginEmail(e.target.value); clearAuthMessages() }}
             onKeyDown={e => e.key === 'Enter' && handleSignIn()}
           />
           <div className="password-row">
             <div className="password-input-wrapper">
               <input
+                id="signin-password"
+                name="password"
                 type={showPassword ? 'text' : 'password'}
                 className="pill-input"
                 placeholder={t('password_placeholder')}
                 value={loginPassword}
+                autoComplete="current-password"
                 onChange={e => { setLoginPassword(e.target.value); clearAuthMessages() }}
                 onKeyDown={e => e.key === 'Enter' && handleSignIn()}
               />
