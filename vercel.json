@@ -3,16 +3,12 @@
   "outputDirectory": "apps/web/dist",
   "installCommand": "npm install",
   "framework": null,
-  "rewrites": [
-    {
-      "source": "/",
-      "has": [{ "type": "host", "value": "reelms.io" }],
-      "destination": "/landing.html"
-    },
+  "redirects": [
     {
       "source": "/",
       "has": [{ "type": "host", "value": "www.reelms.io" }],
-      "destination": "/landing.html"
+      "destination": "/landing.html",
+      "permanent": false
     }
   ]
 }
