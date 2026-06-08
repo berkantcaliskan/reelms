@@ -1796,12 +1796,13 @@ function CompanionsPanel({ reelms = [] }) {
         setBotStatus(prev => ({ ...prev, [reelmId]: true }))
       } else {
         const errData = await res.json().catch(() => ({}))
+        const errorMsg = errData.details ? `${errData.error} (${errData.details})` : (errData.error || `HTTP ${res.status}`)
         console.error('[addBot error]', res.status, errData)
-        alert(`Bot eklenemedi: ${errData.error || 'Bilinmeyen hata'}`)
+        alert(`Bot eklenemedi: ${errorMsg}`)
       }
     } catch (err) {
       console.error('[addBot error]', err)
-      alert('Bot eklenirken hata oluştu')
+      alert(`Bot eklenirken hata oluştu: ${err?.message || 'bilinmeyen'}`)
     }
     setLoading(prev => ({ ...prev, [reelmId]: false }))
   }

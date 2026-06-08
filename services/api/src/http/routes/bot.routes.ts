@@ -59,17 +59,23 @@ export function createBotRouter(io: Server) {
     try {
       const actorUid = String(req.userId)
       const reelmId = String(req.params.reelmId || '')
+      console.log('[bot/add-bot] Starting for reelmId:', reelmId, 'userId:', actorUid)
       if (!reelmId) return res.status(400).json({ error: 'missing_reelm' })
 
-      const isMember = await isReelmMember(actorUid, reelmId).catch(() => false)
+      const isMember = await isReelmMember(actorUid, reelmId).catch((err) => {
+        console.log('[bot/add-bot] isReelmMember error:', err?.message)
+        return false
+      })
+      console.log('[bot/add-bot] isMember:', isMember)
       if (!isMember) return res.status(403).json({ error: 'forbidden' })
 
       const pk = reelmPk(reelmId)
       const [meta, structure, members] = await Promise.all([
-        getDoc<any>(pk, 'meta').catch(() => null),
-        getDoc<any>(pk, 'structure').catch(() => null),
-        getDoc<any[]>(pk, 'members').catch(() => [])
+        getDoc<any>(pk, 'meta').catch((err) => { console.log('[bot/add-bot] meta error:', err?.message); return null }),
+        getDoc<any>(pk, 'structure').catch((err) => { console.log('[bot/add-bot] structure error:', err?.message); return null }),
+        getDoc<any[]>(pk, 'members').catch((err) => { console.log('[bot/add-bot] members error:', err?.message); return [] })
       ])
+      console.log('[bot/add-bot] meta:', !!meta, 'members count:', Array.isArray(members) ? members.length : 0)
       if (!meta?.id) return res.status(404).json({ error: 'reelm_not_found' })
 
       const safeMembers = Array.isArray(members) ? members : []
@@ -106,8 +112,8 @@ export function createBotRouter(io: Server) {
 
       res.json({ ok: true, added: true, reelmId })
     } catch (err) {
-      console.error('[bot/add-bot]', err)
-      res.status(500).json({ error: 'add_bot_failed' })
+      console.error('[bot/add-bot] error:', err instanceof Error ? err.message : String(err), err)
+      res.status(500).json({ error: 'add_bot_failed', details: err instanceof Error ? err.message : 'unknown' })
     }
   })
 
