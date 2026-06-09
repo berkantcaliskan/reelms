@@ -11257,9 +11257,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               const dy = e.changedTouches[0].clientY - mobileTouchRef.current.y
               mobileTouchRef.current = null
               if (Math.abs(dy) > Math.abs(dx) || Math.abs(dx) < 40) return
+              // If a panel is already open, close it first
+              if (mobileLeftPanelOpen) { setMobileLeftPanelOpen(false); return }
+              if (mobileRightPanelOpen) { setMobileRightPanelOpen(false); return }
               if (!selectedReelm) return
-              if (dx > 0) { setMobileLeftPanelOpen(true); setMobileRightPanelOpen(false) }
-              else { setMobileRightPanelOpen(true); setMobileLeftPanelOpen(false) }
+              if (dx > 0) setMobileLeftPanelOpen(true)
+              else setMobileRightPanelOpen(true)
             } : undefined}
           >
             {(mobileLeftPanelOpen || mobileRightPanelOpen) && isMobile && (
