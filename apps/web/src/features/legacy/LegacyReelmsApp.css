@@ -13680,15 +13680,17 @@ button, input, select, textarea,
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 0 12px;
+  padding: 0 14px;
   background: rgba(var(--tb-rgb), 0.70);
   -webkit-backdrop-filter: blur(16px);
   backdrop-filter: blur(16px);
   border: 1px solid rgba(var(--ta-rgb), 0.12);
-  border-radius: 16px;
+  border-radius: 999px;
   flex-shrink: 0;
-  width: 200px;
-  overflow: hidden;
+  width: 244px;
+  min-height: 52px;
+  margin-bottom: 12px;
+  margin-right: 12px;
 }
 .msb-art {
   width: 30px;
@@ -13932,4 +13934,444 @@ button, input, select, textarea,
   font-size: 0.72rem;
   letter-spacing: 0.02em;
   backdrop-filter: blur(10px);
+}
+/* ================================================================
+   MOBILE LAYOUT — max-width: 767px
+   All rules below are mobile-only. Desktop behaviour is unchanged.
+   ================================================================ */
+
+/* ── Bottom nav bar ───────────────────────────────────────────── */
+.mobile-bottom-nav {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .mobile-bottom-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: rgba(20, 18, 28, 0.96);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border-top: 1px solid rgba(var(--ta-rgb), 0.1);
+    z-index: 300;
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .mobile-nav-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    flex: 1;
+    height: 100%;
+    background: none;
+    border: none;
+    color: rgba(var(--ta-rgb), 0.55);
+    cursor: pointer;
+    transition: color 0.15s;
+    -webkit-tap-highlight-color: transparent;
+    padding: 0;
+  }
+
+  .mobile-nav-btn--active {
+    color: rgba(var(--ta-rgb), 1);
+  }
+
+  .mobile-nav-icon {
+    width: 22px;
+    height: 22px;
+  }
+
+  .mobile-nav-btn--profile {
+    flex: 1.1;
+  }
+
+  .mobile-nav-profile-avatar {
+    position: relative;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    overflow: visible;
+  }
+
+  .mobile-nav-profile-avatar img {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(var(--ta-rgb), 0.35);
+  }
+
+  .mobile-nav-status-dot {
+    position: absolute;
+    bottom: -1px;
+    right: -1px;
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(20, 18, 28, 1);
+  }
+
+  .mobile-nav-badge {
+    position: absolute;
+    top: -5px;
+    right: -8px;
+    background: rgba(var(--ta-rgb), 0.85);
+    color: #fff;
+    font-size: 0.6rem;
+    font-weight: 700;
+    border-radius: 8px;
+    padding: 1px 4px;
+    min-width: 14px;
+    text-align: center;
+    line-height: 1.4;
+  }
+
+  /* ── Global mobile layout fixes ───────────────────────────── */
+  .dashboard-fg {
+    padding-bottom: 60px;
+  }
+
+  .panel-divider-draggable {
+    display: none !important;
+  }
+
+  .left-panel-bottom-bar {
+    display: none !important;
+  }
+
+  /* ── Panel overlay system ─────────────────────────────────── */
+  .mobile-panel-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 199;
+    display: block;
+  }
+
+  .panel.panel-left,
+  .panel.panel-right {
+    position: fixed !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    z-index: 200;
+    width: min(82vw, 310px) !important;
+    flex: unset !important;
+    transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
+  .panel.panel-left {
+    left: 0;
+    transform: translateX(-110%);
+  }
+
+  .panel.panel-right {
+    right: 0;
+    transform: translateX(110%);
+  }
+
+  .panel.panel-left.panel-left--open {
+    transform: translateX(0);
+  }
+
+  .panel.panel-right.panel-right--open {
+    transform: translateX(0);
+  }
+
+  /* Messages/chat list: full-width inline (not overlay) */
+  .panel.panel-left.panel-left--chat {
+    position: relative !important;
+    transform: none !important;
+    width: 100% !important;
+    flex: 1 !important;
+    top: unset !important;
+    bottom: unset !important;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  /* Middle panel takes full width on mobile */
+  .panel.panel-middle {
+    flex: 1 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+  }
+
+  /* Hide middle panel when chat-list mode with no selected chat */
+  .panel-left--chat ~ .panel.panel-middle:not(.panel-middle--force-show) {
+    display: none;
+  }
+
+  /* ── Home dashboard mobile cards ──────────────────────────── */
+  .mobile-home-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 8px 14px 14px;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .mobile-home-card {
+    background: rgba(var(--ta-rgb), 0.05);
+    border: 1px solid rgba(var(--ta-rgb), 0.1);
+    border-radius: 18px;
+    padding: 14px 16px;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+  }
+
+  .mobile-home-cards-row {
+    display: flex;
+    gap: 12px;
+  }
+
+  .mobile-home-card-messages,
+  .mobile-home-card-notifs {
+    flex: 1;
+    min-height: 130px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .mobile-home-card-header {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 10px;
+  }
+
+  .mobile-home-card-icon {
+    width: 15px;
+    height: 15px;
+    opacity: 0.65;
+  }
+
+  .mobile-home-card-title {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: rgba(var(--ta-rgb), 0.65);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .mobile-home-card-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  .mobile-home-card-item {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: none;
+    border: none;
+    color: rgba(var(--ta-rgb), 0.8);
+    font-family: inherit;
+    font-size: 0.8rem;
+    padding: 3px 0;
+    cursor: pointer;
+    text-align: left;
+    min-width: 0;
+    width: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .mobile-home-card-item-avatar {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(var(--ta-rgb), 0.15);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    font-weight: 600;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .mobile-home-card-item-avatar--server {
+    border-radius: 8px;
+  }
+
+  .mobile-home-card-item-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .mobile-home-card-item-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .mobile-home-card-item-badge {
+    background: rgba(var(--ta-rgb), 0.7);
+    color: #1a1a1a;
+    border-radius: 8px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    padding: 1px 5px;
+    flex-shrink: 0;
+  }
+
+  .mobile-home-card-empty {
+    font-size: 0.75rem;
+    color: rgba(var(--ta-rgb), 0.3);
+    font-style: italic;
+    padding: 2px 0;
+  }
+
+  .mobile-home-card-viewall {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    background: none;
+    border: none;
+    color: rgba(var(--ta-rgb), 0.4);
+    font-family: inherit;
+    font-size: 0.7rem;
+    padding: 8px 0 0;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* ── Mobile REELMS/DIRECTS section labels ─────────────────── */
+  .mobile-section-label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(var(--ta-rgb), 0.38);
+    padding: 10px 16px 4px;
+  }
+
+  .mobile-reelms-list {
+    padding: 0 4px;
+  }
+
+  /* ── Mobile reelm nav above message input ─────────────────── */
+  .mobile-reelm-input-nav {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 6px;
+    border-top: 1px solid rgba(var(--ta-rgb), 0.08);
+  }
+
+  .mobile-rin-left,
+  .mobile-rin-right {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+  }
+
+  .mobile-rin-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: none;
+    border: none;
+    color: rgba(var(--ta-rgb), 0.5);
+    border-radius: 8px;
+    cursor: pointer;
+    position: relative;
+    -webkit-tap-highlight-color: transparent;
+    transition: background 0.12s, color 0.12s;
+  }
+
+  .mobile-rin-btn:active,
+  .mobile-rin-btn--active {
+    background: rgba(var(--ta-rgb), 0.1);
+    color: rgba(var(--ta-rgb), 0.9);
+  }
+
+  .mobile-rin-btn img {
+    width: 20px;
+    height: 20px;
+    opacity: 0.7;
+  }
+
+  .mobile-rin-btn--active img {
+    opacity: 1;
+  }
+
+  /* ── Message input compacted on mobile ────────────────────── */
+  .msg-input-wrap {
+    height: 40px;
+  }
+
+  .msg-input {
+    font-size: 0.82rem;
+  }
+
+  /* spotify bar hidden on mobile (shows in profile instead) */
+  .msg-spotify-bar {
+    display: none;
+  }
+
+  /* ── chat-list sidebar full width on mobile ───────────────── */
+  .chat-list-sidebar-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+  }
+
+  /* ── dashboard mid row ────────────────────────────────────── */
+  .dashboard-top-right {
+    display: none !important;
+  }
+
+  .chats-row {
+    flex: 1;
+    min-width: 0;
+  }
+
+  /* ── Home panel on mobile ─────────────────────────────────── */
+  .home-panel {
+    overflow-y: auto;
+    padding: 0;
+  }
+
+  .home-panel .home-greeting {
+    font-size: 1.15rem;
+    padding: 16px 16px 4px;
+  }
+
+  /* hide desktop home sections (replaced by mobile-home-cards) */
+  .home-panel .home-sections {
+    display: none;
+  }
+
+  .home-panel .welcome-discover-btn {
+    display: none;
+  }
+
+  /* ── Auth pages mobile ─────────────────────────────────────── */
+  .auth-card {
+    width: 84vw !important;
+    max-width: 360px !important;
+    padding: 24px 20px !important;
+  }
 }
