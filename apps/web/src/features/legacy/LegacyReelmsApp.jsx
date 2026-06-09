@@ -14065,7 +14065,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                 onClick={() => { setShowDiscover(true); setSelectedReelm(null); setSelectedChat(null); setShowChatList(false); setShowSettings(false); setDiscoverQuery('') }}
                 title="Discover"
               >
-                <img src={discoverIcon} alt="Discover" className="mobile-nav-icon" style={{ filter: showDiscover ? undefined : 'opacity(0.55)' }} />
+                <span className="mobile-nav-icon-pill">
+                  <img src={discoverIcon} alt="Discover" className="mobile-nav-icon" />
+                </span>
               </button>
               <button
                 className="mobile-nav-btn mobile-nav-btn--profile"
@@ -14082,8 +14084,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                 onClick={() => { setSelectedChat(null); setSelectedReelm(null); setShowChatList(true); setChatListFilter('all'); setShowDiscover(false); setShowSettings(false); setShowFriendsPanel(false) }}
                 title="Messages"
               >
-                <span style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <img src={messagesIcon} alt="Messages" className="mobile-nav-icon" style={{ filter: (showChatList || selectedChat) && !showDiscover && !showSettings ? undefined : 'opacity(0.55)' }} />
+                <span className="mobile-nav-icon-pill" style={{ position: 'relative' }}>
+                  <img src={messagesIcon} alt="Messages" className="mobile-nav-icon" />
                   {totalUnread > 0 && <span className="mobile-nav-badge">{capBadge(totalUnread)}</span>}
                 </span>
               </button>

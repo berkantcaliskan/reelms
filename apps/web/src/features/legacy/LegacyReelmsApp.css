@@ -14534,3 +14534,91 @@ button, input, select, textarea,
     max-width: 100% !important;
   }
 }
+
+/* ================================================================
+   MOBILE FIXES v3
+   ================================================================ */
+@media (max-width: 767px) {
+
+  /* ── Panel overlay: blur background so text doesn't bleed through ── */
+  .panel.panel-left,
+  .panel.panel-right {
+    background: rgba(14, 12, 22, 0.88) !important;
+    -webkit-backdrop-filter: blur(22px) !important;
+    backdrop-filter: blur(22px) !important;
+  }
+
+  /* ── Content width: match header 12px horizontal padding ─────── */
+  .chats-row {
+    padding-left: 12px !important;
+    padding-right: 12px !important;
+  }
+
+  /* ── Bottom nav: transparent background, match app bg ────────── */
+  .mobile-bottom-nav {
+    background: var(--tb, rgba(14, 12, 22, 1)) !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    border-top: 1px solid rgba(var(--ta-rgb), 0.08) !important;
+  }
+
+  /* Pill outline around nav icons */
+  .mobile-nav-icon-pill {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 52px;
+    height: 30px;
+    border-radius: 999px;
+    border: 1.5px solid rgba(var(--ta-rgb), 0.28);
+    background: transparent;
+  }
+
+  .mobile-nav-btn--active .mobile-nav-icon-pill {
+    border-color: rgba(var(--ta-rgb), 0.75);
+    background: rgba(var(--ta-rgb), 0.08);
+  }
+
+  /* Profile avatar gets a pill-like border ring */
+  .mobile-nav-profile-avatar img {
+    border: 2px solid rgba(var(--ta-rgb), 0.32) !important;
+  }
+
+  /* ── Voice/Live channel controls: centered, icon-only ─────────── */
+  .voice-controls {
+    justify-content: center !important;
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+    padding: 12px 12px 80px !important;
+  }
+
+  .voice-ctrl-label {
+    display: none !important;
+  }
+
+  .voice-ctrl-btn {
+    padding: 0 !important;
+    width: 48px !important;
+    height: 48px !important;
+    justify-content: center !important;
+    gap: 0 !important;
+  }
+
+  .voice-ctrl-btn-round {
+    width: 48px !important;
+    height: 48px !important;
+  }
+
+  .voice-controls-actions {
+    justify-content: center !important;
+    flex-wrap: wrap !important;
+    gap: 10px !important;
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+
+  .voice-controls-left {
+    width: 100% !important;
+    justify-content: center !important;
+  }
+}
