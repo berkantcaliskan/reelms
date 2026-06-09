@@ -698,3 +698,38 @@
   font-size: 11px;
   line-height: 1.35;
 }
+
+/* Mobile: shrink auth card by ~16%+ so it doesn't overflow screen edges */
+@media (max-width: 480px) {
+  .reelms-auth-card-shell {
+    width: min(92vw, 360px);
+  }
+
+  .reelms-auth-card {
+    padding: 20px 18px;
+    border-radius: 24px;
+  }
+
+  .reelms-auth-card-border {
+    border-radius: 25px;
+  }
+
+  .reelms-auth-card-logo {
+    width: 48px;
+    height: 48px;
+    margin-bottom: 12px;
+    border-radius: 17px;
+  }
+
+  .reelms-auth-card-head h2 {
+    font-size: 1.1rem;
+  }
+
+  .reelms-auth-card-head p {
+    font-size: 0.8rem;
+  }
+
+  .auth-form-v2 {
+    gap: 10px;
+  }
+}

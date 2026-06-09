@@ -13667,12 +13667,13 @@ button, input, select, textarea,
 .msg-outer-row {
   display: flex;
   align-items: stretch;
-  gap: 8px;
+  gap: 6px;
   position: relative;
 }
 .msg-outer-row .msg-bar {
   flex: 1;
   min-width: 0;
+  margin-right: 0;
 }
 
 /* Spotify inline bar next to msg-bar */
@@ -14373,5 +14374,12 @@ button, input, select, textarea,
     width: 84vw !important;
     max-width: 360px !important;
     padding: 24px 20px !important;
+  }
+}
+
+/* Hide middle panel on mobile when only chat list is shown */
+@media (max-width: 767px) {
+  .panel.panel-middle.panel-middle--chat-list-only {
+    display: none !important;
   }
 }
