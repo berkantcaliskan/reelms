@@ -14060,35 +14060,35 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           )}
           {isMobile && (
             <nav className="mobile-bottom-nav">
-              <button
-                className={`mobile-nav-btn${showDiscover ? ' mobile-nav-btn--active' : ''}`}
-                onClick={() => { setShowDiscover(true); setSelectedReelm(null); setSelectedChat(null); setShowChatList(false); setShowSettings(false); setDiscoverQuery('') }}
-                title="Discover"
-              >
-                <span className="mobile-nav-icon-pill">
+              <div className="mobile-nav-pill">
+                <button
+                  className={`mobile-nav-btn${showDiscover ? ' mobile-nav-btn--active' : ''}`}
+                  onClick={() => { setShowDiscover(true); setSelectedReelm(null); setSelectedChat(null); setShowChatList(false); setShowSettings(false); setDiscoverQuery('') }}
+                  title="Discover"
+                >
                   <img src={discoverIcon} alt="Discover" className="mobile-nav-icon" />
-                </span>
-              </button>
-              <button
-                className="mobile-nav-btn mobile-nav-btn--profile"
-                onClick={() => setShowProfilePopup(true)}
-                title="Profile"
-              >
-                <div className="mobile-nav-profile-avatar">
-                  <img src={getPersonPhoto(currentUser) || avatarUIcon} alt="Profile" />
-                  <span className="mobile-nav-status-dot" style={{ background: { online: '#4ade80', idle: '#fbbf24', busy: '#f87171', invisible: '#9ca3af' }[profileStatus] }} />
-                </div>
-              </button>
-              <button
-                className={`mobile-nav-btn${(showChatList || selectedChat) && !showDiscover && !showSettings ? ' mobile-nav-btn--active' : ''}`}
-                onClick={() => { setSelectedChat(null); setSelectedReelm(null); setShowChatList(true); setChatListFilter('all'); setShowDiscover(false); setShowSettings(false); setShowFriendsPanel(false) }}
-                title="Messages"
-              >
-                <span className="mobile-nav-icon-pill" style={{ position: 'relative' }}>
-                  <img src={messagesIcon} alt="Messages" className="mobile-nav-icon" />
-                  {totalUnread > 0 && <span className="mobile-nav-badge">{capBadge(totalUnread)}</span>}
-                </span>
-              </button>
+                </button>
+                <button
+                  className="mobile-nav-btn mobile-nav-btn--profile"
+                  onClick={() => setShowProfilePopup(true)}
+                  title="Profile"
+                >
+                  <div className="mobile-nav-profile-avatar">
+                    <img src={getPersonPhoto(currentUser) || avatarUIcon} alt="Profile" />
+                    <span className="mobile-nav-status-dot" style={{ background: { online: '#4ade80', idle: '#fbbf24', busy: '#f87171', invisible: '#9ca3af' }[profileStatus] }} />
+                  </div>
+                </button>
+                <button
+                  className={`mobile-nav-btn${(showChatList || selectedChat) && !showDiscover && !showSettings ? ' mobile-nav-btn--active' : ''}`}
+                  onClick={() => { setSelectedChat(null); setSelectedReelm(null); setShowChatList(true); setChatListFilter('all'); setShowDiscover(false); setShowSettings(false); setShowFriendsPanel(false) }}
+                  title="Messages"
+                >
+                  <span style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <img src={messagesIcon} alt="Messages" className="mobile-nav-icon" />
+                    {totalUnread > 0 && <span className="mobile-nav-badge">{capBadge(totalUnread)}</span>}
+                  </span>
+                </button>
+              </div>
             </nav>
           )}
         </div>

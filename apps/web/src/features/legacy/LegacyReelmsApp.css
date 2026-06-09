@@ -1493,6 +1493,8 @@ h6 {
 .menu-item-with-icon span {
   margin-top: auto;
   transform: translateY(-7px);
+  white-space: nowrap;
+  font-size: 0.8rem;
 }
 
 .menu-item-with-icon:hover {
@@ -14036,7 +14038,7 @@ button, input, select, textarea,
 
   /* ── Global mobile layout fixes ───────────────────────────── */
   .dashboard-fg {
-    padding-bottom: 60px;
+    padding-bottom: 80px;
   }
 
   .panel-divider-draggable {
@@ -14470,14 +14472,11 @@ button, input, select, textarea,
     height: 24px !important;
   }
 
-  /* Bottom nav: centered and closer */
-  .mobile-bottom-nav {
-    justify-content: center !important;
-    gap: 40px !important;
-  }
+  /* Bottom nav: pill layout overrides */
   .mobile-nav-btn {
     flex: unset !important;
-    width: 44px;
+    width: 44px !important;
+    height: 40px !important;
   }
   .mobile-nav-btn--profile .mobile-nav-profile-avatar,
   .mobile-nav-btn--profile .mobile-nav-profile-avatar img {
@@ -14548,40 +14547,38 @@ button, input, select, textarea,
     backdrop-filter: blur(22px) !important;
   }
 
-  /* ── Content width: match header 12px horizontal padding ─────── */
+  /* ── Content width: strip panel-system desktop margins ────────── */
+  .panel-system {
+    margin: 0 !important;
+    border-radius: 0 !important;
+  }
+
   .chats-row {
     padding-left: 12px !important;
     padding-right: 12px !important;
   }
 
-  /* ── Bottom nav: transparent background, match app bg ────────── */
+  /* ── Bottom nav: transparent, centered pill container ─────────── */
   .mobile-bottom-nav {
-    background: var(--tb, rgba(14, 12, 22, 1)) !important;
+    background: transparent !important;
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
-    border-top: 1px solid rgba(var(--ta-rgb), 0.08) !important;
+    border-top: none !important;
+    justify-content: center !important;
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 12px) !important;
+    height: auto !important;
   }
 
-  /* Pill outline around nav icons */
-  .mobile-nav-icon-pill {
+  /* Single pill wrapping all three nav buttons */
+  .mobile-nav-pill {
     display: flex;
     align-items: center;
-    justify-content: center;
-    width: 52px;
-    height: 30px;
-    border-radius: 999px;
-    border: 1.5px solid rgba(var(--ta-rgb), 0.28);
+    gap: 8px;
+    padding: 6px 16px;
     background: transparent;
-  }
-
-  .mobile-nav-btn--active .mobile-nav-icon-pill {
-    border-color: rgba(var(--ta-rgb), 0.75);
-    background: rgba(var(--ta-rgb), 0.08);
-  }
-
-  /* Profile avatar gets a pill-like border ring */
-  .mobile-nav-profile-avatar img {
-    border: 2px solid rgba(var(--ta-rgb), 0.32) !important;
+    border: 1.5px solid rgba(var(--ta-rgb), 0.22);
+    border-radius: 999px;
+    height: 52px;
   }
 
   /* ── Voice/Live channel controls: centered, icon-only ─────────── */
