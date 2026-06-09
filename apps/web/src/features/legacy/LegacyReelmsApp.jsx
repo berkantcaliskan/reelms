@@ -604,9 +604,11 @@ function DatePicker({ day, month, year, onDayChange, onMonthChange, onYearChange
   )
 }
 
-function SettingsIcon() {
+function SettingsIcon({ isNight = false }) {
   const [hovered, setHovered] = useState(false)
   const transition = 'transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1)'
+  const pillFill = isNight ? 'var(--ta)' : '#0c0c20'
+  const dotFill  = isNight ? 'var(--tb)' : 'var(--ta)'
   return (
     <svg
       viewBox="0 0 360 360" width="28" height="28"
@@ -615,17 +617,17 @@ function SettingsIcon() {
       onMouseLeave={() => setHovered(false)}
     >
       <g>
-        <path fill="#0c0c20" d="M 284.652344 0 C 326.394531 0 360 33.605469 360 75.347656 C 360 117.09375 326.394531 150.699219 284.652344 150.699219 L 75.347656 150.699219 C 33.605469 150.699219 0 117.09375 0 75.347656 C 0 33.605469 33.605469 0 75.347656 0 Z"/>
+        <path fill={pillFill} d="M 284.652344 0 C 326.394531 0 360 33.605469 360 75.347656 C 360 117.09375 326.394531 150.699219 284.652344 150.699219 L 75.347656 150.699219 C 33.605469 150.699219 0 117.09375 0 75.347656 C 0 33.605469 33.605469 0 75.347656 0 Z"/>
         <circle
           cx="284.652344" cy="75.347656" r="41.861328"
-          style={{ fill: 'var(--ta)', transition, transform: hovered ? 'translateX(-16.3px)' : 'translateX(0)' }}
+          style={{ fill: dotFill, transition, transform: hovered ? 'translateX(-16.3px)' : 'translateX(0)' }}
         />
       </g>
       <g>
-        <path fill="#0c0c20" d="M 284.652344 209.304688 C 326.394531 209.304688 360 242.910156 360 284.652344 C 360 326.394531 326.394531 360 284.652344 360 L 75.347656 360 C 33.605469 360 0 326.394531 0 284.652344 C 0 242.910156 33.605469 209.304688 75.347656 209.304688 Z"/>
+        <path fill={pillFill} d="M 284.652344 209.304688 C 326.394531 209.304688 360 242.910156 360 284.652344 C 360 326.394531 326.394531 360 284.652344 360 L 75.347656 360 C 33.605469 360 0 326.394531 0 284.652344 C 0 242.910156 33.605469 209.304688 75.347656 209.304688 Z"/>
         <circle
           cx="75.347656" cy="284.652344" r="41.861328"
-          style={{ fill: 'var(--ta)', transition, transform: hovered ? 'translateX(16.3px)' : 'translateX(0)' }}
+          style={{ fill: dotFill, transition, transform: hovered ? 'translateX(16.3px)' : 'translateX(0)' }}
         />
       </g>
     </svg>
@@ -10888,18 +10890,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           </div>
           <div className="header-icons-group">
             <button className="header-settings-btn" onClick={toggleFriendsPopup} style={{ opacity: showFriendsPopup ? 0 : 1 }}>
-              <img src={friendsIcon} alt="Friends" className="header-icon" style={{ filter: 'hue-rotate(220deg) saturate(1.96) brightness(0.14)' }} />
+              <img src={friendsIcon} alt="Friends" className="header-icon" style={{ filter: activeTheme.id === 'gece' ? headerIconThemeFilter(effectiveAccent) : 'hue-rotate(220deg) saturate(1.96) brightness(0.14)' }} />
             </button>
             <button className="header-settings-btn" onClick={toggleNotifPopup} style={{ opacity: showNotificationsPopup ? 0 : 1 }}>
               <span className="notif-icon-wrap">
-                <img src={notificationIcon} alt="Notifications" className="header-icon" style={{ filter: 'hue-rotate(220deg) saturate(1.96) brightness(0.14)' }} />
+                <img src={notificationIcon} alt="Notifications" className="header-icon" style={{ filter: activeTheme.id === 'gece' ? headerIconThemeFilter(effectiveAccent) : 'hue-rotate(220deg) saturate(1.96) brightness(0.14)' }} />
                 {notifications.length > notifSeenCount && (
                   <span className="notif-badge">{capBadge(notifications.length - notifSeenCount)}</span>
                 )}
               </span>
             </button>
             <button className="header-settings-btn" style={{ marginLeft: '5px' }} onClick={() => { setShowSettings(v => !v); setSelectedReelm(null); setSelectedChat(null); setShowDiscover(false); setShowFriendsPanel(false) }}>
-              <SettingsIcon />
+              <SettingsIcon isNight={activeTheme.id === 'gece'} />
             </button>
           </div>
         </header>
