@@ -2093,7 +2093,7 @@ function PhotoEditModal({ previewCanvasRef, photoScale, setPhotoScale, onMouseDo
   )
 }
 
-function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChange, status, onStatusChange, bio, onBioChange, socialLinks, onSocialLinksChange, activePlatforms, onActivePlatformsChange, iconFilter, reelms, uid, spotifyConnected, spotifyNowPlaying, onSpotifyConnect, onSpotifyDisconnect, activity, onActivityChange }) {
+function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChange, status, onStatusChange, bio, onBioChange, socialLinks, onSocialLinksChange, activePlatforms, onActivePlatformsChange, iconFilter, reelms, uid, spotifyConnected, spotifyNowPlaying, onSpotifyConnect, onSpotifyDisconnect, activity, onActivityChange, onViewFullProfile }) {
   const popupRef = useRef(null)
   const ppPhotoInputRef = useRef(null)
   const ppCoverInputRef = useRef(null)
@@ -2495,6 +2495,11 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
             All activity
           </button>
         </div>
+        {onViewFullProfile && (
+          <button className="profile-view-full-btn" onClick={e => { e.stopPropagation(); onClose(); onViewFullProfile() }}>
+            Tüm profili gör
+          </button>
+        )}
       </div>
     </div>
 
@@ -11006,9 +11011,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   {currentActivity?.name && <ActivityBadge activity={currentActivity} />}
                 </div>
               </div>
-              <button className="profile-view-full-btn" onClick={e => { e.stopPropagation(); setFullProfileTarget({ isSelf: true, user: currentUser }) }}>
-                Tüm profili gör
-              </button>
             </div>
           </div>
 
@@ -12987,7 +12989,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                       <div className="msg-reactions">
                                         {Object.entries(msgReactions[msgKey2]?.[String(msg.id)] || {}).map(([emoji, users]) => (
                                           <button key={emoji} className={`${emoji === '+' ? 'reaction-pill--plus' : `reaction-pill${users.includes(String(uid)) ? ' reaction-pill--mine' : ''}`}`} onClick={() => toggleReaction(msgKey2, msg.id, emoji)}>
-                                            {emoji === '+' ? null : emoji} <span>{users.length}</span>
+                                            {emoji === '+' ? <span>+{users.length}</span> : <>{emoji} <span>{users.length}</span></>}
                                           </button>
                                         ))}
                                       </div>
@@ -13855,6 +13857,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               onSpotifyDisconnect={disconnectSpotify}
               activity={currentActivity}
               onActivityChange={setActivity}
+              onViewFullProfile={() => { setShowProfilePopup(false); setFullProfileTarget({ isSelf: true, user: currentUser }) }}
             />
           )}
           {renderFriendProfileSurface(false)}
