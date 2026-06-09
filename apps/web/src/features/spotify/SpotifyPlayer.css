@@ -8,15 +8,16 @@
   gap: 20px;
   padding: 0 22px;
   min-height: 52px;
+  max-width: calc(100vw - 540px);
   background: rgba(var(--tb-rgb), 0.88);
-  backdrop-filter: blur(24px);
   -webkit-backdrop-filter: blur(24px);
+  backdrop-filter: blur(24px);
   border: 1px solid rgba(var(--ta-rgb), 0.14);
-  border-radius: 30px;
+  border-radius: 999px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.40);
   z-index: 500;
-  user-select: none;
   -webkit-user-select: none;
+  user-select: none;
 }
 
 .smp-track {
