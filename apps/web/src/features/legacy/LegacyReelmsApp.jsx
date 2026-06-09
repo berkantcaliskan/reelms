@@ -13217,7 +13217,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           )}
                           {isMobile && selectedReelm && (
                             <div className="mobile-reelm-input-nav">
-                              <div className="mobile-rin-left">
+                              <div className="mobile-rin-right">
                                 <button
                                   className={`mobile-rin-btn${showDiscover ? ' mobile-rin-btn--active' : ''}`}
                                   onClick={() => { setShowDiscover(true); setSelectedReelm(null); setShowFeed(false); setDiscoverQuery('') }}
@@ -13225,25 +13225,26 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 >
                                   <img src={discoverIcon} alt="Discover" width="20" height="20" />
                                 </button>
-                                <button
-                                  className={`mobile-rin-btn${showFeed ? ' mobile-rin-btn--active' : ''}`}
-                                  onClick={() => { setShowFeed(v => !v); setShowDiscover(false) }}
-                                  title="Feed"
-                                >
-                                  <img src={feedIcon} alt="Feed" width="20" height="20" />
-                                </button>
-                              </div>
-                              <div className="mobile-rin-right">
-                                <button
-                                  className="mobile-rin-btn"
-                                  onClick={() => { setSelectedReelm(null); setSelectedChat(null); setShowChatList(true); setChatListFilter('all') }}
-                                  title="Messages"
-                                >
-                                  <span style={{ position: 'relative', display: 'flex' }}>
-                                    <img src={messagesIcon} alt="Messages" width="20" height="20" />
-                                    {totalUnread > 0 && <span className="lpb-badge">{capBadge(totalUnread)}</span>}
-                                  </span>
-                                </button>
+                                {showFeed ? (
+                                  <button
+                                    className="mobile-rin-btn"
+                                    onClick={() => { setShowFeed(false); setSelectedChat(null); setShowChatList(false) }}
+                                    title="Messages"
+                                  >
+                                    <span style={{ position: 'relative', display: 'flex' }}>
+                                      <img src={messagesIcon} alt="Messages" width="20" height="20" />
+                                      {totalUnread > 0 && <span className="lpb-badge">{capBadge(totalUnread)}</span>}
+                                    </span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    className={`mobile-rin-btn${showFeed ? ' mobile-rin-btn--active' : ''}`}
+                                    onClick={() => { setShowFeed(true); setShowDiscover(false) }}
+                                    title="Feed"
+                                  >
+                                    <img src={feedIcon} alt="Feed" width="20" height="20" />
+                                  </button>
+                                )}
                               </div>
                             </div>
                           )}
@@ -13368,20 +13369,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               }
                               e.target.value = ''
                             }} />
-                            {!isMobile && (
-                              <button className={`msg-action-btn${isRecording ? ' msg-action-btn--recording' : ''}`} title={isRecording ? `Durdurup Gönder (${recordingSeconds}s)` : 'Sesli Mesaj'} disabled={!canPost} onClick={toggleRecording}>
-                                {isRecording ? (
-                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-                                ) : (
-                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                                    <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                                    <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                                  </svg>
-                                )}
-                              </button>
-                            )}
+                            <button className={`msg-action-btn${isRecording ? ' msg-action-btn--recording' : ''}`} title={isRecording ? `Durdurup Gönder (${recordingSeconds}s)` : 'Sesli Mesaj'} disabled={!canPost} onClick={toggleRecording}>
+                              {isRecording ? (
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+                              ) : (
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                                  <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                                  <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                                </svg>
+                              )}
+                            </button>
                             {!isMobile && !spotifyNowPlaying && (
                               <button className="msg-action-btn" title="Oyun">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">

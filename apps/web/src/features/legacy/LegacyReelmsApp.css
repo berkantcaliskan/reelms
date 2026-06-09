@@ -14383,3 +14383,139 @@ button, input, select, textarea,
     display: none !important;
   }
 }
+
+
+/* ================================================================
+   MOBILE FIXES v2
+   ================================================================ */
+@media (max-width: 767px) {
+
+  /* Header: ~50% smaller */
+  .app-header {
+    padding: 10px 12px 5px 12px !important;
+  }
+  .logo {
+    width: 24px !important;
+    height: 24px !important;
+  }
+  .app-name {
+    font-size: 0.72rem !important;
+  }
+  .header-icon, .header-settings-icon {
+    width: 14px !important;
+    height: 14px !important;
+  }
+  .header-icons-group {
+    gap: 8px !important;
+  }
+  .logo-area {
+    gap: 6px;
+  }
+
+  /* msg-bar: single row, no wrap */
+  .msg-bar {
+    flex-wrap: nowrap !important;
+    min-height: 44px !important;
+    align-items: center;
+    gap: 4px;
+    padding: 0 4px;
+    margin: 0 8px 8px !important;
+  }
+  .msg-input-wrap {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    height: 36px !important;
+  }
+  .msg-actions {
+    flex-wrap: nowrap !important;
+    gap: 0;
+    flex-shrink: 0;
+    width: auto !important;
+  }
+  .msg-action-btn {
+    width: 36px !important;
+    height: 36px !important;
+  }
+
+  /* Reelm nav bar: right-aligned */
+  .mobile-reelm-input-nav {
+    justify-content: flex-end !important;
+  }
+
+  /* Reelm cover: compact in mobile panel */
+  .reelm-cover-wrap {
+    height: 60px !important;
+    border-radius: 14px !important;
+  }
+  .reelm-cover-img, .reelm-cover-placeholder {
+    border-radius: 14px !important;
+  }
+  .reelm-cover-blur-strip {
+    border-radius: 0 0 14px 14px !important;
+    height: 30px !important;
+  }
+
+  /* Bottom nav: centered and closer */
+  .mobile-bottom-nav {
+    justify-content: center !important;
+    gap: 40px !important;
+  }
+  .mobile-nav-btn {
+    flex: unset !important;
+    width: 44px;
+  }
+  .mobile-nav-btn--profile .mobile-nav-profile-avatar,
+  .mobile-nav-btn--profile .mobile-nav-profile-avatar img {
+    width: 34px !important;
+    height: 34px !important;
+  }
+
+  /* Chat-list row avatar for reelms section */
+  .chat-list-row-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(var(--ta-rgb), 0.12);
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .chat-list-row-avatar--server {
+    border-radius: 10px !important;
+  }
+  .chat-list-row-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .chat-list-row-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .chat-list-row-name {
+    font-size: 0.82rem;
+    color: rgba(var(--ta-rgb), 0.85);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* Auth card: prevent edge overflow on very small screens */
+@media (max-width: 480px) {
+  .reelms-auth-stage {
+    width: 100% !important;
+    padding-left: 16px !important;
+    padding-right: 16px !important;
+  }
+  .reelms-auth-card-shell {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+}
