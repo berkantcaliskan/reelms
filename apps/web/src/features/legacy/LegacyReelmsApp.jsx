@@ -1328,6 +1328,16 @@ function PrivacySafetyPanel({ user, onUpdate, onUnblock, blockedList, sessionsLi
         <div className="accs-section-title">{t('security')}</div>
         <div className="cust-toggle-row">
           <div>
+            <span className="cust-toggle-label">{t('new_signin_notif')}</span>
+            <p className="accs-note">{t('new_signin_notif_desc')}</p>
+          </div>
+          <button
+            className={`cust-toggle${user.notifyNewDevice !== false ? ' cust-toggle-on' : ''}`}
+            onClick={() => onUpdate({ notifyNewDevice: user.notifyNewDevice === false ? true : false })}
+          ><span className="cust-toggle-knob" /></button>
+        </div>
+        <div className="cust-toggle-row" style={{marginTop: '14px'}}>
+          <div>
             <span className="cust-toggle-label">{t('two_fa')}</span>
             <p className="accs-note">{t('two_fa_desc').replace(' Coming soon', '')} <span className="accs-coming-soon">{t('coming_soon')}</span></p>
           </div>
@@ -1336,19 +1346,8 @@ function PrivacySafetyPanel({ user, onUpdate, onUnblock, blockedList, sessionsLi
         <div className="cust-toggle-row" style={{marginTop: '14px'}}>
           <div>
             <span className="cust-toggle-label">{t('e2ee')}</span>
-            <p className="accs-note">{t('e2ee_desc').replace(' Coming soon', '')} <span className="accs-coming-soon">{t('coming_soon')}</span></p>
+            <p className="accs-note">{t('e2ee_desc').replace(' Coming soon', '')}</p>
           </div>
-          <button className="cust-toggle" disabled style={{opacity: 0.4, cursor: 'not-allowed'}}><span className="cust-toggle-knob" /></button>
-        </div>
-        <div className="cust-toggle-row" style={{marginTop: '14px'}}>
-          <div>
-            <span className="cust-toggle-label">{t('new_signin_notif')}</span>
-            <p className="accs-note">{t('new_signin_notif_desc')}</p>
-          </div>
-          <button
-            className={`cust-toggle${user.notifyNewDevice !== false ? ' cust-toggle-on' : ''}`}
-            onClick={() => onUpdate({ notifyNewDevice: user.notifyNewDevice === false ? true : false })}
-          ><span className="cust-toggle-knob" /></button>
         </div>
       </div>
 
