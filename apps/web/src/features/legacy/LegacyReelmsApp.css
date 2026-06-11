@@ -14438,6 +14438,7 @@ button, input, select, textarea,
 
   .main-content {
     max-width: 86vw !important;
+    margin: 0 auto !important;
   }
 
   .signin-card {
