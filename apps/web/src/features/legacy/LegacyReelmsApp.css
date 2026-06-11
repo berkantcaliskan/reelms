@@ -13958,9 +13958,9 @@ button, input, select, textarea,
     left: 0;
     right: 0;
     height: 60px;
-    background: rgba(20, 18, 28, 0.96);
-    backdrop-filter: blur(18px);
-    -webkit-backdrop-filter: blur(18px);
+    background: rgba(var(--bg-rgb, 14, 12, 20), 0.55);
+    backdrop-filter: blur(28px) saturate(1.8) brightness(0.85);
+    -webkit-backdrop-filter: blur(28px) saturate(1.8) brightness(0.85);
     border-top: 1px solid rgba(var(--ta-rgb), 0.1);
     z-index: 300;
     padding-bottom: env(safe-area-inset-bottom, 0px);
@@ -14039,6 +14039,11 @@ button, input, select, textarea,
   /* ── Global mobile layout fixes ───────────────────────────── */
   .dashboard-fg {
     padding-bottom: 80px;
+  }
+
+  /* Reelm veya sohbet ekranında nav bar yok, padding-bottom kaldır */
+  .dashboard-fg--no-nav {
+    padding-bottom: 0 !important;
   }
 
   .panel-divider-draggable {
@@ -14443,9 +14448,9 @@ button, input, select, textarea,
     height: 34px !important;
   }
 
-  /* Reelm nav bar: right-aligned */
+  /* Reelm nav bar: home sol, discover/feed sağ */
   .mobile-reelm-input-nav {
-    justify-content: flex-end !important;
+    justify-content: space-between !important;
   }
 
   /* Reelm cover: compact square with rounded corners in mobile panel */
@@ -14539,12 +14544,17 @@ button, input, select, textarea,
    ================================================================ */
 @media (max-width: 767px) {
 
-  /* ── Panel overlay: blur background so text doesn't bleed through ── */
+  /* ── Panel overlay: iOS 16/17 notification-style frosted glass ─── */
   .panel.panel-left,
   .panel.panel-right {
-    background: rgba(14, 12, 22, 0.88) !important;
-    -webkit-backdrop-filter: blur(22px) !important;
-    backdrop-filter: blur(22px) !important;
+    background: rgba(var(--bg-rgb, 14, 12, 22), 0.52) !important;
+    -webkit-backdrop-filter: blur(40px) saturate(2) brightness(0.82) !important;
+    backdrop-filter: blur(40px) saturate(2) brightness(0.82) !important;
+    border-right: 1px solid rgba(var(--ta-rgb), 0.08) !important;
+  }
+  .panel.panel-right {
+    border-right: none !important;
+    border-left: 1px solid rgba(var(--ta-rgb), 0.08) !important;
   }
 
   /* ── Content width: strip panel-system desktop margins ────────── */
@@ -14569,14 +14579,16 @@ button, input, select, textarea,
     height: auto !important;
   }
 
-  /* Single pill wrapping all three nav buttons */
+  /* Single pill wrapping all three nav buttons — frosted glass blur */
   .mobile-nav-pill {
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 6px 16px;
-    background: transparent;
-    border: 1.5px solid rgba(var(--ta-rgb), 0.22);
+    background: rgba(var(--bg-rgb, 14, 12, 20), 0.45);
+    -webkit-backdrop-filter: blur(28px) saturate(1.8) brightness(0.85);
+    backdrop-filter: blur(28px) saturate(1.8) brightness(0.85);
+    border: 1px solid rgba(var(--ta-rgb), 0.14);
     border-radius: 999px;
     height: 52px;
   }
@@ -14617,5 +14629,211 @@ button, input, select, textarea,
   .voice-controls-left {
     width: 100% !important;
     justify-content: center !important;
+  }
+}
+
+/* ================================================================
+   MOBILE SETTINGS — menü-önce tasarım
+   ================================================================ */
+@media (max-width: 767px) {
+  .settings-layout {
+    flex-direction: column !important;
+    height: 100%;
+    overflow: hidden;
+  }
+
+  /* Only sidebar shown when no category selected */
+  .settings-layout--mobile-menu .settings-content {
+    display: none !important;
+  }
+
+  /* Only content shown when category selected */
+  .settings-layout--mobile-content .settings-sidebar {
+    display: none !important;
+  }
+
+  .settings-layout--mobile-content .settings-content {
+    flex: 1;
+    height: 100%;
+    overflow-y: auto;
+  }
+
+  .settings-sidebar {
+    width: 100% !important;
+    border-right: none !important;
+    border-bottom: 1px solid rgba(var(--ta-rgb), 0.08);
+    padding: 20px 16px 16px !important;
+    overflow-y: auto;
+    flex: 1;
+  }
+
+  .settings-nav-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 16px !important;
+    font-size: 0.95rem !important;
+    border-radius: 16px !important;
+    border-bottom: 1px solid rgba(var(--ta-rgb), 0.06);
+  }
+
+  .settings-nav-item-label {
+    flex: 1;
+  }
+
+  .settings-nav-item-arrow {
+    opacity: 0.4;
+    flex-shrink: 0;
+  }
+
+  .settings-topbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 12px 16px;
+    position: sticky;
+    top: 0;
+    background: rgba(var(--bg-rgb, 14, 12, 22), 0.85);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+    z-index: 2;
+  }
+
+  .settings-mobile-back-btn {
+    background: none;
+    border: none;
+    color: rgba(var(--ta-rgb), 0.7);
+    cursor: pointer;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    -webkit-tap-highlight-color: transparent;
+    margin-right: 4px;
+  }
+
+  .settings-content-panel {
+    padding: 0 16px 80px !important;
+  }
+
+  .settings-ignite-label {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+}
+
+/* ================================================================
+   MOBILE RESPONSIVITY — safe area, viewport, klavye
+   ================================================================ */
+
+/* iOS notch / dynamic island desteği */
+@supports (padding: env(safe-area-inset-top)) {
+  @media (max-width: 767px) {
+    .dashboard-fg,
+    .reelms-auth-page {
+      padding-top: env(safe-area-inset-top, 0px);
+    }
+
+    .mobile-bottom-nav {
+      padding-bottom: max(env(safe-area-inset-bottom, 0px), 8px) !important;
+    }
+  }
+}
+
+/* Android sistem nav ve iOS çentik için viewport-fill */
+@media (max-width: 767px) {
+  html, body {
+    height: 100%;
+    overscroll-behavior: none;
+  }
+
+  /* Klavye açıldığında ekranın bozulmaması */
+  .dashboard-fg {
+    min-height: 100dvh;
+    height: 100dvh;
+  }
+
+  /* Mesaj input klavyede görünür kalsın */
+  .msg-bar {
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+  }
+
+  /* İçeriklerin nav bar'ın arkasına gitmemesi */
+  .panel-system {
+    padding-bottom: 0 !important;
+  }
+
+  /* Kaydırma alanları */
+  .msg-list,
+  .chat-list-sidebar-panel,
+  .mobile-home-cards {
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+  }
+
+  /* 20:9 ve dar ekranlar için font ölçekleme */
+  @media (max-height: 760px) {
+    .home-greeting {
+      font-size: 1rem !important;
+      padding: 12px 16px 4px !important;
+    }
+    .mobile-home-card {
+      padding: 10px 12px !important;
+    }
+    .mobile-bottom-nav {
+      height: 52px !important;
+    }
+  }
+}
+
+/* ================================================================
+   MESAJLAŞMA — profil fotoğrafı ile sol panel erişimi
+   ================================================================ */
+@media (max-width: 767px) {
+  /* Channel header avatar tıklanabilir göster */
+  .channel-header-avatar {
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .channel-header-avatar:active {
+    opacity: 0.7;
+  }
+
+  /* Chat header'da geri tuşu */
+  .channel-header-float {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: rgba(var(--bg-rgb, 14, 12, 22), 0.7);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+  }
+
+  .channel-header-back-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: none;
+    border: none;
+    color: rgba(var(--ta-rgb), 0.7);
+    cursor: pointer;
+    border-radius: 8px;
+    -webkit-tap-highlight-color: transparent;
+    flex-shrink: 0;
+  }
+
+  /* DM panel left: overlay when opened in chat mode */
+  .panel.panel-left:not(.panel-left--chat):not(.panel-left--open) {
+    transform: translateX(-110%) !important;
   }
 }

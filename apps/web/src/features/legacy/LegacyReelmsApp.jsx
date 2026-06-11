@@ -8258,6 +8258,15 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const openFriendProfile = (friend, e, opts = {}) => {
     if (!friend?.id) return
     const fid = String(friend.id)
+    if (isMobile) {
+      setFullProfileTarget({ isSelf: String(fid) === String(uid), user: friend })
+      userProfileGetById(fid).then(data => {
+        if (!data) return
+        const merged = { ...friend, ...data, id: fid }
+        setFullProfileTarget(prev => prev?.user && String(prev.user.id || prev.user.uid || '') === fid ? { ...prev, user: merged } : prev)
+      }).catch(() => {})
+      return
+    }
     const rect = e.currentTarget.getBoundingClientRect()
     const inServerSurface = !!(opts.serverContext || e.currentTarget.closest?.('.rp-members-panel, .reelm-channel-voice-users, .voice-participants, .voice-bar-participants'))
     const cached = profileLookupCacheRef.current.get(fid)
@@ -10896,7 +10905,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       {customization.bgImage && (
         <div className="dashboard-bg" key={customization.bgImage} />
       )}
-      <div className="dashboard-fg">
+      <div className={`dashboard-fg${isMobile && (selectedReelm || selectedChat) ? ' dashboard-fg--no-nav' : ''}`}>
         <header className="app-header" style={showMenu ? { filter: 'blur(4px)' } : {}}>
           <div className="logo-area" style={{ cursor: 'pointer' }} onClick={goHome}>
             <img src={reelmsLogo} alt="Reelms" className="logo" style={{ filter: headerIconThemeFilter(effectiveAccent) }} />
@@ -11295,7 +11304,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                 }}
               />
             ) : showSettings ? (
-              <div className="settings-layout">
+              <div className={`settings-layout${isMobile ? (!selectedSettingsCategory ? ' settings-layout--mobile-menu' : ' settings-layout--mobile-content') : ''}`}>
                 <div className="settings-sidebar">
                   <h2 className="settings-title">{t('settings')}</h2>
                   <nav className="settings-nav">
@@ -11315,7 +11324,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         className={`settings-nav-item${selectedSettingsCategory === item.id ? ' settings-nav-item-active' : ''}`}
                         onClick={() => setSelectedSettingsCategory(item.id)}
                       >
-                        {item.label}
+                        <span className="settings-nav-item-label">{item.label}</span>
+                        {isMobile && <svg className="settings-nav-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                       </button>
                     ))}
                     <div className="settings-nav-divider" />
@@ -11344,6 +11354,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                 </div>
                 <div className="settings-content">
                   <div className="settings-topbar">
+                    {isMobile && selectedSettingsCategory && (
+                      <button type="button" className="settings-mobile-back-btn" onClick={() => setSelectedSettingsCategory(null)}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                          <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                    )}
                     <button type="button" className="settings-signout-btn" onClick={onLogOut}>{t('sign_out')}</button>
                     <button type="button" className="settings-close-btn" onClick={() => setShowSettings(false)}>
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -11676,7 +11693,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               </>
             ) : ((isMod ? false : (showChatList || selectedChat)) || selectedReelm) ? (
               <>
-                <div className={`panel panel-left${isMobile && mobileLeftPanelOpen ? ' panel-left--open' : ''}${isMobile && !selectedReelm ? ' panel-left--chat' : ''}`} style={isMobile ? undefined : { flex: `0 0 ${leftWidth}px` }}>
+                <div className={`panel panel-left${isMobile && mobileLeftPanelOpen ? ' panel-left--open' : ''}${isMobile && !selectedReelm && showChatList && !selectedChat ? ' panel-left--chat' : ''}`} style={isMobile ? undefined : { flex: `0 0 ${leftWidth}px` }}>
                   {showChatList && !selectedReelm && (
                     <div className="chat-list-sidebar-panel">
                       <div className="chat-list-sidebar-header">
@@ -12947,8 +12964,22 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       <>
                         {channelTitle && (
                           <div className="channel-header-float">
+                            {isMobile && selectedChat && (
+                              <button
+                                className="channel-header-back-btn"
+                                onClick={() => setMobileLeftPanelOpen(v => !v)}
+                                title="Konuşmalar"
+                              >
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                  <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                              </button>
+                            )}
                             {selectedChat && (
-                              <div className="channel-header-avatar">
+                              <div
+                                className="channel-header-avatar"
+                                onClick={isMobile ? () => setMobileLeftPanelOpen(v => !v) : undefined}
+                              >
                                 {getChatAvatarSrc(selectedChat)
                                   ? <img src={getChatAvatarSrc(selectedChat)} alt={getChatDisplayName(selectedChat)} />
                                   : (getChatDisplayName(selectedChat) || '?').charAt(0).toUpperCase()
@@ -13220,6 +13251,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           )}
                           {isMobile && selectedReelm && (
                             <div className="mobile-reelm-input-nav">
+                              <div className="mobile-rin-left">
+                                <button
+                                  className="mobile-rin-btn"
+                                  onClick={() => { setSelectedReelm(null); setSelectedChat(null); setShowChatList(false); setShowFeed(false); setShowDiscover(false) }}
+                                  title="Home"
+                                >
+                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                    <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                                    <path d="M9 21V12h6v9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                                  </svg>
+                                </button>
+                              </div>
                               <div className="mobile-rin-right">
                                 <button
                                   className={`mobile-rin-btn${showDiscover ? ' mobile-rin-btn--active' : ''}`}
@@ -14058,7 +14101,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               isPending={fullProfileTarget.user && friendRequestsOut.map(String).includes(String(fullProfileTarget.user.id))}
             />
           )}
-          {isMobile && (
+          {isMobile && !selectedReelm && !selectedChat && (
             <nav className="mobile-bottom-nav">
               <div className="mobile-nav-pill">
                 <button
@@ -14070,7 +14113,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                 </button>
                 <button
                   className="mobile-nav-btn mobile-nav-btn--profile"
-                  onClick={() => setShowProfilePopup(true)}
+                  onClick={() => setFullProfileTarget({ isSelf: true, user: currentUser })}
                   title="Profile"
                 >
                   <div className="mobile-nav-profile-avatar">
