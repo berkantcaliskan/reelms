@@ -64,6 +64,7 @@ export type Message = {
   createdAt?: number
   time?: number
   attachments?: unknown[]
+  enc?: boolean
 }
 
 export type ApiErrorBody = {

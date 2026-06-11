@@ -1837,6 +1837,27 @@ export function createReelmsDataRouter(io: Server) {
     } catch { res.status(500).json({ error: 'delete_failed' }) }
   })
 
+  // ── E2EE public key endpoints ─────────────────────────────────────────────
+
+  router.put('/user/e2ee', async (req, res) => {
+    try {
+      const uid = String(req.userId)
+      const { publicKey } = req.body || {}
+      if (typeof publicKey !== 'string' || !/^[A-Za-z0-9+/]{43}=$/.test(publicKey)) {
+        return res.status(400).json({ error: 'invalid_key' })
+      }
+      await putDoc(userPk(uid), 'e2ee', { publicKey })
+      res.json({ ok: true })
+    } catch { res.status(500).json({ error: 'put_failed' }) }
+  })
+
+  router.get('/user/e2ee/:uid', async (req, res) => {
+    try {
+      const data = await getDoc<any>(userPk(String(req.params.uid)), 'e2ee').catch(() => null)
+      res.json({ data: data?.publicKey || null })
+    } catch { res.status(500).json({ error: 'get_failed' }) }
+  })
+
   router.get('/user/by-username/:username', async (req, res) => {
     try {
       const uid = await getDoc<string>(`USERNAME#${normalizeUsername(req.params.username)}`, 'uid')
