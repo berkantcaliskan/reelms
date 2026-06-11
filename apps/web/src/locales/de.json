@@ -173,7 +173,7 @@
   "two_fa_desc": "Füge deinem Konto eine zusätzliche Sicherheitsebene hinzu. Demnächst",
   "e2ee": "Ende-zu-Ende-Verschlüsselung (E2EE)",
   "e2ee_desc": "Verschlüssele deine Direktnachrichten. Demnächst",
-  "e2ee_dm_notice": "Nachrichten sind Ende-zu-Ende-verschlüsselt. Niemand außerhalb dieses Chats kann sie lesen – nicht einmal wir.",
+  "e2ee_dm_notice": "Nachrichten sind Ende-zu-Ende-verschlüsselt. Niemand außerhalb dieses Chats kann sie lesen – auch wir nicht.",
   "new_signin_notif": "Benachrichtigungen bei neuer Anmeldung",
   "new_signin_notif_desc": "Werde benachrichtigt, wenn sich ein neues Gerät bei deinem Konto anmeldet.",
   "allow_profile_sharing": "Profilfreigabe erlauben",

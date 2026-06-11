@@ -178,7 +178,7 @@
   "two_fa_desc": "Hesabına ekstra bir güvenlik katmanı ekle. Yakında",
   "e2ee": "Uçtan Uca Şifreleme (E2EE)",
   "e2ee_desc": "Direkt mesajlarını yalnızca sen ve alıcının okuyabileceği şekilde şifrele. Yakında",
-  "e2ee_dm_notice": "Mesajlarınız uçtan uca şifreleme ile korunur. Biz dahil hiç kimse içeriğini göremez.",
+  "e2ee_dm_notice": "Mesajlarınız uçtan uca şifreleme ile korunur. Biz de dahil olmak üzere hiç kimse içeriğini göremez.",
   "new_signin_notif": "Yeni oturum açma bildirimleri",
   "new_signin_notif_desc": "Yeni bir cihaz hesabına giriş yaptığında bildirim al.",
   "allow_profile_sharing": "Profil paylaşımına izin ver",

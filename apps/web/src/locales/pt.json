@@ -173,7 +173,7 @@
   "two_fa_desc": "Adicione uma camada extra de segurança à sua conta. Em breve",
   "e2ee": "Criptografia de ponta a ponta (E2EE)",
   "e2ee_desc": "Criptografe suas mensagens diretas. Em breve",
-  "e2ee_dm_notice": "As mensagens são criptografadas de ponta a ponta. Ninguém fora desta conversa pode lê-las, nem nós.",
+  "e2ee_dm_notice": "As mensagens são criptografadas de ponta a ponta. Ninguém pode lê-las, nem nós.",
   "new_signin_notif": "Notificações de novo login",
   "new_signin_notif_desc": "Receba notificações quando um novo dispositivo entrar na sua conta.",
   "allow_profile_sharing": "Permitir compartilhamento de perfil",

@@ -173,7 +173,7 @@
   "two_fa_desc": "Añade una capa extra de seguridad a tu cuenta. Próximamente",
   "e2ee": "Cifrado de extremo a extremo (E2EE)",
   "e2ee_desc": "Cifra tus mensajes directos. Próximamente",
-  "e2ee_dm_notice": "Los mensajes están cifrados de extremo a extremo. Nadie fuera de esta conversación puede leerlos, ni siquiera nosotros.",
+  "e2ee_dm_notice": "Los mensajes están cifrados de extremo a extremo. Nadie puede leerlos, nosotros incluidos.",
   "new_signin_notif": "Notificaciones de nuevo inicio de sesión",
   "new_signin_notif_desc": "Recibe notificaciones cuando un nuevo dispositivo inicia sesión en tu cuenta.",
   "allow_profile_sharing": "Permitir compartir perfil",

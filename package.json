@@ -23,6 +23,7 @@
     "release:win": "npm run build:packages && npm -w reelms-desktop run release:win",
     "docker:local": "docker compose -f infra/docker/docker-compose.local.yml up -d",
     "docker:down": "docker compose -f infra/docker/docker-compose.local.yml down",
+    "dev:ai-bot": "npm -w @reelms/ai-bot run dev",
     "dev:web:lan": "npm -w @reelms/web run dev:lan",
     "test:local:e2e": "node scripts/e2e-local-check.mjs",
     "repair:media": "node scripts/repair-media.mjs",
