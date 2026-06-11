@@ -664,5 +664,8 @@
   "home_recent_chats": "Chats recentes",
   "home_updates": "Atualizações",
   "home_all_caught_up": "Você está em dia.",
-  "password_update_failed": "Não foi possível atualizar a senha. Tente novamente."
+  "password_update_failed": "Não foi possível atualizar a senha. Tente novamente.",
+  "bot_radio_bio": "Toca música do YouTube nos seus canais.",
+  "bot_intelligence_bio": "Seu assistente de IA — converse, resuma mensagens e receba resumos diários.",
+  "bots_group_label": "Bots"
 }

@@ -664,5 +664,8 @@
   "home_recent_chats": "Chats recientes",
   "home_updates": "Actualizaciones",
   "home_all_caught_up": "Estás al día.",
-  "password_update_failed": "No se pudo actualizar la contraseña. Inténtalo de nuevo."
+  "password_update_failed": "No se pudo actualizar la contraseña. Inténtalo de nuevo.",
+  "bot_radio_bio": "Reproduce música de YouTube en tus canales.",
+  "bot_intelligence_bio": "Tu asistente de IA — chatea, resume mensajes y obtén resúmenes diarios.",
+  "bots_group_label": "Bots"
 }

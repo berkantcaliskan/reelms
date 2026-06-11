@@ -2895,7 +2895,10 @@ function normalizeFriendProfileTarget(profile = {}) {
   }
 }
 
+const BOT_BIO_KEY = { 'reelmradio': 'bot_radio_bio', 'reelms-intelligence': 'bot_intelligence_bio' }
+
 function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBlock, onUnblock, onAddFriend, isFriend = true, isBlocked = false, isPending = false, nickname, onNicknameChange, canShare, onMessage, onCreateGroup, onRequestRemoteControl, voiceContext = null, moderationContext = null, roleContext = null, isSelf = false, embedded = false, canEditNickname = true, onViewFullProfile }) {
+  const t = useT()
   const popupRef = useRef(null)
   const safeFriend = normalizeFriendProfileTarget(friend || {})
   const [editingNickname, setEditingNickname] = useState(false)
@@ -2940,7 +2943,9 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
           {safeFriend.activity?.name && <ActivityBadge activity={safeFriend.activity} />}
         </div>
       </div>
-      {safeFriend.bio && <p className="fpp-bio">{safeFriend.bio}</p>}
+      {(safeFriend.isBot ? t(BOT_BIO_KEY[safeFriend.username] || 'bot_radio_bio') : safeFriend.bio) && (
+        <p className="fpp-bio">{safeFriend.isBot ? t(BOT_BIO_KEY[safeFriend.username] || 'bot_radio_bio') : safeFriend.bio}</p>
+      )}
       {voiceContext && !isSelf && (
         <div className="fpp-voice-section">
           {voiceContext.userRoom ? (
@@ -3515,8 +3520,11 @@ function buildReelmMemberGroupsClient({ reelm, members, presence, currentUser, u
     roleMembers.forEach(m => assigned.add(String(m.userId)))
     if (roleMembers.length) groups.push({ role, members: roleMembers })
   }
-  const noRoleMembers = sortMembers((members || []).filter(m => !assigned.has(String(m.userId))))
+  const unassigned = (members || []).filter(m => !assigned.has(String(m.userId)))
+  const botMembers = sortMembers(unassigned.filter(m => m.isBot))
+  const noRoleMembers = sortMembers(unassigned.filter(m => !m.isBot))
   if (noRoleMembers.length) groups.push({ role: { id: '__no_role__', name: 'No role', color: '#94a3b8' }, members: noRoleMembers, noRole: true })
+  if (botMembers.length) groups.push({ role: { id: '__bots__', name: 'bots_group_label', color: '#7c8fa6' }, members: botMembers, isBotsGroup: true })
   return { groups, orderedRoles, getMemberPresence, getMemberStatus }
 }
 
@@ -11065,16 +11073,17 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         <React.Fragment key={m.userId}>
           <div
             className={`rp-member-card${isActiveStatus(status) ? ' rp-member-card--active' : ''}${isMainAdminMemberClient(selectedReelm, m) ? ' rp-member-card--main-admin' : ''}${isSelectedMember ? ' rp-member-card--selected' : ''}`}
-            onClick={e => openFriendProfile({ id: m.userId, name: displayName, photo: displayPhoto }, e, { serverContext: true })}
+            onClick={e => openFriendProfile({ id: m.userId, name: displayName, photo: displayPhoto, isBot: m.isBot, username: m.username }, e, { serverContext: true })}
           >
             <div className="rp-member-avatar-wrap">
-              <div className="rp-member-avatar">
+              <div className={`rp-member-avatar${m.isBot ? ' rp-member-avatar--bot' : ''}`}>
                 {displayPhoto
                   ? <CachedProfileImage src={displayPhoto} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
                   : (displayName || '?').charAt(0).toUpperCase()
                 }
               </div>
-              <span className="rp-member-status-dot" style={{ background: STATUS_COLORS[status] || STATUS_COLORS.offline }} />
+              {!m.isBot && <span className="rp-member-status-dot" style={{ background: STATUS_COLORS[status] || STATUS_COLORS.offline }} />}
+              {m.isBot && <span className="rp-member-bot-dot" title="Bot" />}
             </div>
             <div className="rp-member-info">
               <span className={`rp-member-name${nowPlaying ? ' rp-member-name--listening' : ''}`} style={primaryRole?.color ? { '--member-role-color': primaryRole.color } : undefined}>{displayName}</span>
@@ -11105,7 +11114,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           return (
             <div key={`${panelKey}-${group.role.id}`} className={`rp-role-section${group.noRole ? ' rp-role-section--no-role' : ''}`}>
               <div className="rp-role-section-header" style={{ color: group.role.color }}>
-                <span>{group.role.name}</span>
+                <span>{group.isBotsGroup ? t('bots_group_label') : group.role.name}</span>
                 <span className="rp-role-section-count">{group.members.length}</span>
               </div>
               {group.noRole && group.members.length > 18 && (

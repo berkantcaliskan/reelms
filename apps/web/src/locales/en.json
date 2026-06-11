@@ -7,6 +7,16 @@
   "usage": "Usage",
   "about": "About",
   "companions": "Companions",
+  "platform_windows": "Reelms for Windows",
+  "platform_windows_desc": "Desktop app with native notifications, auto-start, and system tray integration.",
+  "platform_macos": "Reelms for macOS",
+  "platform_macos_desc": "Native Mac app with menu bar access and Apple Silicon support.",
+  "platform_ios": "Reelms for iOS",
+  "platform_ios_desc": "Full Reelms on your iPhone and iPad with push notifications.",
+  "platform_android": "Reelms for Android",
+  "platform_android_desc": "Full Reelms on Android with push notifications and seamless performance.",
+  "platform_coming_soon": "Coming soon",
+  "platform_download": "Download",
   "sign_out": "Sign out",
   "sign_in": "Sign in",
   "sign_up": "Sign up",
@@ -700,5 +710,8 @@
   "home_reelms_recently": "Your Reelms, recently",
   "home_recent_chats": "Recent chats",
   "home_updates": "Updates",
-  "home_all_caught_up": "You're all caught up."
+  "home_all_caught_up": "You're all caught up.",
+  "bot_radio_bio": "Plays music from YouTube in your channels.",
+  "bot_intelligence_bio": "Your AI assistant — chat, summarize messages, and get daily digests.",
+  "bots_group_label": "Bots"
 }

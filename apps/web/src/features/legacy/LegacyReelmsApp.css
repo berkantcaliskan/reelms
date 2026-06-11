@@ -6833,6 +6833,19 @@ h6 {
   border-radius: 50%;
   border: 2px solid var(--tb);
 }
+.rp-member-bot-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 9px;
+  height: 9px;
+  border-radius: 3px;
+  background: #5865f2;
+  border: 2px solid var(--tb);
+}
+.rp-member-avatar--bot {
+  border-radius: 8px;
+}
 .rp-member-info {
   display: flex;
   flex-direction: column;

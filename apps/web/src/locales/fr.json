@@ -664,5 +664,8 @@
   "home_recent_chats": "Chats récents",
   "home_updates": "Mises à jour",
   "home_all_caught_up": "Vous êtes à jour.",
-  "password_update_failed": "Impossible de mettre à jour le mot de passe. Réessayez."
+  "password_update_failed": "Impossible de mettre à jour le mot de passe. Réessayez.",
+  "bot_radio_bio": "Joue de la musique YouTube dans vos salons.",
+  "bot_intelligence_bio": "Votre assistant IA — discutez, résumez des messages et obtenez des digests quotidiens.",
+  "bots_group_label": "Bots"
 }

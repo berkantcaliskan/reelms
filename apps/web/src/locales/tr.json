@@ -7,6 +7,17 @@
   "usage": "Kullanım",
   "about": "Hakkında",
   "companions": "Eşlikçiler",
+  "platform_windows": "Windows için Reelms",
+  "platform_windows_desc": "Yerel bildirimler, otomatik başlatma ve sistem tepsisi entegrasyonuyla masaüstü uygulama.",
+  "platform_macos": "macOS için Reelms",
+  "platform_macos_desc": "Menü çubuğu erişimi ve Apple Silicon desteğiyle yerel Mac uygulaması.",
+  "platform_ios": "iOS için Reelms",
+  "platform_ios_desc": "iPhone ve iPad'de anlık bildirimlerle tam Reelms deneyimi.",
+  "platform_android": "Android için Reelms",
+  "platform_android_desc": "Anlık bildirimler ve kesintisiz performansla Android'de tam Reelms deneyimi.",
+  "platform_coming_soon": "Yakında",
+  "platform_download": "İndir",
+  "platform_preparing_desc": "{name} için Reelms şu anda hazırlanıyor. Hazır olduğunda buradan kontrol edebilir, yükledikten sonra aynı hesabınla kullanmaya devam edebilirsin.",
   "sign_out": "Çıkış yap",
   "sign_in": "Giriş yap",
   "sign_up": "Kaydol",
@@ -675,5 +686,8 @@
   "home_reelms_recently": "Son Reelm'lerin",
   "home_recent_chats": "Son sohbetler",
   "home_updates": "Güncellemeler",
-  "home_all_caught_up": "Her şey yolunda."
+  "home_all_caught_up": "Her şey yolunda.",
+  "bot_radio_bio": "Kanallarında YouTube'dan müzik çalar.",
+  "bot_intelligence_bio": "AI asistanın — sohbet et, mesajları özetle, günlük özet al.",
+  "bots_group_label": "Botlar"
 }

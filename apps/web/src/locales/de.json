@@ -664,5 +664,8 @@
   "home_recent_chats": "Letzte Chats",
   "home_updates": "Aktualisierungen",
   "home_all_caught_up": "Du bist auf dem neuesten Stand.",
-  "password_update_failed": "Passwort konnte nicht aktualisiert werden. Bitte erneut versuchen."
+  "password_update_failed": "Passwort konnte nicht aktualisiert werden. Bitte erneut versuchen.",
+  "bot_radio_bio": "Spielt Musik von YouTube in deinen Kanälen.",
+  "bot_intelligence_bio": "Dein KI-Assistent — chatte, fasse Nachrichten zusammen und erhalte tägliche Digests.",
+  "bots_group_label": "Bots"
 }
