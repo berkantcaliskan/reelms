@@ -6,7 +6,10 @@ import './desktopDownload.css'
 function WindowsIcon() {
   return (
     <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M0 3.449L9.75 2.1v9.451H0m10.949-9.602L24 0v11.4H10.949M0 12.6h9.75v9.451L0 20.699M10.949 12.6H24V24l-12.9-1.801" />
+      <rect x="1" y="1" width="10.5" height="10.5" rx="0.5"/>
+      <rect x="12.5" y="1" width="10.5" height="10.5" rx="0.5"/>
+      <rect x="1" y="12.5" width="10.5" height="10.5" rx="0.5"/>
+      <rect x="12.5" y="12.5" width="10.5" height="10.5" rx="0.5"/>
     </svg>
   )
 }
@@ -36,10 +39,10 @@ function AndroidIcon() {
 }
 
 const PLATFORMS = [
-  { key: 'windows', name: 'Windows', Icon: WindowsIcon, color: '#0078D4', isDesktop: true },
-  { key: 'macos',   name: 'macOS',   Icon: AppleIcon,   color: '#888888', isDesktop: true },
-  { key: 'ios',     name: 'iOS',     Icon: IosIcon,     color: '#147CE5', isDesktop: false },
-  { key: 'android', name: 'Android', Icon: AndroidIcon, color: '#3DDC84', isDesktop: false },
+  { key: 'windows', name: 'Windows', Icon: WindowsIcon, color: '#0078D4' },
+  { key: 'macos',   name: 'macOS',   Icon: AppleIcon,   color: '#888888' },
+  { key: 'android', name: 'Android', Icon: AndroidIcon, color: '#3DDC84' },
+  { key: 'ios',     name: 'iOS',     Icon: IosIcon,     color: '#147CE5' },
 ]
 
 export function DesktopDownloadSettingsPanel({ language = 'en' }) {
