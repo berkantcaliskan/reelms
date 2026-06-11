@@ -4053,6 +4053,9 @@ h6 {
   background-clip: text;
   animation: ignite-flow 3s linear infinite;
 }
+.ignite-beta-logo .settings-ignite-word {
+  font-size: inherit;
+}
 
 /* ── Eşlikçiler (Companions) Panel ────────────────────────────── */
 .companions-panel {
