@@ -13,6 +13,8 @@ import { createSpotifyRouter } from './routes/spotify.routes.js'
 import { debugRouter } from './routes/debug.routes.js'
 import { trackRouter } from './routes/track.routes.js'
 import { clientRouter } from './routes/client.routes.js'
+import { createBotRouter } from './routes/bot.routes.js'
+import { createAIBotRouter } from './routes/ai-bot.routes.js'
 import { requestContext } from './middleware/requestContext.js'
 import { requestLogger } from './middleware/requestLogger.js'
 import { apiRateLimit, authRateLimit, trackingRateLimit } from './middleware/rateLimit.js'
@@ -75,6 +77,8 @@ export function createApp(io?: Server) {
 
   if (io) {
     app.use(createSpotifyRouter(io))
+    app.use(createBotRouter(io))
+    app.use(createAIBotRouter(io))
     // /api/v1 routers authenticate first, then apply apiRateLimit internally.
     // This keeps normal app traffic user-based instead of proxy/IP-based.
     app.use('/api/v1/social', createSocialRouter(io))

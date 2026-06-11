@@ -5,6 +5,8 @@ import { signToken } from '../../modules/auth/authService.js'
 import { getDoc, putDoc, reelmPk, userPk } from '../../modules/store/docStore.js'
 import { authenticate } from '../middleware/authenticate.js'
 import { isReelmMember } from '../../modules/reelms/access.js'
+import { DEFAULT_REELM_ID } from '../../modules/reelms/defaultReelm.js'
+import { isCommunityAdminUid } from '../../modules/reelms/communityAdmins.js'
 
 export const BOT_UID = env.REELMS_BOT_UID
 const BOT_USERNAME = 'reelmradio'
@@ -68,6 +70,11 @@ export function createBotRouter(io: Server) {
       })
       console.log('[bot/add-bot] isMember:', isMember)
       if (!isMember) return res.status(403).json({ error: 'forbidden' })
+
+      if (reelmId === DEFAULT_REELM_ID) {
+        const isAdmin = await isCommunityAdminUid(actorUid)
+        if (!isAdmin) return res.status(403).json({ error: 'forbidden' })
+      }
 
       const pk = reelmPk(reelmId)
       const [meta, structure, members] = await Promise.all([
