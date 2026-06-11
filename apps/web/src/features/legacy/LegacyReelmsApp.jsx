@@ -11583,10 +11583,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       { id: 'account',       label: t('your_account') },
                       { id: 'customization', label: t('customization') },
                       { id: 'usage',         label: t('usage') },
-                      { id: 'desktop',       label: 'Desktop App' },
                       { id: 'privacy',       label: t('privacy_safety') },
                       { id: 'environment',   label: t('environment') },
                       { id: 'companions',    label: t('companions') },
+                      { id: 'desktop',       label: 'Desktop and Mobile' },
                       { id: 'about',         label: t('about') },
                     ].map(item => (
                       <button
