@@ -115,14 +115,12 @@
   "spectrum_primary": "Primario",
   "spectrum_accent": "Secundario",
   "msg_requests_section": "Solicitudes de mensaje",
-
   "typography": "Tipografía",
   "typography_desc": "Personaliza las fuentes usadas en la app.",
   "headers_label": "Encabezados",
   "body_label": "Cuerpo",
   "font_default": "Predeterminado",
   "help_center": "Centro de ayuda",
-
   "signup_heading": "Vamos a crear tu cuenta.",
   "your_name": "Tu nombre",
   "whens_birthday": "¿Cuándo es tu cumpleaños?",
@@ -143,7 +141,6 @@
   "error_username_chars": "El nombre de usuario solo puede contener letras, números, guiones y guiones bajos.",
   "error_email_in_use": "Este correo electrónico ya está en uso.",
   "error_account_creation": "Error al crear la cuenta. Inténtalo de nuevo.",
-
   "change_photo": "Cambiar foto",
   "saved": "¡Guardado!",
   "your_name_ph": "Tu nombre",
@@ -171,7 +168,6 @@
   "close_account_desc": "Elimina permanentemente tu cuenta y todos los datos.",
   "adjust_photo": "Ajustar foto",
   "adjust_photo_hint": "Arrastra para reposicionar · deslizador para zoom",
-
   "security": "Seguridad",
   "two_fa": "Autenticación de dos factores (2FA)",
   "two_fa_desc": "Añade una capa extra de seguridad a tu cuenta. Próximamente",
@@ -207,7 +203,6 @@
   "this_device": "Este dispositivo",
   "signed_in_at": "Sesión iniciada",
   "last_active": "Última actividad",
-
   "background": "Fondo",
   "remove": "Eliminar",
   "upload_bg": "Subir imagen de fondo",
@@ -228,7 +223,6 @@
   "share_sys_audio_desc": "Incluye la salida de audio de tu dispositivo en la transmisión de pantalla.",
   "show_cursor": "Mostrar cursor",
   "show_cursor_desc": "Hace tu cursor visible para otros durante la transmisión de pantalla.",
-
   "edit_cover": "Editar portada",
   "edit_profile": "Editar perfil",
   "status_label": "Estado",
@@ -265,7 +259,6 @@
   "delete_link": "Eliminar enlace",
   "social_placeholder": "@usuario",
   "loading_profile": "Cargando perfil…",
-
   "nickname_label": "APODO",
   "add_nickname": "Añadir apodo...",
   "message_btn": "Mensaje",
@@ -285,7 +278,6 @@
   "vapor_chat_desc": "Los mensajes se eliminan automáticamente después del tiempo establecido.",
   "turn_off": "Desactivar",
   "vapor_chat_on": "Chat Vapor activado",
-
   "reelm_tab_general": "General",
   "reelm_tab_visibility": "Visibilidad",
   "reelm_tab_roles": "Roles y miembros",
@@ -310,7 +302,6 @@
   "voice_channels_section": "Canales de voz",
   "auto_join_click": "Unirse automáticamente al hacer clic",
   "auto_join_click_desc": "Los miembros se unen instantáneamente a un canal de voz al hacer clic.",
-
   "only_admins_post": "Solo los administradores pueden publicar en este canal.",
   "post_announcement": "Publicar un anuncio...",
   "talk_placeholder": "Habla...",
@@ -339,7 +330,6 @@
   "go_to_voice": "Ir al canal de voz",
   "live_action": "Acción en vivo",
   "voice_room": "Sala de voz",
-
   "all_filter": "Todos",
   "unread_filter": "No leídos",
   "groups_filter": "Grupos",
@@ -350,7 +340,6 @@
   "accept": "Aceptar",
   "decline": "Rechazar",
   "reject": "Rechazar",
-
   "search_placeholder": "Buscar reelms, personas...",
   "search_hint": "Empieza a escribir para buscar en reelms, chats y personas.",
   "no_results_for": "Sin resultados para",
@@ -361,11 +350,9 @@
   "pending_badge": "Pendiente",
   "add_friend": "Agregar amigo",
   "requested_badge": "Solicitado",
-
   "friend_requests": "Solicitudes de amistad",
   "no_friends_yet": "Sin amigos aún.",
   "no_notifications": "Sin notificaciones.",
-
   "add_to_story": "Añadir a tu historia",
   "story_text": "Texto",
   "story_photo_video": "Foto / Video",
@@ -389,7 +376,6 @@
   "copy": "Copiar",
   "add_comment": "Añadir un comentario...",
   "reply_ph": "Responder...",
-
   "drafts": "Borradores",
   "no_drafts": "Sin borradores guardados.",
   "untitled": "Sin título",
@@ -416,7 +402,6 @@
   "enter_url": "Ingresa URL:",
   "reading_mode": "Modo lectura",
   "min_read": "min de lectura",
-
   "new_thread_tooltip": "Nuevo hilo",
   "no_threads": "Sin hilos aún. Sé el primero.",
   "vapor_room_active": "Sala Vapor activa",
@@ -429,7 +414,6 @@
   "add_reply": "Añadir una respuesta…",
   "close_vapor_room": "Cerrar sala Vapor",
   "launch_vapor_room": "Lanzar sala Vapor",
-
   "news": "Noticias",
   "post_news_tooltip": "Publicar noticia",
   "category_ph": "Categoría…",
@@ -438,7 +422,6 @@
   "no_news": "Sin noticias en este reelm aún.",
   "no_headlines": "Sin titulares aún.",
   "create_content": "Crear nuevo contenido.",
-
   "invite_friends_menu": "Invitar amigos",
   "reelm_code": "Código Reelm",
   "invite_link": "Enlace de invitación",
@@ -451,7 +434,6 @@
   "share_modal_title": "Compartir",
   "copy_link_btn": "Copiar enlace",
   "download_image": "Descargar imagen",
-
   "create_reelm_title": "Nombra tu Reelm",
   "reelm_name_ph": "Mi Reelm",
   "join_reelm_title": "Unirse a un Reelm",
@@ -466,7 +448,6 @@
   "next_btn": "Siguiente →",
   "new_group": "Nuevo grupo",
   "create_group_btn": "Crear grupo",
-
   "create_vapor_title": "Crear una sala Vapor",
   "vapor_rooms_desc": "Las salas Vapor desaparecen permanentemente cuando se acaba el tiempo.",
   "room_name_ph": "nombre-sala",
@@ -480,7 +461,6 @@
   "duration_12h": "12h",
   "duration_24h": "24h",
   "duration_48h": "48h",
-
   "new_channel": "Nuevo canal",
   "create_vapor_room_ctx": "Crear sala vapor",
   "room_name_input": "Nombre de la sala",
@@ -490,30 +470,24 @@
   "capacity": "Capacidad",
   "unlimited": "+ Ilimitado",
   "delete_channel": "Eliminar canal",
-
   "reelm_settings_menu": "Configuración del reelm",
   "share_reelm": "Compartir Reelm",
   "leave_reelm": "Salir del Reelm",
-
   "report_spam": "Spam",
   "report_harassment": "Acoso u odio",
   "report_inappropriate": "Contenido inapropiado",
   "report_misinfo": "Desinformación",
   "report_violence": "Violencia o amenazas",
   "report_other": "Otro",
-
   "leaving_reelms": "Saliendo de Reelms",
   "external_link_desc": "Este enlace va a un sitio externo:",
   "continue_btn": "Continuar",
-
   "nudge_msg": "¡te dio un toque!",
   "nudge_back": "Responder toque",
   "send_message_btn": "Enviar mensaje",
   "wants_control": "quiere controlar tu pantalla",
   "allow": "Permitir",
-
   "just_now": "ahora mismo",
-
   "joined_reelm": "¡se unió al reelm!",
   "reelm_settings_label": "Configuración del reelm",
   "file_label": "Archivo",
@@ -524,7 +498,6 @@
   "feedback_placeholder": "Cuéntanos tu experiencia, reporta un error o comparte una idea…",
   "feedback_sent": "¡Mensaje enviado! Gracias.",
   "feedback_error": "Error al enviar. Inténtalo de nuevo.",
-
   "terms_of_service": "Términos de Servicio",
   "privacy_policy": "Política de Privacidad",
   "legal_consent_1": "Al continuar, aceptas nuestros ",
@@ -552,7 +525,6 @@
   "privacy_s4_body": "Tus datos están protegidos mediante métodos estándar de la industria.",
   "privacy_s5_title": "5. Eliminación de cuenta",
   "privacy_s5_body": "Puedes eliminar tu cuenta y datos en cualquier momento.",
-
   "cat_beginning": "Inicio",
   "cat_text": "Texto",
   "cat_voice": "Voz & Vídeo",
@@ -562,7 +534,6 @@
   "ch_voice_room": "Sala de Voz",
   "ch_video_room": "Sala de Vídeo",
   "ch_space": "espacio",
-
   "tpl_gaming_name": "Gaming & Esports",
   "tpl_gaming_desc": "Ideal para gamers y aficionados al esport.",
   "tpl_gaming_begin": "todo, torneos",
@@ -611,7 +582,6 @@
   "tpl_lifestyle_text": "chat, descubrimientos diarios, recetas y consejos, rutinas, galería de fotos",
   "tpl_lifestyle_mm": "charla de café, compartir experiencias, sala de motivación",
   "tpl_lifestyle_live": "espacio",
-
   "welcome_to_reelm": "Bienvenido a tu Reelm.",
   "email_or_username_ph": "Correo o nombre de usuario",
   "forgot_password": "¿Olvidaste?",
@@ -626,7 +596,6 @@
   "no_account_signup_first": "Cuenta no encontrada. Por favor regístrate primero.",
   "too_many_login_attempts": "Demasiados intentos. Inténtalo más tarde.",
   "signin_failed_retry": "Error al iniciar sesión. Inténtalo de nuevo.",
-
   "month_jan": "Enero",
   "month_feb": "Febrero",
   "month_mar": "Marzo",
@@ -642,7 +611,6 @@
   "day_ph": "Día",
   "month_ph": "Mes",
   "year_ph": "Año",
-
   "audio_section": "Audio",
   "microphone_label": "Micrófono",
   "microphone_desc": "Dispositivo de entrada para comunicación de voz.",
@@ -683,7 +651,6 @@
   "res_720p": "720p",
   "res_1080p": "1080p",
   "res_4k": "4K",
-
   "permissions_label": "Permisos",
   "permissions_coming_soon": "Sistema de permisos próximamente.",
   "add_members": "Agregar miembros",
@@ -695,5 +662,6 @@
   "home_reelms_recently": "Tus Reelms, recientemente",
   "home_recent_chats": "Chats recientes",
   "home_updates": "Actualizaciones",
-  "home_all_caught_up": "Estás al día."
+  "home_all_caught_up": "Estás al día.",
+  "password_update_failed": "No se pudo actualizar la contraseña. Inténtalo de nuevo."
 }

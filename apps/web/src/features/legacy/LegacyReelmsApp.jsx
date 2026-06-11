@@ -117,6 +117,7 @@ import {
   closeReelmRemote,
   userProfilePut,
   userProfilePatch,
+  authChangePassword,
   userProfileGetById,
   userProfileDelete,
   userByUsername,
@@ -128,7 +129,10 @@ import {
   feedbackSend,
   getVoiceIceServers,
   mediaUploadToS3,
+  e2eeRegisterKey,
+  e2eeGetPublicKey,
 } from '../../reelmsAwsClient'
+import { getOrCreateKeyPair, getKeyPair, encryptForRecipient, decryptFromSender } from '../../lib/e2ee'
 import { seedModerationAccount, MODERATION_ACCOUNT_ID, isModerationSystemUser } from '../../reelmsModerationAccount'
 import { moderateText } from '../../moderationClient'
 import { playSound, applySoundSettings, previewSound, preloadSounds, SOUND_CATEGORIES, SOUND_DEFAULTS } from '../../soundManager'
@@ -1659,9 +1663,11 @@ function AccountSettingsPanel({ user, onUpdate, onLogOut, profileBio, onBioChang
   const [usernameSaved, setUsernameSaved] = useState(false)
   const [bioInput, setBioInput] = useState(profileBio || user.bio || '')
   const [contactInput, setContactInput] = useState(user.contact || '')
-  const [currentPw, setCurrentPw] = useState('')
   const [newPw, setNewPw] = useState('')
   const [confirmPw, setConfirmPw] = useState('')
+  const [currentPw, setCurrentPw] = useState('')
+  const [pwPhase, setPwPhase] = useState('new') // 'new' | 'confirm'
+  const [pwSaving, setPwSaving] = useState(false)
   const [pwError, setPwError] = useState('')
   const [pwSuccess, setPwSuccess] = useState(false)
   const [nameSaved, setNameSaved] = useState(false)
@@ -1804,16 +1810,31 @@ function AccountSettingsPanel({ user, onUpdate, onLogOut, profileBio, onBioChang
     setTimeout(() => setContactSaved(false), 2000)
   }
 
-  const savePassword = () => {
+  const handlePasswordUpdate = async () => {
     setPwError('')
-    setPwSuccess(false)
-    if (currentPw !== user.password) { setPwError(t('wrong_current_password')); return }
-    if (newPw.length < 6) { setPwError(t('password_too_short')); return }
+    if (newPw.length < 8) { setPwError(t('password_too_short')); return }
     if (newPw !== confirmPw) { setPwError(t('passwords_no_match')); return }
-    onUpdate({ password: newPw })
-    setCurrentPw(''); setNewPw(''); setConfirmPw('')
-    setPwSuccess(true)
-    setTimeout(() => setPwSuccess(false), 2000)
+    const hasPassword = Boolean(user.hasPassword)
+    if (hasPassword && pwPhase === 'new') {
+      setPwPhase('confirm')
+      return
+    }
+    setPwSaving(true)
+    try {
+      await authChangePassword({ newPassword: newPw, currentPassword: hasPassword ? currentPw : undefined })
+      onUpdate({ hasPassword: true })
+      setNewPw(''); setConfirmPw(''); setCurrentPw('')
+      setPwPhase('new')
+      setPwSuccess(true)
+      setTimeout(() => setPwSuccess(false), 3000)
+    } catch (err) {
+      const code = err?.code || ''
+      if (code === 'auth/wrong-password') setPwError(t('wrong_current_password'))
+      else if (code === 'auth/weak-password') setPwError(t('password_too_short'))
+      else setPwError(err?.message || t('password_update_failed'))
+    } finally {
+      setPwSaving(false)
+    }
   }
 
   const downloadUserData = async (format) => {
@@ -1975,12 +1996,22 @@ ${posts.length ? `<ul>${posts.map(p => { const raw = (p.text || p.content || '')
       <div className="accs-section">
         <div className="accs-section-title">{t('change_password')}</div>
         <div className="accs-field-col">
-          <input className="accs-input" type="password" value={currentPw} onChange={e => { setCurrentPw(e.target.value); setPwError(''); setPwSuccess(false) }} placeholder={t('current_password')} />
-          <input className="accs-input" type="password" value={newPw} onChange={e => { setNewPw(e.target.value); setPwError(''); setPwSuccess(false) }} placeholder={t('new_password')} />
-          <input className="accs-input" type="password" value={confirmPw} onChange={e => { setConfirmPw(e.target.value); setPwError(''); setPwSuccess(false) }} placeholder={t('confirm_password')} />
+          {pwPhase === 'new' ? (
+            <>
+              <input className="accs-input" type="password" value={newPw} onChange={e => { setNewPw(e.target.value); setPwError(''); setPwSuccess(false) }} placeholder={t('new_password')} autoComplete="new-password" />
+              <input className="accs-input" type="password" value={confirmPw} onChange={e => { setConfirmPw(e.target.value); setPwError(''); setPwSuccess(false) }} placeholder={t('confirm_password')} autoComplete="new-password" />
+            </>
+          ) : (
+            <>
+              <input className="accs-input" type="password" value={currentPw} onChange={e => { setCurrentPw(e.target.value); setPwError('') }} placeholder={t('current_password')} autoComplete="current-password" autoFocus />
+              <button type="button" className="accs-link-btn" onClick={() => { setPwPhase('new'); setCurrentPw(''); setPwError('') }}>{t('back')}</button>
+            </>
+          )}
           {pwError && <p className="accs-error">{pwError}</p>}
           {pwSuccess && <p className="accs-success">{t('password_updated')}</p>}
-          <button className="accs-btn" style={{ alignSelf: 'flex-end' }} onClick={savePassword}>{t('update_password')}</button>
+          <button className="accs-btn" style={{ alignSelf: 'flex-end' }} onClick={handlePasswordUpdate} disabled={pwSaving}>
+            {pwSaving ? '…' : pwPhase === 'confirm' ? t('confirm') : t('update_password')}
+          </button>
         </div>
       </div>
 
@@ -6424,6 +6455,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     return () => { alive = false }
   }, [])
 
+  useEffect(() => {
+    if (!uid || uid === 'guest') return
+    getOrCreateKeyPair().then(kp => e2eeRegisterKey(kp.publicKey)).catch(() => {})
+  }, [uid])
+
   const normalizeProfileUpdates = (updates = {}) => {
     const next = { ...(updates || {}) }
     const photo = getPersonPhoto(next)
@@ -7365,10 +7401,25 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         addNotification(`${name || 'This Reelm'} was closed.`, { type: 'reelm_closed', reelmId: id })
       },
       onMessage: (msgKey, msg) => {
-        setMessages(prev => appendUniqueMessage(prev, msgKey, msg))
-        const now = Date.now()
-        const key = String(msgKey || '')
-        const isDmKey = key.startsWith('dm_')
+        const processMsg = async () => {
+          let displayMsg = msg
+          if (String(msgKey).startsWith('dm_') && msg.enc) {
+            const senderUid = String(msg.sender?.id || msg.userId || msg.authorId || '')
+            if (senderUid && senderUid !== String(uid)) {
+              try {
+                const [myKeys, senderPk] = await Promise.all([getKeyPair(), e2eeGetPublicKey(senderUid)])
+                if (myKeys && senderPk) {
+                  const plaintext = decryptFromSender(msg.text || '', senderPk, myKeys.secretKey)
+                  if (plaintext != null) displayMsg = { ...msg, text: plaintext }
+                }
+              } catch {}
+            }
+          }
+          setMessages(prev => appendUniqueMessage(prev, msgKey, displayMsg))
+          const now = Date.now()
+          const key = String(msgKey || '')
+          const isDmKey = key.startsWith('dm_')
+          const effectiveText = displayMsg.text
         let transientChat = null
         if (isDmKey) {
           const participants = key.slice(3).split('_').filter(Boolean)
@@ -7390,7 +7441,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               profilePhoto: peerPhoto || getPersonPhoto(existingChat) || null,
               avatar: peerPhoto || getPersonPhoto(existingChat) || null,
               image: peerPhoto || getPersonPhoto(existingChat) || null,
-              lastMessage: String(msg?.text || msg?.mediaType || 'New message').slice(0, 180),
+              lastMessage: String(effectiveText || msg?.mediaType || 'New message').slice(0, 180),
               lastMessageAt: Number(msg?.time || now) || now,
               updatedAt: now
             }
@@ -7414,7 +7465,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         }
         if (String(msg.sender?.id) !== String(uid)) {
           const myUsername = currentUserRef.current?.username || ''
-          const hasMention = myUsername && msg.text && msg.text.toLowerCase().includes(`@${myUsername.toLowerCase()}`)
+          const hasMention = myUsername && effectiveText && effectiveText.toLowerCase().includes(`@${myUsername.toLowerCase()}`)
           const isActiveThread = msgKey === activeMsgKeyRef.current && !document.hidden
           if (hasMention) playSound.mention()
           const mutedReelmId = !isDmKey ? reelmsRef.current.find(r => String(msgKey).startsWith(`${r.id}_`))?.id : null
@@ -7430,14 +7481,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             if (chat || transientChat) {
               const dmChat = chat || transientChat
               link = { type: 'dm', chatId: dmChat.id, userId: dmChat.friendId || msg.sender?.id }
-              title = `${msg.sender?.name || dmChat.name || 'New message'}: ${msg.text || 'sent a message'}`
+              title = `${msg.sender?.name || dmChat.name || 'New message'}: ${effectiveText || (msg.enc ? 'sent an encrypted message' : 'sent a message')}`
             } else {
               const reelm = reelmsRef.current.find(r => String(msgKey).startsWith(`${r.id}_`))
               const channelId = reelm ? String(msgKey).slice(String(reelm.id).length + 1) : ''
               const channel = reelm?.categories?.flatMap(c => c.channels || []).find(c => String(c.id) === channelId)
               if (reelm && channel) {
                 link = { type: 'reelm', reelmId: reelm.id, channelId: channel.id }
-                title = `${msg.sender?.name || 'Someone'} in #${channel.name}: ${msg.text || 'sent a message'}`
+                title = `${msg.sender?.name || 'Someone'} in #${channel.name}: ${effectiveText || 'sent a message'}`
               }
             }
             if (link && title) {
@@ -7446,6 +7497,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             }
           }
         }
+        }
+        processMsg()
       },
       onMessagesCleared: (msgKey) => {
         setMessages(prev => ({ ...prev, [msgKey]: [] }))
@@ -8589,8 +8642,25 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       return new Date()
     }
     const now = Date.now()
-    messagesGet(msgKey).then(msgs => {
-      const filtered = dedupeMessagesForRender(msgs.filter(m => !vanishExpired(m, now)))
+    messagesGet(msgKey).then(async msgs => {
+      let processed = msgs
+      if (msgKey.startsWith('dm_')) {
+        const myKeys = await getKeyPair().catch(() => null)
+        if (myKeys) {
+          processed = await Promise.all(msgs.map(async m => {
+            if (!m.enc || !m.text) return m
+            const senderUid = String(m.sender?.id || m.userId || m.authorId || '')
+            if (!senderUid || senderUid === String(uid)) return m
+            try {
+              const senderPk = await e2eeGetPublicKey(senderUid)
+              if (!senderPk) return m
+              const plaintext = decryptFromSender(m.text, senderPk, myKeys.secretKey)
+              return plaintext != null ? { ...m, text: plaintext } : m
+            } catch { return m }
+          }))
+        }
+      }
+      const filtered = dedupeMessagesForRender(processed.filter(m => !vanishExpired(m, now)))
       setMessages(prev => {
         const current = prev[msgKey] || []
         return sameMessageList(current, filtered) ? prev : { ...prev, [msgKey]: filtered }
@@ -10563,7 +10633,20 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         ...(replySnap ? { replyTo: { id: replySnap.id, text: replySnap.text, senderName: replySnap.senderName, senderId: replySnap.senderId } } : {})
       }
       setMessages(prev => appendUniqueMessage(prev, msgKey, msg))
-      messageSend(msgKey, msg).catch(err => handleRemoteMessageError(err, msgKey, msg.id))
+      // For DMs: encrypt before sending; keep plaintext in local state for sender
+      let msgToSend = msg
+      if (msgKey.startsWith('dm_')) {
+        const peerUid = msgKey.slice(3).split('_').find(p => p !== String(uid))
+        if (peerUid) {
+          try {
+            const [myKeys, recipientPk] = await Promise.all([getKeyPair(), e2eeGetPublicKey(peerUid)])
+            if (myKeys && recipientPk) {
+              msgToSend = { ...msg, text: encryptForRecipient(text, recipientPk, myKeys.secretKey), enc: true }
+            }
+          } catch {}
+        }
+      }
+      messageSend(msgKey, msgToSend).catch(err => handleRemoteMessageError(err, msgKey, msg.id))
       notifyMentions(text)
       if (replySnap && String(replySnap.senderId) !== String(uid)) {
         _pushNotifTo(replySnap.senderId, `${currentUser.name || 'Someone'} ${t('replied_to_you')}`,

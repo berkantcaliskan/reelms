@@ -498,7 +498,6 @@
   "feedback_placeholder": "Erzähl uns von deiner Erfahrung, melde einen Fehler oder teile eine Idee…",
   "feedback_sent": "Nachricht gesendet! Danke.",
   "feedback_error": "Senden fehlgeschlagen. Bitte versuche es erneut.",
-
   "terms_of_service": "Nutzungsbedingungen",
   "privacy_policy": "Datenschutzrichtlinie",
   "legal_consent_1": "Mit dem Fortfahren stimmst du unseren ",
@@ -526,7 +525,6 @@
   "privacy_s4_body": "Deine Daten sind durch branchenübliche Methoden geschützt.",
   "privacy_s5_title": "5. Kontolöschung",
   "privacy_s5_body": "Du kannst dein Konto und deine Daten jederzeit löschen.",
-
   "cat_beginning": "Beginn",
   "cat_text": "Text",
   "cat_voice": "Sprache & Video",
@@ -536,7 +534,6 @@
   "ch_voice_room": "Sprachraum",
   "ch_video_room": "Videoraum",
   "ch_space": "space",
-
   "tpl_gaming_name": "Gaming & Esports",
   "tpl_gaming_desc": "Ideal für Gamer und Esports-Fans.",
   "tpl_gaming_begin": "alles, turniere",
@@ -585,7 +582,6 @@
   "tpl_lifestyle_text": "chat, tägliche entdeckungen, rezepte & tipps, routineempfehlungen, fotogalerie",
   "tpl_lifestyle_mm": "tee-chat, erfahrungsaustausch, motivationsraum",
   "tpl_lifestyle_live": "space",
-
   "welcome_to_reelm": "Willkommen in deinem Reelm.",
   "email_or_username_ph": "E-Mail oder Benutzername",
   "forgot_password": "Vergessen?",
@@ -600,7 +596,6 @@
   "no_account_signup_first": "Kein Konto gefunden. Bitte zuerst registrieren.",
   "too_many_login_attempts": "Zu viele Versuche. Bitte später erneut versuchen.",
   "signin_failed_retry": "Anmeldung fehlgeschlagen. Bitte erneut versuchen.",
-
   "month_jan": "Januar",
   "month_feb": "Februar",
   "month_mar": "März",
@@ -616,7 +611,6 @@
   "day_ph": "Tag",
   "month_ph": "Monat",
   "year_ph": "Jahr",
-
   "audio_section": "Audio",
   "microphone_label": "Mikrofon",
   "microphone_desc": "Eingabegerät für die Sprachkommunikation.",
@@ -657,7 +651,6 @@
   "res_720p": "720p",
   "res_1080p": "1080p",
   "res_4k": "4K",
-
   "permissions_label": "Berechtigungen",
   "permissions_coming_soon": "Berechtigungssystem kommt bald.",
   "add_members": "Mitglieder hinzufügen",
@@ -669,5 +662,6 @@
   "home_reelms_recently": "Deine Reelms, kürzlich",
   "home_recent_chats": "Letzte Chats",
   "home_updates": "Aktualisierungen",
-  "home_all_caught_up": "Du bist auf dem neuesten Stand."
+  "home_all_caught_up": "Du bist auf dem neuesten Stand.",
+  "password_update_failed": "Passwort konnte nicht aktualisiert werden. Bitte erneut versuchen."
 }

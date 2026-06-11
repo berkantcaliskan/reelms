@@ -288,7 +288,8 @@ authRouter.post('/register', async (req, res) => {
       updatedAt: now,
       notifyNewDevice: true,
       emailVerified: false,
-      isModerator: false
+      isModerator: false,
+      hasPassword: true,
     }
     await putDoc(userPk(uid), 'profile', profile)
     await autoJoinDefaultReelm(uid, profile.displayName || '', null).catch(() => {})
@@ -389,11 +390,42 @@ authRouter.post('/password-reset/confirm', async (req, res) => {
     const passwordHash = await hashPassword(passwordCheck.password)
     await putDoc(`AUTH#${email}`, 'CREDS', { ...creds, passwordHash, emailVerified: true, emailVerifiedAt: creds.emailVerifiedAt || Date.now(), passwordResetAt: Date.now(), lastPasswordResetEmailSentAt: null })
     const profile = await getDoc<any>(userPk(String(action.uid)), 'profile').catch(() => null)
-    if (profile) await putDoc(userPk(String(action.uid)), 'profile', { ...profile, emailVerified: true, updatedAt: Date.now() }).catch(() => {})
+    if (profile) await putDoc(userPk(String(action.uid)), 'profile', { ...profile, hasPassword: true, emailVerified: true, updatedAt: Date.now() }).catch(() => {})
     return res.json({ ok: true })
   } catch (e) {
     console.error('/auth/password-reset/confirm error:', e)
     return res.status(500).json({ error: 'reset_failed', code: 'auth/server-error' })
+  }
+})
+
+authRouter.post('/change-password', async (req, res) => {
+  const h = req.headers.authorization || ''
+  if (!h.startsWith('Bearer ')) return res.status(401).json({ error: 'missing_token', code: 'auth/missing-token' })
+  const newPasswordCheck = validatePassword(req.body?.newPassword)
+  if (!newPasswordCheck.ok) return res.status(400).json({ error: newPasswordCheck.error, code: newPasswordCheck.code, message: newPasswordCheck.message })
+  try {
+    const uid = await verifyIdToken(h.slice(7))
+    const profile = await getDoc<any>(userPk(uid), 'profile').catch(() => null)
+    const email = normalizeEmail(profile?.contact || profile?.email || '')
+    if (!email) return res.status(400).json({ error: 'no_email', code: 'auth/no-email', message: 'No e-mail is associated with this account.' })
+    const creds = await getDoc<any>(`AUTH#${email}`, 'CREDS').catch(() => null)
+    if (!creds?.uid) return res.status(404).json({ error: 'user_not_found', code: 'auth/user-not-found' })
+    const hasPassword = Boolean(creds?.passwordHash)
+    if (hasPassword) {
+      const currentPassword = String(req.body?.currentPassword || '')
+      if (!currentPassword) return res.status(422).json({ error: 'current_password_required', code: 'auth/current-password-required', message: 'Enter your current password to confirm this change.' })
+      const ok = await verifyPassword(currentPassword, String(creds.passwordHash))
+      if (!ok) return res.status(401).json({ error: 'wrong_password', code: 'auth/wrong-password', message: 'The current password is incorrect.' })
+    }
+    const passwordHash = await hashPassword(newPasswordCheck.password)
+    await putDoc(`AUTH#${email}`, 'CREDS', { ...creds, passwordHash, passwordChangedAt: Date.now() })
+    if (profile) await putDoc(userPk(uid), 'profile', { ...profile, hasPassword: true, updatedAt: Date.now() }).catch(() => {})
+    return res.json({ ok: true })
+  } catch (err: any) {
+    if (err?.code === 'auth/session-replaced' || err?.code === 'session_replaced') {
+      return res.status(401).json({ error: 'session_replaced', code: 'auth/session-replaced' })
+    }
+    return res.status(401).json({ error: 'invalid_token', code: 'auth/invalid-token' })
   }
 })
 

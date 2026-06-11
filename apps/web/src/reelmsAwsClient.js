@@ -648,6 +648,15 @@ export function socketVcBroadcast(reelmId, channelId, payload) {
   socket.emit('vc:broadcast', { reelmId, channelId, payload })
 }
 
+// ── Auth actions (authenticated) ──────────────────────────────────────────────
+
+export async function authChangePassword({ newPassword, currentPassword }) {
+  return api('/auth/change-password', {
+    method: 'POST',
+    body: JSON.stringify({ newPassword, currentPassword }),
+  })
+}
+
 // ── User profiles ─────────────────────────────────────────────────────────────
 
 export async function userProfilePut(data) {
@@ -755,6 +764,24 @@ export async function reactionsToggle(msgKey, msgId, emoji, userId) {
     method: 'POST',
     body: JSON.stringify({ emoji, userId: String(userId) }),
   })
+}
+
+// ── E2EE key management ───────────────────────────────────────────────────────
+
+const e2eeKeyCache = new Map()
+
+export async function e2eeRegisterKey(publicKey) {
+  await api('/api/v1/user/e2ee', { method: 'PUT', body: JSON.stringify({ publicKey }) })
+}
+
+export async function e2eeGetPublicKey(uid) {
+  const id = String(uid || '')
+  if (!id) return null
+  if (e2eeKeyCache.has(id)) return e2eeKeyCache.get(id)
+  const j = await api(`/api/v1/user/e2ee/${encodeURIComponent(id)}`).catch(() => null)
+  const key = j?.data || null
+  if (key) e2eeKeyCache.set(id, key)
+  return key
 }
 
 export async function modInboxGet() {
