@@ -1538,9 +1538,19 @@ const REELM_RADIO_BOT = {
   tags: ['Müzik', 'YouTube', 'Ücretsiz'],
 }
 
+const REELMS_INTELLIGENCE_BOT = {
+  id: 'reelms-intelligence',
+  name: 'Reelms Intelligence',
+  username: 'reelms-intelligence',
+  description: 'Kanallarında AI asistanı. Soru sor, mesajları özetle, günlük digest al.',
+  tags: ['AI', 'Özet', 'Sohbet'],
+}
+
 function CompanionsPanel({ reelms = [] }) {
   const [botStatus, setBotStatus] = useState({})
   const [loading, setLoading] = useState({})
+  const [aiBotStatus, setAiBotStatus] = useState({})
+  const [aiLoading, setAiLoading] = useState({})
   const [authToken, setAuthToken] = useState(null)
 
   useEffect(() => {
@@ -1574,6 +1584,27 @@ function CompanionsPanel({ reelms = [] }) {
     })
   }, [reelms, authToken])
 
+  useEffect(() => {
+    if (!reelms.length || !authToken) return
+    const checks = reelms.map(async (r) => {
+      try {
+        const res = await fetch(`${BACKEND_URL}/api/v1/reelms/${r.id}/ai-bot-status`, {
+          headers: { Authorization: `Bearer ${authToken}` }
+        })
+        if (res.ok) {
+          const data = await res.json()
+          return [r.id, data.hasBot]
+        }
+      } catch {}
+      return [r.id, false]
+    })
+    Promise.all(checks).then(results => {
+      const map = {}
+      results.forEach(([id, has]) => { map[id] = has })
+      setAiBotStatus(map)
+    })
+  }, [reelms, authToken])
+
   async function addBot(reelmId) {
     if (!authToken) return
     setLoading(prev => ({ ...prev, [reelmId]: true }))
@@ -1586,6 +1617,19 @@ function CompanionsPanel({ reelms = [] }) {
       if (res.ok) setBotStatus(prev => ({ ...prev, [reelmId]: true }))
     } catch {}
     setLoading(prev => ({ ...prev, [reelmId]: false }))
+  }
+
+  async function addAIBot(reelmId) {
+    if (!authToken) return
+    setAiLoading(prev => ({ ...prev, [reelmId]: true }))
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/v1/reelms/${reelmId}/add-ai-bot`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${authToken}` }
+      })
+      if (res.ok) setAiBotStatus(prev => ({ ...prev, [reelmId]: true }))
+    } catch {}
+    setAiLoading(prev => ({ ...prev, [reelmId]: false }))
   }
 
   return (
@@ -1638,6 +1682,60 @@ function CompanionsPanel({ reelms = [] }) {
                       onClick={() => addBot(r.id)}
                     >
                       {loading[r.id] ? '...' : 'Ekle'}
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
+      <div className="companion-card">
+        <div className="companion-card-header">
+          <div className="companion-avatar">
+            <svg width="28" height="28" viewBox="0 0 24 24" fill="none">
+              <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="1.6"/>
+              <path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.93 4.93l2.12 2.12M16.95 16.95l2.12 2.12M4.93 19.07l2.12-2.12M16.95 7.05l2.12-2.12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <div className="companion-info">
+            <div className="companion-name">{REELMS_INTELLIGENCE_BOT.name}</div>
+            <div className="companion-username">@{REELMS_INTELLIGENCE_BOT.username}</div>
+          </div>
+          <div className="companion-tags">
+            {REELMS_INTELLIGENCE_BOT.tags.map(tag => (
+              <span key={tag} className="companion-tag">{tag}</span>
+            ))}
+          </div>
+        </div>
+        <p className="companion-desc">{REELMS_INTELLIGENCE_BOT.description}</p>
+        <div className="companion-commands">
+          {['/ai', '/summarize', '/digest', '/ai-reset'].map(cmd => (
+            <code key={cmd} className="companion-cmd">{cmd}</code>
+          ))}
+          <code className="companion-cmd">@reelms-intelligence</code>
+        </div>
+
+        {reelms.length > 0 && (
+          <div className="companion-reelms">
+            <div className="companion-reelms-label">Reelm&apos;lerine ekle</div>
+            <div className="companion-reelm-list">
+              {reelms.map(r => (
+                <div key={r.id} className="companion-reelm-row">
+                  <div className="companion-reelm-avatar" style={r.image ? { backgroundImage: `url(${r.image})`, backgroundSize: 'cover' } : {}}>
+                    {!r.image && (r.name || '?').charAt(0).toUpperCase()}
+                  </div>
+                  <span className="companion-reelm-name">{r.name}</span>
+                  {aiBotStatus[r.id] ? (
+                    <span className="companion-reelm-added">Eklendi ✓</span>
+                  ) : (
+                    <button
+                      className="companion-add-btn"
+                      disabled={!!aiLoading[r.id]}
+                      onClick={() => addAIBot(r.id)}
+                    >
+                      {aiLoading[r.id] ? '...' : 'Ekle'}
                     </button>
                   )}
                 </div>
@@ -2950,10 +3048,11 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
   return ReactDOM.createPortal(profileNode, document.body)
 }
 
-function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onMessage, onAddFriend, onRemove, onBlock, onUnblock, isFriend, isBlocked, isPending, onOpenFriend }) {
+function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onMessage, onAddFriend, onRemove, onBlock, onUnblock, isFriend, isBlocked, isPending, onOpenFriend, spotifyNowPlaying, spotifyConnected }) {
   const [visible, setVisible] = useState(false)
   useEffect(() => { const t = setTimeout(() => setVisible(true), 10); return () => clearTimeout(t) }, [])
 
+  const norm = normalizeFriendProfileTarget(user || {})
   const cover = getPersonCover(user)
   const photo = getPersonPhoto(user)
   const SOCIAL_ICONS = { instagram: InstagramIcon, x: XIcon, tiktok: TikTokIcon, linkedin: LinkedInIcon, whatsapp: WhatsAppIcon, discord: DiscordSocialIcon, snapchat: SnapchatIcon, custom: CustomLinkIcon }
@@ -2996,18 +3095,19 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
               )}
             </div>
 
-            {user.bio && (
+            {norm.bio && (
               <div className="fp-section">
-                <p className="fp-bio">{user.bio}</p>
+                <p className="fp-bio">{norm.bio}</p>
               </div>
             )}
 
-            {user.socialLinks && Object.keys(user.socialLinks).some(k => (user.activePlatforms || []).includes(k) && user.socialLinks[k]) && (
+            {norm.activePlatforms?.length > 0 && Object.keys(norm.socialLinks).some(k => norm.activePlatforms.includes(k) && norm.socialLinks[k]) && (
               <div className="fp-section">
                 <span className="fp-section-label">SOCIALS</span>
                 <div className="fp-socials-row">
-                  {Object.entries(user.socialLinks).filter(([k, v]) => (user.activePlatforms || []).includes(k) && v).map(([k, handle]) => {
+                  {norm.activePlatforms.filter(k => norm.socialLinks[k]).map(k => {
                     const Icon = SOCIAL_ICONS[k]
+                    const handle = norm.socialLinks[k]
                     return Icon ? (
                       <a key={k} className="fp-social-link" href={handle.startsWith('http') ? handle : `#`} target="_blank" rel="noopener noreferrer" title={handle}>
                         <Icon size={18} />
@@ -3068,6 +3168,26 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
                     </div>
                   ))}
                 </div>
+              </div>
+            )}
+            {isSelf && spotifyConnected && (
+              <div className="fp-sidebar-card">
+                <span className="fp-section-label">SPOTIFY</span>
+                {spotifyNowPlaying ? (
+                  <div className="fp-spotify-row">
+                    {spotifyNowPlaying.albumArt && <img src={spotifyNowPlaying.albumArt} alt="album" className="fp-spotify-art" />}
+                    <div className="fp-spotify-track">
+                      <a className="fp-spotify-track-name" href={spotifyNowPlaying.url} target="_blank" rel="noreferrer">{spotifyNowPlaying.name}</a>
+                      <span className="fp-spotify-track-artist">{spotifyNowPlaying.artist}</span>
+                    </div>
+                    <SpotifyIcon size={16} />
+                  </div>
+                ) : (
+                  <div className="fp-spotify-idle">
+                    <SpotifyIcon size={16} />
+                    <span>Bağlı</span>
+                  </div>
+                )}
               </div>
             )}
             <div className="fp-sidebar-card">
@@ -3457,6 +3577,9 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
   const [newRoleName, setNewRoleName] = useState('')
   const [newRoleColor, setNewRoleColor] = useState('#60a5fa')
   const [memberSearch, setMemberSearch] = useState('')
+  const [reelmNameInput, setReelmNameInput] = useState(() => reelm.name || '')
+  const [reelmNameSaving, setReelmNameSaving] = useState(false)
+  const [reelmNameStatus, setReelmNameStatus] = useState('')
   const [showInDiscover, setShowInDiscover] = useState(() => reelm.showInDiscover ?? false)
   const [autoJoinOnInvite, setAutoJoinOnInvite] = useState(() => reelm.autoJoinOnInvite ?? false)
   const [memberInvitesEnabled, setMemberInvitesEnabled] = useState(() => reelm.memberInvitesEnabled ?? true)
@@ -3699,7 +3822,38 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
               <div className="rs-section-header">
                 <span className="rs-section-title">Reelm info</span>
               </div>
-              <p className="rs-section-hint" style={{ marginBottom: 0 }}>General settings coming soon.</p>
+              {canManageOverview && !reelm.isDefault && (
+                <div className="rs-field-row">
+                  <label className="rs-field-label">Reelm name</label>
+                  <div className="rs-field-input-row">
+                    <input
+                      className="rs-field-input"
+                      value={reelmNameInput}
+                      maxLength={64}
+                      onChange={e => { setReelmNameInput(e.target.value); setReelmNameStatus('') }}
+                      placeholder="Reelm adı"
+                    />
+                    <button
+                      className="rs-field-save-btn"
+                      disabled={reelmNameSaving || !reelmNameInput.trim() || reelmNameInput.trim() === reelm.name}
+                      onClick={async () => {
+                        const next = reelmNameInput.trim()
+                        if (!next || next === reelm.name) return
+                        setReelmNameSaving(true)
+                        setReelmNameStatus('')
+                        try {
+                          await onUpdate({ ...reelm, roles, members, name: next })
+                          setReelmNameStatus('saved')
+                        } catch { setReelmNameStatus('error') }
+                        setReelmNameSaving(false)
+                      }}
+                    >
+                      {reelmNameSaving ? '...' : reelmNameStatus === 'saved' ? '✓' : 'Kaydet'}
+                    </button>
+                  </div>
+                  {reelmNameStatus === 'error' && <p className="rs-field-error">Kaydedilemedi, tekrar dene.</p>}
+                </div>
+              )}
               {canManageFullRoles && !reelm.isDefault && (
                 <div className="rs-danger-zone">
                   <span className="rs-section-title">Danger zone</span>
@@ -14231,6 +14385,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               isBlocked={fullProfileTarget.user && blocked.some(b => String(b.id) === String(fullProfileTarget.user.id))}
               isPending={fullProfileTarget.user && friendRequestsOut.map(String).includes(String(fullProfileTarget.user.id))}
               onOpenFriend={f => setFullProfileTarget({ isSelf: false, user: f })}
+              spotifyConnected={fullProfileTarget.isSelf ? spotifyConnected : false}
+              spotifyNowPlaying={fullProfileTarget.isSelf ? spotifyNowPlaying : null}
             />
           )}
           {isMobile && !selectedReelm && !selectedChat && (
