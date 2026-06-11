@@ -4003,7 +4003,7 @@ h6 {
 }
 
 .ignite-beta-logo {
-  font-family: 'Dela Gothic One', sans-serif;
+  font-family: 'Dela Gothic One', sans-serif !important;
   font-size: 1.6rem;
   color: rgba(230, 210, 200, 0.75);
   letter-spacing: 0.01em;
@@ -4038,14 +4038,14 @@ h6 {
 }
 
 .settings-ignite-label {
-  font-family: 'Dela Gothic One', sans-serif;
+  font-family: 'Dela Gothic One', sans-serif !important;
   font-size: 0.88rem;
   color: rgba(var(--ta-rgb), 0.65);
   letter-spacing: 0.02em;
 }
 
 .settings-ignite-word {
-  font-family: 'Dela Gothic One', sans-serif;
+  font-family: 'Dela Gothic One', sans-serif !important;
   font-size: 0.92rem;
   background: linear-gradient(90deg, #ff6b35, #f7c59f, #e8a87c, #ff6b9d, #a855f7, #3b82f6, #ff6b35);
   -webkit-background-clip: text;
