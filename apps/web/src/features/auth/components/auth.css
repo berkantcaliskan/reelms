@@ -699,52 +699,66 @@
   line-height: 1.35;
 }
 
-/* Mobile: shrink auth card so it doesn't overflow screen edges */
-@media (max-width: 480px) {
-  /* Hide decorative floating cells — reduces visual clutter on small screens */
+/* Mobile: full-screen centered card, no decorative elements */
+@media (max-width: 767px) {
   .reelms-auth-cells {
-    display: none;
+    display: none !important;
+  }
+
+  .reelms-auth-topbar {
+    display: none !important;
+  }
+
+  .reelms-auth-copy {
+    display: none !important;
+  }
+
+  .reelms-auth-footer-card {
+    display: none !important;
   }
 
   .reelms-auth-stage {
     width: 100% !important;
-    padding-left: 16px !important;
-    padding-right: 16px !important;
-    box-sizing: border-box;
+    padding: 0 16px !important;
+    min-height: 100dvh !important;
+    box-sizing: border-box !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
   }
 
-  /* Scale card to 80% of its normal size (20% reduction) */
   .reelms-auth-card-shell {
-    width: 82%;
-    max-width: 82%;
-    margin: 0 auto;
+    width: 100% !important;
+    max-width: 340px !important;
+    margin: 0 auto !important;
   }
 
   .reelms-auth-card {
-    padding: 16px 14px;
-    border-radius: 20px;
+    padding: 20px 18px !important;
+    border-radius: 20px !important;
   }
 
   .reelms-auth-card-border {
-    border-radius: 21px;
+    border-radius: 21px !important;
   }
 
   .reelms-auth-card-logo {
-    width: 38px;
-    height: 38px;
-    margin-bottom: 10px;
-    border-radius: 14px;
+    width: 38px !important;
+    height: 38px !important;
+    margin-bottom: 10px !important;
+    border-radius: 14px !important;
   }
 
   .reelms-auth-card-head h2 {
-    font-size: 0.95rem;
+    font-size: 1rem !important;
   }
 
   .reelms-auth-card-head p {
-    font-size: 0.72rem;
+    font-size: 0.75rem !important;
   }
 
   .auth-form-v2 {
-    gap: 8px;
+    gap: 8px !important;
   }
 }
