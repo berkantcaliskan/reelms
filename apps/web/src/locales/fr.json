@@ -173,6 +173,7 @@
   "two_fa_desc": "Ajoutez une couche de sécurité supplémentaire à votre compte. Bientôt disponible",
   "e2ee": "Chiffrement de bout en bout (E2EE)",
   "e2ee_desc": "Chiffrez vos messages directs. Bientôt disponible",
+  "e2ee_dm_notice": "Les messages sont chiffrés de bout en bout. Personne en dehors de cette conversation ne peut les lire, pas même nous.",
   "new_signin_notif": "Notifications de nouvelle connexion",
   "new_signin_notif_desc": "Soyez notifié lorsqu'un nouvel appareil se connecte à votre compte.",
   "allow_profile_sharing": "Autoriser le partage de profil",

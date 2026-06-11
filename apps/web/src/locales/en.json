@@ -181,6 +181,7 @@
   "two_fa_desc": "Add an extra layer of security to your account. Coming soon",
   "e2ee": "End-to-End Encryption (E2EE)",
   "e2ee_desc": "Encrypt your direct messages so only you and the recipient can read them. Coming soon",
+  "e2ee_dm_notice": "Messages are end-to-end encrypted. No one outside of this chat, not even us, can read them.",
   "new_signin_notif": "New sign-in notifications",
   "new_signin_notif_desc": "Get notified when a new device signs in to your account.",
   "allow_profile_sharing": "Allow profile sharing",

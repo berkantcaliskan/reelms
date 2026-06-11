@@ -5508,6 +5508,30 @@ h6 {
   mask-image: linear-gradient(to bottom, transparent 0px, transparent 54px, black 72px);
 }
 .msg-list-spacer { flex: 1; min-height: 0; }
+
+.e2ee-dm-notice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 18px auto 10px;
+  padding: 9px 16px;
+  max-width: 340px;
+  border-radius: 999px;
+  background: rgba(var(--ta-rgb), 0.06);
+  border: 1px solid rgba(var(--ta-rgb), 0.1);
+  color: rgba(var(--ta-rgb), 0.52);
+  font-size: 11.5px;
+  line-height: 1.4;
+  text-align: center;
+  user-select: none;
+}
+
+.e2ee-dm-notice svg {
+  flex-shrink: 0;
+  opacity: 0.7;
+}
+
 .msg-list::-webkit-scrollbar { width: 4px; }
 .msg-list::-webkit-scrollbar-thumb { background: rgba(var(--ta-rgb), 0.18); border-radius: 999px; border: 1.5px solid transparent; background-clip: content-box; }
 
@@ -14601,23 +14625,28 @@ button, input, select, textarea,
    ================================================================ */
 @media (max-width: 767px) {
 
-  /* ── Panel overlay: iOS 16/17 notification-style frosted glass ─── */
-  .panel.panel-left,
-  .panel.panel-right {
-    background: rgba(var(--bg-rgb, 14, 12, 22), 0.52) !important;
-    -webkit-backdrop-filter: blur(40px) saturate(2) brightness(0.82) !important;
-    backdrop-filter: blur(40px) saturate(2) brightness(0.82) !important;
-    border-right: 1px solid rgba(var(--ta-rgb), 0.08) !important;
-  }
-  .panel.panel-right {
-    border-right: none !important;
-    border-left: 1px solid rgba(var(--ta-rgb), 0.08) !important;
-  }
-
   /* ── Content width: strip panel-system desktop margins ────────── */
+  /* Remove backdrop-filter from panel-system so position:fixed panels
+     are not trapped in its stacking/backdrop context and can blur
+     the actual viewport content independently. */
   .panel-system {
     margin: 0 !important;
     border-radius: 0 !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+  }
+
+  /* ── Panel overlay: frosted glass sliding panels ─── */
+  .panel.panel-left,
+  .panel.panel-right {
+    background: rgba(var(--bg-rgb, 14, 12, 22), 0.58) !important;
+    -webkit-backdrop-filter: blur(36px) saturate(1.8) brightness(0.88) !important;
+    backdrop-filter: blur(36px) saturate(1.8) brightness(0.88) !important;
+    border-right: 1px solid rgba(var(--ta-rgb), 0.10) !important;
+  }
+  .panel.panel-right {
+    border-right: none !important;
+    border-left: 1px solid rgba(var(--ta-rgb), 0.10) !important;
   }
 
   .chats-row {
@@ -14625,27 +14654,29 @@ button, input, select, textarea,
     padding-right: 12px !important;
   }
 
-  /* ── Bottom nav: transparent, centered pill container ─────────── */
+  /* ── Bottom nav: frosted glass bar, pill is just an outline ─────── */
+  /* Blur lives on the BAR, not the pill. The pill is a transparent
+     visual frame floating on the blurred bar surface. */
   .mobile-bottom-nav {
-    background: transparent !important;
-    -webkit-backdrop-filter: none !important;
-    backdrop-filter: none !important;
-    border-top: none !important;
+    background: rgba(var(--bg-rgb, 14, 12, 20), 0.62) !important;
+    -webkit-backdrop-filter: blur(32px) saturate(1.8) brightness(0.85) !important;
+    backdrop-filter: blur(32px) saturate(1.8) brightness(0.85) !important;
+    border-top: 1px solid rgba(var(--ta-rgb), 0.08) !important;
     justify-content: center !important;
     padding-bottom: max(env(safe-area-inset-bottom, 0px), 12px) !important;
     height: auto !important;
   }
 
-  /* Nav pill: şeffaf, arkasındaki içerik blur'lu görünür */
+  /* Nav pill: border outline only, transparent — bar blur shows through */
   .mobile-nav-pill {
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 6px 16px;
-    background: transparent;
-    -webkit-backdrop-filter: blur(24px) saturate(1.6);
-    backdrop-filter: blur(24px) saturate(1.6);
-    border: 1px solid rgba(var(--ta-rgb), 0.18);
+    background: rgba(var(--ta-rgb), 0.06);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    border: 1px solid rgba(var(--ta-rgb), 0.20);
     border-radius: 999px;
     height: 52px;
   }

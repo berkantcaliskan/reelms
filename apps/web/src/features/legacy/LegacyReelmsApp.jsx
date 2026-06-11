@@ -13112,6 +13112,15 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         )}
                         <div className="msg-list" ref={msgListRef}>
                           <div className="msg-list-spacer" />
+                          {selectedChat && msgs.length === 0 && (
+                            <div className="e2ee-dm-notice">
+                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                <rect x="5" y="11" width="14" height="10" rx="2" stroke="currentColor" strokeWidth="1.8"/>
+                                <path d="M8 11V7a4 4 0 0 1 8 0v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                              </svg>
+                              <span>{t('e2ee_dm_notice')}</span>
+                            </div>
+                          )}
                           {(() => {
                             const isBubbleMode = !!selectedChat
                             const formatTime = (t) => (t instanceof Date ? t : new Date(t)).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
@@ -14203,7 +14212,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             <FullProfilePage
               user={fullProfileTarget.isSelf ? currentUser : fullProfileTarget.user}
               isSelf={fullProfileTarget.isSelf}
-              reelms={reelms}
+              reelms={fullProfileTarget.isSelf ? reelms : reelms.filter(r => {
+                const friendId = String(fullProfileTarget.user?.id || '')
+                if (!friendId) return false
+                return Array.isArray(r.members) && r.members.some(m => String(m.userId || m.id || '') === friendId)
+              })}
               friends={fullProfileTarget.isSelf ? friends : []}
               onClose={() => setFullProfileTarget(null)}
               onMessage={() => {
