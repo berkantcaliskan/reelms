@@ -43,6 +43,7 @@
     linear-gradient(rgba(255, 255, 255, 0.085) 1px, transparent 1px),
     linear-gradient(90deg, rgba(255, 255, 255, 0.085) 1px, transparent 1px);
   background-size: 58px 58px;
+  -webkit-mask-image: radial-gradient(circle at center, black, transparent 75%);
   mask-image: radial-gradient(circle at center, black, transparent 75%);
 }
 
@@ -95,6 +96,7 @@
     linear-gradient(145deg, rgba(255, 255, 255, 0.11), rgba(255, 255, 255, 0.025)),
     rgba(255, 255, 255, 0.035);
   box-shadow: 0 20px 80px rgba(0, 0, 0, 0.24), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  -webkit-backdrop-filter: blur(14px);
   backdrop-filter: blur(14px);
   animation: reelms-auth-cell-float 9s ease-in-out infinite;
 }
@@ -239,6 +241,7 @@
     radial-gradient(circle at 50% 0%, rgba(116, 126, 255, 0.14), transparent 36%),
     rgba(8, 10, 24, 0.83);
   border: 1px solid rgba(255, 255, 255, 0.08);
+  -webkit-backdrop-filter: blur(24px);
   backdrop-filter: blur(24px);
 }
 
@@ -517,6 +520,7 @@
   border-radius: 22px;
   background: rgba(255, 255, 255, 0.055);
   border: 1px solid rgba(255, 255, 255, 0.095);
+  -webkit-backdrop-filter: blur(18px);
   backdrop-filter: blur(18px);
   box-shadow: 0 20px 70px rgba(0, 0, 0, 0.22);
 }
@@ -593,7 +597,7 @@
 
 @media (max-width: 680px) {
   .reelms-auth-topbar {
-    width: min(100% - 28px, 1180px);
+    width: min(calc(100% - 28px), 1180px);
     padding-top: 16px;
   }
 
@@ -602,7 +606,7 @@
   }
 
   .reelms-auth-stage {
-    width: min(100% - 28px, 1120px);
+    width: min(calc(100% - 28px), 1120px);
     padding-top: 34px;
   }
 
