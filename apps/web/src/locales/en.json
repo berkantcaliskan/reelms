@@ -17,6 +17,7 @@
   "platform_android_desc": "Full Reelms on Android with push notifications and seamless performance.",
   "platform_coming_soon": "Coming soon",
   "platform_download": "Download",
+  "platform_preparing_desc": "Reelms for {name} is currently being prepared. When it's ready, you can check here and use it with the same account after installing.",
   "sign_out": "Sign out",
   "sign_in": "Sign in",
   "sign_up": "Sign up",

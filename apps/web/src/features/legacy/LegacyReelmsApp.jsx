@@ -11827,7 +11827,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       </div>
                     )}
                     {selectedSettingsCategory === 'desktop' && (
-                      <DesktopDownloadSettingsPanel />
+                      <DesktopDownloadSettingsPanel language={language} />
                     )}
                     {selectedSettingsCategory === 'about' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
