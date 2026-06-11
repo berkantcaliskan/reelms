@@ -3797,6 +3797,17 @@ h6 {
   animation: settings-dust-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+.settings-sidebar-top-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0;
+}
+
+.settings-sidebar-actions {
+  display: none;
+}
+
 .settings-title {
   font-family: 'Dela Gothic One', sans-serif;
   font-size: 1.3rem;
@@ -9848,6 +9859,35 @@ h6 {
 
 .fp-reelms-list { display: flex; flex-direction: column; gap: 8px; }
 .fp-reelm-row { display: flex; align-items: center; gap: 10px; }
+
+.fp-friends-list { display: flex; flex-direction: column; gap: 4px; }
+.fp-friend-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px 4px;
+  border-radius: 10px;
+  width: 100%;
+  text-align: left;
+  color: inherit;
+  font-family: inherit;
+  -webkit-tap-highlight-color: transparent;
+  transition: background 0.12s;
+}
+.fp-friend-row:hover { background: rgba(var(--ta-rgb), 0.07); }
+.fp-friend-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  background: rgba(var(--ta-rgb), 0.15);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; flex-shrink: 0;
+  font-size: 0.82rem; font-weight: 700; color: rgba(var(--ta-rgb), 0.7);
+}
+.fp-friend-avatar img { width: 100%; height: 100%; object-fit: cover; border-radius: 50%; }
+.fp-friend-name { font-size: 0.85rem; color: rgba(var(--ta-rgb), 0.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fp-friends-more { font-size: 0.75rem; color: rgba(var(--ta-rgb), 0.4); padding: 4px 4px 0; }
 .fp-reelm-avatar {
   width: 30px; height: 30px; border-radius: 8px;
   background: rgba(var(--ta-rgb),0.15);
@@ -14526,18 +14566,7 @@ button, input, select, textarea,
   }
 }
 
-/* Auth card: prevent edge overflow on very small screens */
-@media (max-width: 480px) {
-  .reelms-auth-stage {
-    width: 100% !important;
-    padding-left: 16px !important;
-    padding-right: 16px !important;
-  }
-  .reelms-auth-card-shell {
-    width: 100% !important;
-    max-width: 100% !important;
-  }
-}
+/* Auth card: handled in auth.css — no overrides here */
 
 /* ================================================================
    MOBILE FIXES v3
@@ -14579,16 +14608,16 @@ button, input, select, textarea,
     height: auto !important;
   }
 
-  /* Single pill wrapping all three nav buttons — frosted glass blur */
+  /* Nav pill: şeffaf, arkasındaki içerik blur'lu görünür */
   .mobile-nav-pill {
     display: flex;
     align-items: center;
     gap: 8px;
     padding: 6px 16px;
-    background: rgba(var(--bg-rgb, 14, 12, 20), 0.45);
-    -webkit-backdrop-filter: blur(28px) saturate(1.8) brightness(0.85);
-    backdrop-filter: blur(28px) saturate(1.8) brightness(0.85);
-    border: 1px solid rgba(var(--ta-rgb), 0.14);
+    background: transparent;
+    -webkit-backdrop-filter: blur(24px) saturate(1.6);
+    backdrop-filter: blur(24px) saturate(1.6);
+    border: 1px solid rgba(var(--ta-rgb), 0.18);
     border-radius: 999px;
     height: 52px;
   }
@@ -14794,27 +14823,35 @@ button, input, select, textarea,
    MESAJLAŞMA — profil fotoğrafı ile sol panel erişimi
    ================================================================ */
 @media (max-width: 767px) {
-  /* Channel header avatar tıklanabilir göster */
+  /* Channel header avatar tıklanabilir — float'ın pointer-events:none'unu geç */
   .channel-header-avatar {
     cursor: pointer;
+    pointer-events: auto !important;
     -webkit-tap-highlight-color: transparent;
   }
   .channel-header-avatar:active {
     opacity: 0.7;
   }
 
-  /* Chat header'da geri tuşu */
-  .channel-header-float {
+  /* Sohbet ekranı geri butonu — channel-header-float'tan bağımsız */
+  .mobile-chat-back-btn {
+    position: absolute;
+    top: 10px;
+    left: 8px;
+    z-index: 12;
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding: 8px 14px;
-    position: sticky;
-    top: 0;
-    z-index: 5;
-    background: rgba(var(--bg-rgb, 14, 12, 22), 0.7);
-    -webkit-backdrop-filter: blur(20px);
-    backdrop-filter: blur(20px);
+    justify-content: center;
+    width: 36px;
+    height: 36px;
+    background: rgba(var(--bg-rgb, 14, 12, 22), 0.55);
+    -webkit-backdrop-filter: blur(16px);
+    backdrop-filter: blur(16px);
+    border: 1px solid rgba(var(--ta-rgb), 0.12);
+    border-radius: 50%;
+    color: rgba(var(--ta-rgb), 0.8);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
   }
 
   .channel-header-back-btn {
@@ -14835,5 +14872,121 @@ button, input, select, textarea,
   /* DM panel left: overlay when opened in chat mode */
   .panel.panel-left:not(.panel-left--chat):not(.panel-left--open) {
     transform: translateX(-110%) !important;
+  }
+}
+
+/* ================================================================
+   MOBİL BİLDİRİMLER PANELİ — tam profil tarzı blur overlay
+   ================================================================ */
+@media (max-width: 767px) {
+  /* Bildirimler popup'ı tam ekran blur overlay olarak göster */
+  .hpopup.hpopup-notifs {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100% !important;
+    max-height: 100dvh !important;
+    top: 0 !important;
+    right: 0 !important;
+    border-radius: 0 !important;
+    border: none !important;
+    background: rgba(var(--bg-rgb, 10, 8, 18), 0.72) !important;
+    -webkit-backdrop-filter: blur(48px) saturate(1.8) brightness(0.82) !important;
+    backdrop-filter: blur(48px) saturate(1.8) brightness(0.82) !important;
+    transform-origin: top center !important;
+    display: flex;
+    flex-direction: column;
+    z-index: 350 !important;
+  }
+
+  .hpopup.hpopup-notifs .hpopup-top-row {
+    padding: calc(env(safe-area-inset-top, 12px) + 20px) 24px 16px !important;
+    border-bottom: 1px solid rgba(var(--ta-rgb), 0.08);
+    flex-shrink: 0;
+  }
+
+  .hpopup.hpopup-notifs .hpopup-title {
+    font-size: 1.4rem !important;
+  }
+
+  .hpopup.hpopup-notifs .hpopup-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 12px 16px 80px !important;
+    gap: 4px !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .hpopup.hpopup-notifs .hpopup-row {
+    padding: 12px 14px !important;
+    border-radius: 18px !important;
+    background: rgba(var(--ta-rgb), 0.04) !important;
+    border: 1px solid rgba(var(--ta-rgb), 0.07);
+    gap: 12px !important;
+  }
+
+  .hpopup.hpopup-notifs .hpopup-row:active {
+    background: rgba(var(--ta-rgb), 0.1) !important;
+  }
+
+  .hpopup.hpopup-notifs .hpopup-name {
+    font-size: 0.92rem !important;
+    line-height: 1.4;
+  }
+
+  .hpopup.hpopup-notifs .hpopup-footer {
+    position: sticky;
+    bottom: 0;
+    background: rgba(var(--bg-rgb, 10, 8, 18), 0.85);
+    -webkit-backdrop-filter: blur(20px);
+    backdrop-filter: blur(20px);
+    padding: 16px 24px calc(env(safe-area-inset-bottom, 12px) + 16px) !important;
+    border-top: 1px solid rgba(var(--ta-rgb), 0.08);
+  }
+
+  /* Bildirimler overlay backdrop'ı kapat butonu (float icon'u kaldır) */
+  .hpopup-float-icon {
+    display: none !important;
+  }
+}
+
+/* ================================================================
+   MOBİL SETTINGS SIDEBAR — sign-out/close yan yana Settings başlığıyla
+   ================================================================ */
+@media (max-width: 767px) {
+  .settings-sidebar-top-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .settings-sidebar-top-row .settings-title {
+    margin: 0 !important;
+  }
+
+  .settings-sidebar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .settings-close-btn--sidebar {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(var(--ta-rgb), 0.08);
+    border: none;
+    cursor: pointer;
+    color: rgba(var(--ta-rgb), 0.65);
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Desktop'ta sidebar actions gizle (orada topbar butonları var) */
+  .settings-sidebar-actions .settings-signout-btn,
+  .settings-sidebar-actions .settings-close-btn--sidebar {
+    /* Görünür — mobil için yapıldı */
   }
 }

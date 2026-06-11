@@ -2919,7 +2919,7 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
   return ReactDOM.createPortal(profileNode, document.body)
 }
 
-function FullProfilePage({ user, isSelf, reelms = [], onClose, onMessage, onAddFriend, onRemove, onBlock, onUnblock, isFriend, isBlocked, isPending }) {
+function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onMessage, onAddFriend, onRemove, onBlock, onUnblock, isFriend, isBlocked, isPending, onOpenFriend }) {
   const [visible, setVisible] = useState(false)
   useEffect(() => { const t = setTimeout(() => setVisible(true), 10); return () => clearTimeout(t) }, [])
 
@@ -3000,6 +3000,30 @@ function FullProfilePage({ user, isSelf, reelms = [], onClose, onMessage, onAddF
           </div>
 
           <div className="fp-sidebar">
+            {isSelf && friends.length > 0 && (
+              <div className="fp-sidebar-card">
+                <span className="fp-section-label">ARKADAŞLAR</span>
+                <div className="fp-friends-list">
+                  {friends.slice(0, 12).map(f => (
+                    <button
+                      key={f.id}
+                      className="fp-friend-row"
+                      onClick={() => onOpenFriend?.(f)}
+                    >
+                      <div className="fp-friend-avatar">
+                        {(f.photo || f.photoURL || f.avatar)
+                          ? <img src={f.photo || f.photoURL || f.avatar} alt={f.name || ''} />
+                          : (f.name || '?').charAt(0).toUpperCase()}
+                      </div>
+                      <span className="fp-friend-name">{f.name || f.username || 'Arkadaş'}</span>
+                    </button>
+                  ))}
+                  {friends.length > 12 && (
+                    <span className="fp-friends-more">+{friends.length - 12} kişi daha</span>
+                  )}
+                </div>
+              </div>
+            )}
             {reelms.length > 0 && (
               <div className="fp-sidebar-card">
                 <span className="fp-section-label">{isSelf ? 'REELMLER' : 'ORTAK REELMLER'}</span>
@@ -6814,7 +6838,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [showNotificationsPopup, setShowNotificationsPopup] = useState(false)
   const [showFriendsPanel, setShowFriendsPanel] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  const [selectedSettingsCategory, setSelectedSettingsCategory] = useState('account')
+  const [selectedSettingsCategory, setSelectedSettingsCategory] = useState(null)
   const [showHelpCenter, setShowHelpCenter] = useState(false)
   const [helpForm, setHelpForm] = useState({ name: '', email: '', message: '' })
   const [helpStatus, setHelpStatus] = useState('idle')
@@ -10925,7 +10949,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                 )}
               </span>
             </button>
-            <button className="header-settings-btn" style={{ marginLeft: '5px' }} onClick={() => { setShowSettings(v => !v); setSelectedReelm(null); setSelectedChat(null); setShowDiscover(false); setShowFriendsPanel(false) }}>
+            <button className="header-settings-btn" style={{ marginLeft: '5px' }} onClick={() => { setShowSettings(v => { if (!v) setSelectedSettingsCategory(null); return !v }); setSelectedReelm(null); setSelectedChat(null); setShowDiscover(false); setShowFriendsPanel(false) }}>
               <SettingsIcon isNight={activeTheme.id === 'gece'} />
             </button>
           </div>
@@ -11306,7 +11330,17 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             ) : showSettings ? (
               <div className={`settings-layout${isMobile ? (!selectedSettingsCategory ? ' settings-layout--mobile-menu' : ' settings-layout--mobile-content') : ''}`}>
                 <div className="settings-sidebar">
-                  <h2 className="settings-title">{t('settings')}</h2>
+                  <div className="settings-sidebar-top-row">
+                    <h2 className="settings-title">{t('settings')}</h2>
+                    <div className="settings-sidebar-actions">
+                      <button type="button" className="settings-signout-btn" onClick={onLogOut}>{t('sign_out')}</button>
+                      <button type="button" className="settings-close-btn settings-close-btn--sidebar" onClick={() => setShowSettings(false)}>
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                          <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        </svg>
+                      </button>
+                    </div>
+                  </div>
                   <nav className="settings-nav">
                     {[
                       { id: 'account',       label: t('your_account') },
@@ -11361,12 +11395,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         </svg>
                       </button>
                     )}
-                    <button type="button" className="settings-signout-btn" onClick={onLogOut}>{t('sign_out')}</button>
-                    <button type="button" className="settings-close-btn" onClick={() => setShowSettings(false)}>
+                    {!isMobile && <button type="button" className="settings-signout-btn" onClick={onLogOut}>{t('sign_out')}</button>}
+                    {!isMobile && <button type="button" className="settings-close-btn" onClick={() => setShowSettings(false)}>
                       <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
                         <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
                       </svg>
-                    </button>
+                    </button>}
                   </div>
                   <div key={selectedSettingsCategory} className="settings-content-panel">
                     {selectedSettingsCategory === 'account' && (
@@ -12962,19 +12996,19 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       : selectedChannel?.name
                     return (
                       <>
+                        {isMobile && selectedChat && (
+                          <button
+                            className="mobile-chat-back-btn"
+                            onClick={() => setMobileLeftPanelOpen(v => !v)}
+                            title="Konuşmalar"
+                          >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                              <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </button>
+                        )}
                         {channelTitle && (
                           <div className="channel-header-float">
-                            {isMobile && selectedChat && (
-                              <button
-                                className="channel-header-back-btn"
-                                onClick={() => setMobileLeftPanelOpen(v => !v)}
-                                title="Konuşmalar"
-                              >
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-                                  <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
-                              </button>
-                            )}
                             {selectedChat && (
                               <div
                                 className="channel-header-avatar"
@@ -14087,6 +14121,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               user={fullProfileTarget.isSelf ? currentUser : fullProfileTarget.user}
               isSelf={fullProfileTarget.isSelf}
               reelms={reelms}
+              friends={fullProfileTarget.isSelf ? friends : []}
               onClose={() => setFullProfileTarget(null)}
               onMessage={() => {
                 const friend = friends.find(f => String(f.id) === String(fullProfileTarget.user?.id)) || fullProfileTarget.user
@@ -14099,6 +14134,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               isFriend={fullProfileTarget.user && friends.some(f => String(f.id) === String(fullProfileTarget.user.id))}
               isBlocked={fullProfileTarget.user && blocked.some(b => String(b.id) === String(fullProfileTarget.user.id))}
               isPending={fullProfileTarget.user && friendRequestsOut.map(String).includes(String(fullProfileTarget.user.id))}
+              onOpenFriend={f => setFullProfileTarget({ isSelf: false, user: f })}
             />
           )}
           {isMobile && !selectedReelm && !selectedChat && (
