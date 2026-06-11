@@ -14417,10 +14417,22 @@ button, input, select, textarea,
   }
 
   /* ── Auth pages mobile ─────────────────────────────────────── */
-  .auth-card {
-    width: 84vw !important;
-    max-width: 360px !important;
-    padding: 24px 20px !important;
+  .auth-shapes {
+    display: none !important;
+  }
+
+  .main-content {
+    max-width: 86vw !important;
+  }
+
+  .signin-card {
+    padding: 28px 22px !important;
+    border-radius: 22px !important;
+    gap: 12px !important;
+  }
+
+  .signin-card-border {
+    border-radius: 23px !important;
   }
 }
 
