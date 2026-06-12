@@ -14118,25 +14118,20 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               </div>
                             )}
                             {item._type === 'user' && String(item.id) !== String(uid) && (
-                              <div onClick={e => e.stopPropagation()} style={{display:'flex', gap:6, alignItems:'center'}}>
+                              <div onClick={e => e.stopPropagation()} style={{display:'flex', gap:6, alignItems:'center', flexShrink:0}}>
                                 {isBlocked(item.id) ? (
                                   <button className="friend-add-btn" onClick={() => unblockUserFn(item.id)}>Unblock</button>
-                                ) : isFriend(item.id) ? (
-                                  <>
-                                    <span className="friend-badge-label">Friends</span>
-                                    <button className="friend-reject-btn" onClick={() => removeFriend(item.id)}>Remove</button>
-                                  </>
-                                ) : hasSentRequest(item.id) ? (
-                                  <span className="friend-badge-label friend-badge-pending">Pending</span>
                                 ) : (
-                                  <button className="friend-add-btn" onClick={() => sendFriendRequest(item)}>Add Friend</button>
+                                  <>
+                                    <button className="friend-add-btn" onClick={() => setFullProfileTarget({ isSelf: false, user: item })}>See Profile</button>
+                                    {isFriend(item.id)
+                                      ? <button className="friend-add-btn" onClick={() => startDM(item)}>Message</button>
+                                      : hasSentRequest(item.id)
+                                        ? <span className="friend-badge-label friend-badge-pending">Pending</span>
+                                        : <button className="friend-add-btn" onClick={() => sendFriendRequest(item)}>Add Friend</button>
+                                    }
+                                  </>
                                 )}
-                                {!isBlocked(item.id) && !isFriend(item.id) && (
-                                  hasSentMsgRequest(item.id)
-                                    ? <span className="friend-badge-label friend-badge-pending" style={{fontSize:'11px'}}>Requested</span>
-                                    : <button className="friend-add-btn friend-msg-btn" onClick={() => sendMsgRequest(item)}>Message</button>
-                                )}
-                                {!isBlocked(item.id) && <button className="friend-reject-btn" onClick={() => blockUserFn(item)}>Block</button>}
                               </div>
                             )}
                           </div>
@@ -16121,7 +16116,7 @@ function ShareModal({ target, onClose, activeTheme }) {
     ctx.stroke()
 
     // URL
-    ctx.font = '11px "Courier New", monospace'
+    ctx.font = '11px "JetBrains Mono", monospace'
     ctx.fillStyle = 'rgba(255,255,255,0.35)'
     ctx.textAlign = 'left'
     ctx.fillText(shareUrl, 20, H - 15)

@@ -1,5 +1,5 @@
 /* Legacy visual system isolated under features/legacy. New feature CSS should not be added here. */
-@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600&family=Inclusive+Sans:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700&family=Mona+Sans:wght@300;400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600&family=Akt:wght@300;400;500;600;700&family=Sour+Gummy:wght@400;500;600;700&family=LINE+Seed+JP:wght@300;400;700&family=Dela+Gothic+One&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600&family=Inclusive+Sans:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Mona+Sans:wght@300;400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600&family=Akt:wght@300;400;500;600;700&family=Sour+Gummy:wght@400;500;600;700&family=LINE+Seed+JP:wght@300;400;700&family=Dela+Gothic+One&display=swap');
 
 :root {
   --ta: #b99887;
@@ -3343,7 +3343,7 @@ h6 {
 }
 .invite-modal-code {
   flex: 1;
-  font-family: 'Courier New', monospace;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 1.15rem;
   font-weight: 700;
   color: rgba(var(--ta-rgb), 0.95);
@@ -4082,7 +4082,7 @@ h6 {
 
 .ignite-settings-section-title {
   font-family: 'Dela Gothic One', sans-serif !important;
-  font-size: 1.9rem;
+  font-size: 2.3rem;
 }
 
 .ignite-settings-soon {
@@ -4186,7 +4186,7 @@ h6 {
   border-radius: 6px;
   background: rgba(var(--ta-rgb), 0.08);
   color: rgba(var(--ta-rgb), 0.7);
-  font-family: monospace;
+  font-family: 'JetBrains Mono', monospace;
   border: 1px solid rgba(var(--ta-rgb), 0.1);
 }
 
@@ -5326,7 +5326,7 @@ h6 {
 .discover-clear-btn:hover { opacity: 1; }
 
 .discover-results {
-  width: 340px;
+  width: 510px;
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -5883,7 +5883,7 @@ h6 {
   padding: 6px 11px 2px;
 }
 .slash-option-cmd {
-  font-family: monospace;
+  font-family: 'JetBrains Mono', monospace;
   font-size: 0.73rem;
   font-weight: 600;
   padding: 2px 9px;
