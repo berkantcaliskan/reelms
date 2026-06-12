@@ -87,7 +87,7 @@ export class ReelmsAIBot {
     })
 
     this.socket.on('connect', async () => {
-      console.log('[ReelmsAI] Socket bağlandı')
+      console.log('[ReelmsAI] Socket bağlandı, ID:', this.socket?.id)
       const reelms = await this.fetchBotReelms()
       for (const reelm of reelms) {
         this.trackReelm(reelm)
@@ -112,6 +112,7 @@ export class ReelmsAIBot {
     })
 
     this.socket.on('reelms:message', (payload: { msgKey: string; message: any }) => {
+      console.log('[ReelmsAI] Mesaj alındı:', payload.msgKey, '| text:', payload.message?.text?.slice(0, 80))
       this.onMessage(payload).catch(console.error)
     })
   }
@@ -123,6 +124,7 @@ export class ReelmsAIBot {
 
   private joinChannels(channels: ChannelRef[]) {
     for (const ch of channels) {
+      console.log('[ReelmsAI] Kanala katılıyor:', ch.msgKey)
       this.socket?.emit('joinChannel', ch.msgKey)
     }
   }
@@ -173,8 +175,9 @@ export class ReelmsAIBot {
 
     const text: string = message?.text ?? ''
     const parsed = parse(text)
-    if (!parsed) return
+    if (!parsed) { console.log('[ReelmsAI] Parse null, komut değil:', text.slice(0, 40)); return }
 
+    console.log('[ReelmsAI] Komut işleniyor:', parsed.command, parsed.args)
     const senderName: string = message?.sender?.name ?? message?.sender?.username ?? 'Kullanıcı'
     const senderId: string = message?.userId ?? message?.sender?.id ?? ''
     const channelRefs = this.findChannelRefsForMsgKey(msgKey)
@@ -184,6 +187,7 @@ export class ReelmsAIBot {
       this.fetchMessages.bind(this),
       channelRefs
     )
+    console.log('[ReelmsAI] Yanıt uzunluğu:', response?.length ?? 0)
     if (response) await this.sendMessage(msgKey, response)
   }
 
