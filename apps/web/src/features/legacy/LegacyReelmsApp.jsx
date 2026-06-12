@@ -11533,7 +11533,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   const blockedIds = new Set((blocked || []).map(b => String(b.id || b.userId || '')))
                   const topChatItems = (Array.isArray(chats) ? chats : [])
                     .filter(c => !(c.type === 'dm' && blockedIds.has(String(c.friendId || ''))))
-                    .filter(c => pinnedItemIds.includes(c.id) || getChatUnreadCount(c) > 0 || selectedChat?.id === c.id)
                   const allItemsFlat = [
                     ...reelms.map(r => ({ ...r, itemType: 'reelm' })),
                     ...topChatItems.map(c => ({ ...c, itemType: 'chat' }))

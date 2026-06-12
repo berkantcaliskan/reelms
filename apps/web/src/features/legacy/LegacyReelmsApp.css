@@ -6594,10 +6594,10 @@ h6 {
 /* ── Friend Profile Popup ── */
 .friend-profile-popup {
   position: fixed;
-  background: rgba(var(--ta-rgb), 0.18);
+  background: rgba(var(--fpp-theme-accent-rgb), 0.18);
   -webkit-backdrop-filter: blur(48px) saturate(2.2);
   backdrop-filter: blur(48px) saturate(2.2);
-  border: 1px solid rgba(var(--ta-rgb), 0.15);
+  border: 1px solid rgba(var(--fpp-theme-accent-rgb), 0.15);
   border-radius: 16px;
   overflow: hidden;
   max-height: calc(100vh - 24px);
@@ -10893,9 +10893,25 @@ h6 {
   display: flex;
   align-items: flex-end;
   gap: 5px;
+  position: relative;
 }
 .bubble-row--own .bubble-and-time {
   flex-direction: row-reverse;
+}
+.bubble-and-time .msg-react-ctrl {
+  position: absolute;
+  bottom: calc(100% + 2px);
+  left: 0;
+  margin-left: 0;
+  background: rgba(var(--tb-rgb, 18,14,30), 0.92);
+  border-radius: 8px;
+  padding: 2px 5px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.28);
+  z-index: 10;
+}
+.bubble-row--own .bubble-and-time .msg-react-ctrl {
+  left: auto;
+  right: 0;
 }
 .bubble {
   padding: 1px 14px 2px;
