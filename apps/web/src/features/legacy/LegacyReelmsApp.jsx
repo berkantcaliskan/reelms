@@ -1860,7 +1860,7 @@ function CompanionsPanel({ reelms = [] }) {
   )
 }
 
-function AccountSettingsPanel({ user, onUpdate, onLogOut, profileBio, onBioChange, spotifyConnected, onSpotifyConnect, onSpotifyDisconnect, reelms = [] }) {
+function AccountSettingsPanel({ user, onUpdate, onLogOut, profileBio, onBioChange, spotifyConnected, onSpotifyConnect, onSpotifyDisconnect, reelms = [], onOpenProfileEdit }) {
   const t = useT()
   const photoInputRef = useRef(null)
   const previewCanvasRef = useRef(null)
@@ -2139,14 +2139,6 @@ ${posts.length ? `<ul>${posts.map(p => { const raw = (p.text || p.content || '')
   return (
     <div className="accs-panel">
       <div className="accs-section">
-        <div className="accs-section-title">{t('display_name')}</div>
-        <div className="accs-field-row">
-          <input className="accs-input" value={nameInput} onChange={e => setNameInput(e.target.value)} placeholder={t('your_name_ph')} />
-          <button className="accs-btn" onClick={saveName}>{nameSaved ? t('saved') : t('save')}</button>
-        </div>
-      </div>
-
-      <div className="accs-section">
         <div className="accs-section-title">{t('username')}</div>
         <div className="accs-field-row">
           <input
@@ -2159,6 +2151,15 @@ ${posts.length ? `<ul>${posts.map(p => { const raw = (p.text || p.content || '')
         </div>
         {usernameError && <p className="accs-error">{usernameError}</p>}
       </div>
+
+      {onOpenProfileEdit && (
+        <div className="accs-section accs-section--profile-link">
+          <button className="accs-profile-link" onClick={onOpenProfileEdit}>
+            Edit your profile here
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+        </div>
+      )}
 
       <div className="accs-section">
         <div className="accs-section-title">{t('email')}</div>
@@ -2301,13 +2302,13 @@ function PhotoEditModal({ previewCanvasRef, photoScale, setPhotoScale, onMouseDo
   )
 }
 
-function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChange, status, onStatusChange, bio, onBioChange, socialLinks, onSocialLinksChange, activePlatforms, onActivePlatformsChange, iconFilter, reelms, uid, spotifyConnected, spotifyNowPlaying, onSpotifyConnect, onSpotifyDisconnect, activity, onActivityChange, onViewFullProfile }) {
+function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChange, status, onStatusChange, bio, onBioChange, socialLinks, onSocialLinksChange, activePlatforms, onActivePlatformsChange, iconFilter, reelms, uid, spotifyConnected, spotifyNowPlaying, onSpotifyConnect, onSpotifyDisconnect, activity, onActivityChange, onViewFullProfile, initialEditOpen = false }) {
   const popupRef = useRef(null)
   const ppPhotoInputRef = useRef(null)
   const ppCoverInputRef = useRef(null)
   const [statusOpen, setStatusOpen] = useState(false)
-  const [headerEditOpen, setHeaderEditOpen] = useState(false)
-  const [editingBio, setEditingBio] = useState(false)
+  const [headerEditOpen, setHeaderEditOpen] = useState(initialEditOpen)
+  const [editingBio, setEditingBio] = useState(initialEditOpen)
   const [bioInput, setBioInput] = useState('')
   const [editingSocial, setEditingSocial] = useState(null)
   const [socialInput, setSocialInput] = useState('')
@@ -7122,6 +7123,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [showMenu, setShowMenu] = useState(false)
   const [showFeed, setShowFeed] = useState(false)
   const [showProfilePopup, setShowProfilePopup] = useState(false)
+  const [profilePopupInitialEdit, setProfilePopupInitialEdit] = useState(false)
   const [fullProfileTarget, setFullProfileTarget] = useState(null)
   const [showLiveParticipantsPopup, setShowLiveParticipantsPopup] = useState(false)
   const [activeNudge, setActiveNudge] = useState(null)
@@ -7666,11 +7668,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           let displayMsg = msg
           if (String(msgKey).startsWith('dm_') && msg.enc) {
             const senderUid = String(msg.sender?.id || msg.userId || msg.authorId || '')
-            if (senderUid && senderUid !== String(uid)) {
+            const peerUid = String(msgKey).slice(3).split('_').find(id => id !== String(uid)) || ''
+            const lookupUid = senderUid === String(uid) ? peerUid : senderUid
+            if (lookupUid) {
               try {
-                const [myKeys, senderPk] = await Promise.all([getKeyPair(), e2eeGetPublicKey(senderUid)])
-                if (myKeys && senderPk) {
-                  const plaintext = decryptFromSender(msg.text || '', senderPk, myKeys.secretKey)
+                const [myKeys, theirPk] = await Promise.all([getKeyPair(), e2eeGetPublicKey(lookupUid)])
+                if (myKeys && theirPk) {
+                  const plaintext = decryptFromSender(msg.text || '', theirPk, myKeys.secretKey)
                   if (plaintext != null) displayMsg = { ...msg, text: plaintext }
                 }
               } catch {}
@@ -8915,14 +8919,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       if (msgKey.startsWith('dm_')) {
         const myKeys = await getKeyPair().catch(() => null)
         if (myKeys) {
+          const peerUid = msgKey.slice(3).split('_').find(id => id !== String(uid)) || ''
           processed = await Promise.all(msgs.map(async m => {
             if (!m.enc || !m.text) return m
             const senderUid = String(m.sender?.id || m.userId || m.authorId || '')
-            if (!senderUid || senderUid === String(uid)) return m
+            const lookupUid = senderUid === String(uid) ? peerUid : senderUid
+            if (!lookupUid) return m
             try {
-              const senderPk = await e2eeGetPublicKey(senderUid)
-              if (!senderPk) return m
-              const plaintext = decryptFromSender(m.text, senderPk, myKeys.secretKey)
+              const theirPk = await e2eeGetPublicKey(lookupUid)
+              if (!theirPk) return m
+              const plaintext = decryptFromSender(m.text, theirPk, myKeys.secretKey)
               return plaintext != null ? { ...m, text: plaintext } : m
             } catch { return m }
           }))
@@ -11852,6 +11858,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         spotifyConnected={spotifyConnected}
                         onSpotifyConnect={connectSpotify}
                         onSpotifyDisconnect={disconnectSpotify}
+                        onOpenProfileEdit={() => { setShowSettings(false); setShowProfilePopup(true); setProfilePopupInitialEdit(true) }}
                       />
                     )}
                     {selectedSettingsCategory === 'privacy' && (
@@ -14667,7 +14674,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             <ProfilePopup
               user={currentUser}
               width={365}
-              onClose={() => setShowProfilePopup(false)}
+              initialEditOpen={profilePopupInitialEdit}
+              onClose={() => { setShowProfilePopup(false); setProfilePopupInitialEdit(false) }}
               onPhotoChange={(photo) => updateUserData({ photo })}
               cover={getPersonCover(currentUser)}
               onCoverChange={(cover) => updateUserData({ cover })}
