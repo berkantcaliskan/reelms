@@ -13527,13 +13527,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                   onMouseEnter={() => setSlashSelIdx(i)}
                                   onMouseDown={e => { e.preventDefault(); insertSlashCommand(opt) }}
                                 >
-                                  <div className="slash-cmd-icon">/</div>
-                                  <div className="mention-option-text">
-                                    <span className="mention-option-name">
-                                      {opt.cmd}{opt.args && <span className="slash-cmd-args"> {opt.args}</span>}
-                                    </span>
-                                    <span className="mention-option-sub">{opt.desc}</span>
-                                  </div>
+                                  <code className="slash-option-cmd">
+                                    {opt.cmd}{opt.args && <span className="slash-cmd-args"> {opt.args}</span>}
+                                  </code>
+                                  <span className="mention-option-sub">{opt.desc}</span>
                                 </div>
                               ))}
                             </div>

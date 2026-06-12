@@ -5821,30 +5821,34 @@ h6 {
 
 /* ── Slash command picker ── */
 .slash-dropdown-header {
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: rgba(var(--ta-rgb), 0.35);
-  padding: 4px 10px 2px;
-}
-.slash-cmd-icon {
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  background: rgba(88, 101, 242, 0.12);
-  color: #5865f2;
-  font-size: 1.1rem;
+  font-size: 0.65rem;
   font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: rgba(var(--ta-rgb), 0.3);
+  padding: 7px 12px 3px;
+}
+.slash-option-cmd {
+  font-family: monospace;
+  font-size: 0.76rem;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 99px;
+  background: rgba(var(--ta-rgb), 0.09);
+  color: rgba(var(--ta-rgb), 0.72);
+  border: 1px solid rgba(var(--ta-rgb), 0.11);
+  white-space: nowrap;
   flex-shrink: 0;
+  transition: background 0.1s, border-color 0.1s;
+}
+.mention-option--sel .slash-option-cmd,
+.mention-option:hover .slash-option-cmd {
+  background: rgba(var(--ta-rgb), 0.15);
+  border-color: rgba(var(--ta-rgb), 0.2);
 }
 .slash-cmd-args {
   font-weight: 400;
-  color: rgba(var(--ta-rgb), 0.45);
-  font-size: 0.78rem;
+  opacity: 0.5;
 }
 
 /* ── Mention spans in messages ── */
