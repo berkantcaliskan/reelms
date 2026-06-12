@@ -968,8 +968,8 @@ h6 {
   transition: transform 0.2s ease;
 }
 .bar-item-avatar {
-  width: 40px;
-  height: 40px;
+  width: 32px;
+  height: 32px;
   border-radius: 50%;
   background: rgba(var(--ta-rgb), 0.18);
   border: 1px solid rgba(var(--ta-rgb), 0.2);
@@ -977,7 +977,7 @@ h6 {
   align-items: center;
   justify-content: center;
   font-family: 'Dela Gothic One', sans-serif;
-  font-size: 0.9rem;
+  font-size: 0.72rem;
   color: rgba(var(--ta-rgb), 0.8);
   transition: background 0.2s, border-color 0.2s;
   overflow: hidden;
@@ -5910,6 +5910,44 @@ h6 {
 }
 .slash-dropdown .mention-option-sub {
   font-size: 0.69rem;
+}
+.slash-bots-row {
+  display: flex;
+  gap: 6px;
+  padding: 6px 8px 4px;
+  flex-wrap: wrap;
+}
+.slash-bot-chip {
+  font-family: 'Dela Gothic One', serif;
+  font-size: 0.72rem;
+  padding: 4px 10px;
+  border-radius: 99px;
+  border: 1px solid rgba(var(--ta-rgb), 0.18);
+  background: transparent;
+  color: rgba(var(--ta-rgb), 0.65);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  white-space: nowrap;
+}
+.slash-bot-chip:hover {
+  background: rgba(var(--ta-rgb), 0.08);
+  color: rgba(var(--ta-rgb), 0.9);
+  border-color: rgba(var(--ta-rgb), 0.28);
+}
+.slash-bot-chip--active {
+  background: rgba(var(--ta-rgb), 0.12);
+  color: rgba(var(--ta-rgb), 1);
+  border-color: rgba(var(--ta-rgb), 0.35);
+}
+.slash-see-more {
+  font-size: 0.68rem;
+  color: rgba(var(--ta-rgb), 0.45);
+  padding: 4px 11px 6px;
+  cursor: pointer;
+  transition: color 0.15s;
+}
+.slash-see-more:hover {
+  color: rgba(var(--ta-rgb), 0.75);
 }
 
 /* ── Mention spans in messages ── */
