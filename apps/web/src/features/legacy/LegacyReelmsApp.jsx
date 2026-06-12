@@ -772,6 +772,7 @@ function PillSelect({ value, onChange, options }) {
 }
 
 const THEMES = [
+  { id: 'blur-bg',  name: 'Photo',           accent: '#b99887', accentRgb: '185,152,135', base: '#1a1512', baseRgb: '26,21,18', isBlurBg: true },
   { id: 'default',  name: 'Default',         accent: '#b99887', accentRgb: '185,152,135', base: '#0c0c20', baseRgb: '12,12,32' },
   { id: 'gece',     name: 'Night',           accent: '#b99887', accentRgb: '185,152,135', base: '#1e1c1a', baseRgb: '30,28,26', grainOpacity: 0.12, noAccentGlow: true },
   { id: 'stone',    name: 'Soft Light',      accent: '#c8bfa8', accentRgb: '200,191,168', base: '#383835', baseRgb: '56,56,53', noGradient: true },
@@ -16001,7 +16002,7 @@ function ShareModal({ target, onClose, activeTheme }) {
     const canvas = canvasRef.current
     if (!canvas) return
     const theme = THEMES.find(t => t.id === selectedThemeId) || THEMES[0]
-    const W = 390, H = 650
+    const W = 360, H = 430
     canvas.width = W * 2
     canvas.height = H * 2
     canvas.style.width = W + 'px'
@@ -16009,117 +16010,121 @@ function ShareModal({ target, onClose, activeTheme }) {
     const ctx = canvas.getContext('2d')
     ctx.scale(2, 2)
 
-    // 1. Background
-    ctx.fillStyle = theme.base
-    ctx.fillRect(0, 0, W, H)
+    // Pre-load cover image (used for background blur and/or main image)
+    let loadedImg = null
+    if (target.image) {
+      loadedImg = await new Promise((resolve) => {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = () => resolve(img)
+        img.onerror = () => resolve(null)
+        img.src = target.image
+      })
+    }
 
-    // 2. Radial gradient overlay
-    const grad = ctx.createRadialGradient(W / 2, H * 0.3, 0, W / 2, H * 0.3, W * 0.75)
-    grad.addColorStop(0, theme.accent + '18')
-    grad.addColorStop(1, 'transparent')
-    ctx.fillStyle = grad
-    ctx.fillRect(0, 0, W, H)
+    const accent = theme.accent
 
-    // 3. Logo (tinted with accent)
+    // Background
+    if (theme.isBlurBg && loadedImg) {
+      const overflow = 44
+      const sc = Math.max((W + overflow * 2) / loadedImg.width, (H + overflow * 2) / loadedImg.height)
+      const bw = loadedImg.width * sc
+      const bh = loadedImg.height * sc
+      ctx.save()
+      ctx.filter = 'blur(26px) brightness(0.4) saturate(1.4)'
+      ctx.drawImage(loadedImg, (W - bw) / 2, (H - bh) / 2, bw, bh)
+      ctx.restore()
+      ctx.fillStyle = 'rgba(0,0,0,0.38)'
+      ctx.fillRect(0, 0, W, H)
+    } else {
+      ctx.fillStyle = theme.base
+      ctx.fillRect(0, 0, W, H)
+      const g1 = ctx.createRadialGradient(W, 0, 0, W, 0, W * 0.9)
+      g1.addColorStop(0, accent + '2A')
+      g1.addColorStop(1, 'transparent')
+      ctx.fillStyle = g1
+      ctx.fillRect(0, 0, W, H)
+      const g2 = ctx.createRadialGradient(0, H, 0, 0, H, W * 0.65)
+      g2.addColorStop(0, accent + '18')
+      g2.addColorStop(1, 'transparent')
+      ctx.fillStyle = g2
+      ctx.fillRect(0, 0, W, H)
+    }
+
+    // Header: logo + "reelms" text
     try {
       await new Promise((resolve) => {
         const logoImg = new Image()
-        logoImg.onload = () => {
-          // Draw on temp canvas to tint
-          const tmp = document.createElement('canvas')
-          tmp.width = 26
-          tmp.height = 26
-          const tc = tmp.getContext('2d')
-          tc.drawImage(logoImg, 0, 0, 26, 26)
-          tc.globalCompositeOperation = 'source-atop'
-          tc.fillStyle = theme.accent
-          tc.fillRect(0, 0, 26, 26)
-          ctx.drawImage(tmp, W / 2 - 52, 44, 26, 26)
-          resolve()
-        }
+        logoImg.onload = () => { ctx.drawImage(logoImg, 20, 14, 36, 36); resolve() }
         logoImg.onerror = resolve
         logoImg.src = reelmsLogo
       })
     } catch { /* noop */ }
 
-    // 4. "Reelms" text
     ctx.font = 'bold 17px "Dela Gothic One", serif'
-    ctx.fillStyle = theme.accent
+    ctx.fillStyle = 'rgba(255,255,255,0.92)'
     ctx.textAlign = 'left'
-    ctx.fillText('Reelms', W / 2 - 22, 65)
+    ctx.fillText('reelms', 62, 38)
 
-    // 5. Label
-    const labelText = getShareLabel(target.type).split('').join('  ')
-    ctx.font = '500 10px sans-serif'
-    ctx.fillStyle = 'rgba(255,255,255,0.55)'
-    ctx.textAlign = 'center'
-    ctx.fillText(labelText, W / 2, 105)
-
-    // 6. Image area
-    const imgX = (W - 265) / 2
-    const imgY = 120
-    const imgW = 265
-    const imgH = 265
-    const imgR = 28
-    ctx.save()
-    drawRoundRect(ctx, imgX, imgY, imgW, imgH, imgR)
-    ctx.clip()
-    if (target.image) {
-      try {
-        await new Promise((resolve) => {
-          const img = new Image()
-          img.crossOrigin = 'anonymous'
-          img.onload = () => {
-            // Cover sizing
-            const scale = Math.max(imgW / img.width, imgH / img.height)
-            const sw = img.width * scale
-            const sh = img.height * scale
-            const sx = imgX + (imgW - sw) / 2
-            const sy = imgY + (imgH - sh) / 2
-            ctx.drawImage(img, sx, sy, sw, sh)
-            resolve()
-          }
-          img.onerror = resolve
-          img.src = target.image
-        })
-      } catch { /* noop */ }
-    } else {
-      ctx.fillStyle = theme.accent + '18'
-      ctx.fillRect(imgX, imgY, imgW, imgH)
-      // Faint icon placeholder
-      ctx.strokeStyle = theme.accent + '40'
-      ctx.lineWidth = 2
-      ctx.beginPath()
-      ctx.arc(imgX + imgW / 2, imgY + imgH / 2, 30, 0, Math.PI * 2)
-      ctx.stroke()
-    }
-    ctx.restore()
-
-    // 7. Title
-    ctx.font = 'bold 20px "Dela Gothic One", serif'
-    ctx.fillStyle = '#ffffff'
-    ctx.textAlign = 'center'
-    wrapCanvasText(ctx, target.title || '', W / 2, 435, W - 60, 26)
-
-    // 8. Subtitle
-    ctx.font = '14px sans-serif'
-    ctx.fillStyle = 'rgba(255,255,255,0.58)'
-    ctx.textAlign = 'center'
-    ctx.fillText(target.subtitle || '', W / 2, 470)
-
-    // 9. Divider line
+    // Header separator
     ctx.strokeStyle = 'rgba(255,255,255,0.1)'
     ctx.lineWidth = 1
     ctx.beginPath()
-    ctx.moveTo(24, 610)
-    ctx.lineTo(366, 610)
+    ctx.moveTo(20, 60)
+    ctx.lineTo(W - 20, 60)
     ctx.stroke()
 
-    // 10. URL
-    ctx.font = '12px "Courier New", monospace'
-    ctx.fillStyle = 'rgba(255,255,255,0.38)'
-    ctx.textAlign = 'center'
-    ctx.fillText(shareUrl, W / 2, 634)
+    // Cover image
+    const imgPad = 20
+    const imgX = imgPad, imgY = 72, imgW = W - imgPad * 2, imgH = 192, imgR = 14
+
+    ctx.save()
+    drawRoundRect(ctx, imgX, imgY, imgW, imgH, imgR)
+    ctx.clip()
+    if (loadedImg) {
+      const sc = Math.max(imgW / loadedImg.width, imgH / loadedImg.height)
+      const sw = loadedImg.width * sc, sh = loadedImg.height * sc
+      ctx.drawImage(loadedImg, imgX + (imgW - sw) / 2, imgY + (imgH - sh) / 2, sw, sh)
+    } else {
+      ctx.fillStyle = accent + '20'
+      ctx.fillRect(imgX, imgY, imgW, imgH)
+    }
+    ctx.restore()
+
+    // Title
+    const contentY = imgY + imgH + 26
+    ctx.font = 'bold 21px "Dela Gothic One", serif'
+    ctx.fillStyle = '#ffffff'
+    ctx.textAlign = 'left'
+    wrapCanvasText(ctx, target.title || '', imgPad, contentY, W - imgPad * 2, 27)
+
+    // Subtitle
+    if (target.subtitle) {
+      ctx.font = '13px sans-serif'
+      ctx.fillStyle = 'rgba(255,255,255,0.5)'
+      ctx.textAlign = 'left'
+      ctx.fillText(target.subtitle, imgPad, contentY + 44)
+    }
+
+    // "Join this Reelm" CTA
+    ctx.font = '600 13px sans-serif'
+    ctx.fillStyle = theme.isBlurBg ? 'rgba(255,255,255,0.85)' : accent
+    ctx.textAlign = 'left'
+    ctx.fillText('Join this Reelm →', imgPad, contentY + 72)
+
+    // Footer divider
+    ctx.strokeStyle = 'rgba(255,255,255,0.09)'
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.moveTo(20, H - 36)
+    ctx.lineTo(W - 20, H - 36)
+    ctx.stroke()
+
+    // URL
+    ctx.font = '11px "Courier New", monospace'
+    ctx.fillStyle = 'rgba(255,255,255,0.35)'
+    ctx.textAlign = 'left'
+    ctx.fillText(shareUrl, 20, H - 15)
   }, [selectedThemeId, target, shareUrl])
 
   useEffect(() => { drawCard() }, [drawCard])
@@ -16152,8 +16157,8 @@ function ShareModal({ target, onClose, activeTheme }) {
           {THEMES.map(t => (
             <button
               key={t.id}
-              className={`share-theme-dot${selectedThemeId === t.id ? ' share-theme-dot--active' : ''}`}
-              style={{ background: t.accent }}
+              className={`share-theme-dot${selectedThemeId === t.id ? ' share-theme-dot--active' : ''}${t.isBlurBg ? ' share-theme-dot--photo' : ''}`}
+              style={{ background: t.isBlurBg ? 'linear-gradient(135deg, #3a2a1e 0%, #8a6850 100%)' : t.accent }}
               title={t.name}
               onClick={() => setSelectedThemeId(t.id)}
             />
@@ -16164,7 +16169,25 @@ function ShareModal({ target, onClose, activeTheme }) {
             {copied ? '✓ Copied' : 'Copy link'}
           </button>
           <button className="share-download-btn" onClick={handleDownload}>
-            Download image
+            Download
+          </button>
+        </div>
+        <div className="share-social-row">
+          <button className="share-social-btn" style={{ background: '#25D366' }}
+            onClick={() => window.open(`https://wa.me/?text=${encodeURIComponent((target.title || '') + ' ' + shareUrl)}`, '_blank')}>
+            WhatsApp
+          </button>
+          <button className="share-social-btn" style={{ background: '#FF4500' }}
+            onClick={() => window.open(`https://reddit.com/submit?url=${encodeURIComponent(shareUrl)}&title=${encodeURIComponent(target.title || '')}`, '_blank')}>
+            Reddit
+          </button>
+          <button className="share-social-btn" style={{ background: 'linear-gradient(135deg, #833ab4 0%, #fd1d1d 50%, #fcb045 100%)' }}
+            onClick={handleDownload}>
+            Instagram ↓
+          </button>
+          <button className="share-social-btn" style={{ background: '#010101', border: '1px solid rgba(255,255,255,0.15)' }}
+            onClick={handleDownload}>
+            TikTok ↓
           </button>
         </div>
       </div>
