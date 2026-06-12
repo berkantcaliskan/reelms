@@ -5744,14 +5744,20 @@ h6 {
   bottom: calc(100% + 6px);
   left: 0;
   right: 0;
-  background: rgba(240, 234, 228, 0.97);
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(var(--ta-rgb), 0.12);
+  background: rgba(22, 20, 28, 0.88);
+  -webkit-backdrop-filter: blur(28px) saturate(1.6) brightness(0.75);
+  backdrop-filter: blur(28px) saturate(1.6) brightness(0.75);
+  border: 1px solid rgba(var(--ta-rgb), 0.1);
   border-radius: 14px;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.38);
   overflow: hidden;
   z-index: 200;
   padding: 4px;
+}
+.slash-dropdown {
+  right: auto;
+  min-width: 260px;
+  max-width: 360px;
 }
 .mention-option {
   display: flex;
@@ -5763,7 +5769,7 @@ h6 {
   transition: background 0.12s;
 }
 .mention-option--sel,
-.mention-option:hover { background: rgba(var(--ta-rgb), 0.09); }
+.mention-option:hover { background: rgba(var(--ta-rgb), 0.13); }
 .mention-option-avatar {
   width: 30px;
   height: 30px;
@@ -5808,46 +5814,53 @@ h6 {
 .mention-option-name {
   font-size: 0.84rem;
   font-weight: 600;
-  color: rgba(var(--ta-rgb), 0.85);
+  color: rgba(var(--ta-rgb), 0.92);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .mention-option-sub {
   font-size: 0.72rem;
-  color: rgba(var(--ta-rgb), 0.45);
+  color: rgba(var(--ta-rgb), 0.52);
 }
 
 /* ── Slash command picker ── */
 .slash-dropdown-header {
-  font-size: 0.65rem;
+  font-size: 0.62rem;
   font-weight: 700;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(var(--ta-rgb), 0.3);
-  padding: 7px 12px 3px;
+  color: rgba(var(--ta-rgb), 0.38);
+  padding: 6px 11px 2px;
 }
 .slash-option-cmd {
   font-family: monospace;
-  font-size: 0.76rem;
+  font-size: 0.73rem;
   font-weight: 600;
-  padding: 3px 10px;
+  padding: 2px 9px;
   border-radius: 99px;
-  background: rgba(var(--ta-rgb), 0.09);
-  color: rgba(var(--ta-rgb), 0.72);
-  border: 1px solid rgba(var(--ta-rgb), 0.11);
+  background: rgba(var(--ta-rgb), 0.1);
+  color: rgba(var(--ta-rgb), 0.82);
+  border: 1px solid rgba(var(--ta-rgb), 0.15);
   white-space: nowrap;
   flex-shrink: 0;
   transition: background 0.1s, border-color 0.1s;
 }
 .mention-option--sel .slash-option-cmd,
 .mention-option:hover .slash-option-cmd {
-  background: rgba(var(--ta-rgb), 0.15);
-  border-color: rgba(var(--ta-rgb), 0.2);
+  background: rgba(var(--ta-rgb), 0.18);
+  border-color: rgba(var(--ta-rgb), 0.25);
 }
 .slash-cmd-args {
   font-weight: 400;
-  opacity: 0.5;
+  opacity: 0.48;
+}
+.slash-dropdown .mention-option {
+  padding: 5px 8px;
+  gap: 8px;
+}
+.slash-dropdown .mention-option-sub {
+  font-size: 0.69rem;
 }
 
 /* ── Mention spans in messages ── */
