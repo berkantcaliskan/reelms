@@ -840,7 +840,10 @@ const DEFAULT_CUSTOMIZATION = {
   customAccent: null,
   customBase: null,
   customTextColor: 'white',
+  customGreeting: null,
 }
+
+const CLASSIC_GREETINGS = ['Good morning', 'Good afternoon', 'Good evening', 'Good night']
 
 function EnvToggle({ k, def = false, v, set }) {
   return (
@@ -1065,7 +1068,7 @@ function EnvironmentPanel({ uid }) {
   )
 }
 
-function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onFontChange }) {
+function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onFontChange, user }) {
   const t = useT()
   const bgInputRef = useRef(null)
   const currentTheme = THEMES.find(th => th.id === customization.themeId) || THEMES[0]
@@ -1295,6 +1298,37 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="accs-section">
+        <div className="accs-section-title">Custom Greeting</div>
+        <div className="cust-greeting-sublabel">Classic Greetings</div>
+        <div className="cust-greeting-pills">
+          {CLASSIC_GREETINGS.map(g => (
+            <button
+              key={g}
+              type="button"
+              className={`cust-greeting-pill${customization.customGreeting === g ? ' cust-greeting-pill--active' : ''}`}
+              onClick={() => onChange({ customGreeting: customization.customGreeting === g ? null : g })}
+            >{g}</button>
+          ))}
+        </div>
+        <div className="cust-greeting-sublabel" style={{ marginTop: 18 }}>Custom greeting</div>
+        <input
+          className="accs-input"
+          style={{ width: '100%' }}
+          placeholder='e.g. "Selam" or "Hey"'
+          value={CLASSIC_GREETINGS.includes(customization.customGreeting) ? '' : (customization.customGreeting || '')}
+          onChange={e => onChange({ customGreeting: e.target.value || null })}
+          onFocus={() => {
+            if (CLASSIC_GREETINGS.includes(customization.customGreeting)) onChange({ customGreeting: null })
+          }}
+        />
+        {customization.customGreeting && (
+          <p className="cust-greeting-preview">
+            {customization.customGreeting}, {user?.name || user?.username || 'you'}!
+          </p>
+        )}
       </div>
     </div>
   )
@@ -11727,6 +11761,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         bodyFont={bodyFont}
                         BODY_FONTS={BODY_FONTS}
                         onFontChange={updateBodyFont}
+                        user={currentUser}
                       />
                     )}
                     {selectedSettingsCategory === 'environment' && (
@@ -13723,7 +13758,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           <div className={`msg-input-wrap${pendingAttachment ? ' msg-input-wrap--has-attach' : ''}`}>
                             <input
                               className="msg-input"
-                              placeholder={selectedChatSystemLocked ? 'Reelms System is read-only.' : (selectedChatBlockedEntry ? 'You blocked this user. Unblock to send messages.' : (isAnnouncement ? 'Post an announcement...' : 'Message'))}
+                              placeholder={selectedChatSystemLocked ? 'Reelms System is read-only.' : (selectedChatBlockedEntry ? 'You blocked this user. Unblock to send messages.' : (isAnnouncement ? 'Post an announcement' : 'Message'))}
                               disabled={!canPost}
                               value={messageInput}
                               onChange={e => {
@@ -14270,10 +14305,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   const sortedReelms = [...reelms].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
                   const sortedChats = [...chats].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
                   const hour = new Date().getHours()
-                  const greetingWord = hour >= 5 && hour < 12 ? 'Good morning'
+                  const greetingWord = customization.customGreeting || (
+                    hour >= 5 && hour < 12 ? 'Good morning'
                     : hour >= 12 && hour < 17 ? 'Good afternoon'
                     : hour >= 17 && hour < 21 ? 'Good evening'
                     : 'Good night'
+                  )
                   const greetName = currentUser?.name || currentUser?.username || ''
                   const ArrowRight = () => (
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
