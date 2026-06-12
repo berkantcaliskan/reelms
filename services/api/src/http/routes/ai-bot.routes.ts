@@ -7,7 +7,7 @@ import { authenticate } from '../middleware/authenticate.js'
 import { isReelmMember } from '../../modules/reelms/access.js'
 
 export const AI_BOT_UID = env.REELMS_AI_BOT_UID
-const AI_BOT_USERNAME = 'reelms-intelligence'
+const AI_BOT_USERNAME = 'reelmsintelligence'
 const AI_BOT_NAME = 'Reelms Intelligence'
 
 async function ensureAIBotProfile() {
@@ -95,7 +95,7 @@ export function createAIBotRouter(io: Server) {
       const botMember = {
         userId: AI_BOT_UID, userName: AI_BOT_NAME, username: AI_BOT_USERNAME,
         userPhoto: null, photo: null, cover: null, coverImage: null, coverUrl: null,
-        bio: 'Reelms Intelligence — @reelms-intelligence ile konuş, /summarize ile özetle',
+        bio: 'Reelms Intelligence — @reelmsintelligence ile konuş, /summarize ile özetle',
         activity: null, profileTheme: null, roleIds: [], isBot: true, joinedAt: Date.now()
       }
       await putDoc(pk, 'members', [botMember, ...safeMembers])
