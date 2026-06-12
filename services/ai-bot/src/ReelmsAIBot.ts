@@ -175,10 +175,10 @@ export class ReelmsAIBot {
 
     const text: string = message?.text ?? ''
     const parsed = parse(text)
-    if (!parsed) { console.log('[ReelmsAI] Parse null, komut değil:', text.slice(0, 40)); return }
+    if (!parsed) return
 
-    console.log('[ReelmsAI] Komut işleniyor:', parsed.command, parsed.args)
-    const senderName: string = message?.sender?.name ?? message?.sender?.username ?? 'Kullanıcı'
+    console.log('[ReelmsAI] Command:', parsed.command, parsed.args)
+    const senderName: string = message?.sender?.name ?? message?.sender?.username ?? 'User'
     const senderId: string = message?.userId ?? message?.sender?.id ?? ''
     const channelRefs = this.findChannelRefsForMsgKey(msgKey)
 
@@ -187,7 +187,7 @@ export class ReelmsAIBot {
       this.fetchMessages.bind(this),
       channelRefs
     )
-    console.log('[ReelmsAI] Yanıt uzunluğu:', response?.length ?? 0)
+    console.log('[ReelmsAI] Response length:', response?.length ?? 0)
     if (response) await this.sendMessage(msgKey, response)
   }
 

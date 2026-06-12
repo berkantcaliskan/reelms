@@ -56,6 +56,21 @@ export async function isCommunityAdminUid(uid: string) {
   return isCommunityAdminEmail(profile.contact || profile.email) || isCommunityAdminUsername(profile.username)
 }
 
+export async function isSystemAdminEmail(value: unknown) {
+  const email = normalizeAdminEmail(value)
+  // System admin check for admin@reelms.io
+  return email === 'admin@reelms.io'
+}
+
+export async function isSystemAdminUid(uid: string) {
+  if (!uid) return false
+  if (uid === env.REELMS_MODERATION_UID) return true
+  
+  const profile = (await getDoc<any>(userPk(uid), 'profile').catch(() => null)) || {}
+  const email = normalizeAdminEmail(profile.contact || profile.email || '')
+  return email === 'admin@reelms.io'
+}
+
 export async function resolveCommunityAdminUids() {
   const resolved = new Set<string>()
 

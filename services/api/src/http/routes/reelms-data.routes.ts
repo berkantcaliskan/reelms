@@ -9,7 +9,7 @@ import { verifyIdToken } from '../../modules/auth/authService.js'
 import { APP_PK, chanPk, deleteDoc, getDoc, putDoc, putDocIfAbsent, queryDocs, reelmPk, scanByPkPrefix, scanByPkPrefixAndSk, userPk } from '../../modules/store/docStore.js'
 import { canManageReelm, canUseReelmPermission, getActiveReelmTimeout, getMessageKeyAccess, getUserPublicProfile as getStoredPublicProfile, isReelmMember, normalizeEmail, normalizeUsername, publicProfileFromStored } from '../../modules/reelms/access.js'
 import { autoJoinDefaultReelm, DEFAULT_REELM_ID, hasLeftDefaultReelm, setDefaultReelmLeft } from '../../modules/reelms/defaultReelm.js'
-import { isCommunityAdminUid, resolveCommunityAdminUids } from '../../modules/reelms/communityAdmins.js'
+import { isCommunityAdminUid, isSystemAdminUid, resolveCommunityAdminUids } from '../../modules/reelms/communityAdmins.js'
 import { buildUserUploadKey, getObjectStorage } from '../../modules/storage/objectStorage.js'
 
 const USER_BOOTSTRAP_KEYS = [
@@ -1908,7 +1908,9 @@ export function createReelmsDataRouter(io: Server) {
   })
 
   router.get('/admin/all-reelms', async (req, res) => {
-    if (req.userId !== env.REELMS_MODERATION_UID) return res.status(403).json({ error: 'forbidden' })
+    const uid = String(req.userId || '')
+    const isSystemAdmin = await isSystemAdminUid(uid).catch(() => false)
+    if (uid !== env.REELMS_MODERATION_UID && !isSystemAdmin) return res.status(403).json({ error: 'forbidden' })
     try {
       const items = await scanByPkPrefix('REELM#')
       const map: Record<string, unknown> = {}
@@ -2983,7 +2985,8 @@ export function createReelmsDataRouter(io: Server) {
       if (!target) return res.json({ ok: true })
       const data = target.data as any
       const authorId = String(data?.userId || data?.authorId || data?.sender?.id || '')
-      if (uid !== env.REELMS_MODERATION_UID && authorId !== uid) return res.status(403).json({ error: 'forbidden' })
+      const isSystemAdmin = await isSystemAdminUid(uid).catch(() => false)
+      if (uid !== env.REELMS_MODERATION_UID && !isSystemAdmin && authorId !== uid) return res.status(403).json({ error: 'forbidden' })
 
       await deleteDoc(chanPk(msgKey), target.sk)
       const payload = { msgKey, msgId }

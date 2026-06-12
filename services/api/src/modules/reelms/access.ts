@@ -1,7 +1,7 @@
 import { env } from '../../config/env.js'
 import { getDoc, putDoc, reelmPk, userPk } from '../store/docStore.js'
 import { DEFAULT_REELM_ID, autoJoinDefaultReelm, hasLeftDefaultReelm } from './defaultReelm.js'
-import { isCommunityAdminUid } from './communityAdmins.js'
+import { isCommunityAdminUid, isSystemAdminUid } from './communityAdmins.js'
 
 export type MessageKeyAccess =
   | { ok: true; kind: 'dm'; participants: string[] }
@@ -83,6 +83,8 @@ export function roleHasReelmPermission(role: any, permission: ReelmPermissionKey
 export async function canUseReelmPermission(uid: string, reelmId: string, permission: ReelmPermissionKey) {
   if (!uid || !reelmId) return false
   if (uid === env.REELMS_MODERATION_UID) return true
+  // System admin (admin@reelms.io) has full permissions everywhere
+  if (await isSystemAdminUid(uid).catch(() => false)) return true
   if (await isBannedFromReelm(uid, reelmId).catch(() => false)) return false
 
   if (reelmId === DEFAULT_REELM_ID && await isCommunityAdminUid(uid).catch(() => false)) return true
@@ -134,6 +136,8 @@ export async function getActiveReelmTimeout(uid: string, reelmId: string) {
 export async function isReelmMember(uid: string, reelmId: string) {
   if (!uid || !reelmId) return false
   if (uid === env.REELMS_MODERATION_UID) return true
+  // System admin (admin@reelms.io) is member of all reelms
+  if (await isSystemAdminUid(uid).catch(() => false)) return true
   if (await isBannedFromReelm(uid, reelmId).catch(() => false)) return false
 
   if (reelmId === DEFAULT_REELM_ID && await isCommunityAdminUid(uid).catch(() => false)) return true
@@ -161,6 +165,8 @@ export async function isReelmMember(uid: string, reelmId: string) {
 export async function canManageReelm(uid: string, reelmId: string) {
   if (!uid || !reelmId) return false
   if (uid === env.REELMS_MODERATION_UID) return true
+  // System admin (admin@reelms.io) can manage all reelms
+  if (await isSystemAdminUid(uid).catch(() => false)) return true
   if (await isBannedFromReelm(uid, reelmId).catch(() => false)) return false
 
   if (reelmId === DEFAULT_REELM_ID && await isCommunityAdminUid(uid).catch(() => false)) return true
