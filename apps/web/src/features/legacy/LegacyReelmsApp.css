@@ -6377,7 +6377,9 @@ h6 {
   backdrop-filter: blur(48px) saturate(2.2);
   border: 1px solid rgba(var(--ta-rgb), 0.15);
   border-radius: 16px;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: calc(100vh - 24px);
   z-index: 900;
   box-shadow: 0 8px 40px rgba(0,0,0,0.35);
   font-family: var(--body-font);
@@ -13719,7 +13721,6 @@ button, input, select, textarea,
   --fpp-theme-accent-rgb: var(--ta-rgb);
   --fpp-theme-base: var(--tb);
   --fpp-theme-base-rgb: var(--tb-rgb);
-  background: linear-gradient(180deg, rgba(var(--fpp-theme-base-rgb), 0.88), rgba(var(--tb-rgb), 0.86));
   border-color: rgba(var(--fpp-theme-accent-rgb), 0.22);
   box-shadow: 0 16px 46px rgba(0,0,0,0.36), 0 0 0 1px rgba(var(--fpp-theme-accent-rgb), 0.08);
 }

@@ -2917,8 +2917,8 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
     return () => document.removeEventListener('mousedown', handler)
   }, [onClose, embedded])
 
-  const popupW = 280
-  const popupH = 460
+  const popupW = 350
+  const popupH = 480
   const friendCover = safeFriend.cover || safeFriend.coverImage || safeFriend.coverUrl || null
   const safeRect = anchorRect || { top: 96, bottom: 112, left: Math.max(8, window.innerWidth - popupW - 18), right: window.innerWidth - 18 }
   let left = safeRect.left - popupW - 8
@@ -6543,6 +6543,7 @@ function sameMessageList(a, b) {
 
 function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, updateAvailable, setUpdateAvailable: _setUA, pushToast }) {
   const navigate = useNavigate()
+  const t = useT()
   const authSession = useCentralAuthSession()
   const [authUser, setAuthUser] = useState(() =>
     authSession.authUser || (isElectron ? getElectronCurrentUser() : getWebCurrentUser())
@@ -10686,20 +10687,20 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     {
       bot: 'Reelms Intelligence',
       commands: [
-        { cmd: '/ai', args: '<message>', desc: 'Chat with AI' },
-        { cmd: '/summarize', args: '[n]', desc: 'Summarize last N messages (default: 30)' },
-        { cmd: '/digest', args: '', desc: 'Daily channel digest' },
-        { cmd: '/ai-reset', args: '', desc: 'Clear AI chat history' },
-        { cmd: '/ai-help', args: '', desc: 'List all AI commands' },
+        { cmd: '/ai', args: '<message>', desc: t('slash_cmd_ai_desc') },
+        { cmd: '/summarize', args: '[n]', desc: t('slash_cmd_summarize_desc') },
+        { cmd: '/digest', args: '', desc: t('slash_cmd_digest_desc') },
+        { cmd: '/ai-reset', args: '', desc: t('slash_cmd_ai_reset_desc') },
+        { cmd: '/ai-help', args: '', desc: t('slash_cmd_ai_help_desc') },
       ]
     },
     {
       bot: 'Reelm Radio',
       commands: [
-        { cmd: '/play', args: '<query>', desc: 'Play music in voice channel' },
-        { cmd: '/skip', args: '', desc: 'Skip current track' },
-        { cmd: '/queue', args: '', desc: 'Show music queue' },
-        { cmd: '/stop', args: '', desc: 'Stop playback' },
+        { cmd: '/play', args: '<query>', desc: t('slash_cmd_play_desc') },
+        { cmd: '/skip', args: '', desc: t('slash_cmd_skip_desc') },
+        { cmd: '/queue', args: '', desc: t('slash_cmd_queue_desc') },
+        { cmd: '/stop', args: '', desc: t('slash_cmd_stop_desc') },
       ]
     },
   ]
@@ -13556,7 +13557,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         {canPost && <div className="msg-bar-wrap">
                           {slashMenu && (
                             <div className="mention-dropdown slash-dropdown">
-                              <div className="slash-dropdown-header">Commands</div>
+                              <div className="slash-dropdown-header">{t('slash_commands_header')}</div>
                               {slashOptions.length > 0 ? (
                                 <>
                                   {(slashShowAll ? slashOptions : slashOptions.slice(0, 2)).map((opt, i) => (
@@ -13577,7 +13578,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                       className="slash-see-more"
                                       onMouseDown={e => { e.preventDefault(); setSlashShowAll(true) }}
                                     >
-                                      See {slashOptions.length - 2} more…
+                                      {t('slash_see_more').replace('{n}', slashOptions.length - 2)}
                                     </div>
                                   )}
                                 </>
@@ -13617,7 +13618,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                             className="slash-see-more"
                                             onMouseDown={e => { e.preventDefault(); setSlashShowAll(true) }}
                                           >
-                                            See {botCmds.length - 2} more…
+                                            {t('slash_see_more').replace('{n}', botCmds.length - 2)}
                                           </div>
                                         )}
                                       </>
