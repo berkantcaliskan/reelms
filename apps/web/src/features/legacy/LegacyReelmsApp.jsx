@@ -2920,10 +2920,12 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
   const popupW = 280
   const popupH = 460
   const friendCover = safeFriend.cover || safeFriend.coverImage || safeFriend.coverUrl || null
-  const safeRect = anchorRect || { top: 96, bottom: 112, left: Math.max(8, window.innerWidth - popupW - 18) }
-  let top = safeRect.top - popupH - 8
-  let left = Math.min(Math.max(8, safeRect.left), window.innerWidth - popupW - 8)
-  if (top < 8) top = safeRect.bottom + 8
+  const safeRect = anchorRect || { top: 96, bottom: 112, left: Math.max(8, window.innerWidth - popupW - 18), right: window.innerWidth - 18 }
+  let left = safeRect.left - popupW - 8
+  if (left < 8) left = (safeRect.right || safeRect.left) + 8
+  let top = safeRect.top
+  if (top + popupH > window.innerHeight - 8) top = window.innerHeight - popupH - 8
+  if (top < 8) top = 8
 
   const profileNode = (
     <div className={`friend-profile-popup${embedded ? ' friend-profile-popup--embedded' : ''}`} style={{ ...(buildProfileThemeStyle(safeFriend) || {}), ...(embedded ? {} : { top, left, width: popupW }) }} ref={popupRef}>
@@ -10977,10 +10979,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }, [])
 
 
-  const renderFriendProfileSurface = (embedded = false) => {
+  const renderFriendProfileSurface = () => {
     if (!friendProfileTarget) return null
-    if (embedded && friendProfileTarget.serverContext !== 'reelm') return null
-    if (!embedded && friendProfileTarget.serverContext === 'reelm') return null
     const f = friendProfileTarget.friend
     if (!f?.id) return null
     const canShare = f?.allowProfileSharing !== false
@@ -11087,9 +11087,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       const roleIds = new Set(getMemberRoleIdsClient(m).map(String))
       return orderedPanelRoles.find(role => roleIds.has(String(role.id))) || null
     }
-    const selectedMemberId = friendProfileTarget?.serverContext === 'reelm'
-      ? String(friendProfileTarget?.friend?.id || '')
-      : ''
     const renderMember = (m) => {
       const info = getMemberPresence(m)
       const status = getMemberStatus(m)
@@ -11098,11 +11095,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       const displayPhoto = isMe ? (currentUser.photo || info.userPhoto || m.userPhoto) : (info.userPhoto || m.userPhoto)
       const nowPlaying = !isMe ? spotifyFriendsNowPlaying[m.userId] : null
       const primaryRole = getPrimaryPanelRole(m)
-      const isSelectedMember = selectedMemberId && String(m.userId) === selectedMemberId
       return (
         <React.Fragment key={m.userId}>
           <div
-            className={`rp-member-card${isActiveStatus(status) ? ' rp-member-card--active' : ''}${isMainAdminMemberClient(selectedReelm, m) ? ' rp-member-card--main-admin' : ''}${isSelectedMember ? ' rp-member-card--selected' : ''}`}
+            className={`rp-member-card${isActiveStatus(status) ? ' rp-member-card--active' : ''}${isMainAdminMemberClient(selectedReelm, m) ? ' rp-member-card--main-admin' : ''}`}
             onClick={e => openFriendProfile({ id: m.userId, name: displayName, photo: displayPhoto, isBot: m.isBot, username: m.username }, e, { serverContext: true })}
           >
             <div className="rp-member-avatar-wrap">
@@ -11126,11 +11122,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               )}
             </div>
           </div>
-          {isSelectedMember && (
-            <div className="rp-member-profile-dock rp-member-profile-dock--inline">
-              {renderFriendProfileSurface(true)}
-            </div>
-          )}
         </React.Fragment>
       )
     }
@@ -14442,7 +14433,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               onViewFullProfile={() => { setShowProfilePopup(false); setFullProfileTarget({ isSelf: true, user: currentUser }) }}
             />
           )}
-          {renderFriendProfileSurface(false)}
+          {renderFriendProfileSurface()}
           {fullProfileTarget && (
             <FullProfilePage
               user={fullProfileTarget.isSelf ? currentUser : fullProfileTarget.user}
@@ -16070,7 +16061,7 @@ function ShareModal({ target, onClose, activeTheme }) {
     } catch { /* noop */ }
 
     ctx.font = '400 18px "Dela Gothic One", serif'
-    ctx.fillStyle = '#ffffff'
+    ctx.fillStyle = '#b99887'
     ctx.textAlign = 'left'
     ctx.fillText('Reelms', logoTextX, 38)
 
