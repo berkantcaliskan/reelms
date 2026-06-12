@@ -1334,6 +1334,85 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
   )
 }
 
+function AccessibilityPanel({ uid }) {
+  const t = useT()
+  const [a11y, setA11y] = useState({})
+
+  useEffect(() => {
+    if (!uid || uid === 'guest') return
+    userGetDoc('accessibility').then(d => {
+      if (d && typeof d === 'object') setA11y(d)
+    }).catch(() => {})
+  }, [uid])
+
+  useEffect(() => {
+    const el = document.documentElement
+    if (a11y.reducedMotion) el.classList.add('a11y-reduced-motion')
+    else el.classList.remove('a11y-reduced-motion')
+    if (a11y.messageSpacing) el.classList.add('a11y-msg-spacing')
+    else el.classList.remove('a11y-msg-spacing')
+    const scale = a11y.fontScale || 1
+    el.style.fontSize = scale === 1 ? '' : (16 * scale) + 'px'
+  }, [a11y])
+
+  const update = (next) => {
+    setA11y(next)
+    scheduleUserPersist('accessibility', next)
+  }
+
+  const FONT_OPTS = [
+    { val: 0.85, key: 'a11y_font_small' },
+    { val: 1,    key: 'a11y_font_normal' },
+    { val: 1.15, key: 'a11y_font_large' },
+    { val: 1.3,  key: 'a11y_font_xlarge' },
+  ]
+
+  return (
+    <div className="accs-panel">
+      <div className="accs-section">
+        <div className="accs-section-title">{t('a11y_motion')}</div>
+        <div className="cust-toggle-row">
+          <div>
+            <span className="cust-toggle-label">{t('a11y_motion')}</span>
+            <p className="accs-note">{t('a11y_motion_desc')}</p>
+          </div>
+          <button
+            className={`cust-toggle${a11y.reducedMotion ? ' cust-toggle-on' : ''}`}
+            onClick={() => update({ ...a11y, reducedMotion: !a11y.reducedMotion })}
+          ><span className="cust-toggle-knob" /></button>
+        </div>
+      </div>
+
+      <div className="accs-section">
+        <div className="accs-section-title">{t('a11y_font_size')}</div>
+        <div className="a11y-scale-row">
+          {FONT_OPTS.map(opt => (
+            <button
+              key={opt.val}
+              className={`a11y-scale-btn${(a11y.fontScale || 1) === opt.val ? ' a11y-scale-btn--active' : ''}`}
+              onClick={() => update({ ...a11y, fontScale: opt.val })}
+            >{t(opt.key)}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="accs-section">
+        <div className="accs-section-title">{t('a11y_msg_spacing')}</div>
+        <div className="cust-toggle-row">
+          <div>
+            <span className="cust-toggle-label">{t('a11y_msg_spacing')}</span>
+            <p className="accs-note">{t('a11y_msg_spacing_desc')}</p>
+          </div>
+          <button
+            className={`cust-toggle${a11y.messageSpacing ? ' cust-toggle-on' : ''}`}
+            onClick={() => update({ ...a11y, messageSpacing: !a11y.messageSpacing })}
+          ><span className="cust-toggle-knob" /></button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function PrivacySafetyPanel({ user, onUpdate, onUnblock, blockedList, sessionsList, onSessionsUpdate }) {
   const t = useT()
 
@@ -2060,22 +2139,6 @@ ${posts.length ? `<ul>${posts.map(p => { const raw = (p.text || p.content || '')
   return (
     <div className="accs-panel">
       <div className="accs-section">
-        <div className="accs-section-title">{t('profile_photo')}</div>
-        <div className="accs-photo-row">
-          <div className="accs-photo-wrap">
-            <CachedProfileImage src={getPersonPhoto(user)} alt="Avatar" className="accs-photo" fallback={<img src={avatarUIcon} alt="Avatar" className="accs-photo" />} />
-          </div>
-          <div className="accs-photo-btns">
-            <button className="accs-btn" onClick={() => photoInputRef.current?.click()}>{t('change_photo')}</button>
-            {getPersonPhoto(user) && (
-              <button className="accs-btn accs-btn-ghost" onClick={() => onUpdate({ photo: null, image: null, avatar: null, photoURL: null })}>{t('remove_photo')}</button>
-            )}
-          </div>
-          <input type="file" accept="image/*" ref={photoInputRef} style={{ display: 'none' }} onChange={handlePhotoChange} />
-        </div>
-      </div>
-
-      <div className="accs-section">
         <div className="accs-section-title">{t('display_name')}</div>
         <div className="accs-field-row">
           <input className="accs-input" value={nameInput} onChange={e => setNameInput(e.target.value)} placeholder={t('your_name_ph')} />
@@ -2095,23 +2158,6 @@ ${posts.length ? `<ul>${posts.map(p => { const raw = (p.text || p.content || '')
           <button className="accs-btn" onClick={saveUsername}>{usernameSaved ? t('saved') : t('save')}</button>
         </div>
         {usernameError && <p className="accs-error">{usernameError}</p>}
-      </div>
-
-      <div className="accs-section">
-        <div className="accs-section-title">{t('bio')}</div>
-        <div className="accs-field-col">
-          <textarea
-            className="accs-textarea"
-            value={bioInput}
-            onChange={e => { if (e.target.value.length <= 240) setBioInput(e.target.value) }}
-            placeholder={t('bio_placeholder')}
-            rows={3}
-          />
-          <div className="accs-row-between">
-            <span className="accs-note">{bioInput.length}/240</span>
-            <button className="accs-btn" onClick={saveBio}>{bioSaved ? t('saved') : t('save')}</button>
-          </div>
-        </div>
       </div>
 
       <div className="accs-section">
@@ -6721,6 +6767,17 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     return () => { cancel = true }
   }, [uid])
 
+  useEffect(() => {
+    if (!uid || uid === 'guest') return
+    userGetDoc('accessibility').then(d => {
+      if (!d || typeof d !== 'object') return
+      const el = document.documentElement
+      if (d.reducedMotion) el.classList.add('a11y-reduced-motion')
+      if (d.messageSpacing) el.classList.add('a11y-msg-spacing')
+      if (d.fontScale && d.fontScale !== 1) el.style.fontSize = (16 * d.fontScale) + 'px'
+    }).catch(() => {})
+  }, [uid])
+
   const [env, setEnv] = useState({})
   useEffect(() => {
     if (!uid || uid === 'guest') return undefined
@@ -8784,6 +8841,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }, [openMsgCtxFor])
   const [lightboxImg, setLightboxImg] = useState(null)
   const [showInputEmoji, setShowInputEmoji] = useState(false)
+  const [showGifPicker, setShowGifPicker] = useState(false)
+  const [gifTab, setGifTab] = useState('gif')
+  const [gifSearch, setGifSearch] = useState('')
+  const [gifResults, setGifResults] = useState([])
+  const [gifLoading, setGifLoading] = useState(false)
   const [mentionQuery, setMentionQuery] = useState(null)
   const [mentionSelIdx, setMentionSelIdx] = useState(0)
   const [newMsgId, setNewMsgId] = useState(null)
@@ -10761,6 +10823,57 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setSlashShowAll(false)
   }
 
+  const TENOR_KEY = import.meta.env.VITE_TENOR_API_KEY || ''
+
+  const fetchTenor = useCallback(async (query, isSticker) => {
+    if (!TENOR_KEY) return []
+    setGifLoading(true)
+    try {
+      const stickerParam = isSticker ? '&searchfilter=sticker' : ''
+      const endpoint = query
+        ? `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(query)}&key=${TENOR_KEY}&limit=24&media_filter=gif${stickerParam}`
+        : `https://tenor.googleapis.com/v2/featured?key=${TENOR_KEY}&limit=24&media_filter=gif${stickerParam}`
+      const res = await fetch(endpoint)
+      const data = await res.json()
+      return (data.results || []).map(r => ({
+        id: r.id,
+        url: r.media_formats?.gif?.url || r.media_formats?.tinygif?.url || '',
+        preview: r.media_formats?.tinygif?.url || r.media_formats?.gif?.url || '',
+        width: r.media_formats?.tinygif?.dims?.[0] || 120,
+        height: r.media_formats?.tinygif?.dims?.[1] || 120,
+      })).filter(r => r.url)
+    } catch {
+      return []
+    } finally {
+      setGifLoading(false)
+    }
+  }, [TENOR_KEY])
+
+  useEffect(() => {
+    if (!showGifPicker) return
+    const timer = setTimeout(() => {
+      fetchTenor(gifSearch, gifTab === 'sticker').then(setGifResults)
+    }, gifSearch ? 400 : 0)
+    return () => clearTimeout(timer)
+  }, [showGifPicker, gifSearch, gifTab, fetchTenor])
+
+  const sendGif = (item) => {
+    const msgKey = selectedChat ? selectedChat.id : composeReelmMsgKey(selectedReelm, selectedChannel)
+    if (!msgKey || !currentUser) return
+    const now = Date.now()
+    const msg = {
+      id: createClientMessageId(),
+      mediaUrl: item.url,
+      mediaType: gifTab === 'sticker' ? 'sticker' : 'gif',
+      sender: { id: currentUser.id, name: currentUser.name, photo: getPersonPhoto(currentUser) || null },
+      time: now,
+    }
+    setMessages(prev => appendUniqueMessage(prev, msgKey, msg))
+    messageSend(msgKey, msg).catch(err => handleRemoteMessageError(err, msgKey, msg.id))
+    setShowGifPicker(false)
+    setGifSearch('')
+  }
+
   const mentionOptions = useMemo(() => {
     if (!mentionQuery || !selectedReelm) return []
     const q = mentionQuery.query.toLowerCase()
@@ -11672,6 +11785,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       { id: 'environment',   label: t('environment') },
                       { id: 'companions',    label: t('companions') },
                       { id: 'desktop',       label: 'Desktop and Mobile' },
+                      { id: 'accessibility', label: t('accessibility') },
                       { id: 'about',         label: t('about') },
                     ].map(item => (
                       <button
@@ -11769,6 +11883,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     )}
                     {selectedSettingsCategory === 'companions' && (
                       <CompanionsPanel reelms={reelms} />
+                    )}
+                    {selectedSettingsCategory === 'accessibility' && (
+                      <AccessibilityPanel uid={uid} />
                     )}
                     {selectedSettingsCategory === 'usage' && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
@@ -13460,6 +13577,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                     ) : null })()}
                                     {msg.mediaUrl && msg.mediaType === 'image' && <img src={msg.mediaUrl} alt="" className="msg-media-img" onClick={() => setLightboxImg(msg.mediaUrl)} />}
                                     {msg.mediaUrl && msg.mediaType === 'video' && <video src={msg.mediaUrl} className="msg-media-video" controls />}
+                                    {msg.mediaUrl && (msg.mediaType === 'gif' || msg.mediaType === 'sticker') && <img src={msg.mediaUrl} alt="" className={msg.mediaType === 'sticker' ? 'msg-sticker-img' : 'msg-gif-img'} />}
                                     {msg.fileUrl && (
                                       <a href={msg.fileUrl} download={msg.fileName} className="msg-doc-card">
                                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -13495,7 +13613,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                     <div className="bubble-content">
                                       {!isOwn && selectedChat?.type === 'group' && <span className="bubble-sender-name">{sender.name}</span>}
                                       <div className="bubble-and-time">
-                                        {msg.mediaUrl && msg.mediaType === 'image' && !msg.text && !msg.fileUrl ? (
+                                        {msg.mediaUrl && (msg.mediaType === 'gif' || msg.mediaType === 'sticker') && !msg.text ? (
+                                          <img src={msg.mediaUrl} alt="" className={msg.mediaType === 'sticker' ? 'msg-sticker-img' : 'msg-gif-img'} />
+                                        ) : msg.mediaUrl && msg.mediaType === 'image' && !msg.text && !msg.fileUrl ? (
                                           <img src={msg.mediaUrl} alt="" className="msg-media-img" onClick={() => setLightboxImg(msg.mediaUrl)} style={{ cursor: 'pointer' }} />
                                         ) : (
                                         <div className={`bubble${isOwn ? ' bubble--own' : ' bubble--other'}`}>
@@ -13508,6 +13628,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                           {msg.text && <span className="bubble-text">{renderMentions(msg.text, uid, selectedReelm?.members, selectedReelm?.roles)}</span>}
                                           {msg.mediaUrl && msg.mediaType === 'image' && <img src={msg.mediaUrl} alt="" className="msg-media-img" onClick={() => setLightboxImg(msg.mediaUrl)} />}
                                           {msg.mediaUrl && msg.mediaType === 'video' && <video src={msg.mediaUrl} className="msg-media-video" controls />}
+                                          {msg.mediaUrl && (msg.mediaType === 'gif' || msg.mediaType === 'sticker') && <img src={msg.mediaUrl} alt="" className={msg.mediaType === 'sticker' ? 'msg-sticker-img' : 'msg-gif-img'} />}
                                           {msg.fileUrl && (
                                             <a href={msg.fileUrl} download={msg.fileName} className="msg-doc-card">
                                               <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -13829,40 +13950,82 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 </button>
                               </div>
                             )}
+                            {/* Inline input-right buttons: Emoji · GIF/Sticker · Voice */}
+                            <div className="msg-inline-actions">
+                              {!isMobile && (
+                                <div className="msg-action-emoji-wrap">
+                                  <button className="msg-inline-btn" title="Emoji" onClick={() => { setShowInputEmoji(v => !v); setShowGifPicker(false) }}>
+                                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><path d="M8 14s1.5 2 4 2 4-2 4-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="9" cy="10" r="1.5" fill="currentColor"/><circle cx="15" cy="10" r="1.5" fill="currentColor"/></svg>
+                                  </button>
+                                  {showInputEmoji && (
+                                    <div className="input-emoji-picker-wrap">
+                                      <EmojiPickerReact emojiStyle={EmojiStyle.APPLE} height={320} width={280} searchDisabled previewConfig={{ showPreview: false }} onEmojiClick={d => {
+                                        const curr = messageInputRef.current || ''
+                                        const next = curr + d.emoji
+                                        messageInputRef.current = next
+                                        setMessageInput(next)
+                                        setShowInputEmoji(false)
+                                      }} />
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              {!isMobile && (
+                                <div className="msg-gif-picker-wrap">
+                                  <button className="msg-inline-btn msg-inline-btn--gif" title="GIF / Sticker" onClick={() => { setShowGifPicker(v => !v); setShowInputEmoji(false) }}>
+                                    GIF
+                                  </button>
+                                  {showGifPicker && (
+                                    <div className="gif-picker">
+                                      <div className="gif-picker-tabs">
+                                        <button className={`gif-tab${gifTab === 'gif' ? ' gif-tab--active' : ''}`} onClick={() => { setGifTab('gif'); setGifSearch('') }}>GIF</button>
+                                        <button className={`gif-tab${gifTab === 'sticker' ? ' gif-tab--active' : ''}`} onClick={() => { setGifTab('sticker'); setGifSearch('') }}>Sticker</button>
+                                      </div>
+                                      <input
+                                        className="gif-search"
+                                        placeholder={gifTab === 'gif' ? 'Search GIFs…' : 'Search Stickers…'}
+                                        value={gifSearch}
+                                        onChange={e => setGifSearch(e.target.value)}
+                                        autoFocus
+                                      />
+                                      <div className="gif-grid">
+                                        {gifLoading && <div className="gif-loading">…</div>}
+                                        {!gifLoading && gifResults.length === 0 && TENOR_KEY && <div className="gif-empty">No results</div>}
+                                        {!TENOR_KEY && <div className="gif-empty">Set VITE_TENOR_API_KEY to enable GIFs</div>}
+                                        {gifResults.map(item => (
+                                          <img
+                                            key={item.id}
+                                            src={item.preview}
+                                            alt=""
+                                            className="gif-item"
+                                            onClick={() => sendGif(item)}
+                                            loading="lazy"
+                                          />
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                              <button className={`msg-inline-btn${isRecording ? ' msg-inline-btn--recording' : ''}`} title={isRecording ? `Stop & Send (${recordingSeconds}s)` : 'Voice message'} disabled={!canPost} onClick={toggleRecording}>
+                                {isRecording ? (
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+                                ) : (
+                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                    <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                                    <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                                    <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                                    <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                                  </svg>
+                                )}
+                              </button>
+                            </div>
                             <button className="msg-send-btn" onClick={sendMessage} disabled={!canPost}>
                               <img src={sendIcon} alt="Send" width="30" height="30" />
                             </button>
                           </div>
                           <div className="msg-actions">
-                            {!isMobile && (
-                              <div className="msg-action-emoji-wrap">
-                                <button className="msg-action-btn" title="Emoji" onClick={() => setShowInputEmoji(v => !v)}>
-                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><path d="M8 14s1.5 2 4 2 4-2 4-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="9" cy="10" r="1.5" fill="currentColor"/><circle cx="15" cy="10" r="1.5" fill="currentColor"/></svg>
-                                </button>
-                                {showInputEmoji && (
-                                  <div className="input-emoji-picker-wrap">
-                                    <EmojiPickerReact emojiStyle={EmojiStyle.APPLE} height={320} width={280} searchDisabled previewConfig={{ showPreview: false }} onEmojiClick={d => {
-                                      const curr = messageInputRef.current || ''
-                                      const next = curr + d.emoji
-                                      messageInputRef.current = next
-                                      setMessageInput(next)
-                                      setShowInputEmoji(false)
-                                    }} />
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                            {!isMobile && !spotifyNowPlaying && (
-                              <button className="msg-action-btn" title="Birlikte Yap">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                                  <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.8"/>
-                                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                                  <path d="M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                                </svg>
-                              </button>
-                            )}
-                            <button className="msg-action-btn" title="Medya" disabled={!canPost} onClick={() => mediaInputRef.current?.click()}>
+                            <button className="msg-action-btn" title="Media" disabled={!canPost} onClick={() => mediaInputRef.current?.click()}>
                               <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
                                 <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.8"/>
                                 <circle cx="8.5" cy="10.5" r="1.5" stroke="currentColor" strokeWidth="1.5"/>
@@ -13883,25 +14046,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               }
                               e.target.value = ''
                             }} />
-                            <button className={`msg-action-btn${isRecording ? ' msg-action-btn--recording' : ''}`} title={isRecording ? `Durdurup Gönder (${recordingSeconds}s)` : 'Sesli Mesaj'} disabled={!canPost} onClick={toggleRecording}>
-                              {isRecording ? (
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
-                              ) : (
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                                  <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                                  <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                                  <line x1="8" y1="23" x2="16" y2="23" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                                </svg>
-                              )}
-                            </button>
                             {!isMobile && !spotifyNowPlaying && (
-                              <button className="msg-action-btn" title="Oyun">
+                              <button className="msg-action-btn" title="Together">
                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                                  <rect x="2" y="6" width="20" height="12" rx="6" stroke="currentColor" strokeWidth="1.8"/>
-                                  <path d="M6 12h4M8 10v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                                  <circle cx="15" cy="11" r="1" fill="currentColor"/>
-                                  <circle cx="17" cy="13" r="1" fill="currentColor"/>
+                                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                                  <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.8"/>
+                                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                                  <path d="M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
                                 </svg>
                               </button>
                             )}

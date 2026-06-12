@@ -6098,25 +6098,62 @@ h6 {
 }
 
 .msg-input {
-  width: 100%;
+  flex: 1;
   height: 100%;
   background: transparent;
   border: none;
   border-radius: 0;
-  padding: 0 38px 0 10px;
+  padding: 0 6px 0 10px;
   color: var(--text-fg);
   font-size: 0.84rem;
   font-family: inherit;
   outline: none;
+  min-width: 0;
 }
 .msg-input:focus {
   outline: none;
 }
 .msg-input::placeholder { color: rgba(235, 225, 210, 0.32); }
 
+/* Inline buttons (emoji · gif · voice) inside the input row */
+.msg-inline-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+}
+.msg-inline-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(235, 225, 210, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: color 0.15s, background 0.15s;
+  flex-shrink: 0;
+}
+.msg-inline-btn:hover { color: rgba(235, 225, 210, 0.9); background: rgba(255,255,255,0.06); }
+.msg-inline-btn--recording { color: #ef4444; animation: rec-pulse 1s ease-in-out infinite; }
+.msg-inline-btn--gif {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  font-family: 'JetBrains Mono', monospace;
+  border-radius: 6px;
+  width: auto;
+  padding: 0 5px;
+  height: 22px;
+  border: 1.5px solid rgba(235, 225, 210, 0.22);
+}
+.msg-inline-btn--gif:hover { border-color: rgba(235, 225, 210, 0.5); }
+
 .msg-send-btn {
-  position: absolute;
-  right: 10px;
+  flex-shrink: 0;
   background: none;
   border: none;
   cursor: pointer;
@@ -6124,19 +6161,20 @@ h6 {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 4px;
+  padding: 4px 6px 4px 2px;
   transition: opacity 0.2s;
 }
 .msg-send-btn:hover { opacity: 0.7; }
 
-.msg-input-wrap--has-attach .msg-input { padding-right: 94px; }
+.msg-input-wrap--has-attach .msg-input { padding-left: 8px; }
 
 .msg-attach-preview {
-  position: absolute;
-  right: 46px;
   display: flex;
   align-items: center;
+  flex-shrink: 0;
+  position: relative;
   z-index: 2;
+  margin-right: 2px;
 }
 .msg-attach-thumb {
   width: 36px;
@@ -6312,11 +6350,121 @@ h6 {
 .msg-action-emoji-wrap {
   position: relative;
 }
+.msg-action-emoji-wrap,
+.msg-gif-picker-wrap {
+  position: relative;
+}
 .input-emoji-picker-wrap {
   position: absolute;
-  bottom: 52px;
-  left: 0;
+  bottom: calc(100% + 8px);
+  right: 0;
   z-index: 200;
+}
+
+/* ── GIF / Sticker picker ── */
+.msg-gif-picker-wrap { position: relative; }
+
+.gif-picker {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  width: 320px;
+  height: 400px;
+  background: rgba(22, 20, 18, 0.92);
+  -webkit-backdrop-filter: blur(32px) saturate(1.6);
+  backdrop-filter: blur(32px) saturate(1.6);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.45);
+  z-index: 200;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: epr-popup-in 0.22s cubic-bezier(0.22,1,0.36,1) both;
+}
+.gif-picker-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 10px 10px 6px;
+  flex-shrink: 0;
+}
+.gif-tab {
+  flex: 1;
+  padding: 6px 0;
+  border-radius: 8px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: transparent;
+  color: rgba(235,225,210,0.5);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  font-family: 'JetBrains Mono', monospace;
+}
+.gif-tab--active {
+  background: rgba(185,152,135,0.18);
+  border-color: rgba(185,152,135,0.35);
+  color: rgba(235,225,210,0.95);
+}
+.gif-search {
+  margin: 0 10px 8px;
+  padding: 7px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.1);
+  background: rgba(255,255,255,0.06);
+  color: var(--text-fg);
+  font-size: 0.78rem;
+  font-family: inherit;
+  outline: none;
+  flex-shrink: 0;
+}
+.gif-search::placeholder { color: rgba(235,225,210,0.3); }
+.gif-search:focus { border-color: rgba(185,152,135,0.4); }
+.gif-grid {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 6px 8px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  align-content: start;
+}
+.gif-grid::-webkit-scrollbar { width: 4px; }
+.gif-grid::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+.gif-item {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.15s, opacity 0.15s;
+  background: rgba(255,255,255,0.05);
+}
+.gif-item:hover { transform: scale(1.04); opacity: 0.9; }
+.gif-loading, .gif-empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: rgba(235,225,210,0.3);
+  font-size: 0.75rem;
+  padding: 24px 0;
+}
+
+/* ── GIF / Sticker in messages ── */
+.msg-gif-img {
+  max-width: 240px;
+  max-height: 200px;
+  border-radius: 10px;
+  display: block;
+  margin: 2px 0;
+}
+.msg-sticker-img {
+  max-width: 140px;
+  max-height: 140px;
+  border-radius: 4px;
+  display: block;
+  margin: 2px 0;
+  background: transparent;
 }
 
 /* ── Emoji picker theming (hpopup-style glass) ── */
@@ -15379,4 +15527,48 @@ button, input, select, textarea,
   .settings-sidebar-actions .settings-close-btn--sidebar {
     /* Görünür — mobil için yapıldı */
   }
+}
+
+/* ── Accessibility ── */
+.a11y-reduced-motion *,
+.a11y-reduced-motion *::before,
+.a11y-reduced-motion *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
+.a11y-msg-spacing .msg-row {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+.a11y-msg-spacing .msg-row + .msg-row {
+  margin-top: 4px;
+}
+
+.a11y-scale-row {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.a11y-scale-btn {
+  padding: 7px 18px;
+  border-radius: 12px;
+  border: 1.5px solid rgba(var(--ta-rgb), 0.18);
+  background: none;
+  color: rgba(var(--ta-rgb), 0.5);
+  font-family: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.a11y-scale-btn:hover {
+  border-color: rgba(var(--ta-rgb), 0.35);
+  color: rgba(var(--ta-rgb), 0.75);
+}
+.a11y-scale-btn--active {
+  border-color: rgba(var(--ta-rgb), 0.7);
+  background: rgba(var(--ta-rgb), 0.12);
+  color: rgba(var(--ta-rgb), 0.95);
 }
