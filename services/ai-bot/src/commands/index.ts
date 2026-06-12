@@ -11,11 +11,11 @@ export interface CommandContext {
 }
 
 const HELP_TEXT = [
-  '🤖 **Reelms Intelligence komutları:**',
-  '`@reelms-intelligence <soru>` veya `/ai <soru>` — AI ile sohbet et',
-  '`/summarize [n]` — Son N mesajı özetle (varsayılan: 30)',
-  '`/digest` — Son 24 saatin özeti',
-  '`/ai-reset` — Sohbet geçmişini temizle'
+  '🤖 **Reelms Intelligence commands:**',
+  '`@reelms-intelligence <question>` or `/ai <question>` — Chat with AI',
+  '`/summarize [n]` — Summarize the last N messages (default: 30)',
+  '`/digest` — Digest of the last 24 hours',
+  '`/ai-reset` — Clear chat history'
 ].join('\n')
 
 export async function dispatch(
@@ -29,7 +29,7 @@ export async function dispatch(
     case 'digest':   return handleDigest(ctx, fetchMessages, channelRefs)
     case 'ai-reset': {
       clearHistory(ctx.msgKey)
-      return '🔄 Sohbet geçmişi temizlendi.'
+      return '🔄 Chat history cleared.'
     }
     case 'ai-help':  return HELP_TEXT
     default:         return null

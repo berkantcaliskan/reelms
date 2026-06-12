@@ -5,17 +5,17 @@ import type { CommandContext } from './index.js'
 export function handleSkip(ctx: CommandContext): string {
   const { msgKey } = ctx
 
-  if (!isPlaying(msgKey)) return '⏭️ Şu an çalan bir şarkı yok.'
+  if (!isPlaying(msgKey)) return '⏭️ Nothing is currently playing.'
 
   const next = skip(msgKey)
 
   if (!next) {
     stop(msgKey)
-    return '⏭️ Atlandı. Kuyruk bitti.'
+    return '⏭️ Skipped. Queue is empty.'
   }
 
   return [
-    `⏭️ Atlandı. **Şimdi çalıyor:** ${next.title}`,
+    `⏭️ Skipped. **Now playing:** ${next.title}`,
     `👤 ${next.artist}  •  ⏱️ ${formatDuration(next.durationSec)}`,
     `🔗 ${next.url}`
   ].join('\n')

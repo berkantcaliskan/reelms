@@ -12,18 +12,18 @@ export async function handleSummarize(ctx: CommandContext, fetchMessages: FetchM
     messages = await fetchMessages(msgKey, n)
   } catch (err) {
     console.error('[AI/summarize] mesaj çekme hatası:', err)
-    return '❌ Mesajlar alınamadı.'
+    return '❌ Failed to fetch messages.'
   }
 
-  if (!messages.length) return '📭 Özetlenecek mesaj bulunamadı.'
+  if (!messages.length) return '📭 No messages found to summarize.'
 
   try {
     const channelName = msgKey.split('_').slice(1).join('_') || msgKey
     const summary = await summarizeMessages(messages, channelName)
-    return `📝 **Son ${messages.length} mesajın özeti:**\n\n${summary}`
+    return `📝 **Summary of the last ${messages.length} messages:**\n\n${summary}`
   } catch (err) {
-    console.error('[AI/summarize] özet hatası:', err)
-    return '❌ Özet oluşturulurken hata oluştu.'
+    console.error('[AI/summarize] summary error:', err)
+    return '❌ Failed to generate summary.'
   }
 }
 
@@ -32,7 +32,7 @@ export async function handleDigest(
   fetchMessages: FetchMessages,
   channelRefs: Array<{ channelId: string; msgKey: string; name?: string }>
 ): Promise<string> {
-  if (!channelRefs.length) return '📭 Bu reelm\'de kanal bulunamadı.'
+  if (!channelRefs.length) return '📭 No channels found in this reelm.'
 
   const channels: Array<{ name: string; messages: any[] }> = []
 
@@ -49,7 +49,7 @@ export async function handleDigest(
     }
   }
 
-  if (!channels.length) return '📭 Son 24 saatte özetlenecek mesaj bulunamadı.'
+  if (!channels.length) return '📭 No messages to summarize in the last 24 hours.'
 
   const { generateDigest } = await import('../ai/openai.js')
   try {
@@ -57,7 +57,7 @@ export async function handleDigest(
     return digest
   } catch (err) {
     console.error('[AI/digest] hata:', err)
-    return '❌ Özet oluşturulurken hata oluştu.'
+    return '❌ Failed to generate digest.'
   }
 }
 

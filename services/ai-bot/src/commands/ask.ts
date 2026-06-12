@@ -26,11 +26,11 @@ export async function handleAsk(ctx: CommandContext): Promise<string> {
 
   if (!args.trim()) {
     return [
-      '👋 Merhaba! Ben Reelms Intelligence.',
-      '`@reelms-intelligence <soru>` veya `/ai <soru>` ile bana soru sorabilirsin.',
-      '`/summarize [n]` ile son N mesajı özetleyebilirsin.',
-      '`/digest` ile günün özetini alabilirsin.',
-      '`/ai-reset` ile sohbet geçmişini temizleyebilirsin.'
+      '👋 Hi! I\'m Reelms Intelligence.',
+      'Use `@reelms-intelligence <question>` or `/ai <question>` to ask me anything.',
+      'Use `/summarize [n]` to summarize the last N messages.',
+      'Use `/digest` to get today\'s digest.',
+      'Use `/ai-reset` to clear chat history.'
     ].join('\n')
   }
 
@@ -42,6 +42,6 @@ export async function handleAsk(ctx: CommandContext): Promise<string> {
     return reply
   } catch (err) {
     console.error('[AI/ask] hata:', err)
-    return '❌ AI ile iletişimde sorun oluştu. Lütfen tekrar dene.'
+    return '❌ Failed to communicate with AI. Please try again.'
   }
 }

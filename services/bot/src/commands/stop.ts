@@ -4,8 +4,8 @@ import type { CommandContext } from './index.js'
 export function handleStop(ctx: CommandContext): string {
   const { msgKey } = ctx
 
-  if (!isPlaying(msgKey)) return '⏹️ Zaten çalan bir şey yok.'
+  if (!isPlaying(msgKey)) return '⏹️ Nothing is currently playing.'
 
   stop(msgKey)
-  return '⏹️ Durduruldu. Kuyruk temizlendi.'
+  return '⏹️ Stopped. Queue cleared.'
 }

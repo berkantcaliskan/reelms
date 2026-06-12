@@ -5,10 +5,10 @@ export interface ChatMessage {
   content: string
 }
 
-const SYSTEM_PROMPT = `Sen Reelms Intelligence'sın — Reelms topluluğunun AI asistanı.
-Kullanıcılara yardımcı ol, soru cevapla, içerik öner.
-Kısa ve net cevaplar ver. Markdown kullanabilirsin.
-Türkçe konuşanlarla Türkçe, İngilizce konuşanlarla İngilizce yanıt ver.`
+const SYSTEM_PROMPT = `You are Reelms Intelligence — the AI assistant of the Reelms community.
+Help users, answer questions, and suggest content.
+Keep your answers short and clear. You may use Markdown.
+Always respond in English.`
 
 export async function chatWithAI(
   history: ChatMessage[],
@@ -48,21 +48,21 @@ export async function summarizeMessages(
   messages: Array<{ sender?: any; text?: string; time?: number }>,
   channelName: string
 ): Promise<string> {
-  if (!messages.length) return 'Bu kanalda özetlenecek mesaj yok.'
+  if (!messages.length) return 'No messages to summarize in this channel.'
 
   const formatted = messages
     .filter((m) => m?.text)
     .map((m) => {
-      const name = m.sender?.name || m.sender?.username || 'Kullanıcı'
+      const name = m.sender?.name || m.sender?.username || 'User'
       return `${name}: ${String(m.text).slice(0, 300)}`
     })
     .join('\n')
 
-  if (!formatted.trim()) return 'Özetlenecek metin bulunamadı.'
+  if (!formatted.trim()) return 'No text to summarize.'
 
-  const prompt = `Aşağıdaki "${channelName}" kanal konuşmasını Türkçe olarak özetle.
-Önemli konuları, kararları ve öne çıkan noktaları maddeler halinde listele.
-Maksimum 10 madde, her madde 1-2 cümle:
+  const prompt = `Summarize the following conversation from the "${channelName}" channel in English.
+List the key topics, decisions, and highlights as bullet points.
+Maximum 10 bullets, 1-2 sentences each:
 
 ${formatted}`
 
@@ -92,7 +92,7 @@ ${formatted}`
 export async function generateDigest(
   channels: Array<{ name: string; messages: Array<{ sender?: any; text?: string; time?: number }> }>
 ): Promise<string> {
-  const parts: string[] = [`📊 **Günlük Özet** — ${new Date().toLocaleDateString('tr-TR')}\n`]
+  const parts: string[] = [`📊 **Daily Digest** — ${new Date().toLocaleDateString('en-US')}\n`]
 
   for (const ch of channels) {
     if (!ch.messages.length) continue
@@ -100,9 +100,9 @@ export async function generateDigest(
       const summary = await summarizeMessages(ch.messages, ch.name)
       parts.push(`**#${ch.name}**\n${summary}`)
     } catch {
-      parts.push(`**#${ch.name}** — özetlenemedi`)
+      parts.push(`**#${ch.name}** — could not be summarized`)
     }
   }
 
-  return parts.length > 1 ? parts.join('\n\n') : 'Bugün özet oluşturulacak mesaj bulunamadı.'
+  return parts.length > 1 ? parts.join('\n\n') : 'No messages to summarize for today.'
 }

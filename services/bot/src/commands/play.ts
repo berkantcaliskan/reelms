@@ -5,10 +5,10 @@ import type { CommandContext } from './index.js'
 export async function handlePlay(ctx: CommandContext): Promise<string> {
   const { args, msgKey, senderName } = ctx
 
-  if (!args) return '🎵 Ne çalmamı istiyorsun? Örnek: `/play bohemian rhapsody`'
+  if (!args) return '🎵 What do you want to play? Example: `/play bohemian rhapsody`'
 
   const track = await searchYouTube(args, senderName)
-  if (!track) return '❌ Şarkı bulunamadı. Farklı bir arama dene.'
+  if (!track) return '❌ Song not found. Try a different search.'
 
   const { position } = enqueue(msgKey, track)
   const wasEmpty = position === 1
@@ -16,16 +16,16 @@ export async function handlePlay(ctx: CommandContext): Promise<string> {
   if (wasEmpty) {
     setPlaying(msgKey, true)
     return [
-      `🎵 **Şimdi çalıyor:** ${track.title}`,
+      `🎵 **Now playing:** ${track.title}`,
       `👤 ${track.artist}  •  ⏱️ ${formatDuration(track.durationSec)}`,
       `🔗 ${track.url}`,
-      `📥 İsteyen: ${senderName}`
+      `📥 Requested by: ${senderName}`
     ].join('\n')
   }
 
   return [
-    `📥 Kuyruğa eklendi (#${position}): **${track.title}**`,
+    `📥 Added to queue (#${position}): **${track.title}**`,
     `👤 ${track.artist}  •  ⏱️ ${formatDuration(track.durationSec)}`,
-    `İsteyen: ${senderName}`
+    `Requested by: ${senderName}`
   ].join('\n')
 }

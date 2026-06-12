@@ -12,13 +12,13 @@ export interface CommandContext {
 }
 
 const HELP_TEXT = [
-  '🎙️ **Reelm Radio komutları:**',
-  '`/play <şarkı adı veya link>` — Çal veya kuyruğa ekle',
-  '`/skip` — Sonraki şarkıya geç',
-  '`/queue` — Kuyruğu göster',
-  '`/stop` — Durdur ve kuyruğu temizle',
+  '🎙️ **Reelm Radio commands:**',
+  '`/play <song name or link>` — Play or add to queue',
+  '`/skip` — Skip to next song',
+  '`/queue` — Show queue',
+  '`/stop` — Stop and clear queue',
   '',
-  'Mention ile de kullanabilirsin: `@reelmradio play <şarkı>`'
+  'You can also use mention: `@reelmradio play <song>`'
 ].join('\n')
 
 export async function dispatch(ctx: CommandContext): Promise<string | null> {
