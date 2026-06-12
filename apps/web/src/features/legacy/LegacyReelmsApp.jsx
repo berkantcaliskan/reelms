@@ -3135,8 +3135,17 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
   return ReactDOM.createPortal(profileNode, document.body)
 }
 
-function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onMessage, onAddFriend, onRemove, onBlock, onUnblock, isFriend, isBlocked, isPending, onOpenFriend, spotifyNowPlaying, spotifyConnected }) {
+function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onMessage, onAddFriend, onRemove, onBlock, onUnblock, isFriend, isBlocked, isPending, onOpenFriend, spotifyNowPlaying, spotifyConnected, onPhotoChange, onCoverChange, onBioChange, onSocialLinksChange, profileBio, socialLinks, activePlatforms }) {
   const [visible, setVisible] = useState(false)
+  const [editMode, setEditMode] = useState(false)
+  const [editingBio, setEditingBio] = useState(false)
+  const [bioInput, setBioInput] = useState('')
+  const [editingSocial, setEditingSocial] = useState(null)
+  const [socialInput, setSocialInput] = useState('')
+  const [mediaSaving, setMediaSaving] = useState(null)
+  const fpPhotoRef = useRef(null)
+  const fpCoverRef = useRef(null)
+
   useEffect(() => { const t = setTimeout(() => setVisible(true), 10); return () => clearTimeout(t) }, [])
 
   const norm = normalizeFriendProfileTarget(user || {})
@@ -3144,9 +3153,23 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
   const photo = getPersonPhoto(user)
   const SOCIAL_ICONS = { instagram: InstagramIcon, x: XIcon, tiktok: TikTokIcon, linkedin: LinkedInIcon, whatsapp: WhatsAppIcon, discord: DiscordSocialIcon, snapchat: SnapchatIcon, custom: CustomLinkIcon }
 
-  const handleClose = () => {
-    setVisible(false)
-    setTimeout(onClose, 320)
+  const displayBio = isSelf ? (profileBio || '') : norm.bio
+  const displayPlatforms = isSelf ? (activePlatforms || []) : (norm.activePlatforms || [])
+  const displayLinks = isSelf ? (socialLinks || {}) : (norm.socialLinks || {})
+  const hasSocials = displayPlatforms.some(k => displayLinks[k])
+
+  const handleClose = () => { setVisible(false); setTimeout(onClose, 320) }
+
+  const handlePhotoUpload = async (file) => {
+    try { setMediaSaving('photo'); const url = await uploadProfileImageFile(file, 'profile-photo'); onPhotoChange?.(url) }
+    catch (err) { console.warn('Profile photo upload failed:', err) }
+    finally { setMediaSaving(null) }
+  }
+
+  const handleCoverUpload = async (file) => {
+    try { setMediaSaving('cover'); const url = await uploadProfileImageFile(file, 'profile-cover'); onCoverChange?.(url) }
+    catch (err) { console.warn('Cover upload failed:', err) }
+    finally { setMediaSaving(null) }
   }
 
   return (
@@ -3159,49 +3182,135 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
           Geri
         </button>
 
+        {isSelf && (
+          <>
+            <input type="file" accept="image/*" ref={fpPhotoRef} style={{ display: 'none' }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) handlePhotoUpload(f); e.target.value = '' }} />
+            <input type="file" accept="image/*" ref={fpCoverRef} style={{ display: 'none' }}
+              onChange={e => { const f = e.target.files?.[0]; if (f) handleCoverUpload(f); e.target.value = '' }} />
+          </>
+        )}
+
         <div className="fp-layout">
           <div className="fp-main">
-            <CachedProfileCover src={cover} className="fp-cover">
-              <div className="fp-avatar-wrap">
-                <CachedProfileImage
-                  src={photo}
-                  alt=""
-                  className="fp-avatar"
-                  fallback={<div className="fp-avatar fp-avatar--text">{(user.name || '?').charAt(0).toUpperCase()}</div>}
-                />
-              </div>
-            </CachedProfileCover>
+
+            <div className={`fp-cover-zone${editMode ? ' fp-cover-zone--edit' : ''}`}
+              onClick={() => { if (editMode) fpCoverRef.current?.click() }}>
+              <CachedProfileCover src={cover} className="fp-cover">
+                <div
+                  className={`fp-avatar-wrap${editMode ? ' fp-avatar-wrap--edit' : ''}`}
+                  onClick={e => { if (!editMode) return; e.stopPropagation(); fpPhotoRef.current?.click() }}
+                >
+                  <CachedProfileImage src={photo} alt="" className="fp-avatar"
+                    fallback={<div className="fp-avatar fp-avatar--text">{(user.name || '?').charAt(0).toUpperCase()}</div>}
+                  />
+                  {editMode && (
+                    <div className="fp-media-edit-overlay">
+                      {mediaSaving === 'photo'
+                        ? <span className="fp-edit-saving-dot" />
+                        : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                      }
+                    </div>
+                  )}
+                </div>
+              </CachedProfileCover>
+              {editMode && (
+                <div className="fp-cover-edit-hint">
+                  {mediaSaving === 'cover'
+                    ? <span className="fp-edit-saving-dot" />
+                    : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                  }
+                  <span>Edit cover</span>
+                </div>
+              )}
+            </div>
 
             <div className="fp-identity">
               <div className="fp-identity-names">
                 <h1 className="fp-name">{user.name}</h1>
                 {user.username && <span className="fp-username">@{user.username.startsWith('@') ? user.username.slice(1) : user.username}</span>}
+                {isSelf && (
+                  <button
+                    className={`fp-edit-profile-btn${editMode ? ' fp-edit-profile-btn--done' : ''}`}
+                    onClick={() => { setEditMode(v => !v); setEditingBio(false); setEditingSocial(null) }}
+                  >{editMode ? 'Done' : 'Edit Profile'}</button>
+                )}
               </div>
-              {user.activity?.name && (
-                <div className="fp-activity"><ActivityBadge activity={user.activity} /></div>
-              )}
+              {user.activity?.name && <div className="fp-activity"><ActivityBadge activity={user.activity} /></div>}
             </div>
 
-            {norm.bio && (
-              <div className="fp-section">
-                <p className="fp-bio">{norm.bio}</p>
+            {(displayBio || (isSelf && editMode)) && (
+              <div className={`fp-section${editMode ? ' fp-section--editable' : ''}`}>
+                {editingBio ? (
+                  <div className="fp-bio-edit">
+                    <textarea className="fp-bio-textarea" value={bioInput} autoFocus
+                      onChange={e => { if (e.target.value.length <= 240) setBioInput(e.target.value) }}
+                      placeholder="Tell us about yourself..." />
+                    <div className="fp-bio-controls">
+                      <span className="fp-bio-count">{bioInput.length}/240</span>
+                      <button className="fp-bio-save" onClick={() => { onBioChange?.(bioInput); setEditingBio(false) }}>Save</button>
+                      <button className="fp-bio-cancel" onClick={() => setEditingBio(false)}>Cancel</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="fp-editable-row">
+                    <p className={`fp-bio${!displayBio ? ' fp-bio--empty' : ''}`}>{displayBio || 'Add a bio...'}</p>
+                    {editMode && (
+                      <button className="fp-inline-edit-btn" onClick={() => { setBioInput(displayBio || ''); setEditingBio(true) }}>
+                        <PencilIcon />
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
-            {norm.activePlatforms?.length > 0 && Object.keys(norm.socialLinks).some(k => norm.activePlatforms.includes(k) && norm.socialLinks[k]) && (
-              <div className="fp-section">
-                <span className="fp-section-label">SOCIALS</span>
-                <div className="fp-socials-row">
-                  {norm.activePlatforms.filter(k => norm.socialLinks[k]).map(k => {
-                    const Icon = SOCIAL_ICONS[k]
-                    const handle = norm.socialLinks[k]
-                    return Icon ? (
-                      <a key={k} className="fp-social-link" href={handle.startsWith('http') ? handle : `#`} target="_blank" rel="noopener noreferrer" title={handle}>
-                        <Icon size={18} />
-                      </a>
-                    ) : null
-                  })}
+            {(hasSocials || (isSelf && editMode)) && (
+              <div className={`fp-section${editMode ? ' fp-section--editable' : ''}`}>
+                <div className="fp-editable-row">
+                  <span className="fp-section-label">SOCIALS</span>
+                  {editMode && (
+                    <button className="fp-inline-edit-btn" onClick={() => setEditingSocial(v => v ? null : 'open')}>
+                      <PencilIcon />
+                    </button>
+                  )}
                 </div>
+                {editMode && editingSocial ? (
+                  <div className="fp-socials-edit">
+                    {displayPlatforms.map(k => {
+                      const Icon = SOCIAL_ICONS[k]
+                      return (
+                        <div key={k} className="fp-social-edit-row">
+                          {Icon && <span className="fp-social-edit-icon"><Icon /></span>}
+                          <input className="accs-input" style={{ flex: 1 }}
+                            value={editingSocial === k ? socialInput : (displayLinks[k] || '')}
+                            onFocus={() => { setEditingSocial(k); setSocialInput(displayLinks[k] || '') }}
+                            onChange={e => setSocialInput(e.target.value)}
+                            onBlur={() => {
+                              if (editingSocial === k) {
+                                onSocialLinksChange?.(prev => ({ ...(prev || {}), [k]: socialInput }))
+                                setEditingSocial('open')
+                              }
+                            }}
+                            placeholder={`${k} handle or URL`}
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <div className="fp-socials-row">
+                    {displayPlatforms.filter(k => displayLinks[k]).map(k => {
+                      const Icon = SOCIAL_ICONS[k]
+                      const handle = displayLinks[k]
+                      return Icon ? (
+                        <a key={k} className="fp-social-link" href={handle.startsWith('http') ? handle : '#'} target="_blank" rel="noopener noreferrer" title={handle}>
+                          <Icon size={18} />
+                        </a>
+                      ) : null
+                    })}
+                  </div>
+                )}
               </div>
             )}
 
@@ -3223,11 +3332,7 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
                 <span className="fp-section-label">ARKADAŞLAR</span>
                 <div className="fp-friends-list">
                   {friends.slice(0, 12).map(f => (
-                    <button
-                      key={f.id}
-                      className="fp-friend-row"
-                      onClick={() => onOpenFriend?.(f)}
-                    >
+                    <button key={f.id} className="fp-friend-row" onClick={() => onOpenFriend?.(f)}>
                       <div className="fp-friend-avatar">
                         {(f.photo || f.photoURL || f.avatar)
                           ? <img src={f.photo || f.photoURL || f.avatar} alt={f.name || ''} />
@@ -3236,9 +3341,7 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
                       <span className="fp-friend-name">{f.name || f.username || 'Arkadaş'}</span>
                     </button>
                   ))}
-                  {friends.length > 12 && (
-                    <span className="fp-friends-more">+{friends.length - 12} kişi daha</span>
-                  )}
+                  {friends.length > 12 && <span className="fp-friends-more">+{friends.length - 12} kişi daha</span>}
                 </div>
               </div>
             )}
@@ -3270,10 +3373,7 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
                     <SpotifyIcon size={16} />
                   </div>
                 ) : (
-                  <div className="fp-spotify-idle">
-                    <SpotifyIcon size={16} />
-                    <span>Bağlı</span>
-                  </div>
+                  <div className="fp-spotify-idle"><SpotifyIcon size={16} /><span>Bağlı</span></div>
                 )}
               </div>
             )}
@@ -14731,6 +14831,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               onOpenFriend={f => setFullProfileTarget({ isSelf: false, user: f })}
               spotifyConnected={fullProfileTarget.isSelf ? spotifyConnected : false}
               spotifyNowPlaying={fullProfileTarget.isSelf ? spotifyNowPlaying : null}
+              onPhotoChange={fullProfileTarget.isSelf ? (url => updateUserData({ photo: url })) : undefined}
+              onCoverChange={fullProfileTarget.isSelf ? (url => updateUserData({ cover: url })) : undefined}
+              onBioChange={fullProfileTarget.isSelf ? (bio => { setProfileBio(bio || ''); updateUserData({ bio: bio || '' }) }) : undefined}
+              onSocialLinksChange={fullProfileTarget.isSelf ? (val => { const next = typeof val === 'function' ? val(profileSocialLinks) : val; setProfileSocialLinks(next || {}) }) : undefined}
+              profileBio={fullProfileTarget.isSelf ? profileBio : undefined}
+              socialLinks={fullProfileTarget.isSelf ? profileSocialLinks : undefined}
+              activePlatforms={fullProfileTarget.isSelf ? profileActivePlatforms : undefined}
             />
           )}
           {isMobile && !selectedReelm && !selectedChat && (

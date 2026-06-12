@@ -4623,6 +4623,26 @@ h6 {
   font-size: 11.5px;
   color: rgba(var(--ta-rgb), 0.38);
 }
+.accs-section--profile-link {
+  padding: 0;
+  border: none;
+  background: none;
+}
+.accs-profile-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: rgba(var(--ta-rgb), 0.55);
+  font-family: inherit;
+  transition: color 0.15s;
+}
+.accs-profile-link:hover { color: rgba(var(--ta-rgb), 0.9); }
 
 /* ── Environment Panel: Sliders ── */
 .env-slider-row {
@@ -10384,6 +10404,117 @@ h6 {
   gap: 6px;
   font-size: 0.82rem;
   color: rgba(var(--ta-rgb), 0.45);
+}
+
+/* FullProfilePage — edit mode */
+.fp-cover-zone { position: relative; }
+.fp-cover-zone--edit { cursor: pointer; }
+.fp-cover-zone--edit .fp-cover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: rgba(0,0,0,0.28);
+  border-radius: inherit;
+  pointer-events: none;
+  transition: background 0.2s;
+}
+.fp-cover-edit-hint {
+  position: absolute;
+  bottom: 12px;
+  right: 14px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.85);
+  pointer-events: none;
+  z-index: 2;
+}
+.fp-avatar-wrap--edit { cursor: pointer; }
+.fp-media-edit-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.45);
+  border-radius: 50%;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.18s;
+}
+.fp-avatar-wrap--edit:hover .fp-media-edit-overlay { opacity: 1; }
+.fp-edit-profile-btn {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 5px 16px;
+  border-radius: 999px;
+  border: 1.5px solid rgba(var(--ta-rgb), 0.3);
+  background: transparent;
+  color: rgba(var(--ta-rgb), 0.75);
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.fp-edit-profile-btn:hover { border-color: rgba(var(--ta-rgb), 0.6); color: rgba(var(--ta-rgb), 0.95); background: rgba(var(--ta-rgb), 0.06); }
+.fp-edit-profile-btn--done { border-color: rgba(var(--ta-rgb), 0.55); color: rgba(var(--ta-rgb), 0.95); background: rgba(var(--ta-rgb), 0.1); }
+.fp-section--editable { position: relative; }
+.fp-editable-row { display: flex; align-items: flex-start; gap: 8px; }
+.fp-editable-row .fp-bio { flex: 1; }
+.fp-editable-row .fp-section-label { flex: 1; }
+.fp-inline-edit-btn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: rgba(var(--ta-rgb), 0.4);
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 4px;
+  transition: color 0.15s, background 0.15s;
+  display: flex;
+  align-items: center;
+}
+.fp-inline-edit-btn:hover { color: rgba(var(--ta-rgb), 0.85); background: rgba(var(--ta-rgb), 0.08); }
+.fp-bio--empty { color: rgba(var(--ta-rgb), 0.3); font-style: italic; }
+.fp-bio-edit { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+.fp-bio-textarea {
+  width: 100%;
+  min-height: 80px;
+  background: rgba(var(--tb-rgb), 0.18);
+  border: 1.5px solid rgba(var(--ta-rgb), 0.18);
+  border-radius: 8px;
+  color: var(--text-fg);
+  font-size: 0.88rem;
+  padding: 10px 12px;
+  resize: vertical;
+  font-family: inherit;
+  box-sizing: border-box;
+  outline: none;
+}
+.fp-bio-textarea:focus { border-color: rgba(var(--ta-rgb), 0.4); }
+.fp-bio-controls { display: flex; align-items: center; gap: 8px; }
+.fp-bio-count { font-size: 0.75rem; color: rgba(var(--ta-rgb), 0.4); margin-right: auto; }
+.fp-bio-save {
+  padding: 4px 14px;
+  border-radius: 999px;
+  border: none;
+  background: rgba(var(--ta-rgb), 0.18);
+  color: rgba(var(--ta-rgb), 0.9);
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+.fp-bio-save:hover { background: rgba(var(--ta-rgb), 0.28); }
+.fp-bio-cancel { padding: 4px 12px; border-radius: 999px; border: none; background: none; color: rgba(var(--ta-rgb), 0.45); font-size: 0.8rem; cursor: pointer; }
+.fp-bio-cancel:hover { color: rgba(var(--ta-rgb), 0.75); }
+.fp-socials-edit { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.fp-social-edit-row { display: flex; align-items: center; gap: 8px; }
+.fp-social-edit-icon { display: flex; align-items: center; color: rgba(var(--ta-rgb), 0.55); width: 20px; flex-shrink: 0; }
+@keyframes fp-saving-pulse { 0%,100% { opacity:0.3; } 50% { opacity:1; } }
+.fp-edit-saving-dot {
+  width: 8px; height: 8px; border-radius: 50%;
+  background: rgba(var(--ta-rgb), 0.7);
+  animation: fp-saving-pulse 1s ease-in-out infinite;
+  display: inline-block;
 }
 
 /* "Tüm profili gör" trigger buttons */
