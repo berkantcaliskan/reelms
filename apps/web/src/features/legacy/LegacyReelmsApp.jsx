@@ -3231,6 +3231,12 @@ function formatTimeLeft(expiresAt) {
 }
 
 // ── Mention renderer ──────────────────────────────────────────────────────────
+function extractYouTubeId(text) {
+  if (!text) return null
+  const m = text.match(/(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/)([A-Za-z0-9_-]{11})/)
+  return m ? m[1] : null
+}
+
 function renderMentions(text, uid, members, roles) {
   if (!text) return null
   const parts = text.split(/(@\w+)/g)
@@ -11898,11 +11904,21 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       </div>
                     )}
                     {selectedSettingsCategory === 'ignite' && (
-                      <div className="ignite-beta-panel">
-                        <div className="ignite-beta-logo">
-                          Reelms <span className="settings-ignite-word">Ignite</span>
+                      <div className="ignite-settings-panel">
+                        <div className="ignite-settings-sections">
+                          <div className="ignite-settings-section">
+                            <div className="ignite-settings-section-title">
+                              <span className="settings-ignite-word">Ignite</span>
+                            </div>
+                            <p className="ignite-settings-soon">Ignite is coming soon.</p>
+                          </div>
+                          <div className="ignite-settings-section">
+                            <div className="ignite-settings-section-title">
+                              <span className="settings-ignite-word">Ignite All</span>
+                            </div>
+                            <p className="ignite-settings-soon">Ignite All is coming soon.</p>
+                          </div>
                         </div>
-                        <p className="ignite-beta-msg">{getT(language)('ignite_beta_notice')}</p>
                       </div>
                     )}
                   </div>
@@ -13385,6 +13401,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                       </div>
                                     )}
                                     {msg.text && <div className="msg-text">{renderMentions(msg.text, uid, selectedReelm?.members, selectedReelm?.roles)}</div>}
+                                    {msg.text && (() => { const ytId = extractYouTubeId(msg.text); return ytId ? (
+                                      <div className="msg-yt-embed">
+                                        <iframe
+                                          src={`https://www.youtube-nocookie.com/embed/${ytId}`}
+                                          title="YouTube video"
+                                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                                          allowFullScreen
+                                        />
+                                      </div>
+                                    ) : null })()}
                                     {msg.mediaUrl && msg.mediaType === 'image' && <img src={msg.mediaUrl} alt="" className="msg-media-img" onClick={() => setLightboxImg(msg.mediaUrl)} />}
                                     {msg.mediaUrl && msg.mediaType === 'video' && <video src={msg.mediaUrl} className="msg-media-video" controls />}
                                     {msg.fileUrl && (
