@@ -2459,15 +2459,15 @@ h6 {
 .reelm-channel-ctx-menu {
   position: fixed;
   animation: ctx-menu-in 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
-  background: rgba(var(--tb-rgb), 0.55);
-  -webkit-backdrop-filter: blur(28px) saturate(1.6) brightness(0.85);
-  backdrop-filter: blur(28px) saturate(1.6) brightness(0.85);
+  background: rgba(var(--ta-rgb), 0.18);
+  -webkit-backdrop-filter: blur(48px) saturate(2.2);
+  backdrop-filter: blur(48px) saturate(2.2);
   border: 1px solid rgba(var(--ta-rgb), 0.2);
   border-radius: 12px;
   overflow: hidden;
   z-index: 9999;
-  min-width: 160px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.45);
+  min-width: 200px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
   display: flex;
   flex-direction: column;
 }
@@ -3530,20 +3530,21 @@ h6 {
   transition: opacity 0.15s;
 }
 .reelm-category-arrow:hover { opacity: 0.85; }
-.reelm-category-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  right: 0;
+.reelm-category-menu { display: none; }
+.reelm-category-ctx-menu {
+  position: fixed;
   animation: ctx-menu-in 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
-  background: rgba(var(--tb-rgb), 0.55);
-  -webkit-backdrop-filter: blur(28px) saturate(1.6) brightness(0.85);
-  backdrop-filter: blur(28px) saturate(1.6) brightness(0.85);
+  background: rgba(var(--ta-rgb), 0.18);
+  -webkit-backdrop-filter: blur(48px) saturate(2.2);
+  backdrop-filter: blur(48px) saturate(2.2);
   border: 1px solid rgba(var(--ta-rgb), 0.2);
   border-radius: 12px;
   overflow: hidden;
-  z-index: 50;
-  min-width: 120px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  z-index: 9999;
+  min-width: 200px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  display: flex;
+  flex-direction: column;
 }
 .reelm-category-menu-item {
   display: block;
@@ -6598,12 +6599,16 @@ h6 {
   backdrop-filter: blur(48px) saturate(2.2);
   border: 1px solid rgba(var(--ta-rgb), 0.15);
   border-radius: 16px;
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: hidden;
   max-height: calc(100vh - 24px);
   z-index: 900;
   box-shadow: 0 8px 40px rgba(0,0,0,0.35);
   font-family: var(--body-font);
+}
+.fpp-scroll-inner {
+  overflow-y: auto;
+  overflow-x: hidden;
+  max-height: calc(100vh - 24px);
 }
 .fpp-cover {
   height: 88px;
