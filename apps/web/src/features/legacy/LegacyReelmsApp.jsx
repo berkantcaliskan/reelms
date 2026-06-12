@@ -10682,18 +10682,37 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     messageSend(msgKey, msg).catch(err => handleRemoteMessageError(err, msgKey, msg.id))
   }
 
-  const SLASH_COMMANDS = [
-    { cmd: '/summarize', args: '[sayı]', desc: 'Son N mesajı özetle (varsayılan: 30)' },
-    { cmd: '/digest', args: '', desc: 'Günlük kanal özeti' },
-    { cmd: '/ai', args: '<mesaj>', desc: 'AI ile sohbet et' },
-    { cmd: '/ai-reset', args: '', desc: 'AI sohbet geçmişini sıfırla' },
-    { cmd: '/ai-help', args: '', desc: 'Tüm AI komutlarını listele' },
+  const BOT_COMMANDS = [
+    {
+      bot: 'Reelms Intelligence',
+      commands: [
+        { cmd: '/ai', args: '<message>', desc: 'Chat with AI' },
+        { cmd: '/summarize', args: '[n]', desc: 'Summarize last N messages (default: 30)' },
+        { cmd: '/digest', args: '', desc: 'Daily channel digest' },
+        { cmd: '/ai-reset', args: '', desc: 'Clear AI chat history' },
+        { cmd: '/ai-help', args: '', desc: 'List all AI commands' },
+      ]
+    },
+    {
+      bot: 'Reelm Radio',
+      commands: [
+        { cmd: '/play', args: '<query>', desc: 'Play music in voice channel' },
+        { cmd: '/skip', args: '', desc: 'Skip current track' },
+        { cmd: '/queue', args: '', desc: 'Show music queue' },
+        { cmd: '/stop', args: '', desc: 'Stop playback' },
+      ]
+    },
   ]
+
+  const [slashExpandedBot, setSlashExpandedBot] = useState(null)
+  const [slashShowAll, setSlashShowAll] = useState(false)
 
   const slashOptions = useMemo(() => {
     if (!slashMenu) return []
     const f = slashMenu.filter.toLowerCase()
-    return SLASH_COMMANDS.filter(c => c.cmd.slice(1).startsWith(f))
+    if (!f) return []
+    const all = BOT_COMMANDS.flatMap(b => b.commands)
+    return all.filter(c => c.cmd.slice(1).startsWith(f))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slashMenu])
 
@@ -10703,6 +10722,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setMessageInput(text)
     setSlashMenu(null)
     setSlashSelIdx(0)
+    setSlashExpandedBot(null)
+    setSlashShowAll(false)
   }
 
   const mentionOptions = useMemo(() => {
@@ -11061,7 +11082,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         moderationContext={moderationContext}
         roleContext={roleContext}
         isSelf={String(friendProfileTarget.friend?.id) === String(uid)}
-        embedded={embedded}
         canEditNickname={!isReelmsSystemUid(f.id)}
         onViewFullProfile={(friend) => { setFriendProfileTarget(null); setFullProfileTarget({ isSelf: false, user: friend }) }}
       />
@@ -13534,22 +13554,77 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           <div className="moderation-warning">{moderationWarning}</div>
                         )}
                         {canPost && <div className="msg-bar-wrap">
-                          {slashMenu && slashOptions.length > 0 && (
+                          {slashMenu && (
                             <div className="mention-dropdown slash-dropdown">
-                              <div className="slash-dropdown-header">Komutlar</div>
-                              {slashOptions.map((opt, i) => (
-                                <div
-                                  key={opt.cmd}
-                                  className={`mention-option${i === slashSelIdx ? ' mention-option--sel' : ''}`}
-                                  onMouseEnter={() => setSlashSelIdx(i)}
-                                  onMouseDown={e => { e.preventDefault(); insertSlashCommand(opt) }}
-                                >
-                                  <code className="slash-option-cmd">
-                                    {opt.cmd}{opt.args && <span className="slash-cmd-args"> {opt.args}</span>}
-                                  </code>
-                                  <span className="mention-option-sub">{opt.desc}</span>
-                                </div>
-                              ))}
+                              <div className="slash-dropdown-header">Commands</div>
+                              {slashOptions.length > 0 ? (
+                                <>
+                                  {(slashShowAll ? slashOptions : slashOptions.slice(0, 2)).map((opt, i) => (
+                                    <div
+                                      key={opt.cmd}
+                                      className={`mention-option${i === slashSelIdx ? ' mention-option--sel' : ''}`}
+                                      onMouseEnter={() => setSlashSelIdx(i)}
+                                      onMouseDown={e => { e.preventDefault(); insertSlashCommand(opt) }}
+                                    >
+                                      <code className="slash-option-cmd">
+                                        {opt.cmd}{opt.args && <span className="slash-cmd-args"> {opt.args}</span>}
+                                      </code>
+                                      <span className="mention-option-sub">{opt.desc}</span>
+                                    </div>
+                                  ))}
+                                  {!slashShowAll && slashOptions.length > 2 && (
+                                    <div
+                                      className="slash-see-more"
+                                      onMouseDown={e => { e.preventDefault(); setSlashShowAll(true) }}
+                                    >
+                                      See {slashOptions.length - 2} more…
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <>
+                                  <div className="slash-bots-row">
+                                    {BOT_COMMANDS.map(b => (
+                                      <button
+                                        key={b.bot}
+                                        className={`slash-bot-chip${slashExpandedBot === b.bot ? ' slash-bot-chip--active' : ''}`}
+                                        onMouseDown={e => { e.preventDefault(); setSlashExpandedBot(prev => prev === b.bot ? null : b.bot) }}
+                                      >
+                                        {b.bot}
+                                      </button>
+                                    ))}
+                                  </div>
+                                  {slashExpandedBot && (() => {
+                                    const botCmds = BOT_COMMANDS.find(b => b.bot === slashExpandedBot)?.commands || []
+                                    const visible = slashShowAll ? botCmds : botCmds.slice(0, 2)
+                                    return (
+                                      <>
+                                        {visible.map((opt, i) => (
+                                          <div
+                                            key={opt.cmd}
+                                            className={`mention-option${i === slashSelIdx ? ' mention-option--sel' : ''}`}
+                                            onMouseEnter={() => setSlashSelIdx(i)}
+                                            onMouseDown={e => { e.preventDefault(); insertSlashCommand(opt) }}
+                                          >
+                                            <code className="slash-option-cmd">
+                                              {opt.cmd}{opt.args && <span className="slash-cmd-args"> {opt.args}</span>}
+                                            </code>
+                                            <span className="mention-option-sub">{opt.desc}</span>
+                                          </div>
+                                        ))}
+                                        {!slashShowAll && botCmds.length > 2 && (
+                                          <div
+                                            className="slash-see-more"
+                                            onMouseDown={e => { e.preventDefault(); setSlashShowAll(true) }}
+                                          >
+                                            See {botCmds.length - 2} more…
+                                          </div>
+                                        )}
+                                      </>
+                                    )
+                                  })()}
+                                </>
+                              )}
                             </div>
                           )}
                           {mentionQuery && mentionOptions.length > 0 && (
@@ -13660,8 +13735,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 if (match) { setMentionQuery({ query: match[1], triggerStart: cursor - match[0].length }); setMentionSelIdx(0) }
                                 else setMentionQuery(null)
                                 const slashMatch = val.match(/^\/(\w*)$/)
-                                if (slashMatch) { setSlashMenu({ filter: slashMatch[1] }); setSlashSelIdx(0) }
-                                else setSlashMenu(null)
+                                if (slashMatch) { setSlashMenu({ filter: slashMatch[1] }); setSlashSelIdx(0); setSlashExpandedBot(null); setSlashShowAll(false) }
+                                else { setSlashMenu(null); setSlashExpandedBot(null); setSlashShowAll(false) }
                                 const tMsgKey = selectedChat ? selectedChat.id : composeReelmMsgKey(selectedReelm, selectedChannel)
                                 if (tMsgKey) {
                                   if (val.trim()) {
