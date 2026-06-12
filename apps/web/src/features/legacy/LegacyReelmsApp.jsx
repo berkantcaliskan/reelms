@@ -13656,7 +13656,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           <div className={`msg-input-wrap${pendingAttachment ? ' msg-input-wrap--has-attach' : ''}`}>
                             <input
                               className="msg-input"
-                              placeholder={selectedChatSystemLocked ? 'Reelms System is read-only.' : (selectedChatBlockedEntry ? 'You blocked this user. Unblock to send messages.' : (isAnnouncement ? 'Post an announcement...' : 'Talk...'))}
+                              placeholder={selectedChatSystemLocked ? 'Reelms System is read-only.' : (selectedChatBlockedEntry ? 'You blocked this user. Unblock to send messages.' : (isAnnouncement ? 'Post an announcement...' : 'Message'))}
                               disabled={!canPost}
                               value={messageInput}
                               onChange={e => {
