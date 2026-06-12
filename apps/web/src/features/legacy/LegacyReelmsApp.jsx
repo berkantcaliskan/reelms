@@ -16084,7 +16084,7 @@ function ShareModal({ target, onClose, activeTheme }) {
 
     // Cover image
     const imgPad = 20
-    const imgX = imgPad, imgY = 72, imgW = W - imgPad * 2, imgH = 192, imgR = 14
+    const imgX = imgPad, imgY = 72, imgW = W - imgPad * 2, imgH = 154, imgR = 14
 
     ctx.save()
     drawRoundRect(ctx, imgX, imgY, imgW, imgH, imgR)
