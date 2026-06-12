@@ -10907,7 +10907,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     },
   ]
 
-  const [slashExpandedBot, setSlashExpandedBot] = useState(null)
   const [slashShowAll, setSlashShowAll] = useState(false)
 
   const slashOptions = useMemo(() => {
@@ -10925,7 +10924,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setMessageInput(text)
     setSlashMenu(null)
     setSlashSelIdx(0)
-    setSlashExpandedBot(null)
     setSlashShowAll(false)
   }
 
@@ -13847,27 +13845,20 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 </>
                               ) : (
                                 <>
-                                  <div className="slash-bots-row">
-                                    {BOT_COMMANDS.map(b => (
-                                      <button
-                                        key={b.bot}
-                                        className={`slash-bot-chip${slashExpandedBot === b.bot ? ' slash-bot-chip--active' : ''}`}
-                                        onMouseDown={e => { e.preventDefault(); setSlashExpandedBot(prev => prev === b.bot ? null : b.bot) }}
-                                      >
-                                        {b.bot}
-                                      </button>
-                                    ))}
-                                  </div>
-                                  {slashExpandedBot && (() => {
-                                    const botCmds = BOT_COMMANDS.find(b => b.bot === slashExpandedBot)?.commands || []
-                                    const visible = slashShowAll ? botCmds : botCmds.slice(0, 2)
+                                  {BOT_COMMANDS.map((b, bi) => {
+                                    const allCmds = b.commands
+                                    const isFirst = bi === 0
+                                    const globalOffset = BOT_COMMANDS.slice(0, bi).reduce((s, x) => s + x.commands.length, 0)
+                                    const visible = slashShowAll ? allCmds : (isFirst ? allCmds.slice(0, 3) : allCmds.slice(0, 2))
+                                    const hiddenCount = allCmds.length - visible.length
                                     return (
-                                      <>
+                                      <div key={b.bot}>
+                                        <div className="slash-bot-group-label">{b.bot}</div>
                                         {visible.map((opt, i) => (
                                           <div
                                             key={opt.cmd}
-                                            className={`mention-option${i === slashSelIdx ? ' mention-option--sel' : ''}`}
-                                            onMouseEnter={() => setSlashSelIdx(i)}
+                                            className={`mention-option${globalOffset + i === slashSelIdx ? ' mention-option--sel' : ''}`}
+                                            onMouseEnter={() => setSlashSelIdx(globalOffset + i)}
                                             onMouseDown={e => { e.preventDefault(); insertSlashCommand(opt) }}
                                           >
                                             <code className="slash-option-cmd">
@@ -13876,17 +13867,17 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                             <span className="mention-option-sub">{opt.desc}</span>
                                           </div>
                                         ))}
-                                        {!slashShowAll && botCmds.length > 2 && (
+                                        {!slashShowAll && hiddenCount > 0 && (
                                           <div
                                             className="slash-see-more"
                                             onMouseDown={e => { e.preventDefault(); setSlashShowAll(true) }}
                                           >
-                                            {t('slash_see_more').replace('{n}', botCmds.length - 2)}
+                                            {t('slash_see_more').replace('{n}', hiddenCount)}
                                           </div>
                                         )}
-                                      </>
+                                      </div>
                                     )
-                                  })()}
+                                  })}
                                 </>
                               )}
                             </div>

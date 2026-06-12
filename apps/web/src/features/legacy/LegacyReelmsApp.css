@@ -6004,6 +6004,14 @@ h6 {
   color: rgba(var(--ta-rgb), 1);
   border-color: rgba(var(--ta-rgb), 0.35);
 }
+.slash-bot-group-label {
+  font-size: 0.65rem;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: rgba(var(--ta-rgb), 0.35);
+  padding: 8px 11px 3px;
+}
+.slash-bot-group-label:first-child { padding-top: 3px; }
 .slash-see-more {
   font-size: 0.68rem;
   color: rgba(var(--ta-rgb), 0.45);
