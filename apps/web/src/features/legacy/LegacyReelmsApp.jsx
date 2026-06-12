@@ -772,7 +772,6 @@ function PillSelect({ value, onChange, options }) {
 }
 
 const THEMES = [
-  { id: 'blur-bg',  name: 'Photo',           accent: '#b99887', accentRgb: '185,152,135', base: '#1a1512', baseRgb: '26,21,18', isBlurBg: true },
   { id: 'default',  name: 'Default',         accent: '#b99887', accentRgb: '185,152,135', base: '#0c0c20', baseRgb: '12,12,32' },
   { id: 'gece',     name: 'Night',           accent: '#b99887', accentRgb: '185,152,135', base: '#1e1c1a', baseRgb: '30,28,26', grainOpacity: 0.12, noAccentGlow: true },
   { id: 'stone',    name: 'Soft Light',      accent: '#c8bfa8', accentRgb: '200,191,168', base: '#383835', baseRgb: '56,56,53', noGradient: true },
@@ -15996,7 +15995,9 @@ function ShareModal({ target, onClose, activeTheme }) {
   const drawCard = useCallback(async () => {
     const canvas = canvasRef.current
     if (!canvas) return
-    const theme = THEMES.find(t => t.id === selectedThemeId) || THEMES[0]
+    const theme = selectedThemeId === 'blur-bg'
+      ? { accent: '#b99887', base: '#1a1512' }
+      : (THEMES.find(t => t.id === selectedThemeId) || THEMES[0])
     const W = 360, H = 430
     canvas.width = W * 2
     canvas.height = H * 2
@@ -16005,7 +16006,12 @@ function ShareModal({ target, onClose, activeTheme }) {
     const ctx = canvas.getContext('2d')
     ctx.scale(2, 2)
 
-    // Pre-load cover image (used for background blur and/or main image)
+    // Wait for web fonts (Dela Gothic One etc.) to be ready before drawing
+    await document.fonts.ready
+
+    const isBlurBg = selectedThemeId === 'blur-bg'
+
+    // Pre-load cover image
     let loadedImg = null
     if (target.image) {
       loadedImg = await new Promise((resolve) => {
@@ -16020,7 +16026,7 @@ function ShareModal({ target, onClose, activeTheme }) {
     const accent = theme.accent
 
     // Background
-    if (theme.isBlurBg && loadedImg) {
+    if (isBlurBg && loadedImg) {
       const overflow = 44
       const sc = Math.max((W + overflow * 2) / loadedImg.width, (H + overflow * 2) / loadedImg.height)
       const bw = loadedImg.width * sc
@@ -16046,20 +16052,27 @@ function ShareModal({ target, onClose, activeTheme }) {
       ctx.fillRect(0, 0, W, H)
     }
 
-    // Header: logo + "reelms" text
+    // Header: logo (natural aspect ratio) + "Reelms" text
+    let logoTextX = 62
     try {
       await new Promise((resolve) => {
         const logoImg = new Image()
-        logoImg.onload = () => { ctx.drawImage(logoImg, 20, 14, 36, 36); resolve() }
+        logoImg.onload = () => {
+          const ar = logoImg.naturalWidth / logoImg.naturalHeight
+          const lh = 36, lw = lh * ar
+          ctx.drawImage(logoImg, 20, 14 + (36 - lh) / 2, lw, lh)
+          logoTextX = 20 + lw + 8
+          resolve()
+        }
         logoImg.onerror = resolve
         logoImg.src = reelmsLogo
       })
     } catch { /* noop */ }
 
-    ctx.font = 'bold 17px "Dela Gothic One", serif'
-    ctx.fillStyle = 'rgba(255,255,255,0.92)'
+    ctx.font = '400 18px "Dela Gothic One", serif'
+    ctx.fillStyle = '#ffffff'
     ctx.textAlign = 'left'
-    ctx.fillText('reelms', 62, 38)
+    ctx.fillText('Reelms', logoTextX, 38)
 
     // Header separator
     ctx.strokeStyle = 'rgba(255,255,255,0.1)'
@@ -16087,25 +16100,17 @@ function ShareModal({ target, onClose, activeTheme }) {
     ctx.restore()
 
     // Title
-    const contentY = imgY + imgH + 26
-    ctx.font = 'bold 21px "Dela Gothic One", serif'
+    const contentY = imgY + imgH + 30
+    ctx.font = '400 22px "Dela Gothic One", serif'
     ctx.fillStyle = '#ffffff'
     ctx.textAlign = 'left'
-    wrapCanvasText(ctx, target.title || '', imgPad, contentY, W - imgPad * 2, 27)
+    wrapCanvasText(ctx, target.title || '', imgPad, contentY, W - imgPad * 2, 28)
 
-    // Subtitle
-    if (target.subtitle) {
-      ctx.font = '13px sans-serif'
-      ctx.fillStyle = 'rgba(255,255,255,0.5)'
-      ctx.textAlign = 'left'
-      ctx.fillText(target.subtitle, imgPad, contentY + 44)
-    }
-
-    // "Join this Reelm" CTA
-    ctx.font = '600 13px sans-serif'
-    ctx.fillStyle = theme.isBlurBg ? 'rgba(255,255,255,0.85)' : accent
+    // "Join this Reelm" CTA (single, no subtitle duplication)
+    ctx.font = '500 13px sans-serif'
+    ctx.fillStyle = isBlurBg ? 'rgba(255,255,255,0.75)' : accent
     ctx.textAlign = 'left'
-    ctx.fillText('Join this Reelm →', imgPad, contentY + 72)
+    ctx.fillText('Join this Reelm →', imgPad, contentY + 56)
 
     // Footer divider
     ctx.strokeStyle = 'rgba(255,255,255,0.09)'
@@ -16149,11 +16154,17 @@ function ShareModal({ target, onClose, activeTheme }) {
         </div>
         <canvas ref={canvasRef} className="share-canvas" />
         <div className="share-theme-row">
+          <button
+            className={`share-theme-dot share-theme-dot--photo${selectedThemeId === 'blur-bg' ? ' share-theme-dot--active' : ''}`}
+            style={{ background: 'linear-gradient(135deg, #3a2a1e 0%, #8a6850 100%)' }}
+            title="Photo"
+            onClick={() => setSelectedThemeId('blur-bg')}
+          />
           {THEMES.map(t => (
             <button
               key={t.id}
-              className={`share-theme-dot${selectedThemeId === t.id ? ' share-theme-dot--active' : ''}${t.isBlurBg ? ' share-theme-dot--photo' : ''}`}
-              style={{ background: t.isBlurBg ? 'linear-gradient(135deg, #3a2a1e 0%, #8a6850 100%)' : t.accent }}
+              className={`share-theme-dot${selectedThemeId === t.id ? ' share-theme-dot--active' : ''}`}
+              style={{ background: t.accent }}
               title={t.name}
               onClick={() => setSelectedThemeId(t.id)}
             />
