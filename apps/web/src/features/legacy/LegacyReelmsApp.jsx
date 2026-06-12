@@ -3120,13 +3120,10 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
         {canShare && (
           <button className="fpp-action-btn" onClick={() => { navigator.clipboard?.writeText(`${safeFriend.name} (@${safeFriend.username || friend.id})`); onClose() }}>Share Profile</button>
         )}
-        {!isSelf && isBlocked && onUnblock && <button className="fpp-action-btn" onClick={() => { onUnblock(friend.id); onClose() }}>Unblock</button>}
         {!isSelf && !isBlocked && !isFriend && onAddFriend && (isPending
           ? <button className="fpp-action-btn" disabled>Friend request sent</button>
           : <button className="fpp-action-btn" onClick={() => { onAddFriend(friend); onClose() }}>Add Friend</button>
         )}
-        {!isSelf && !isBlocked && isFriend && <button className="fpp-action-btn fpp-action-danger" onClick={() => { onRemove(friend.id); onClose() }}>Remove Friend</button>}
-        {!isSelf && !isBlocked && onBlock && <button className="fpp-action-btn fpp-action-danger" onClick={() => { onBlock(friend); onClose() }}>Block</button>}
         <button className="fpp-view-full-btn" onClick={() => { onClose(); setTimeout(() => onViewFullProfile?.(friend), 50) }}>Tüm profili gör →</button>
       </div>
       </div>
@@ -3597,6 +3594,7 @@ const REELM_PERMISSION_OPTIONS = [
   { key: 'manageInvites', label: 'Invites', note: 'Can invite even if member invites are off.' },
   { key: 'manageJoinRequests', label: 'Join requests', note: 'Can approve or reject join requests.' },
   { key: 'manageModeration', label: 'Moderation', note: 'Can timeout/ban regular members.' },
+  { key: 'createVaporRoom', label: 'Create vapor rooms', note: 'Can create temporary vapor rooms in any category.' },
   { key: 'manageReelm', label: 'Full admin', note: 'Can manage all server permissions.' },
 ]
 const REELM_ELEVATED_ROLE_RE = /admin|owner|founder|moderator/i
@@ -9069,6 +9067,15 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }, [channelCtxMenu])
 
   useEffect(() => {
+    if (!openCategoryMenu) return
+    const handler = (e) => {
+      if (!e.target.closest('.reelm-category-ctx-menu')) setOpenCategoryMenu(null)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [openCategoryMenu])
+
+  useEffect(() => {
     if (!showReelmMenu) return
     const handler = (e) => {
       if (!e.target.closest('.reelm-name-menu') && !e.target.closest('.reelm-sidebar-name')) setShowReelmMenu(false)
@@ -12832,7 +12839,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       {selectedReelm.categories.map(cat => (
                         <div key={cat.id} className="reelm-category">
                           <div className="reelm-category-header">
-                            <span className="reelm-category-name" onClick={() => toggleCategory(selectedReelm.id, cat.id)}>
+                            <span className="reelm-category-name"
+                              onClick={() => toggleCategory(selectedReelm.id, cat.id)}
+                              onContextMenu={e => {
+                                e.preventDefault()
+                                const isAdmin = canManageReelmClient(selectedReelm, uid)
+                                const canVapor = hasReelmPermissionClient(selectedReelm, uid, 'createVaporRoom')
+                                if (!isAdmin && !canVapor) return
+                                setOpenCategoryMenu({ id: cat.id, x: e.clientX, y: e.clientY, isAdmin, canVapor })
+                              }}
+                            >
                               {(() => {
                                 const key = cat.icon || (cat.type === 'announcement' ? 'general' : cat.type === 'text' ? 'text' : cat.type === 'voice' ? 'multimedia' : 'liveaction')
                                 const src = { general: channelGeneralIcon, text: channelTextIcon, multimedia: channelMultimediaIcon, liveaction: channelLiveactionIcon }[key]
@@ -12840,31 +12856,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               })()}
                               {cat.name}
                             </span>
-                            <div className="reelm-category-arrow-wrap">
-                              <button
-                                className="reelm-category-arrow"
-                                onClick={(e) => { e.stopPropagation(); setOpenCategoryMenu(openCategoryMenu === cat.id ? null : cat.id) }}
-                              >
-                                <svg width="8" height="5" viewBox="0 0 8 5" fill="none">
-                                  <path d="M1 1l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-                                </svg>
-                              </button>
-                              {openCategoryMenu === cat.id && (
-                                <div className="reelm-category-menu">
-                                  <button className="reelm-category-menu-item" onClick={() => { addChannel(selectedReelm.id, cat.id); setOpenCategoryMenu(null) }}>
-                                    New channel
-                                  </button>
-                                  <button className="reelm-category-menu-item reelm-category-menu-flying" onClick={() => {
-                                    setFlyingRoomModal({ reelmId: selectedReelm.id, catId: cat.id })
-                                    setFlyingRoomName('')
-                                    setFlyingRoomDuration(60 * 60 * 1000)
-                                    setOpenCategoryMenu(null)
-                                  }}>
-                                    ✦ Create a vapor room
-                                  </button>
-                                </div>
-                              )}
-                            </div>
                           </div>
                           {!cat.collapsed && (
                             <div className="reelm-channels">
@@ -15375,6 +15366,25 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             </div>
           </div>
         </div>
+      )}
+      {openCategoryMenu && ReactDOM.createPortal(
+        <div className="reelm-category-ctx-menu" style={{ top: openCategoryMenu.y, left: openCategoryMenu.x }}
+          onMouseDown={e => e.stopPropagation()}>
+          {openCategoryMenu.isAdmin && (
+            <button className="reelm-category-menu-item" onClick={() => { addChannel(selectedReelm.id, openCategoryMenu.id); setOpenCategoryMenu(null) }}>
+              New channel
+            </button>
+          )}
+          <button className="reelm-category-menu-item reelm-category-menu-flying" onClick={() => {
+            setFlyingRoomModal({ reelmId: selectedReelm.id, catId: openCategoryMenu.id })
+            setFlyingRoomName('')
+            setFlyingRoomDuration(60 * 60 * 1000)
+            setOpenCategoryMenu(null)
+          }}>
+            ✦ Create a vapor room
+          </button>
+        </div>,
+        document.body
       )}
       {channelCtxMenu && ReactDOM.createPortal(
         <div className="reelm-channel-ctx-menu" style={{ top: channelCtxMenu.y, left: channelCtxMenu.x }}
