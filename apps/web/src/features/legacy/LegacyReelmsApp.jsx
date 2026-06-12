@@ -8713,6 +8713,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [messageInput, setMessageInput] = useState('')
   const messageInputRef = useRef('')
   const [pendingAttachment, setPendingAttachment] = useState(null)
+  const [slashMenu, setSlashMenu] = useState(null)
+  const [slashSelIdx, setSlashSelIdx] = useState(0)
   const [typingUsers, setTypingUsers] = useState({})
   const typingTimers = useRef({})
   const typingEmitTimer = useRef(null)
@@ -10670,6 +10672,29 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     const msgKey = `${reelmId}_${channelId}`
     const msg = { id: createClientMessageId(), text, sender: { id: 'system', name: 'Reelms', photo: null }, time: Date.now(), isSystem: true }
     messageSend(msgKey, msg).catch(err => handleRemoteMessageError(err, msgKey, msg.id))
+  }
+
+  const SLASH_COMMANDS = [
+    { cmd: '/summarize', args: '[sayı]', desc: 'Son N mesajı özetle (varsayılan: 30)' },
+    { cmd: '/digest', args: '', desc: 'Günlük kanal özeti' },
+    { cmd: '/ai', args: '<mesaj>', desc: 'AI ile sohbet et' },
+    { cmd: '/ai-reset', args: '', desc: 'AI sohbet geçmişini sıfırla' },
+    { cmd: '/ai-help', args: '', desc: 'Tüm AI komutlarını listele' },
+  ]
+
+  const slashOptions = useMemo(() => {
+    if (!slashMenu) return []
+    const f = slashMenu.filter.toLowerCase()
+    return SLASH_COMMANDS.filter(c => c.cmd.slice(1).startsWith(f))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [slashMenu])
+
+  const insertSlashCommand = (opt) => {
+    const text = opt.args ? opt.cmd + ' ' : opt.cmd
+    messageInputRef.current = text
+    setMessageInput(text)
+    setSlashMenu(null)
+    setSlashSelIdx(0)
   }
 
   const mentionOptions = useMemo(() => {
@@ -13492,6 +13517,27 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           <div className="moderation-warning">{moderationWarning}</div>
                         )}
                         {canPost && <div className="msg-bar-wrap">
+                          {slashMenu && slashOptions.length > 0 && (
+                            <div className="mention-dropdown slash-dropdown">
+                              <div className="slash-dropdown-header">Komutlar</div>
+                              {slashOptions.map((opt, i) => (
+                                <div
+                                  key={opt.cmd}
+                                  className={`mention-option${i === slashSelIdx ? ' mention-option--sel' : ''}`}
+                                  onMouseEnter={() => setSlashSelIdx(i)}
+                                  onMouseDown={e => { e.preventDefault(); insertSlashCommand(opt) }}
+                                >
+                                  <div className="slash-cmd-icon">/</div>
+                                  <div className="mention-option-text">
+                                    <span className="mention-option-name">
+                                      {opt.cmd}{opt.args && <span className="slash-cmd-args"> {opt.args}</span>}
+                                    </span>
+                                    <span className="mention-option-sub">{opt.desc}</span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
                           {mentionQuery && mentionOptions.length > 0 && (
                             <div className="mention-dropdown">
                               {mentionOptions.map((opt, i) => (
@@ -13599,6 +13645,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 const match = before.match(/@(\w*)$/)
                                 if (match) { setMentionQuery({ query: match[1], triggerStart: cursor - match[0].length }); setMentionSelIdx(0) }
                                 else setMentionQuery(null)
+                                const slashMatch = val.match(/^\/(\w*)$/)
+                                if (slashMatch) { setSlashMenu({ filter: slashMatch[1] }); setSlashSelIdx(0) }
+                                else setSlashMenu(null)
                                 const tMsgKey = selectedChat ? selectedChat.id : composeReelmMsgKey(selectedReelm, selectedChannel)
                                 if (tMsgKey) {
                                   if (val.trim()) {
@@ -13619,6 +13668,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 }
                               }}
                               onKeyDown={e => {
+                                if (slashMenu && slashOptions.length > 0) {
+                                  if (e.key === 'ArrowDown') { e.preventDefault(); setSlashSelIdx(i => Math.min(i + 1, slashOptions.length - 1)); return }
+                                  else if (e.key === 'ArrowUp') { e.preventDefault(); setSlashSelIdx(i => Math.max(i - 1, 0)); return }
+                                  else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); insertSlashCommand(slashOptions[slashSelIdx]); return }
+                                  else if (e.key === 'Escape') { setSlashMenu(null); return }
+                                }
                                 if (mentionQuery && mentionOptions.length > 0) {
                                   if (e.key === 'ArrowDown') { e.preventDefault(); setMentionSelIdx(i => Math.min(i + 1, mentionOptions.length - 1)) }
                                   else if (e.key === 'ArrowUp') { e.preventDefault(); setMentionSelIdx(i => Math.max(i - 1, 0)) }
