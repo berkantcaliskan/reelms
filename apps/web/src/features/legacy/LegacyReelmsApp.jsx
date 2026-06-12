@@ -1366,6 +1366,8 @@ function AccessibilityPanel({ uid }) {
     { val: 1.15, key: 'a11y_font_large' },
     { val: 1.3,  key: 'a11y_font_xlarge' },
   ]
+  // label overrides — use direct strings instead of locale keys for these
+  const FONT_LABELS = ['Small', 'Default', 'Big', 'Bigger']
 
   return (
     <div className="accs-panel">
@@ -1386,12 +1388,12 @@ function AccessibilityPanel({ uid }) {
       <div className="accs-section">
         <div className="accs-section-title">{t('a11y_font_size')}</div>
         <div className="a11y-scale-row">
-          {FONT_OPTS.map(opt => (
+          {FONT_OPTS.map((opt, i) => (
             <button
               key={opt.val}
               className={`a11y-scale-btn${(a11y.fontScale || 1) === opt.val ? ' a11y-scale-btn--active' : ''}`}
               onClick={() => update({ ...a11y, fontScale: opt.val })}
-            >{t(opt.key)}</button>
+            >{FONT_LABELS[i]}</button>
           ))}
         </div>
       </div>
