@@ -3010,6 +3010,7 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
 
   const profileNode = (
     <div className={`friend-profile-popup${embedded ? ' friend-profile-popup--embedded' : ''}`} style={{ ...(buildProfileThemeStyle(safeFriend) || {}), ...(embedded ? {} : { top, left, width: popupW }) }} ref={popupRef}>
+      <div className="fpp-scroll-inner">
       <CachedProfileCover src={friendCover} className={`fpp-cover${friendCover ? ' fpp-cover--has-image' : ''}`} />
       {embedded && <button type="button" className="fpp-embedded-close" onClick={onClose} aria-label="Close profile">×</button>}
       <div className="fpp-identity">
@@ -3127,6 +3128,7 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
         {!isSelf && !isBlocked && isFriend && <button className="fpp-action-btn fpp-action-danger" onClick={() => { onRemove(friend.id); onClose() }}>Remove Friend</button>}
         {!isSelf && !isBlocked && onBlock && <button className="fpp-action-btn fpp-action-danger" onClick={() => { onBlock(friend); onClose() }}>Block</button>}
         <button className="fpp-view-full-btn" onClick={() => { onClose(); setTimeout(() => onViewFullProfile?.(friend), 50) }}>Tüm profili gör →</button>
+      </div>
       </div>
     </div>
   )
@@ -7276,7 +7278,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     }).catch(() => {})
   }, [selectedSettingsCategory])
   const updateBodyFont = (id) => { setBodyFont(id); scheduleUserPersist('body_font', id); userPutDoc('body_font', id).catch(() => {}) }
-  const t = getT(language)
   const [spotifyConnected, setSpotifyConnected] = useState(false)
   const [spotifyNowPlaying, setSpotifyNowPlaying] = useState(null)
   const [spotifyFriendsNowPlaying, setSpotifyFriendsNowPlaying] = useState({})
