@@ -3240,7 +3240,9 @@ h6 {
   top: calc(100% + 4px);
   left: 0;
   right: 0;
-  background: rgba(24, 22, 24, 0.98);
+  background: rgba(var(--ta-rgb), 0.18);
+  -webkit-backdrop-filter: blur(48px) saturate(2.2);
+  backdrop-filter: blur(48px) saturate(2.2);
   border: 1px solid rgba(var(--ta-rgb), 0.2);
   border-radius: 14px;
   overflow: hidden;
@@ -14286,7 +14288,9 @@ button, input, select, textarea,
   top: calc(100% + 4px);
   left: 0;
   z-index: 120;
-  background: var(--tb);
+  background: rgba(var(--ta-rgb), 0.18);
+  -webkit-backdrop-filter: blur(48px) saturate(2.2);
+  backdrop-filter: blur(48px) saturate(2.2);
   border: 1px solid rgba(var(--ta-rgb), 0.14);
   border-radius: 8px;
   box-shadow: 0 4px 18px rgba(0,0,0,0.22);
@@ -14787,34 +14791,41 @@ button, input, select, textarea,
 
   /* ── Panel overlay system ─────────────────────────────────── */
   .mobile-panel-backdrop {
-    position: fixed;
+    position: absolute;
     inset: 0;
-    background: rgba(0, 0, 0, 0.5);
+    background: rgba(0, 0, 0, 0.4);
     z-index: 199;
     display: block;
   }
 
   .panel.panel-left,
   .panel.panel-right {
-    position: fixed !important;
+    position: absolute !important;
     top: 0 !important;
     bottom: 0 !important;
     z-index: 200;
     width: min(62vw, 235px) !important;
     flex: unset !important;
     transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
-    overflow-y: auto;
-    overflow-x: hidden;
+    background: rgba(var(--ta-rgb), 0.18);
+    -webkit-backdrop-filter: blur(48px) saturate(2.2);
+    backdrop-filter: blur(48px) saturate(2.2);
+    border-radius: 20px;
+    will-change: transform;
   }
 
   .panel.panel-left {
     left: 0;
     transform: translateX(-110%);
+    border-top-left-radius: 0;
+    border-bottom-left-radius: 0;
   }
 
   .panel.panel-right {
     right: 0;
     transform: translateX(110%);
+    border-top-right-radius: 0;
+    border-bottom-right-radius: 0;
   }
 
   .panel.panel-left.panel-left--open {
@@ -14833,6 +14844,11 @@ button, input, select, textarea,
     flex: 1 !important;
     top: unset !important;
     bottom: unset !important;
+    border-radius: 0 !important;
+    background: none !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    will-change: auto !important;
     height: 100%;
     display: flex;
     flex-direction: column;

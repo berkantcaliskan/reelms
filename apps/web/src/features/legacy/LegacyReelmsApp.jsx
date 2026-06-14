@@ -3012,18 +3012,21 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
   }, [onClose, embedded])
 
   const popupW = 350
-  const popupH = 480
   const friendCover = safeFriend.cover || safeFriend.coverImage || safeFriend.coverUrl || null
   const safeRect = anchorRect || { top: 96, bottom: 112, left: Math.max(8, window.innerWidth - popupW - 18), right: window.innerWidth - 18 }
-  const rightBoundary = window.innerWidth - (rightPanelWidth || 0) - 5
-  let left = safeRect.left - popupW - 8
+
+  // 5px gap from the right panel's left edge, regardless of panel resize
+  const panelLeftEdge = rightPanelWidth > 0 ? window.innerWidth - rightPanelWidth : safeRect.left
+  let left = panelLeftEdge - popupW - 5
   if (left < 8) left = (safeRect.right || safeRect.left) + 8
-  if (left + popupW > rightBoundary) left = rightBoundary - popupW
   if (left < 8) left = 8
-  const clampH = Math.min(popupH, window.innerHeight - 32)
+
+  // bottom constrained to top of message input so popup never goes off screen
+  const msgBarEl = !embedded ? document.querySelector('.msg-bar-wrap') : null
+  const screenBottom = msgBarEl ? msgBarEl.getBoundingClientRect().top - 5 : window.innerHeight - 72
   let top = safeRect.top
-  if (top + clampH > window.innerHeight - 8) top = window.innerHeight - clampH - 8
   if (top < 8) top = 8
+  const maxHeight = Math.min(480, Math.max(200, screenBottom - top))
 
   const profileNode = (
     <div className={`friend-profile-popup${embedded ? ' friend-profile-popup--embedded' : ''}`} style={{ ...(buildProfileThemeStyle(safeFriend) || {}), ...(embedded ? {} : { top, left, width: popupW }) }} ref={popupRef}>
