@@ -2461,9 +2461,6 @@ h6 {
 .reelm-channel-ctx-menu {
   position: fixed;
   animation: ctx-menu-in 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
-  background: rgba(var(--ta-rgb), 0.18);
-  -webkit-backdrop-filter: blur(48px) saturate(2.2);
-  backdrop-filter: blur(48px) saturate(2.2);
   border: 1px solid rgba(var(--ta-rgb), 0.2);
   border-radius: 12px;
   z-index: 9999;
@@ -2471,6 +2468,18 @@ h6 {
   box-shadow: 0 8px 32px rgba(0,0,0,0.4);
   display: flex;
   flex-direction: column;
+  isolation: isolate;
+}
+.reelm-channel-ctx-menu::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: rgba(var(--ta-rgb), 0.18);
+  -webkit-backdrop-filter: blur(48px) saturate(2.2);
+  backdrop-filter: blur(48px) saturate(2.2);
+  z-index: -1;
+  pointer-events: none;
 }
 .reelm-channel-ctx-item {
   width: 100%;
@@ -10489,7 +10498,7 @@ h6 {
 .fp-edit-profile-btn {
   display: inline-block;
   margin-top: 8px;
-  padding: 5px 16px;
+  padding: 3px 10px;
   border-radius: 999px;
   border: 1.5px solid rgba(var(--ta-rgb), 0.3);
   background: transparent;
