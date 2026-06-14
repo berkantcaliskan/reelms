@@ -133,7 +133,7 @@ import {
   e2eeRegisterKey,
   e2eeGetPublicKey,
 } from '../../reelmsAwsClient'
-import { getOrCreateKeyPair, getKeyPair, encryptForRecipient, decryptFromSender } from '../../lib/e2ee'
+import { getOrCreateKeyPair, getKeyPair, encryptForRecipient, decryptFromSender, storeSentPlaintext, getSentPlaintext } from '../../lib/e2ee'
 import { seedModerationAccount, MODERATION_ACCOUNT_ID, isModerationSystemUser } from '../../reelmsModerationAccount'
 import { moderateText } from '../../moderationClient'
 import { playSound, applySoundSettings, previewSound, preloadSounds, SOUND_CATEGORIES, SOUND_DEFAULTS } from '../../soundManager'
@@ -7828,7 +7828,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                 const [myKeys, theirPk] = await Promise.all([getKeyPair(), e2eeGetPublicKey(lookupUid)])
                 if (myKeys && theirPk) {
                   const plaintext = decryptFromSender(msg.text || '', theirPk, myKeys.secretKey)
-                  if (plaintext != null) displayMsg = { ...msg, text: plaintext }
+                  if (plaintext != null) { displayMsg = { ...msg, text: plaintext } }
+                  else if (senderUid === String(uid)) {
+                    const cached = await getSentPlaintext(String(msg.id)).catch(() => null)
+                    if (cached) displayMsg = { ...msg, text: cached }
+                  }
+                } else if (senderUid === String(uid)) {
+                  const cached = await getSentPlaintext(String(msg.id)).catch(() => null)
+                  if (cached) displayMsg = { ...msg, text: cached }
                 }
               } catch {}
             }
@@ -9120,9 +9127,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             if (!lookupUid) return m
             try {
               const theirPk = await e2eeGetPublicKey(lookupUid)
-              if (!theirPk) return m
-              const plaintext = decryptFromSender(m.text, theirPk, myKeys.secretKey)
-              return plaintext != null ? { ...m, text: plaintext } : m
+              if (theirPk) {
+                const plaintext = decryptFromSender(m.text, theirPk, myKeys.secretKey)
+                if (plaintext != null) return { ...m, text: plaintext }
+              }
+              // Decryption failed — fall back to cached plaintext for own sent messages
+              if (senderUid === String(uid)) {
+                const cached = await getSentPlaintext(String(m.id)).catch(() => null)
+                if (cached) return { ...m, text: cached }
+              }
+              return m
             } catch { return m }
           }))
         }
@@ -11211,6 +11225,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             const [myKeys, recipientPk] = await Promise.all([getKeyPair(), e2eeGetPublicKey(peerUid)])
             if (myKeys && recipientPk) {
               msgToSend = { ...msg, text: encryptForRecipient(text, recipientPk, myKeys.secretKey), enc: true }
+              storeSentPlaintext(msg.id, text).catch(() => {})
             }
           } catch {}
         }
