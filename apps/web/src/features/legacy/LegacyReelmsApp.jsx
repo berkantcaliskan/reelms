@@ -3024,9 +3024,10 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
   // bottom constrained to top of message input so popup never goes off screen
   const msgBarEl = !embedded ? document.querySelector('.msg-bar-wrap') : null
   const screenBottom = msgBarEl ? msgBarEl.getBoundingClientRect().top - 5 : window.innerHeight - 72
+  const maxHeight = Math.min(480, screenBottom - 8)
   let top = safeRect.top
+  if (top + maxHeight > screenBottom) top = screenBottom - maxHeight
   if (top < 8) top = 8
-  const maxHeight = Math.min(480, Math.max(200, screenBottom - top))
 
   const profileNode = (
     <div className={`friend-profile-popup${embedded ? ' friend-profile-popup--embedded' : ''}`} style={{ ...(buildProfileThemeStyle(safeFriend) || {}), ...(embedded ? {} : { top, left, width: popupW, maxHeight }) }} ref={popupRef}>
@@ -14268,7 +14269,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               </button>
                             </div>
                             <button className="msg-send-btn" onClick={sendMessage} disabled={!canPost}>
-                              <img src={sendIcon} alt="Send" width="30" height="30" />
+                              <img src={sendIcon} alt="Send" width="48" height="48" />
                             </button>
                           </div>
                           <div className="msg-actions">
@@ -14974,6 +14975,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               onPhotoChange={fullProfileTarget.isSelf ? (url => updateUserData({ photo: url })) : undefined}
               onCoverChange={fullProfileTarget.isSelf ? (url => updateUserData({ cover: url })) : undefined}
               onBioChange={fullProfileTarget.isSelf ? (bio => { setProfileBio(bio || ''); updateUserData({ bio: bio || '' }) }) : undefined}
+              onNameChange={fullProfileTarget.isSelf ? (name => updateUserData({ name })) : undefined}
               onSocialLinksChange={fullProfileTarget.isSelf ? (val => { const next = typeof val === 'function' ? val(profileSocialLinks) : val; setProfileSocialLinks(next || {}) }) : undefined}
               profileBio={fullProfileTarget.isSelf ? profileBio : undefined}
               socialLinks={fullProfileTarget.isSelf ? profileSocialLinks : undefined}
