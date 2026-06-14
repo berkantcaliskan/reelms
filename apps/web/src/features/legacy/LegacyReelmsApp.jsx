@@ -1416,7 +1416,7 @@ function AccessibilityPanel({ uid }) {
   )
 }
 
-function PrivacySafetyPanel({ user, onUpdate, onUnblock, blockedList, sessionsList, onSessionsUpdate }) {
+function PrivacySafetyPanel({ user, onUpdate, onUnblock, blockedList, sessionsList, onSessionsUpdate, showHiddenBarItems, onShowHiddenBarItemsChange }) {
   const t = useT()
 
   if (!user) {
@@ -1489,6 +1489,16 @@ function PrivacySafetyPanel({ user, onUpdate, onUnblock, blockedList, sessionsLi
           <button
             className={`cust-toggle${user.showInDiscover !== false ? ' cust-toggle-on' : ''}`}
             onClick={() => onUpdate({ showInDiscover: user.showInDiscover === false ? true : false })}
+          ><span className="cust-toggle-knob" /></button>
+        </div>
+        <div className="cust-toggle-row" style={{marginTop: '14px'}}>
+          <div>
+            <span className="cust-toggle-label">Dinamik sohbetler'de gizlenen içeriği göster</span>
+            <p className="accs-note">Dinamik sohbetler çubuğunda gizlenen sohbet ve toplulukları görünür kılar.</p>
+          </div>
+          <button
+            className={`cust-toggle${showHiddenBarItems ? ' cust-toggle-on' : ''}`}
+            onClick={() => onShowHiddenBarItemsChange?.(!showHiddenBarItems)}
           ><span className="cust-toggle-knob" /></button>
         </div>
 
@@ -2980,7 +2990,7 @@ function normalizeFriendProfileTarget(profile = {}) {
 
 const BOT_BIO_KEY = { 'reelmradio': 'bot_radio_bio', 'reelms-intelligence': 'bot_intelligence_bio' }
 
-function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBlock, onUnblock, onAddFriend, isFriend = true, isBlocked = false, isPending = false, nickname, onNicknameChange, canShare, onMessage, onCreateGroup, onRequestRemoteControl, voiceContext = null, moderationContext = null, roleContext = null, isSelf = false, embedded = false, canEditNickname = true, onViewFullProfile }) {
+function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBlock, onUnblock, onAddFriend, isFriend = true, isBlocked = false, isPending = false, nickname, onNicknameChange, canShare, onMessage, onCreateGroup, onRequestRemoteControl, voiceContext = null, moderationContext = null, roleContext = null, isSelf = false, embedded = false, canEditNickname = true, onViewFullProfile, rightPanelWidth = 0 }) {
   const t = useT()
   const popupRef = useRef(null)
   const safeFriend = normalizeFriendProfileTarget(friend || {})
@@ -3005,10 +3015,14 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
   const popupH = 480
   const friendCover = safeFriend.cover || safeFriend.coverImage || safeFriend.coverUrl || null
   const safeRect = anchorRect || { top: 96, bottom: 112, left: Math.max(8, window.innerWidth - popupW - 18), right: window.innerWidth - 18 }
+  const rightBoundary = window.innerWidth - (rightPanelWidth || 0) - 5
   let left = safeRect.left - popupW - 8
   if (left < 8) left = (safeRect.right || safeRect.left) + 8
+  if (left + popupW > rightBoundary) left = rightBoundary - popupW
+  if (left < 8) left = 8
+  const clampH = Math.min(popupH, window.innerHeight - 32)
   let top = safeRect.top
-  if (top + popupH > window.innerHeight - 8) top = window.innerHeight - popupH - 8
+  if (top + clampH > window.innerHeight - 8) top = window.innerHeight - clampH - 8
   if (top < 8) top = 8
 
   const profileNode = (
@@ -11411,6 +11425,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         isSelf={String(friendProfileTarget.friend?.id) === String(uid)}
         canEditNickname={!isReelmsSystemUid(f.id)}
         onViewFullProfile={(friend) => { setFriendProfileTarget(null); setFullProfileTarget({ isSelf: false, user: friend }) }}
+        rightPanelWidth={rightWidth}
       />
     )
   }
@@ -11684,9 +11699,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   className="bar-ctx-menu-item"
                   onClick={() => {
                     const friend = { id: barCtxMenu.item.friendId, name: barCtxMenu.item.name, photo: barCtxMenu.item.photo }
-                    const fakeE = { currentTarget: { getBoundingClientRect: () => ({ left: barCtxMenu.x, top: barCtxMenu.y, right: barCtxMenu.x, bottom: barCtxMenu.y, width: 0, height: 0 }) } }
                     setBarCtxMenu(null)
-                    openFriendProfile(friend, fakeE)
+                    setFullProfileTarget({ isSelf: false, user: friend })
                   }}
                 >
                   Arkadaş profilini gör
@@ -12085,6 +12099,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         onSessionsUpdate={(next) => {
                           setSessionsList(next)
                           userPutDoc('sessions', next).catch(() => {})
+                        }}
+                        showHiddenBarItems={showHiddenBarItems}
+                        onShowHiddenBarItemsChange={(val) => {
+                          setShowHiddenBarItems(val)
+                          scheduleUserPersist('bar_prefs', { showHidden: val })
+                          userPutDoc('bar_prefs', { showHidden: val }).catch(() => {})
                         }}
                       />
                     )}
