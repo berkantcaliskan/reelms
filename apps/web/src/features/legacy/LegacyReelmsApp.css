@@ -2157,9 +2157,9 @@ h6 {
   position: absolute;
   top: 114px;
   right: 12px;
-  background: rgba(var(--tb-rgb), 0.55);
-  -webkit-backdrop-filter: blur(28px) saturate(1.6) brightness(0.85);
-  backdrop-filter: blur(28px) saturate(1.6) brightness(0.85);
+  background: rgba(var(--ta-rgb), 0.18);
+  -webkit-backdrop-filter: blur(48px) saturate(2.2);
+  backdrop-filter: blur(48px) saturate(2.2);
   border: 1px solid rgba(var(--ta-rgb), 0.2);
   border-radius: 14px;
   overflow: hidden;
@@ -2263,7 +2263,9 @@ h6 {
   position: absolute;
   top: calc(100% + 4px);
   right: 0;
-  background: rgba(24, 22, 24, 0.98);
+  background: rgba(var(--ta-rgb), 0.18);
+  -webkit-backdrop-filter: blur(48px) saturate(2.2);
+  backdrop-filter: blur(48px) saturate(2.2);
   border: 1px solid rgba(var(--ta-rgb), 0.2);
   border-radius: 14px;
   overflow: hidden;
@@ -2408,9 +2410,9 @@ h6 {
 .pp-social-add-btn:hover { opacity: 1; }
 .pp-social-add-menu {
   position: fixed;
-  background: rgba(var(--tb-rgb), 0.55);
-  -webkit-backdrop-filter: blur(28px) saturate(1.6) brightness(0.85);
-  backdrop-filter: blur(28px) saturate(1.6) brightness(0.85);
+  background: rgba(var(--ta-rgb), 0.18);
+  -webkit-backdrop-filter: blur(48px) saturate(2.2);
+  backdrop-filter: blur(48px) saturate(2.2);
   border: 1px solid rgba(var(--ta-rgb), 0.2);
   border-radius: 14px;
   overflow: hidden;
@@ -2427,9 +2429,9 @@ h6 {
 .pp-social-ctx-menu {
   position: fixed;
   animation: ctx-menu-in 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
-  background: rgba(var(--tb-rgb), 0.55);
-  -webkit-backdrop-filter: blur(28px) saturate(1.6) brightness(0.85);
-  backdrop-filter: blur(28px) saturate(1.6) brightness(0.85);
+  background: rgba(var(--ta-rgb), 0.18);
+  -webkit-backdrop-filter: blur(48px) saturate(2.2);
+  backdrop-filter: blur(48px) saturate(2.2);
   border: 1px solid rgba(var(--ta-rgb), 0.2);
   border-radius: 12px;
   overflow: hidden;
@@ -6567,7 +6569,9 @@ h6 {
   position: absolute;
   bottom: 42px;
   right: 0;
-  background: rgba(22, 15, 38, 0.97);
+  background: rgba(var(--ta-rgb), 0.18);
+  -webkit-backdrop-filter: blur(48px) saturate(2.2);
+  backdrop-filter: blur(48px) saturate(2.2);
   border: 1px solid rgba(var(--ta-rgb), 0.2);
   border-radius: 12px;
   padding: 5px;
@@ -9166,14 +9170,13 @@ h6 {
   position: absolute;
   bottom: calc(100% + 8px);
   right: 0;
-  background: rgba(18, 12, 30, 0.97);
+  background: rgba(var(--ta-rgb), 0.18);
+  -webkit-backdrop-filter: blur(48px) saturate(2.2);
+  backdrop-filter: blur(48px) saturate(2.2);
   border: 1px solid rgba(var(--ta-rgb), 0.2);
   border-radius: 14px;
   padding: 5px;
   min-width: 120px;
-  -webkit-backdrop-filter: blur(18px) brightness(0.9);
-  backdrop-filter: blur(18px) brightness(0.9);
-  -webkit-backdrop-filter: blur(18px) brightness(0.9);
   z-index: 100;
   box-shadow: 0 8px 24px rgba(0,0,0,0.38);
   animation: fadeIn 0.14s ease;
@@ -11807,9 +11810,9 @@ h6 {
 
 /* ─── Bar Context Menu ───────────────────────────────────────────────────── */
 .bar-ctx-menu {
-  background: rgba(var(--tb-rgb), 0.55);
-  -webkit-backdrop-filter: blur(28px) saturate(1.6) brightness(0.85);
-  backdrop-filter: blur(28px) saturate(1.6) brightness(0.85);
+  background: rgba(var(--ta-rgb), 0.18);
+  -webkit-backdrop-filter: blur(48px) saturate(2.2);
+  backdrop-filter: blur(48px) saturate(2.2);
   border: 1px solid rgba(var(--ta-rgb), 0.15);
   border-radius: 10px;
   padding: 4px;
@@ -13412,12 +13415,13 @@ button, input, select, textarea,
 .voice-room-user-menu {
   position: fixed;
   min-width: 176px;
-  background: rgba(12, 12, 18, 0.98);
+  background: rgba(var(--ta-rgb), 0.18);
+  -webkit-backdrop-filter: blur(48px) saturate(2.2);
+  backdrop-filter: blur(48px) saturate(2.2);
   border: 1px solid rgba(var(--ta-rgb), 0.14);
   border-radius: 14px;
   padding: 10px;
   box-shadow: 0 16px 38px rgba(0,0,0,0.45);
-  backdrop-filter: blur(16px);
 }
 .voice-room-user-menu-head {
   display: flex;
