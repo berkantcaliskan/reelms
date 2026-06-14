@@ -803,7 +803,7 @@ h6 {
 }
 
 .panel-left {
-  flex: 0 0 250px;
+  flex: 0 0 248px;
   padding: 12px;
   gap: 12px;
   overflow: hidden;
@@ -819,7 +819,7 @@ h6 {
 }
 
 .panel-right {
-  flex: 0 0 250px;
+  flex: 0 0 248px;
 }
 
 .panel-divider {
@@ -10941,6 +10941,19 @@ h6 {
   white-space: nowrap;
   flex-shrink: 0;
   margin-bottom: 3px;
+}
+.bubble-read-receipt {
+  display: flex;
+  justify-content: flex-end;
+  padding-right: 4px;
+  margin-top: 2px;
+}
+.bubble-receipt-avatar {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  object-fit: cover;
+  opacity: 0.7;
 }
 .bubble-date-sep {
   display: flex;

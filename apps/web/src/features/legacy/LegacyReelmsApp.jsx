@@ -76,6 +76,7 @@ import {
   socketSetPresenceStatus,
   socketEmitTyping,
   socketEmitTypingStop,
+  socketEmitReadReceipt,
   messagesGet,
   messageSend,
   messageDelete,
@@ -7304,6 +7305,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [mutedReelmIds, setMutedReelmIds] = useState([])
   const mutedReelmIdsRef = useRef([])
   useEffect(() => { mutedReelmIdsRef.current = mutedReelmIds.map(String) }, [mutedReelmIds])
+  const [mutedChatIds, setMutedChatIds] = useState([])
+  const mutedChatIdsRef = useRef([])
+  useEffect(() => { mutedChatIdsRef.current = mutedChatIds.map(String) }, [mutedChatIds])
+  const [hiddenBarIds, setHiddenBarIds] = useState([])
+  const [showHiddenBarItems, setShowHiddenBarItems] = useState(false)
   const [friends, setFriends] = useState([])
   const [blocked, setBlocked] = useState([])
   const [chatProfileCache, setChatProfileCache] = useState({})
@@ -7500,6 +7506,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       if (data.unread_counts && typeof data.unread_counts === 'object') setUnreadCounts(data.unread_counts)
       if (Array.isArray(data.pinned_items)) setPinnedItemIds(data.pinned_items)
       if (Array.isArray(data.muted_reelms)) setMutedReelmIds(data.muted_reelms.map(String))
+      if (Array.isArray(data.muted_chats)) setMutedChatIds(data.muted_chats.map(String))
+      if (Array.isArray(data.hidden_bar_items)) setHiddenBarIds(data.hidden_bar_items.map(String))
+      if (data.bar_prefs?.showHidden === true) setShowHiddenBarItems(true)
       if (Array.isArray(data.feed_nav) && data.feed_nav.length === ALL_FEED_NAV.length) setFeedNavOrder(data.feed_nav)
       if (typeof data.landing_view === 'string') setReelmLandingView(data.landing_view)
       if (data.lpw != null) setLeftWidth(parseInt(String(data.lpw), 10) || PANEL_DEFAULT)
@@ -7551,6 +7560,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       else if (sk === 'unread_counts') setStableObject(setUnreadCounts, v && typeof v === 'object' ? v : {})
       else if (sk === 'pinned_items') setStableArray(setPinnedItemIds, Array.isArray(v) ? v : [])
       else if (sk === 'muted_reelms') setStableArray(setMutedReelmIds, Array.isArray(v) ? v.map(String) : [])
+      else if (sk === 'muted_chats') setStableArray(setMutedChatIds, Array.isArray(v) ? v.map(String) : [])
+      else if (sk === 'hidden_bar_items') setStableArray(setHiddenBarIds, Array.isArray(v) ? v.map(String) : [])
+      else if (sk === 'bar_prefs') { if (v && typeof v === 'object') setShowHiddenBarItems(v.showHidden === true) }
       else if (sk === 'spotify_connected') setSpotifyConnected(v === true || v === 'true')
       else if (sk === 'last_channels') setStableObject(setLastChannels, v && typeof v === 'object' ? v : {})
       else if (sk === 'sessions') setStableArray(setSessionsList, Array.isArray(v) ? v : [])
@@ -7836,11 +7848,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           if (hasMention) playSound.mention()
           const mutedReelmId = !isDmKey ? reelmsRef.current.find(r => String(msgKey).startsWith(`${r.id}_`))?.id : null
           const reelmMuted = mutedReelmId && mutedReelmIdsRef.current.includes(String(mutedReelmId))
-          if (hasMention && !reelmMuted) playSound.mention()
+          const chatMuted = isDmKey && mutedChatIdsRef.current.includes(String(msgKey))
+          const isMuted = reelmMuted || chatMuted
+          if (hasMention && !isMuted) playSound.mention()
           else if (isActiveThread) playSound.dot()
-          else if (!reelmMuted) playSound.message()
-          if (!isActiveThread && !reelmMuted) bumpUnreadForMsgKey(msgKey, 1)
-          if (!isActiveThread && !reelmMuted) {
+          else if (!isMuted) playSound.message()
+          if (!isActiveThread && !isMuted) bumpUnreadForMsgKey(msgKey, 1)
+          if (!isActiveThread && !isMuted) {
             const chat = chatsRef.current.find(c => String(c.id) === String(msgKey))
             let link = null
             let title = ''
@@ -7994,6 +8008,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           return { ...prev, [key]: (prev[key] || []).filter(u => u.uid !== String(typingUid)) }
         })
       },
+      onReadReceipt: ({ uid: readerUid, msgKey, lastMsgId, photo }) => {
+        if (!readerUid || !msgKey || !lastMsgId) return
+        setDmReadReceipts(prev => ({
+          ...prev,
+          [String(msgKey)]: { uid: String(readerUid), lastMsgId: String(lastMsgId), photo: photo || null },
+        }))
+      },
     })
     return off
   }, [uid])
@@ -8137,6 +8158,36 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       userPutDoc('muted_reelms', next).catch(() => {})
       return next
     })
+  }
+
+  const toggleMuteChatById = (chatId) => {
+    const id = String(chatId || '')
+    if (!id) return
+    setMutedChatIds(prev => {
+      const exists = prev.map(String).includes(id)
+      const next = exists ? prev.filter(x => String(x) !== id) : [...prev.map(String), id]
+      scheduleUserPersist('muted_chats', next)
+      userPutDoc('muted_chats', next).catch(() => {})
+      return next
+    })
+  }
+
+  const toggleHideBarItem = (itemId) => {
+    const id = String(itemId || '')
+    if (!id) return
+    setHiddenBarIds(prev => {
+      const exists = prev.map(String).includes(id)
+      const next = exists ? prev.filter(x => String(x) !== id) : [...prev.map(String), id]
+      scheduleUserPersist('hidden_bar_items', next)
+      userPutDoc('hidden_bar_items', next).catch(() => {})
+      return next
+    })
+  }
+
+  const clearChatMessages = (chatId) => {
+    const id = String(chatId || '')
+    if (!id) return
+    setMessages(prev => { const next = { ...prev }; delete next[id]; return next })
   }
 
   const toggleMuteSelectedReelm = () => {
@@ -8924,6 +8975,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const typingTimers = useRef({})
   const typingEmitTimer = useRef(null)
   const isTypingRef = useRef(false)
+  const [dmReadReceipts, setDmReadReceipts] = useState({})
   const [msgReactions, setMsgReactions] = useState({})
   const [showMsgEmojiFor, setShowMsgEmojiFor] = useState(null)
   const [replyingTo, setReplyingTo] = useState(null)
@@ -11169,6 +11221,19 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     else activeMsgKeyRef.current = null
   }, [selectedChat?.id, selectedReelm?.id, selectedChannel?.id])
 
+  // Emit read receipt when opening a DM chat or when new messages arrive in the open DM
+  useEffect(() => {
+    if (!selectedChat?.id || !uid) return
+    const chatMsgs = messages[selectedChat.id] || []
+    if (!chatMsgs.length) return
+    const lastMsg = chatMsgs[chatMsgs.length - 1]
+    if (!lastMsg?.id) return
+    const privacy = currentUserRef.current?.readReceiptsVisibility
+    if (privacy === 'nobody') return
+    const myPhoto = getPersonPhoto(currentUserRef.current) || null
+    socketEmitReadReceipt(selectedChat.id, String(lastMsg.id), myPhoto)
+  }, [selectedChat?.id, messages, uid])
+
   const toggleReaction = (msgKey, msgId, emoji) => {
     if (String(msgKey || '').startsWith('dm_') && String(msgKey || '').slice(3).split('_').some(isReelmsSystemUid)) return
     const myUid = String(uid)
@@ -11533,8 +11598,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   const blockedIds = new Set((blocked || []).map(b => String(b.id || b.userId || '')))
                   const topChatItems = (Array.isArray(chats) ? chats : [])
                     .filter(c => !(c.type === 'dm' && blockedIds.has(String(c.friendId || ''))))
+                    .filter(c => showHiddenBarItems || !hiddenBarIds.map(String).includes(String(c.id)))
                   const allItemsFlat = [
-                    ...reelms.map(r => ({ ...r, itemType: 'reelm' })),
+                    ...reelms.filter(r => showHiddenBarItems || !hiddenBarIds.map(String).includes(String(r.id))).map(r => ({ ...r, itemType: 'reelm' })),
                     ...topChatItems.map(c => ({ ...c, itemType: 'chat' }))
                   ]
                   const pinnedItems = pinnedItemIds.map(id => allItemsFlat.find(i => i.id === id)).filter(Boolean)
@@ -11623,7 +11689,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     openFriendProfile(friend, fakeE)
                   }}
                 >
-                  View friend's profile
+                  Arkadaş profilini gör
                 </button>
               )}
               {pinnedItemIds.includes(barCtxMenu.item.id) ? (
@@ -11639,7 +11705,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     })
                   }}
                 >
-                  Remove pin
+                  Sabitlemeyi kaldır
                 </button>
               ) : (
                 <button
@@ -11655,7 +11721,21 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     })
                   }}
                 >
-                  {pinnedItemIds.length >= 5 ? 'Pin (max. 5)' : 'Pin'}
+                  {pinnedItemIds.length >= 5 ? 'Sabitle (maks. 5)' : 'Sabitle'}
+                </button>
+              )}
+              {barCtxMenu.item.itemType === 'chat' && (
+                <button
+                  type="button"
+                  className="bar-ctx-menu-item"
+                  onClick={(e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    const item = barCtxMenu.item
+                    setBarCtxMenu(null)
+                    toggleMuteChatById(item.id)
+                  }}
+                >
+                  {mutedChatIds.map(String).includes(String(barCtxMenu.item.id)) ? 'Bildirimleri aç' : 'Bildirimleri sessize al'}
                 </button>
               )}
               {barCtxMenu.item.itemType === 'reelm' && (
@@ -11669,10 +11749,22 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     toggleMuteReelmById(item.id)
                   }}
                 >
-                  {mutedReelmIds.map(String).includes(String(barCtxMenu.item.id)) ? 'Turn notifications on' : 'Mute notifications'}
+                  {mutedReelmIds.map(String).includes(String(barCtxMenu.item.id)) ? 'Bildirimleri aç' : 'Sessize al'}
                 </button>
               )}
-              {barCtxMenu.item.itemType === 'chat' && (
+              <button
+                type="button"
+                className="bar-ctx-menu-item"
+                onClick={(e) => {
+                  e.preventDefault(); e.stopPropagation();
+                  const item = barCtxMenu.item
+                  setBarCtxMenu(null)
+                  toggleHideBarItem(item.id)
+                }}
+              >
+                {hiddenBarIds.map(String).includes(String(barCtxMenu.item.id)) ? 'Dinamik sohbetlerde göster' : 'Dinamik sohbetlerde gizle'}
+              </button>
+              {barCtxMenu.item.itemType === 'chat' && barCtxMenu.item.type === 'dm' && (
                 <button
                   type="button"
                   className="bar-ctx-menu-item bar-ctx-menu-item--danger"
@@ -11683,7 +11775,21 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     deleteConversation(item.id)
                   }}
                 >
-                  Delete chat
+                  Sohbeti sil
+                </button>
+              )}
+              {barCtxMenu.item.itemType === 'chat' && barCtxMenu.item.type === 'group' && (
+                <button
+                  type="button"
+                  className="bar-ctx-menu-item bar-ctx-menu-item--danger"
+                  onClick={(e) => {
+                    e.preventDefault(); e.stopPropagation();
+                    const item = barCtxMenu.item
+                    setBarCtxMenu(null)
+                    clearChatMessages(item.id)
+                  }}
+                >
+                  Sohbeti temizle
                 </button>
               )}
             </div>
@@ -13771,6 +13877,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                       )}
                                     </div>
                                   </div>
+                                  {isOwn && dmReadReceipts[msgKey2] && String(dmReadReceipts[msgKey2].lastMsgId) === String(msg.id) && dmReadReceipts[msgKey2].photo && (
+                                    <div className="bubble-read-receipt">
+                                      <img src={dmReadReceipts[msgKey2].photo} alt="" className="bubble-receipt-avatar" />
+                                    </div>
+                                  )}
                                 </div>
                               )
                             })
@@ -15185,9 +15296,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           <div className="hpopup hpopup-notifs" onClick={e => e.stopPropagation()}>
             <div className="hpopup-top-row">
               <span className="hpopup-title" style={{ fontFamily: "'Dela Gothic One', sans-serif", fontWeight: 'normal' }}>{t('notifications')}</span>
-              {notifications.length > 0 && <button className="notif-clear-all-btn" onClick={clearAllNotifications}>Clear all</button>}
             </div>
-            <div className="hpopup-content">
+            <div className="hpopup-content hpopup-content--scroll">
               {notifications.length === 0
                 ? <p className="hpopup-empty">{t('no_notifications')}</p>
                 : notifications.map((n) => {
@@ -15218,7 +15328,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             </div>
             {notifications.length > 0 && (
               <div className="hpopup-footer">
-                <button className="hpopup-see-all notif-clear-all-bottom" onClick={clearAllNotifications}>Clear all notifications</button>
+                <button className="notif-clear-all-pill" onClick={clearAllNotifications}>Clear all</button>
               </div>
             )}
           </div>

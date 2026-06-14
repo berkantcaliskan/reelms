@@ -394,7 +394,7 @@ export async function loadReelmDocuments(reelmId) {
 }
 
 export function connectReelmsSocket(handlers) {
-  const { onUserDoc, onReelmDoc, onReelmManagerDoc, onReelmCoreSnapshot, onAppDoc, onMessage, onMessageDeleted, onMessagesCleared, onReaction, onVoicePosition, onVcEvent, onVcError, onVcCount, onVcCounts, onVcParticipants, onVcState, onPresence, onTyping, onTypingStop, onProfileUpdated, onReelmAccessRevoked, onReelmMemberJoined, onReelmMemberRemoved, onReelmMemberLeft, onJoinRequestRejected, onJoinRequestApproved, onReelmTimeout, onReelmTimeoutRemoved, onReelmBanned, onReelmClosed, onConnect } = handlers
+  const { onUserDoc, onReelmDoc, onReelmManagerDoc, onReelmCoreSnapshot, onAppDoc, onMessage, onMessageDeleted, onMessagesCleared, onReaction, onVoicePosition, onVcEvent, onVcError, onVcCount, onVcCounts, onVcParticipants, onVcState, onPresence, onTyping, onTypingStop, onProfileUpdated, onReelmAccessRevoked, onReelmMemberJoined, onReelmMemberRemoved, onReelmMemberLeft, onJoinRequestRejected, onJoinRequestApproved, onReelmTimeout, onReelmTimeoutRemoved, onReelmBanned, onReelmClosed, onConnect, onReadReceipt } = handlers
   const run = async () => {
     const token = await getIdToken()
     if (!token) return
@@ -526,6 +526,9 @@ export function connectReelmsSocket(handlers) {
     socket.on('reelms:typing:stop', (msg) => {
       if (msg?.msgKey && msg?.uid) onTypingStop?.(msg)
     })
+    socket.on('dm:read', (msg) => {
+      if (msg?.msgKey && msg?.uid && msg?.lastMsgId) onReadReceipt?.(msg)
+    })
     socket.on('auth:session-replaced', (msg) => {
       const code = msg?.code || 'auth/session-replaced'
       try { window.dispatchEvent(new CustomEvent('reelms:session-invalid', { detail: { code } })) } catch {}
@@ -580,6 +583,11 @@ export function socketEmitTyping(msgKey, { name = '', photo = '' } = {}) {
 export function socketEmitTypingStop(msgKey) {
   if (!socket?.connected || !msgKey) return
   socket.emit('typing:stop', { msgKey })
+}
+
+export function socketEmitReadReceipt(msgKey, lastMsgId, photo) {
+  if (!socket?.connected || !msgKey || !lastMsgId) return
+  socket.emit('dm:read', { msgKey, lastMsgId, photo })
 }
 
 export function socketSetPresenceStatus(status) {
