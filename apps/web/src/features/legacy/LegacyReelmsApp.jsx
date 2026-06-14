@@ -13772,7 +13772,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               const showDateSep = msgDateLabel !== lastDateLabel
                               if (showDateSep) lastDateLabel = msgDateLabel
                               const sender = (msg.sender && typeof msg.sender === 'object') ? msg.sender : { id: '', name: '?', photo: null, image: null }
-                              const isOwn = sender.id === uid
+                              const isOwn = String(sender.id || '') === String(uid)
+                              const canDeleteMsg = !selectedChatSystemLocked && (isMod || isOwn || (selectedReelm && hasReelmPermissionClient(selectedReelm, uid, 'manageModeration')))
                               if (msg.isSystem) return (
                                 <div key={msg.id} className={`msg-system-row${msg.id === newMsgId ? ' msg-row-new' : ''}`}>
                                   <span className="msg-system-text">{msg.text}</span>
@@ -13782,7 +13783,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               if (!isBubbleMode) return (
                                 <React.Fragment key={msg.id}>
                                   {showDateSep && <div className="bubble-date-sep"><span>{msgDateLabel}</span></div>}
-                                <div className={`msg-row${msg.id === newMsgId ? ' msg-row-new' : ''}${isMod ? ' msg-row-mod' : ''}${blocked.some(b => b.id === sender.id) ? ' msg-row-blocked' : ''}`} onDoubleClick={() => !selectedChatSystemLocked && setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id })}>
+                                <div className={`msg-row${msg.id === newMsgId ? ' msg-row-new' : ''}${isMod ? ' msg-row-mod' : ''}${blocked.some(b => b.id === sender.id) ? ' msg-row-blocked' : ''}`} onDoubleClick={() => !selectedChatSystemLocked && setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id })} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); if (!selectedChatSystemLocked) setOpenMsgCtxFor(f => f === msg.id ? null : msg.id) }}>
                                   <div className="msg-avatar">
                                     {(sender.photo || sender.image)
                                       ? <img src={sender.photo || sender.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
@@ -13801,14 +13802,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                           {openMsgCtxFor === msg.id && (
                                             <div className="msg-ctx-menu">
                                               <button className="msg-ctx-item" onClick={() => { setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id }); setOpenMsgCtxFor(null) }}>{t('reply')}</button>
-                                              {isMod && <button className="msg-ctx-item msg-ctx-item--danger" onClick={() => { modDeleteMessage(msgKey2, msg.id); setOpenMsgCtxFor(null) }}>{t('delete')}</button>}
+                                              {canDeleteMsg && <button className="msg-ctx-item msg-ctx-item--danger" onClick={() => { modDeleteMessage(msgKey2, msg.id); setOpenMsgCtxFor(null) }}>{t('delete')}</button>}
                                             </div>
                                           )}
                                         </div>
                                       )}
-                                      {isMod && !selectedChatSystemLocked && <button className="mod-msg-delete-btn" title="Delete message" onClick={() => modDeleteMessage(msgKey2, msg.id)}>
-                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/></svg>
-                                      </button>}
                                       {!selectedChatSystemLocked && <div className="msg-react-ctrl">
                                         <button className="msg-react-btn msg-react-plus" title="+1" onClick={() => toggleReaction(msgKey2, msg.id, '+')}><img src={newIcon} alt="+" style={{ width: '12px', height: '12px', display: 'block', opacity: 0.65 }} /></button>
                                         <div className="msg-react-emoji-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
@@ -13866,7 +13864,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               return (
                                 <div key={msg.id}>
                                   {showDateSep && <div className="bubble-date-sep"><span>{msgDateLabel}</span></div>}
-                                  <div className={`bubble-row${isOwn ? ' bubble-row--own' : ' bubble-row--other'}${msg.id === newMsgId ? ' msg-row-new' : ''}`} onDoubleClick={() => !selectedChatSystemLocked && setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id })}>
+                                  <div className={`bubble-row${isOwn ? ' bubble-row--own' : ' bubble-row--other'}${msg.id === newMsgId ? ' msg-row-new' : ''}`} onDoubleClick={() => !selectedChatSystemLocked && setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id })} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); if (!selectedChatSystemLocked) setOpenMsgCtxFor(f => f === msg.id ? null : msg.id) }}>
                                     {!isOwn && (
                                       <div className="bubble-avatar bubble-avatar--clickable" onClick={e => sender.id && openFriendProfile({ id: sender.id, name: sender.name, photo: sender.photo || sender.image || null }, e)}>
                                         {(sender.photo || sender.image)
@@ -13910,6 +13908,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                             {openMsgCtxFor === msg.id && (
                                               <div className="msg-ctx-menu">
                                                 <button className="msg-ctx-item" onClick={() => { setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id }); setOpenMsgCtxFor(null) }}>{t('reply')}</button>
+                                                {canDeleteMsg && <button className="msg-ctx-item msg-ctx-item--danger" onClick={() => { modDeleteMessage(msgKey2, msg.id); setOpenMsgCtxFor(null) }}>{t('delete')}</button>}
                                               </div>
                                             )}
                                           </div>
