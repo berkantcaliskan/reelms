@@ -21,12 +21,15 @@ function b64decode(str: string): Uint8Array {
 
 async function openDb(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
+    // Version 2: adds sent_plaintext store (kept for users who already have v2).
+    // Plaintext cache is now handled via localStorage so this store is unused.
     const req = indexedDB.open(DB_NAME, 2)
     req.onupgradeneeded = (e) => {
       const db = (e.target as IDBOpenDBRequest).result
       if (!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE)
-      if (!db.objectStoreNames.contains(SENT_STORE)) db.createObjectStore(SENT_STORE)
+      if (!db.objectStoreNames.contains('sent_plaintext')) db.createObjectStore('sent_plaintext')
     }
+    req.onblocked = () => reject(new Error('idb_blocked'))
     req.onsuccess = () => resolve(req.result)
     req.onerror = () => reject(req.error)
   })
@@ -50,28 +53,14 @@ async function idbPut(db: IDBDatabase, key: string, value: StoredKeyPair): Promi
 
 let cache: StoredKeyPair | null = null
 
-const SENT_STORE = 'sent_plaintext'
-
-export async function storeSentPlaintext(msgId: string, plaintext: string): Promise<void> {
-  try {
-    const db = await openDb()
-    await new Promise<void>((resolve, reject) => {
-      const req = db.transaction(SENT_STORE, 'readwrite').objectStore(SENT_STORE).put(plaintext, msgId)
-      req.onsuccess = () => resolve()
-      req.onerror = () => reject(req.error)
-    })
-  } catch {}
+// localStorage-backed plaintext cache for sent E2EE messages.
+// Synchronous, no IndexedDB version concerns.
+export function storeSentPlaintext(msgId: string, plaintext: string): void {
+  try { localStorage.setItem(`e2ee_s_${msgId}`, plaintext) } catch {}
 }
 
-export async function getSentPlaintext(msgId: string): Promise<string | null> {
-  try {
-    const db = await openDb()
-    return new Promise<string | null>((resolve) => {
-      const req = db.transaction(SENT_STORE, 'readonly').objectStore(SENT_STORE).get(msgId)
-      req.onsuccess = () => resolve(typeof req.result === 'string' ? req.result : null)
-      req.onerror = () => resolve(null)
-    })
-  } catch { return null }
+export function getSentPlaintext(msgId: string): string | null {
+  try { return localStorage.getItem(`e2ee_s_${msgId}`) } catch { return null }
 }
 
 export async function getOrCreateKeyPair(): Promise<StoredKeyPair> {
