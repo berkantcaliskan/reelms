@@ -133,7 +133,7 @@ import {
   e2eeRegisterKey,
   e2eeGetPublicKey,
 } from '../../reelmsAwsClient'
-import { getOrCreateKeyPair, getKeyPair, encryptForRecipient, decryptFromSender, storeSentPlaintext, getSentPlaintext } from '../../lib/e2ee'
+import { getOrCreateKeyPair, getKeyPair, decryptFromSender, getSentPlaintext } from '../../lib/e2ee'
 import { seedModerationAccount, MODERATION_ACCOUNT_ID, isModerationSystemUser } from '../../reelmsModerationAccount'
 import { moderateText } from '../../moderationClient'
 import { playSound, applySoundSettings, previewSound, preloadSounds, SOUND_CATEGORIES, SOUND_DEFAULTS } from '../../soundManager'
@@ -3155,7 +3155,7 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
   return ReactDOM.createPortal(profileNode, document.body)
 }
 
-function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onMessage, onAddFriend, onRemove, onBlock, onUnblock, isFriend, isBlocked, isPending, onOpenFriend, spotifyNowPlaying, spotifyConnected, onPhotoChange, onCoverChange, onBioChange, onNameChange, onSocialLinksChange, profileBio, socialLinks, activePlatforms }) {
+function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onMessage, onAddFriend, onRemove, onBlock, onUnblock, isFriend, isBlocked, isPending, onOpenFriend, spotifyNowPlaying, spotifyConnected, onPhotoChange, onCoverChange, onBioChange, onNameChange, onSocialLinksChange, profileBio, socialLinks, activePlatforms, lastSeenLabel }) {
   const [visible, setVisible] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [editingName, setEditingName] = useState(false)
@@ -3271,6 +3271,7 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
                   >{user.name}</h1>
                 )}
                 {user.username && <span className="fp-username">@{user.username.startsWith('@') ? user.username.slice(1) : user.username}</span>}
+                {!isSelf && lastSeenLabel && <span className="fp-lastseen">{lastSeenLabel}</span>}
                 {isSelf && (
                   <button
                     className={`fp-edit-profile-btn${editMode ? ' fp-edit-profile-btn--done' : ''}`}
@@ -7823,21 +7824,22 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             const senderUid = String(msg.sender?.id || msg.userId || msg.authorId || '')
             const peerUid = String(msgKey).slice(3).split('_').find(id => id !== String(uid)) || ''
             const lookupUid = senderUid === String(uid) ? peerUid : senderUid
+            let decrypted = false
             if (lookupUid) {
               try {
                 const [myKeys, theirPk] = await Promise.all([getKeyPair(), e2eeGetPublicKey(lookupUid)])
                 if (myKeys && theirPk) {
                   const plaintext = decryptFromSender(msg.text || '', theirPk, myKeys.secretKey)
-                  if (plaintext != null) { displayMsg = { ...msg, text: plaintext } }
-                  else if (senderUid === String(uid)) {
-                    const cached = await getSentPlaintext(String(msg.id)).catch(() => null)
-                    if (cached) displayMsg = { ...msg, text: cached }
-                  }
-                } else if (senderUid === String(uid)) {
-                  const cached = await getSentPlaintext(String(msg.id)).catch(() => null)
-                  if (cached) displayMsg = { ...msg, text: cached }
+                  if (plaintext != null) { displayMsg = { ...msg, text: plaintext }; decrypted = true }
                 }
               } catch {}
+            }
+            if (!decrypted) {
+              if (senderUid === String(uid)) {
+                const cached = getSentPlaintext(String(msg.id))
+                if (cached) { displayMsg = { ...msg, text: cached }; decrypted = true }
+              }
+              if (!decrypted) displayMsg = { ...msg, text: '🔒 Şifreli mesaj — anahtar bu cihazda mevcut değil.' }
             }
           }
           setMessages(prev => appendUniqueMessage(prev, msgKey, displayMsg))
@@ -8909,6 +8911,22 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   useEffect(() => { selectedChatRef.current = selectedChat }, [selectedChat])
   const [profileStatus, setProfileStatusRaw] = useState('online')
   const [reelmPresence, setReelmPresence] = useState({}) // { [reelmId]: { [userId]: { status, userName, userPhoto } } }
+  const [lastSeenMap, setLastSeenMap] = useState({}) // { [userId]: timestamp } — last time user was seen online
+  useEffect(() => {
+    const now = Date.now()
+    setLastSeenMap(prev => {
+      const next = { ...prev }
+      let changed = false
+      Object.values(reelmPresence || {}).forEach(users => {
+        Object.entries(users || {}).forEach(([userId, data]) => {
+          if (isActiveStatus(data?.status) && (!prev[userId] || now - prev[userId] > 30000)) {
+            next[userId] = now; changed = true
+          }
+        })
+      })
+      return changed ? next : prev
+    })
+  }, [reelmPresence])
   const getPresenceForUser = useCallback((userId) => {
     const id = String(userId || '')
     if (!id) return null
@@ -8923,6 +8941,20 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }, [reelmPresence, uid, profileStatus, currentUser?.name, currentUser?.photo])
   const getUserStatus = useCallback((userId) => getPresenceForUser(userId)?.status || 'offline', [getPresenceForUser])
   const isUserActive = useCallback((userId) => isActiveStatus(getUserStatus(userId)), [getUserStatus])
+  const getLastSeenLabel = useCallback((userId) => {
+    const id = String(userId || '')
+    if (!id) return null
+    if (isUserActive(id)) return 'Çevrimiçi'
+    const ts = lastSeenMap[id]
+    if (!ts) return null
+    const d = new Date(ts)
+    const now = new Date()
+    const timeStr = d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })
+    if (d.toDateString() === now.toDateString()) return `Son görülme: ${timeStr}`
+    const yesterday = new Date(now); yesterday.setDate(yesterday.getDate() - 1)
+    if (d.toDateString() === yesterday.toDateString()) return `Son görülme: dün ${timeStr}`
+    return `Son görülme: ${d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })} ${timeStr}`
+  }, [lastSeenMap, isUserActive])
   const updateProfileStatus = useCallback((status) => {
     setProfileStatusRaw(status)
     socketSetPresenceStatus(status)
@@ -9117,29 +9149,28 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     messagesGet(msgKey).then(async msgs => {
       let processed = msgs
       if (msgKey.startsWith('dm_')) {
+        // Attempt to decrypt legacy E2EE messages; new messages are sent as plaintext.
         const myKeys = await getKeyPair().catch(() => null)
-        if (myKeys) {
-          const peerUid = msgKey.slice(3).split('_').find(id => id !== String(uid)) || ''
-          processed = await Promise.all(msgs.map(async m => {
-            if (!m.enc || !m.text) return m
-            const senderUid = String(m.sender?.id || m.userId || m.authorId || '')
-            const lookupUid = senderUid === String(uid) ? peerUid : senderUid
-            if (!lookupUid) return m
+        const peerUid = msgKey.slice(3).split('_').find(id => id !== String(uid)) || ''
+        processed = await Promise.all(msgs.map(async m => {
+          if (!m.enc || !m.text) return m
+          const senderUid = String(m.sender?.id || m.userId || m.authorId || '')
+          const lookupUid = senderUid === String(uid) ? peerUid : senderUid
+          if (myKeys && lookupUid) {
             try {
               const theirPk = await e2eeGetPublicKey(lookupUid)
               if (theirPk) {
                 const plaintext = decryptFromSender(m.text, theirPk, myKeys.secretKey)
                 if (plaintext != null) return { ...m, text: plaintext }
               }
-              // Decryption failed — fall back to cached plaintext for own sent messages
-              if (senderUid === String(uid)) {
-                const cached = await getSentPlaintext(String(m.id)).catch(() => null)
-                if (cached) return { ...m, text: cached }
-              }
-              return m
-            } catch { return m }
-          }))
-        }
+            } catch {}
+          }
+          if (senderUid === String(uid)) {
+            const cached = getSentPlaintext(String(m.id))
+            if (cached) return { ...m, text: cached }
+          }
+          return { ...m, text: '🔒 Şifreli mesaj — anahtar bu cihazda mevcut değil.' }
+        }))
       }
       const filtered = dedupeMessagesForRender(processed.filter(m => !vanishExpired(m, now)))
       setMessages(prev => {
@@ -11216,21 +11247,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         ...(replySnap ? { replyTo: { id: replySnap.id, text: replySnap.text, senderName: replySnap.senderName, senderId: replySnap.senderId } } : {})
       }
       setMessages(prev => appendUniqueMessage(prev, msgKey, msg))
-      // For DMs: encrypt before sending; keep plaintext in local state for sender
-      let msgToSend = msg
-      if (msgKey.startsWith('dm_')) {
-        const peerUid = msgKey.slice(3).split('_').find(p => p !== String(uid))
-        if (peerUid) {
-          try {
-            const [myKeys, recipientPk] = await Promise.all([getKeyPair(), e2eeGetPublicKey(peerUid)])
-            if (myKeys && recipientPk) {
-              msgToSend = { ...msg, text: encryptForRecipient(text, recipientPk, myKeys.secretKey), enc: true }
-              storeSentPlaintext(msg.id, text).catch(() => {})
-            }
-          } catch {}
-        }
-      }
-      messageSend(msgKey, msgToSend).catch(err => handleRemoteMessageError(err, msgKey, msg.id))
+      messageSend(msgKey, msg).catch(err => handleRemoteMessageError(err, msgKey, msg.id))
       notifyMentions(text)
       if (replySnap && String(replySnap.senderId) !== String(uid)) {
         _pushNotifTo(replySnap.senderId, `${currentUser.name || 'Someone'} ${t('replied_to_you')}`,
@@ -12796,7 +12813,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 : displayName.charAt(0).toUpperCase()
                               }
                             </div>
-                            <span className="dm-friend-name">{displayName}</span>
+                            <div className="dm-friend-info">
+                              <span className="dm-friend-name">{displayName}</span>
+                              {!dmIsSelf && getLastSeenLabel(dmPeerId) && (
+                                <span className="dm-friend-lastseen">{getLastSeenLabel(dmPeerId)}</span>
+                              )}
+                            </div>
                             <svg className={`dm-profile-chevron${dmProfileExpanded ? ' dm-profile-chevron--open' : ''}`} width="14" height="14" viewBox="0 0 24 24" fill="none">
                               <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
                             </svg>
@@ -14994,6 +15016,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               profileBio={fullProfileTarget.isSelf ? profileBio : undefined}
               socialLinks={fullProfileTarget.isSelf ? profileSocialLinks : undefined}
               activePlatforms={fullProfileTarget.isSelf ? profileActivePlatforms : undefined}
+              lastSeenLabel={fullProfileTarget.isSelf ? null : getLastSeenLabel(fullProfileTarget.user?.id)}
             />
           )}
           {isMobile && !selectedReelm && !selectedChat && (

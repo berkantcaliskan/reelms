@@ -6941,6 +6941,13 @@ h6 {
   flex-shrink: 0;
   overflow: hidden;
 }
+.dm-friend-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+}
 .dm-friend-name {
   font-family: 'Dela Gothic One', sans-serif;
   font-weight: 400;
@@ -6950,6 +6957,11 @@ h6 {
   overflow: hidden;
   text-overflow: ellipsis;
   max-width: 100%;
+}
+.dm-friend-lastseen {
+  font-size: 0.72rem;
+  color: rgba(var(--ta-rgb), 0.42);
+  white-space: nowrap;
 }
 .dm-friend-bio {
   font-size: 0.72rem;
@@ -10284,6 +10296,7 @@ h6 {
 }
 .fp-name-input:focus { border-color: rgba(var(--ta-rgb), 0.45); background: rgba(var(--ta-rgb), 0.09); }
 .fp-username { font-size: 0.88rem; color: rgba(var(--ta-rgb),0.5); }
+.fp-lastseen { font-size: 0.78rem; color: rgba(var(--ta-rgb),0.38); margin-top: 2px; display: block; }
 .fp-activity { margin-top: 4px; }
 
 .fp-section {
