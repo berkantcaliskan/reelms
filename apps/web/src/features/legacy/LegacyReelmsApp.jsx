@@ -3029,7 +3029,7 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
   const maxHeight = Math.min(480, Math.max(200, screenBottom - top))
 
   const profileNode = (
-    <div className={`friend-profile-popup${embedded ? ' friend-profile-popup--embedded' : ''}`} style={{ ...(buildProfileThemeStyle(safeFriend) || {}), ...(embedded ? {} : { top, left, width: popupW }) }} ref={popupRef}>
+    <div className={`friend-profile-popup${embedded ? ' friend-profile-popup--embedded' : ''}`} style={{ ...(buildProfileThemeStyle(safeFriend) || {}), ...(embedded ? {} : { top, left, width: popupW, maxHeight }) }} ref={popupRef}>
       <div className="fpp-scroll-inner">
       <CachedProfileCover src={friendCover} className={`fpp-cover${friendCover ? ' fpp-cover--has-image' : ''}`} />
       {embedded && <button type="button" className="fpp-embedded-close" onClick={onClose} aria-label="Close profile">×</button>}
@@ -3154,9 +3154,11 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
   return ReactDOM.createPortal(profileNode, document.body)
 }
 
-function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onMessage, onAddFriend, onRemove, onBlock, onUnblock, isFriend, isBlocked, isPending, onOpenFriend, spotifyNowPlaying, spotifyConnected, onPhotoChange, onCoverChange, onBioChange, onSocialLinksChange, profileBio, socialLinks, activePlatforms }) {
+function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onMessage, onAddFriend, onRemove, onBlock, onUnblock, isFriend, isBlocked, isPending, onOpenFriend, spotifyNowPlaying, spotifyConnected, onPhotoChange, onCoverChange, onBioChange, onNameChange, onSocialLinksChange, profileBio, socialLinks, activePlatforms }) {
   const [visible, setVisible] = useState(false)
   const [editMode, setEditMode] = useState(false)
+  const [editingName, setEditingName] = useState(false)
+  const [nameInput, setNameInput] = useState('')
   const [editingBio, setEditingBio] = useState(false)
   const [bioInput, setBioInput] = useState('')
   const [editingSocial, setEditingSocial] = useState(null)
@@ -3246,12 +3248,32 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
 
             <div className="fp-identity">
               <div className="fp-identity-names">
-                <h1 className="fp-name">{user.name}</h1>
+                {isSelf && editingName ? (
+                  <div className="fp-name-edit">
+                    <input
+                      className="fp-name-input"
+                      value={nameInput}
+                      autoFocus
+                      maxLength={50}
+                      onChange={e => setNameInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') { const t = nameInput.trim(); if (t) { onNameChange?.(t); } setEditingName(false) }
+                        if (e.key === 'Escape') setEditingName(false)
+                      }}
+                      onBlur={() => { const t = nameInput.trim(); if (t) { onNameChange?.(t); } setEditingName(false) }}
+                    />
+                  </div>
+                ) : (
+                  <h1
+                    className={`fp-name${isSelf ? ' fp-name--editable' : ''}`}
+                    onClick={() => { if (isSelf) { setNameInput(user.name || ''); setEditingName(true) } }}
+                  >{user.name}</h1>
+                )}
                 {user.username && <span className="fp-username">@{user.username.startsWith('@') ? user.username.slice(1) : user.username}</span>}
                 {isSelf && (
                   <button
                     className={`fp-edit-profile-btn${editMode ? ' fp-edit-profile-btn--done' : ''}`}
-                    onClick={() => { setEditMode(v => !v); setEditingBio(false); setEditingSocial(null) }}
+                    onClick={() => { setEditMode(v => !v); setEditingBio(false); setEditingSocial(null); setEditingName(false) }}
                   >{editMode ? 'Done' : 'Edit Profile'}</button>
                 )}
               </div>
@@ -11006,39 +11028,39 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setSlashShowAll(false)
   }
 
-  const TENOR_KEY = import.meta.env.VITE_TENOR_API_KEY || ''
+  const GIPHY_KEY = import.meta.env.VITE_GIPHY_API_KEY || ''
 
-  const fetchTenor = useCallback(async (query, isSticker) => {
-    if (!TENOR_KEY) return []
+  const fetchGiphy = useCallback(async (query, isSticker) => {
+    if (!GIPHY_KEY) return []
     setGifLoading(true)
     try {
-      const stickerParam = isSticker ? '&searchfilter=sticker' : ''
+      const type = isSticker ? 'stickers' : 'gifs'
       const endpoint = query
-        ? `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(query)}&key=${TENOR_KEY}&limit=24&media_filter=gif${stickerParam}`
-        : `https://tenor.googleapis.com/v2/featured?key=${TENOR_KEY}&limit=24&media_filter=gif${stickerParam}`
+        ? `https://api.giphy.com/v1/${type}/search?api_key=${GIPHY_KEY}&q=${encodeURIComponent(query)}&limit=24&rating=g`
+        : `https://api.giphy.com/v1/${type}/trending?api_key=${GIPHY_KEY}&limit=24&rating=g`
       const res = await fetch(endpoint)
       const data = await res.json()
-      return (data.results || []).map(r => ({
+      return (data.data || []).map(r => ({
         id: r.id,
-        url: r.media_formats?.gif?.url || r.media_formats?.tinygif?.url || '',
-        preview: r.media_formats?.tinygif?.url || r.media_formats?.gif?.url || '',
-        width: r.media_formats?.tinygif?.dims?.[0] || 120,
-        height: r.media_formats?.tinygif?.dims?.[1] || 120,
+        url: r.images?.fixed_height?.url || r.images?.original?.url || '',
+        preview: r.images?.fixed_height_small?.webp || r.images?.fixed_height_small?.url || r.images?.fixed_height?.url || '',
+        width: Number(r.images?.fixed_height_small?.width) || 120,
+        height: Number(r.images?.fixed_height_small?.height) || 120,
       })).filter(r => r.url)
     } catch {
       return []
     } finally {
       setGifLoading(false)
     }
-  }, [TENOR_KEY])
+  }, [GIPHY_KEY])
 
   useEffect(() => {
     if (!showGifPicker) return
     const timer = setTimeout(() => {
-      fetchTenor(gifSearch, gifTab === 'sticker').then(setGifResults)
+      fetchGiphy(gifSearch, gifTab === 'sticker').then(setGifResults)
     }, gifSearch ? 400 : 0)
     return () => clearTimeout(timer)
-  }, [showGifPicker, gifSearch, gifTab, fetchTenor])
+  }, [showGifPicker, gifSearch, gifTab, fetchGiphy])
 
   const sendGif = (item) => {
     const msgKey = selectedChat ? selectedChat.id : composeReelmMsgKey(selectedReelm, selectedChannel)
@@ -14215,8 +14237,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                       />
                                       <div className="gif-grid">
                                         {gifLoading && <div className="gif-loading">…</div>}
-                                        {!gifLoading && gifResults.length === 0 && TENOR_KEY && <div className="gif-empty">No results</div>}
-                                        {!TENOR_KEY && <div className="gif-empty">Set VITE_TENOR_API_KEY to enable GIFs</div>}
+                                        {!gifLoading && gifResults.length === 0 && GIPHY_KEY && <div className="gif-empty">No results</div>}
+                                        {!GIPHY_KEY && <div className="gif-empty">Set VITE_GIPHY_API_KEY to enable GIFs</div>}
                                         {gifResults.map(item => (
                                           <img
                                             key={item.id}
