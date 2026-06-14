@@ -2069,15 +2069,26 @@ function AccountSettingsPanel({ user, onUpdate, onLogOut, profileBio, onBioChang
   const saveUsername = async () => {
     const val = usernameInput.trim()
     if (!val) return
+    if (val === (user.username || '')) return
     const usernameAvailability = await userCheckUsername(val)
     if (usernameAvailability?.exists || usernameAvailability === false) {
       setUsernameError(t('username_taken'))
       return
     }
     setUsernameError('')
-    onUpdate({ username: val })
-    setUsernameSaved(true)
-    setTimeout(() => setUsernameSaved(false), 2000)
+    try {
+      await onUpdate({ username: val })
+      setUsernameSaved(true)
+      setTimeout(() => setUsernameSaved(false), 2000)
+    } catch (err) {
+      if (err?.code === 'auth/username-change-rate-limited') {
+        const days = Number(err?.payload?.retryAfterDays || err?.retryAfterDays) || 0
+        setUsernameError(t('username_change_limited').replace('{days}', String(days)))
+      } else {
+        setUsernameError(err?.message || t('username_taken'))
+      }
+      setUsernameInput(user.username || '')
+    }
   }
 
   const saveBio = () => {
@@ -3333,7 +3344,7 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
                   </div>
                 ) : (
                   <h1
-                    className={`fp-name${isSelf && editMode ? ' fp-name--editable' : ''}${!isSelf ? ' fp-name--friend' : ''}`}
+                    className={`fp-name${isSelf && editMode ? ' fp-name--editable' : ''}`}
                     onClick={() => { if (isSelf && editMode) { setNameInput(user.name || ''); setEditingName(true) } }}
                   >{user.name}</h1>
                 )}
@@ -6947,8 +6958,17 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const updateUserData = (updates) => {
     const normalized = normalizeProfileUpdates(updates)
+    const prevValues = {}
+    const base = currentUser || {}
+    Object.keys(normalized).forEach((k) => { prevValues[k] = base[k] })
     setCurrentUser(prev => ({ ...(prev || {}), ...normalized }))
-    userProfilePatch(normalized).catch((err) => console.warn('profile patch failed:', err))
+    const pending = userProfilePatch(normalized)
+    pending.catch((err) => {
+      console.warn('profile patch failed:', err)
+      // Roll back the optimistic update so the UI matches the server.
+      setCurrentUser(prev => ({ ...(prev || {}), ...prevValues }))
+    })
+    return pending
   }
 
   const [customization, setCustomization] = useState(() => ({ ...DEFAULT_CUSTOMIZATION }))
@@ -11354,7 +11374,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }
 
   // Clear pending attachment and reply state when switching channel or chat
-  useEffect(() => { setPendingAttachment(null); setReplyingTo(null); setOpenMsgCtxFor(null) }, [selectedChannel?.id, selectedChat?.id])
+  useEffect(() => { setPendingAttachment(null); setReplyingTo(null); setMsgCtxMenu(null) }, [selectedChannel?.id, selectedChat?.id])
 
   // Track active chat key for sound routing
   useEffect(() => {
@@ -11816,6 +11836,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               </div>
             )}
           </div>
+
+          {msgCtxMenu && (
+            <div
+              className="msg-ctx-menu msg-ctx-menu-fixed"
+              style={{ position: 'fixed', left: msgCtxMenu.x, top: msgCtxMenu.y, zIndex: 9999 }}
+            >
+              <button className="msg-ctx-item" onClick={() => { setReplyingTo(msgCtxMenu.replyInfo); setMsgCtxMenu(null) }}>{t('reply')}</button>
+              {msgCtxMenu.canDelete && <button className="msg-ctx-item msg-ctx-item--danger" onClick={() => { modDeleteMessage(msgCtxMenu.chatKey, msgCtxMenu.msgId); setMsgCtxMenu(null) }}>{t('delete')}</button>}
+            </div>
+          )}
 
           {barCtxMenu && (
             <div
@@ -13883,7 +13913,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               if (!isBubbleMode) return (
                                 <React.Fragment key={msg.id}>
                                   {showDateSep && <div className="bubble-date-sep"><span>{msgDateLabel}</span></div>}
-                                <div className={`msg-row${msg.id === newMsgId ? ' msg-row-new' : ''}${isMod ? ' msg-row-mod' : ''}${blocked.some(b => b.id === sender.id) ? ' msg-row-blocked' : ''}`} onDoubleClick={() => !selectedChatSystemLocked && setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id })} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); if (!selectedChatSystemLocked) setOpenMsgCtxFor(f => f === msg.id ? null : msg.id) }}>
+                                <div className={`msg-row${msg.id === newMsgId ? ' msg-row-new' : ''}${isMod ? ' msg-row-mod' : ''}${blocked.some(b => b.id === sender.id) ? ' msg-row-blocked' : ''}`} onDoubleClick={() => !selectedChatSystemLocked && setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id })} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); if (!selectedChatSystemLocked) setMsgCtxMenu({ x: e.clientX, y: e.clientY, msgId: msg.id, chatKey: msgKey2, canDelete: canDeleteMsg, replyInfo: { id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id } }) }}>
                                   <div className="msg-avatar">
                                     {(sender.photo || sender.image)
                                       ? <img src={sender.photo || sender.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
@@ -13896,15 +13926,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                       <span className="msg-time">{formatTime(msg.time)}</span>
                                       {!selectedChatSystemLocked && (
                                         <div className="msg-ctx-menu-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
-                                          <button className="msg-ctx-btn" onClick={() => setOpenMsgCtxFor(f => f === msg.id ? null : msg.id)}>
+                                          <button className="msg-ctx-btn" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMsgCtxMenu(prev => prev?.msgId === msg.id ? null : { x: r.left, y: r.bottom + 4, msgId: msg.id, chatKey: msgKey2, canDelete: canDeleteMsg, replyInfo: { id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id } }) }}>
                                             <svg width="3" height="12" viewBox="0 0 3 12" fill="currentColor"><circle cx="1.5" cy="1.5" r="1.5"/><circle cx="1.5" cy="6" r="1.5"/><circle cx="1.5" cy="10.5" r="1.5"/></svg>
                                           </button>
-                                          {openMsgCtxFor === msg.id && (
-                                            <div className="msg-ctx-menu">
-                                              <button className="msg-ctx-item" onClick={() => { setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id }); setOpenMsgCtxFor(null) }}>{t('reply')}</button>
-                                              {canDeleteMsg && <button className="msg-ctx-item msg-ctx-item--danger" onClick={() => { modDeleteMessage(msgKey2, msg.id); setOpenMsgCtxFor(null) }}>{t('delete')}</button>}
-                                            </div>
-                                          )}
                                         </div>
                                       )}
                                       {!selectedChatSystemLocked && <div className="msg-react-ctrl">
@@ -13964,7 +13988,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               return (
                                 <div key={msg.id}>
                                   {showDateSep && <div className="bubble-date-sep"><span>{msgDateLabel}</span></div>}
-                                  <div className={`bubble-row${isOwn ? ' bubble-row--own' : ' bubble-row--other'}${msg.id === newMsgId ? ' msg-row-new' : ''}`} onDoubleClick={() => !selectedChatSystemLocked && setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id })} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); if (!selectedChatSystemLocked) setOpenMsgCtxFor(f => f === msg.id ? null : msg.id) }}>
+                                  <div className={`bubble-row${isOwn ? ' bubble-row--own' : ' bubble-row--other'}${msg.id === newMsgId ? ' msg-row-new' : ''}`} onDoubleClick={() => !selectedChatSystemLocked && setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id })} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); if (!selectedChatSystemLocked) setMsgCtxMenu({ x: e.clientX, y: e.clientY, msgId: msg.id, chatKey: msgKey2, canDelete: canDeleteMsg, replyInfo: { id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id } }) }}>
                                     {!isOwn && (
                                       <div className="bubble-avatar bubble-avatar--clickable" onClick={e => sender.id && openFriendProfile({ id: sender.id, name: sender.name, photo: sender.photo || sender.image || null }, e)}>
                                         {(sender.photo || sender.image)
@@ -14002,15 +14026,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                         )}
                                         {!selectedChatSystemLocked && <div className="msg-react-ctrl">
                                           <div className="msg-ctx-menu-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
-                                            <button className="msg-ctx-btn" onClick={() => setOpenMsgCtxFor(f => f === msg.id ? null : msg.id)}>
+                                            <button className="msg-ctx-btn" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMsgCtxMenu(prev => prev?.msgId === msg.id ? null : { x: r.left, y: r.bottom + 4, msgId: msg.id, chatKey: msgKey2, canDelete: canDeleteMsg, replyInfo: { id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id } }) }}>
                                               <svg width="3" height="12" viewBox="0 0 3 12" fill="currentColor"><circle cx="1.5" cy="1.5" r="1.5"/><circle cx="1.5" cy="6" r="1.5"/><circle cx="1.5" cy="10.5" r="1.5"/></svg>
                                             </button>
-                                            {openMsgCtxFor === msg.id && (
-                                              <div className="msg-ctx-menu">
-                                                <button className="msg-ctx-item" onClick={() => { setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id }); setOpenMsgCtxFor(null) }}>{t('reply')}</button>
-                                                {canDeleteMsg && <button className="msg-ctx-item msg-ctx-item--danger" onClick={() => { modDeleteMessage(msgKey2, msg.id); setOpenMsgCtxFor(null) }}>{t('delete')}</button>}
-                                              </div>
-                                            )}
                                           </div>
                                           <button className="msg-react-btn msg-react-plus" title="+1" onClick={() => toggleReaction(msgKey2, msg.id, '+')}><img src={newIcon} alt="+" style={{ width: '12px', height: '12px', display: 'block', opacity: 0.65 }} /></button>
                                           <div className="msg-react-emoji-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
@@ -15490,7 +15508,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             </div>
             {notifications.length > 0 && (
               <div className="hpopup-footer">
-                <button className="notif-clear-all-pill" onClick={clearAllNotifications}>Clear all</button>
+                <button className="notif-clear-all-btn notif-clear-all-bottom" onClick={clearAllNotifications}>Clear all</button>
               </div>
             )}
           </div>
