@@ -406,6 +406,25 @@ h6 {
   border-top: 1px solid rgba(var(--ta-rgb), 0.09);
 }
 
+.notif-clear-all-pill {
+  display: block;
+  margin: 0 auto;
+  background: transparent;
+  border: 1px solid rgba(var(--ta-rgb), 0.3);
+  border-radius: 999px;
+  color: rgba(var(--ta-rgb), 0.6);
+  font-family: inherit;
+  font-size: 0.78rem;
+  padding: 5px 16px;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.notif-clear-all-pill:hover {
+  border-color: rgba(var(--ta-rgb), 0.55);
+  color: var(--ta);
+  background: rgba(var(--ta-rgb), 0.06);
+}
+
 .hpopup-see-all {
   background: none;
   border: none;
@@ -3250,28 +3269,16 @@ h6 {
   z-index: 2;
 }
 .reelm-name-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  right: 0;
-  border: 1px solid rgba(var(--ta-rgb), 0.2);
-  border-radius: 14px;
-  overflow: hidden;
-  z-index: 500;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
-  animation: nameMenuFadeIn 0.18s ease both;
-  isolation: isolate;
-}
-.reelm-name-menu::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
+  position: fixed;
   background: rgba(var(--ta-rgb), 0.18);
   -webkit-backdrop-filter: blur(48px) saturate(2.2);
   backdrop-filter: blur(48px) saturate(2.2);
-  z-index: -1;
-  pointer-events: none;
+  border: 1px solid rgba(var(--ta-rgb), 0.2);
+  border-radius: 14px;
+  overflow: hidden;
+  z-index: 9999;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+  animation: nameMenuFadeIn 0.18s ease both;
 }
 .reelm-name-menu-item {
   display: block;
@@ -4816,6 +4823,101 @@ h6 {
   justify-content: space-between;
   gap: 16px;
   padding: 8px 0;
+}
+.accs-visibility-row--stacked {
+  flex-direction: column;
+  align-items: stretch;
+}
+.accs-visibility-row--stacked .accs-visibility-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.accs-allow-list {
+  margin-top: 10px;
+  padding: 12px;
+  background: rgba(var(--ta-rgb), 0.06);
+  border-radius: 10px;
+  border: 1px solid rgba(var(--ta-rgb), 0.12);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.accs-allow-list-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgba(var(--ta-rgb), 0.7);
+}
+.accs-allow-list-search {
+  background: rgba(var(--ta-rgb), 0.08);
+  border: 1px solid rgba(var(--ta-rgb), 0.18);
+  border-radius: 7px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+  color: rgba(var(--ta-rgb), 0.9);
+  font-family: inherit;
+  outline: none;
+}
+.accs-allow-list-search:focus {
+  border-color: rgba(var(--ta-rgb), 0.4);
+}
+.accs-allow-list-friends {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.accs-allow-list-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: rgba(var(--ta-rgb), 0.85);
+  text-align: left;
+  transition: background 0.12s;
+}
+.accs-allow-list-item:hover {
+  background: rgba(var(--ta-rgb), 0.1);
+}
+.accs-allow-list-item--on {
+  background: rgba(var(--ta-rgb), 0.12);
+  border-color: rgba(var(--ta-rgb), 0.22);
+}
+.accs-allow-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+.accs-allow-avatar--placeholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--ta-rgb), 0.18);
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: rgba(var(--ta-rgb), 0.8);
+}
+.accs-allow-name {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.accs-allow-check {
+  font-size: 0.8rem;
+  color: rgba(var(--ta-rgb), 0.9);
+  font-weight: 700;
+  flex-shrink: 0;
 }
 .accs-visibility-select {
   flex-shrink: 0;
@@ -10306,6 +10408,7 @@ h6 {
 }
 .fp-identity-names { flex: 1; min-width: 0; }
 .fp-name { font-size: 1.5rem; font-weight: 700; color: rgba(var(--ta-rgb),0.95); margin: 0 0 3px; }
+.fp-name--friend { font-family: 'Dela Gothic One', sans-serif; font-weight: 400; }
 .fp-name--editable { cursor: text; border-radius: 6px; padding: 0 4px; margin-left: -4px; transition: background 0.15s; }
 .fp-name--editable:hover { background: rgba(var(--ta-rgb), 0.07); }
 .fp-name-edit { margin: 0 0 3px; }

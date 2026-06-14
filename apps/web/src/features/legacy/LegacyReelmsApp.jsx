@@ -1416,8 +1416,9 @@ function AccessibilityPanel({ uid }) {
   )
 }
 
-function PrivacySafetyPanel({ user, onUpdate, onUnblock, blockedList, sessionsList, onSessionsUpdate, showHiddenBarItems, onShowHiddenBarItemsChange }) {
+function PrivacySafetyPanel({ user, onUpdate, onUnblock, blockedList, sessionsList, onSessionsUpdate, showHiddenBarItems, onShowHiddenBarItemsChange, friends, lastSeenAllowList, onLastSeenAllowListChange }) {
   const t = useT()
+  const [friendSearch, setFriendSearch] = React.useState('')
 
   if (!user) {
     return (
@@ -1507,7 +1508,6 @@ function PrivacySafetyPanel({ user, onUpdate, onUnblock, blockedList, sessionsLi
           {[
             { key: 'readReceiptsVisibility', label: t('read_receipts'), note: t('read_receipts_desc') },
             { key: 'onlineStatusVisibility', label: t('online_status_label'), note: t('online_status_desc') },
-            { key: 'lastSeenVisibility', label: t('last_seen'), note: t('last_seen_desc') },
           ].map(({ key, label, note }) => (
             <div key={key} className="accs-visibility-row">
               <div>
@@ -1525,6 +1525,73 @@ function PrivacySafetyPanel({ user, onUpdate, onUnblock, blockedList, sessionsLi
               />
             </div>
           ))}
+
+          <div className="accs-visibility-row accs-visibility-row--stacked">
+            <div className="accs-visibility-row-top">
+              <div>
+                <span className="cust-toggle-label">{t('last_seen')}</span>
+                <p className="accs-note">{t('last_seen_desc')}</p>
+              </div>
+              <PillSelect
+                value={user.lastSeenVisibility || 'friends'}
+                onChange={val => onUpdate({ lastSeenVisibility: val })}
+                options={[
+                  { value: 'reelm_members', label: "Aynı reelm'dekiler" },
+                  { value: 'friends', label: t('friends') },
+                  { value: 'custom', label: 'Sadece şu kişiler...' },
+                ]}
+              />
+            </div>
+            {user.lastSeenVisibility === 'custom' && (
+              <div className="accs-allow-list">
+                <span className="accs-allow-list-title">Son görülmeyi kimlerle paylaş?</span>
+                <input
+                  className="accs-allow-list-search"
+                  type="text"
+                  placeholder="Arkadaş ara..."
+                  value={friendSearch}
+                  onChange={e => setFriendSearch(e.target.value)}
+                />
+                <div className="accs-allow-list-friends">
+                  {(friends || [])
+                    .filter(f => {
+                      const q = friendSearch.toLowerCase()
+                      return !q || (f.displayName || f.name || '').toLowerCase().includes(q) || (f.username || '').toLowerCase().includes(q)
+                    })
+                    .map(f => {
+                      const fid = String(f.id || '')
+                      const selected = (lastSeenAllowList || []).includes(fid)
+                      return (
+                        <button
+                          key={fid}
+                          className={`accs-allow-list-item${selected ? ' accs-allow-list-item--on' : ''}`}
+                          onClick={() => {
+                            const next = selected
+                              ? (lastSeenAllowList || []).filter(id => id !== fid)
+                              : [...(lastSeenAllowList || []), fid]
+                            onLastSeenAllowListChange?.(next)
+                          }}
+                        >
+                          {f.photoURL
+                            ? <img src={f.photoURL} alt="" className="accs-allow-avatar" />
+                            : <span className="accs-allow-avatar accs-allow-avatar--placeholder">{(f.displayName || f.name || '?')[0].toUpperCase()}</span>
+                          }
+                          <span className="accs-allow-name">{f.displayName || f.name}</span>
+                          {selected && <span className="accs-allow-check">✓</span>}
+                        </button>
+                      )
+                    })
+                  }
+                  {(friends || []).length === 0 && (
+                    <p className="accs-note" style={{padding: '8px 0'}}>Henüz arkadaşın yok.</p>
+                  )}
+                </div>
+                {(lastSeenAllowList || []).length > 0 && (
+                  <p className="accs-note" style={{marginTop: '6px'}}>{lastSeenAllowList.length} kişiyle paylaşılıyor</p>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -1665,8 +1732,8 @@ const REELM_RADIO_BOT = {
 
 const REELMS_INTELLIGENCE_BOT = {
   id: 'reelms-intelligence',
-  name: 'Reelms Intelligence',
-  username: 'reelms-intelligence',
+  name: 'Reelms AI',
+  username: 'reelmsai',
   description: 'Kanallarında AI asistanı. Soru sor, mesajları özetle, günlük digest al.',
   tags: ['AI', 'Özet', 'Sohbet'],
 }
@@ -1839,7 +1906,7 @@ function CompanionsPanel({ reelms = [] }) {
           {['/ai', '/summarize', '/digest', '/ai-reset'].map(cmd => (
             <code key={cmd} className="companion-cmd">{cmd}</code>
           ))}
-          <code className="companion-cmd">@reelms-intelligence</code>
+          <code className="companion-cmd">@reelmsai</code>
         </div>
 
         {reelms.length > 0 && (
@@ -3266,7 +3333,7 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
                   </div>
                 ) : (
                   <h1
-                    className={`fp-name${isSelf && editMode ? ' fp-name--editable' : ''}`}
+                    className={`fp-name${isSelf && editMode ? ' fp-name--editable' : ''}${!isSelf ? ' fp-name--friend' : ''}`}
                     onClick={() => { if (isSelf && editMode) { setNameInput(user.name || ''); setEditingName(true) } }}
                   >{user.name}</h1>
                 )}
@@ -7110,7 +7177,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setFeedNavOrder(order)
     scheduleUserPersist('feed_nav', order)
   }
-  const [showReelmMenu, setShowReelmMenu] = useState(false)
+  const [showReelmMenu, setShowReelmMenu] = useState(null)
   const [showReelmSettings, setShowReelmSettings] = useState(false)
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [copiedInvite, setCopiedInvite] = useState(false)
@@ -7351,6 +7418,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   useEffect(() => { mutedChatIdsRef.current = mutedChatIds.map(String) }, [mutedChatIds])
   const [hiddenBarIds, setHiddenBarIds] = useState([])
   const [showHiddenBarItems, setShowHiddenBarItems] = useState(false)
+  const [lastSeenAllowList, setLastSeenAllowList] = useState([])
   const [friends, setFriends] = useState([])
   const [blocked, setBlocked] = useState([])
   const [chatProfileCache, setChatProfileCache] = useState({})
@@ -7550,6 +7618,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       if (Array.isArray(data.muted_chats)) setMutedChatIds(data.muted_chats.map(String))
       if (Array.isArray(data.hidden_bar_items)) setHiddenBarIds(data.hidden_bar_items.map(String))
       if (data.bar_prefs?.showHidden === true) setShowHiddenBarItems(true)
+      if (Array.isArray(data.last_seen_allow_list)) setLastSeenAllowList(data.last_seen_allow_list.map(String))
       if (Array.isArray(data.feed_nav) && data.feed_nav.length === ALL_FEED_NAV.length) setFeedNavOrder(data.feed_nav)
       if (typeof data.landing_view === 'string') setReelmLandingView(data.landing_view)
       if (data.lpw != null) setLeftWidth(parseInt(String(data.lpw), 10) || PANEL_DEFAULT)
@@ -7604,6 +7673,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       else if (sk === 'muted_chats') setStableArray(setMutedChatIds, Array.isArray(v) ? v.map(String) : [])
       else if (sk === 'hidden_bar_items') setStableArray(setHiddenBarIds, Array.isArray(v) ? v.map(String) : [])
       else if (sk === 'bar_prefs') { if (v && typeof v === 'object') setShowHiddenBarItems(v.showHidden === true) }
+      else if (sk === 'last_seen_allow_list') setStableArray(setLastSeenAllowList, Array.isArray(v) ? v.map(String) : [])
       else if (sk === 'spotify_connected') setSpotifyConnected(v === true || v === 'true')
       else if (sk === 'last_channels') setStableObject(setLastChannels, v && typeof v === 'object' ? v : {})
       else if (sk === 'sessions') setStableArray(setSessionsList, Array.isArray(v) ? v : [])
@@ -9058,7 +9128,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [msgReactions, setMsgReactions] = useState({})
   const [showMsgEmojiFor, setShowMsgEmojiFor] = useState(null)
   const [replyingTo, setReplyingTo] = useState(null)
-  const [openMsgCtxFor, setOpenMsgCtxFor] = useState(null)
+  const [msgCtxMenu, setMsgCtxMenu] = useState(null)
   useEffect(() => {
     if (!showMsgEmojiFor) return undefined
     const handler = (e) => {
@@ -9068,13 +9138,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     return () => document.removeEventListener('mousedown', handler)
   }, [showMsgEmojiFor])
   useEffect(() => {
-    if (!openMsgCtxFor) return undefined
+    if (!msgCtxMenu) return undefined
     const handler = (e) => {
-      if (!e.target.closest('.msg-ctx-menu-wrap')) setOpenMsgCtxFor(null)
+      if (!e.target.closest('.msg-ctx-menu-fixed') && !e.target.closest('.msg-ctx-btn')) setMsgCtxMenu(null)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [openMsgCtxFor])
+  }, [msgCtxMenu])
   const [lightboxImg, setLightboxImg] = useState(null)
   const [showInputEmoji, setShowInputEmoji] = useState(false)
   const [showGifPicker, setShowGifPicker] = useState(false)
@@ -9217,7 +9287,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   useEffect(() => {
     if (!showReelmMenu) return
     const handler = (e) => {
-      if (!e.target.closest('.reelm-name-menu') && !e.target.closest('.reelm-sidebar-name')) setShowReelmMenu(false)
+      if (!e.target.closest('.reelm-name-menu') && !e.target.closest('.reelm-sidebar-name')) setShowReelmMenu(null)
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -11034,7 +11104,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const BOT_COMMANDS = [
     {
-      bot: 'Reelms Intelligence',
+      bot: 'Reelms AI',
       commands: [
         { cmd: '/ai', args: '<message>', desc: t('slash_cmd_ai_desc') },
         { cmd: '/summarize', args: '[n]', desc: t('slash_cmd_summarize_desc') },
@@ -12164,6 +12234,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           scheduleUserPersist('bar_prefs', { showHidden: val })
                           userPutDoc('bar_prefs', { showHidden: val }).catch(() => {})
                         }}
+                        friends={friends}
+                        lastSeenAllowList={lastSeenAllowList}
+                        onLastSeenAllowListChange={(next) => {
+                          setLastSeenAllowList(next)
+                          userPutDoc('last_seen_allow_list', next).catch(() => {})
+                        }}
                       />
                     )}
                     {selectedSettingsCategory === 'customization' && (
@@ -12399,17 +12475,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       }
                       {selectedReelm.image && <div className="reelm-cover-blur-strip" />}
                       <div className="reelm-sidebar-name-row" onClick={e => e.stopPropagation()}>
-                        <span className="reelm-sidebar-name" onClick={() => setShowReelmMenu(v => !v)}>{selectedReelm.name}</span>
-                        {showReelmMenu && (
-                          <div className="reelm-name-menu">
+                        <span className="reelm-sidebar-name" onClick={(e) => { if (showReelmMenu) { setShowReelmMenu(null); return; } const r = e.currentTarget.getBoundingClientRect(); setShowReelmMenu({ x: r.left, y: r.bottom + 4, w: r.width }) }}>{selectedReelm.name}</span>
+                        {showReelmMenu && ReactDOM.createPortal(
+                          <div className="reelm-name-menu" style={{ top: showReelmMenu.y, left: showReelmMenu.x, width: showReelmMenu.w }}>
                             {canOpenReelmSettingsClient(selectedReelm, uid) && (
-                              <button className="reelm-name-menu-item" onClick={() => { setShowReelmSettings(true); setShowReelmMenu(false) }}>{t('reelm_settings_menu')}</button>
+                              <button className="reelm-name-menu-item" onClick={() => { setShowReelmSettings(true); setShowReelmMenu(null) }}>{t('reelm_settings_menu')}</button>
                             )}
-                            <button className="reelm-name-menu-item" onClick={() => { setShowInviteModal(true); setShowReelmMenu(false) }}>{t('invite_friends_menu')}</button>
-                            <button className="reelm-name-menu-item" onClick={() => { setShareTarget({ type: 'reelm', title: selectedReelm.name, subtitle: 'Join this Reelm now', image: selectedReelm.image || null, data: selectedReelm }); setShowReelmMenu(false) }}>{t('share_reelm')}</button>
+                            <button className="reelm-name-menu-item" onClick={() => { setShowInviteModal(true); setShowReelmMenu(null) }}>{t('invite_friends_menu')}</button>
+                            <button className="reelm-name-menu-item" onClick={() => { setShareTarget({ type: 'reelm', title: selectedReelm.name, subtitle: 'Join this Reelm now', image: selectedReelm.image || null, data: selectedReelm }); setShowReelmMenu(null) }}>{t('share_reelm')}</button>
                             <div className="reelm-name-menu-divider" />
                             <button className="reelm-name-menu-item reelm-name-menu-leave" onClick={() => leaveReelm(selectedReelm.id)}>{t('leave_reelm')}</button>
-                          </div>
+                          </div>,
+                          document.body
                         )}
                       </div>
                     </div>
@@ -12979,9 +13056,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         }
                         {selectedReelm.image && <div className="reelm-cover-blur-strip" />}
                         <div className="reelm-sidebar-name-row" onClick={e => e.stopPropagation()}>
-                          <span className="reelm-sidebar-name" onClick={() => setShowReelmMenu(v => !v)}>{selectedReelm.name}</span>
-                          {showReelmMenu && (
-                            <div className="reelm-name-menu">
+                          <span className="reelm-sidebar-name" onClick={(e) => { if (showReelmMenu) { setShowReelmMenu(null); return; } const r = e.currentTarget.getBoundingClientRect(); setShowReelmMenu({ x: r.left, y: r.bottom + 4, w: r.width }) }}>{selectedReelm.name}</span>
+                          {showReelmMenu && ReactDOM.createPortal(
+                            <div className="reelm-name-menu" style={{ top: showReelmMenu.y, left: showReelmMenu.x, width: showReelmMenu.w }}>
                               {(() => {
                                 const _mm = selectedReelm.members?.find(m => m.userId === uid)
                                 const _mr = (selectedReelm.roles || []).filter(r => (_mm?.roleIds || []).includes(r.id))
@@ -12996,13 +13073,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 </>) : null
                               })()}
                               {canOpenReelmSettingsClient(selectedReelm, uid) && (
-                                <button className="reelm-name-menu-item" onClick={() => { setShowReelmSettings(true); setShowReelmMenu(false) }}>{t('reelm_settings_menu')}</button>
+                                <button className="reelm-name-menu-item" onClick={() => { setShowReelmSettings(true); setShowReelmMenu(null) }}>{t('reelm_settings_menu')}</button>
                               )}
-                              <button className="reelm-name-menu-item" onClick={() => { setShowInviteModal(true); setShowReelmMenu(false) }}>{t('invite_friends_menu')}</button>
-                              <button className="reelm-name-menu-item" onClick={() => { setShareTarget({ type: 'reelm', title: selectedReelm.name, subtitle: 'Join this Reelm now', image: selectedReelm.image || null, data: selectedReelm }); setShowReelmMenu(false) }}>{t('share_reelm')}</button>
+                              <button className="reelm-name-menu-item" onClick={() => { setShowInviteModal(true); setShowReelmMenu(null) }}>{t('invite_friends_menu')}</button>
+                              <button className="reelm-name-menu-item" onClick={() => { setShareTarget({ type: 'reelm', title: selectedReelm.name, subtitle: 'Join this Reelm now', image: selectedReelm.image || null, data: selectedReelm }); setShowReelmMenu(null) }}>{t('share_reelm')}</button>
                               <div className="reelm-name-menu-divider" />
                               <button className="reelm-name-menu-item reelm-name-menu-leave" onClick={() => leaveReelm(selectedReelm.id)}>{t('leave_reelm')}</button>
-                            </div>
+                            </div>,
+                            document.body
                           )}
                         </div>
                         <input
