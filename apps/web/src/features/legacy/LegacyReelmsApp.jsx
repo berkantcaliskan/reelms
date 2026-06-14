@@ -3266,8 +3266,8 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
                   </div>
                 ) : (
                   <h1
-                    className={`fp-name${isSelf ? ' fp-name--editable' : ''}`}
-                    onClick={() => { if (isSelf) { setNameInput(user.name || ''); setEditingName(true) } }}
+                    className={`fp-name${isSelf && editMode ? ' fp-name--editable' : ''}`}
+                    onClick={() => { if (isSelf && editMode) { setNameInput(user.name || ''); setEditingName(true) } }}
                   >{user.name}</h1>
                 )}
                 {user.username && <span className="fp-username">@{user.username.startsWith('@') ? user.username.slice(1) : user.username}</span>}
