@@ -6328,7 +6328,8 @@ h6 {
 
 /* Rich (contentEditable) message composer */
 .msg-input--rich {
-  height: auto;
+  height: auto !important;
+  align-self: center;
   min-height: 22px;
   max-height: 120px;
   overflow-y: auto;

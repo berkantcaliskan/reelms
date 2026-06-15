@@ -14875,7 +14875,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               </button>
                             </div>
                             <button className="msg-send-btn" onClick={sendMessage} disabled={!canPost}>
-                              <img src={sendIcon} alt="Send" width="48" height="48" />
+                              <img src={sendIcon} alt="Send" width="36" height="36" />
                             </button>
                           </div>
                           <div className="msg-actions">
