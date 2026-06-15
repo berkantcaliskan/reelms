@@ -2797,7 +2797,7 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
         </div>
         {onViewFullProfile && (
           <button className="profile-view-full-btn" onClick={e => { e.stopPropagation(); onClose(); onViewFullProfile() }}>
-            Tüm profili gör
+            {t('see_full_profile')}
           </button>
         )}
       </div>
@@ -3549,7 +3549,7 @@ function renderMentions(text, uid, members, roles) {
     const raw = part.slice(1)
     const lower = raw.toLowerCase()
     if (lower === 'everyone') return <span key={i} className="mention mention--everyone">{part}</span>
-    const role = roles?.find(r => r.name.toLowerCase() === lower)
+    const role = roles?.find(r => r.name?.toLowerCase() === lower)
     if (role) return <span key={i} className="mention mention--role" style={{ color: role.color }}>{part}</span>
     const member = members?.find(m => m.userName?.toLowerCase() === lower)
     if (member) {
@@ -3619,7 +3619,7 @@ function mentionNodes(text, uid, members, roles, keyBase) {
     if (!part.startsWith('@')) return part
     const lower = part.slice(1).toLowerCase()
     if (lower === 'everyone') return <span key={key} className="mention mention--everyone">{part}</span>
-    const role = roles?.find(r => r.name.toLowerCase() === lower)
+    const role = roles?.find(r => r.name?.toLowerCase() === lower)
     if (role) return <span key={key} className="mention mention--role" style={{ color: role.color }}>{part}</span>
     const member = members?.find(m => m.userName?.toLowerCase() === lower)
     if (member) {
@@ -13299,7 +13299,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     const selectedBlockedEntry = getBlockedEntry(selectedChat.friendId)
                     const selectedChatPeer = selectedBlockedEntry || dmFriendProfile || getChatPeer(selectedChat)
                     const dmPeerId = String(selectedChat.friendId || selectedChatPeer?.id || '')
-                    const displayName = nicknames[selectedChat.friendId] || selectedChatPeer?.name || selectedChat.name
+                    const displayName = nicknames[selectedChat.friendId] || selectedChatPeer?.name || selectedChat.name || ''
                     const fpRaw = dmFriendProfile || selectedBlockedEntry || selectedChatPeer
                     const fp = fpRaw ? { ...fpRaw, id: fpRaw.id || dmPeerId } : (dmPeerId ? { id: dmPeerId, name: displayName } : null)
                     const dmIsSelf = dmPeerId && String(dmPeerId) === String(uid)
@@ -13332,7 +13332,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             <div className="dm-friend-avatar">
                               {selectedAvatarSrc
                                 ? <img src={selectedAvatarSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-                                : displayName.charAt(0).toUpperCase()
+                                : (displayName || '?').charAt(0).toUpperCase()
                               }
                             </div>
                             <div className="dm-friend-info">
@@ -14595,7 +14595,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                     <div className="mention-option-avatar">
                                       {opt.photo
                                         ? <img src={opt.photo} alt="" />
-                                        : opt.displayName.charAt(0).toUpperCase()}
+                                        : (opt.displayName || '?').charAt(0).toUpperCase()}
                                     </div>
                                   )}
                                   {opt.type === 'role' && (

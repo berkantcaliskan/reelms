@@ -702,5 +702,6 @@
   "slash_cmd_skip_desc": "Aktuellen Titel überspringen",
   "slash_cmd_queue_desc": "Musikwarteschlange anzeigen",
   "slash_cmd_stop_desc": "Wiedergabe stoppen",
-  "community_citizens_hidden": "Hunderte von Citizens sind hier mit dir. Wir teilen dies nicht öffentlich, weil uns Datenschutz wichtig ist."
+  "community_citizens_hidden": "Hunderte von Citizens sind hier mit dir. Wir teilen dies nicht öffentlich, weil uns Datenschutz wichtig ist.",
+  "see_full_profile": "Vollständiges Profil anzeigen"
 }

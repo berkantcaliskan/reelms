@@ -10766,7 +10766,7 @@ h6 {
 .fp-edit-profile-btn {
   display: inline-block;
   margin-top: 8px;
-  padding: 3px 10px;
+  padding: 3px 7px;
   border-radius: 999px;
   border: 1.5px solid rgba(var(--ta-rgb), 0.3);
   background: transparent;
@@ -10843,13 +10843,13 @@ h6 {
   padding: 5px 8px;
   background: none;
   border: none;
-  border-top: 1px solid rgba(var(--ta-rgb),0.1);
   color: rgba(var(--ta-rgb),0.45);
   font-size: 0.72rem;
   text-align: center;
   cursor: pointer;
   transition: color 0.15s, background 0.15s;
   letter-spacing: 0.02em;
+  border-radius: 0 0 8px 8px;
 }
 .profile-view-full-btn:hover { color: rgba(var(--ta-rgb),0.8); background: rgba(var(--ta-rgb),0.06); }
 

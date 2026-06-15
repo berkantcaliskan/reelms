@@ -713,5 +713,6 @@
   "slash_cmd_skip_desc": "Mevcut parçayı atla",
   "slash_cmd_queue_desc": "Müzik sırasını göster",
   "slash_cmd_stop_desc": "Çalmayı durdur",
-  "community_citizens_hidden": "Seninle birlikte yüzlerce Citizen burada. Gizliliği önemsediğimiz için herkese açık paylaşmıyoruz."
+  "community_citizens_hidden": "Seninle birlikte yüzlerce Citizen burada. Gizliliği önemsediğimiz için herkese açık paylaşmıyoruz.",
+  "see_full_profile": "Tüm profili gör"
 }
