@@ -7642,6 +7642,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     { id: 'line-seed-jp', label: 'LINE Seed JP', family: "'LINE Seed JP', sans-serif" },
     { id: 'akt', label: 'Akt', family: "'Akt', sans-serif" },
     { id: 'mona-sans', label: 'Mona Sans', family: "'Mona Sans', sans-serif" },
+    { id: 'pliant', label: 'Pliant', family: "'Pliant', sans-serif" },
     { id: 'inclusive-sans', label: 'Inclusive Sans', family: "'Inclusive Sans', sans-serif" },
     { id: 'inter', label: 'Inter', family: "'Inter', sans-serif" },
     { id: 'sour-gummy', label: 'Sour Gummy', family: "'Sour Gummy', sans-serif" },

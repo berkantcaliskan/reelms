@@ -1,5 +1,5 @@
 /* Legacy visual system isolated under features/legacy. New feature CSS should not be added here. */
-@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600&family=Inclusive+Sans:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Mona+Sans:wght@300;400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600&family=Akt:wght@300;400;500;600;700&family=Sour+Gummy:wght@400;500;600;700&family=LINE+Seed+JP:wght@300;400;700&family=Dela+Gothic+One&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@300;400;500;600&family=Inclusive+Sans:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Mona+Sans:wght@300;400;500;600&family=Pliant:wght@300;400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600&family=Akt:wght@300;400;500;600;700&family=Sour+Gummy:wght@400;500;600;700&family=LINE+Seed+JP:wght@300;400;700&family=Dela+Gothic+One&display=swap');
 
 :root {
   --ta: #b99887;
