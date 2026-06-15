@@ -11416,6 +11416,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   ]
 
   const [slashShowAll, setSlashShowAll] = useState(false)
+  // Which bot's commands are shown in the slash menu (no-filter view). null → default:
+  // "Reelms AI" if present, otherwise the bot with the longest command list.
+  const [slashExpandedBot, setSlashExpandedBot] = useState(null)
 
   const slashOptions = useMemo(() => {
     if (!slashMenu) return []
@@ -11558,7 +11561,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setSlashShowAll(false)
   }
 
-  const GIPHY_KEY = import.meta.env.VITE_GIPHY_API_KEY || ''
+  const GIPHY_KEY = import.meta.env.VITE_GIPHY_API_KEY || 'mJ5UEhU6epu6RoFCjTqiEC1oMFFr130E'
 
   const fetchGiphy = useCallback(async (query, isSticker) => {
     if (!GIPHY_KEY) return []
@@ -11980,10 +11983,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (!selectedReelm) return null
     let members = selectedReelm.members || []
     if (members.length === 0) return null
+    let showCitizenNotice = false
     if (isDefaultCommunity(selectedReelm)) {
       const myMember = members.find(m => String(m.userId) === String(uid))
       if (getCommunityMemberLevel(selectedReelm, myMember) === 'citizen') {
         members = members.filter(m => String(m.userId) === String(uid) || getCommunityMemberLevel(selectedReelm, m) !== 'citizen')
+        showCitizenNotice = true
       }
     }
     const presence = reelmPresence[selectedReelm.id] || {}
@@ -12064,6 +12069,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             </div>
           )
         })}
+        {showCitizenNotice && (
+          <div className="rp-citizen-notice">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            <span>{t('community_citizens_hidden')}</span>
+          </div>
+        )}
       </div>
     )
   }
@@ -14531,43 +14542,44 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                     </div>
                                   )}
                                 </>
-                              ) : (
-                                <>
-                                  {BOT_COMMANDS.map((b, bi) => {
-                                    const allCmds = b.commands
-                                    const isFirst = bi === 0
-                                    const globalOffset = BOT_COMMANDS.slice(0, bi).reduce((s, x) => s + x.commands.length, 0)
-                                    const visible = slashShowAll ? allCmds : (isFirst ? allCmds.slice(0, 3) : allCmds.slice(0, 2))
-                                    const hiddenCount = allCmds.length - visible.length
-                                    return (
-                                      <div key={b.bot}>
-                                        <div className="slash-bot-group-label">{b.bot}</div>
-                                        {visible.map((opt, i) => (
-                                          <div
-                                            key={opt.cmd}
-                                            className={`mention-option${globalOffset + i === slashSelIdx ? ' mention-option--sel' : ''}`}
-                                            onMouseEnter={() => setSlashSelIdx(globalOffset + i)}
-                                            onMouseDown={e => { e.preventDefault(); insertSlashCommand(opt) }}
-                                          >
-                                            <code className="slash-option-cmd">
-                                              {opt.cmd}{opt.args && <span className="slash-cmd-args"> {opt.args}</span>}
-                                            </code>
-                                            <span className="mention-option-sub">{opt.desc}</span>
-                                          </div>
+                              ) : (() => {
+                                // Default-expanded bot: "Reelms AI" if present, else the one
+                                // with the longest command list.
+                                const fallbackBot = BOT_COMMANDS.reduce(
+                                  (a, b) => (b.commands.length > a.commands.length ? b : a),
+                                  BOT_COMMANDS[0]
+                                )
+                                const defaultBot = BOT_COMMANDS.find(b => b.bot === 'Reelms AI') || fallbackBot
+                                const activeBot = BOT_COMMANDS.find(b => b.bot === slashExpandedBot) || defaultBot
+                                return (
+                                  <>
+                                    {BOT_COMMANDS.length > 1 && (
+                                      <div className="slash-bots-row">
+                                        {BOT_COMMANDS.map(b => (
+                                          <button
+                                            key={b.bot}
+                                            className={`slash-bot-chip${b.bot === activeBot.bot ? ' slash-bot-chip--active' : ''}`}
+                                            onMouseDown={e => { e.preventDefault(); setSlashExpandedBot(b.bot); setSlashSelIdx(0) }}
+                                          >{b.bot}</button>
                                         ))}
-                                        {!slashShowAll && hiddenCount > 0 && (
-                                          <div
-                                            className="slash-see-more"
-                                            onMouseDown={e => { e.preventDefault(); setSlashShowAll(true) }}
-                                          >
-                                            {t('slash_see_more').replace('{n}', hiddenCount)}
-                                          </div>
-                                        )}
                                       </div>
-                                    )
-                                  })}
-                                </>
-                              )}
+                                    )}
+                                    {activeBot.commands.map((opt, i) => (
+                                      <div
+                                        key={opt.cmd}
+                                        className={`mention-option${i === slashSelIdx ? ' mention-option--sel' : ''}`}
+                                        onMouseEnter={() => setSlashSelIdx(i)}
+                                        onMouseDown={e => { e.preventDefault(); insertSlashCommand(opt) }}
+                                      >
+                                        <code className="slash-option-cmd">
+                                          {opt.cmd}{opt.args && <span className="slash-cmd-args"> {opt.args}</span>}
+                                        </code>
+                                        <span className="mention-option-sub">{opt.desc}</span>
+                                      </div>
+                                    ))}
+                                  </>
+                                )
+                              })()}
                             </div>
                           )}
                           {mentionQuery && mentionOptions.length > 0 && (

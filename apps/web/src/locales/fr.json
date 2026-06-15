@@ -701,5 +701,6 @@
   "slash_cmd_play_desc": "Lire de la musique dans le canal vocal",
   "slash_cmd_skip_desc": "Passer la piste actuelle",
   "slash_cmd_queue_desc": "Afficher la file d'attente musicale",
-  "slash_cmd_stop_desc": "Arrêter la lecture"
+  "slash_cmd_stop_desc": "Arrêter la lecture",
+  "community_citizens_hidden": "Des centaines de Citizens sont ici avec toi. Nous ne le partageons pas publiquement car nous respectons la vie privée."
 }

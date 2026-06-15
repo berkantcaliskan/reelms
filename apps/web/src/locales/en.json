@@ -737,5 +737,6 @@
   "slash_cmd_play_desc": "Play music in voice channel",
   "slash_cmd_skip_desc": "Skip current track",
   "slash_cmd_queue_desc": "Show music queue",
-  "slash_cmd_stop_desc": "Stop playback"
+  "slash_cmd_stop_desc": "Stop playback",
+  "community_citizens_hidden": "Hundreds of Citizens are here with you. We don't share this publicly because we care about privacy."
 }

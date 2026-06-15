@@ -701,5 +701,6 @@
   "slash_cmd_play_desc": "Tocar música no canal de voz",
   "slash_cmd_skip_desc": "Pular faixa atual",
   "slash_cmd_queue_desc": "Mostrar fila de música",
-  "slash_cmd_stop_desc": "Parar reprodução"
+  "slash_cmd_stop_desc": "Parar reprodução",
+  "community_citizens_hidden": "Centenas de Citizens estão aqui com você. Não compartilhamos isso publicamente porque nos importamos com a privacidade."
 }

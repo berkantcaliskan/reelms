@@ -701,5 +701,6 @@
   "slash_cmd_play_desc": "Reproducir música en el canal de voz",
   "slash_cmd_skip_desc": "Saltar pista actual",
   "slash_cmd_queue_desc": "Mostrar cola de música",
-  "slash_cmd_stop_desc": "Detener reproducción"
+  "slash_cmd_stop_desc": "Detener reproducción",
+  "community_citizens_hidden": "Cientos de Citizens están aquí contigo. No lo compartimos públicamente porque nos importa la privacidad."
 }

@@ -7420,6 +7420,24 @@ h6 {
   color: rgba(var(--ta-rgb), 0.55);
   padding: 0 4px 8px 4px;
 }
+.rp-citizen-notice {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  margin-top: 14px;
+  padding: 10px 12px;
+  background: rgba(var(--ta-rgb), 0.06);
+  border-radius: 9px;
+  border: 1px solid rgba(var(--ta-rgb), 0.1);
+  color: rgba(var(--ta-rgb), 0.5);
+  font-size: 0.74rem;
+  line-height: 1.45;
+}
+.rp-citizen-notice svg {
+  flex-shrink: 0;
+  margin-top: 1px;
+  opacity: 0.55;
+}
 .rp-members-group {
   display: flex;
   flex-direction: column;
