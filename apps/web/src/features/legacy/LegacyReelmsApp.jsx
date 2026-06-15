@@ -3551,13 +3551,262 @@ function renderMentions(text, uid, members, roles) {
     if (lower === 'everyone') return <span key={i} className="mention mention--everyone">{part}</span>
     const role = roles?.find(r => r.name.toLowerCase() === lower)
     if (role) return <span key={i} className="mention mention--role" style={{ color: role.color }}>{part}</span>
-    const member = members?.find(m => m.userName.toLowerCase() === lower)
+    const member = members?.find(m => m.userName?.toLowerCase() === lower)
     if (member) {
       const isMe = String(member.userId) === String(uid)
       return <span key={i} className={`mention mention--user${isMe ? ' mention--me' : ''}`}>{part}</span>
     }
     return part
   })
+}
+
+// ── Rich message formatting (bold / italic / underline / strike / mono / color) ──
+// Editor formatting is captured as a compact, safe marker syntax so messages can be
+// stored and rendered as controlled React nodes (no dangerouslySetInnerHTML):
+//   **bold**  *italic*  __underline__  ~~strike~~  `mono`  [#rrggbb]colored[/c]
+const RICH_COLOR_OPEN = /^\[#([0-9a-fA-F]{3,8})\]/
+
+function rgbToHex(color) {
+  if (!color) return null
+  const c = String(color).trim()
+  if (c.startsWith('#')) return c.length === 4 ? '#' + c.slice(1).split('').map(ch => ch + ch).join('') : c.slice(0, 7)
+  const m = c.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/i)
+  if (!m) return null
+  const hex = (n) => Math.max(0, Math.min(255, Number(n))).toString(16).padStart(2, '0')
+  return '#' + hex(m[1]) + hex(m[2]) + hex(m[3])
+}
+
+function serializeRichNode(node) {
+  if (node.nodeType === 3) return node.nodeValue || ''
+  if (node.nodeType !== 1) return ''
+  const el = node
+  const tag = el.tagName
+  if (tag === 'BR') return '\n'
+  let out = Array.from(el.childNodes).map(serializeRichNode).join('')
+  if (!out) return tag === 'DIV' ? '\n' : ''
+  const style = el.style || {}
+  const deco = `${style.textDecoration || ''} ${style.textDecorationLine || ''}`
+  const fontFamily = (style.fontFamily || '').toLowerCase()
+  const isBold = tag === 'B' || tag === 'STRONG' || /bold|^[6-9]00/.test(style.fontWeight || '')
+  const isItalic = tag === 'I' || tag === 'EM' || style.fontStyle === 'italic'
+  const isUnderline = tag === 'U' || /underline/.test(deco)
+  const isStrike = tag === 'S' || tag === 'STRIKE' || tag === 'DEL' || /line-through/.test(deco)
+  const isMono = tag === 'CODE' || /(^|\s)msg-mono(\s|$)/.test(el.className || '') || /mono|courier|consol/.test(fontFamily)
+  const colorHex = rgbToHex(style.color || (tag === 'FONT' ? el.getAttribute('color') : ''))
+  if (isBold) out = `**${out}**`
+  if (isItalic) out = `*${out}*`
+  if (isUnderline) out = `__${out}__`
+  if (isStrike) out = `~~${out}~~`
+  if (isMono) out = '`' + out + '`'
+  if (colorHex) out = `[${colorHex}]${out}[/c]`
+  if (tag === 'DIV') out = '\n' + out
+  return out
+}
+
+function serializeRichEditor(root) {
+  if (!root) return ''
+  return Array.from(root.childNodes).map(serializeRichNode).join('').replace(/\n+$/, '')
+}
+
+function editorHasFormatting(root) {
+  return !!(root && root.querySelector('b,strong,i,em,u,s,strike,del,code,font,span[style]'))
+}
+
+function mentionNodes(text, uid, members, roles, keyBase) {
+  if (!text) return []
+  return text.split(/(@\w+)/g).map((part, i) => {
+    const key = `${keyBase}-m${i}`
+    if (!part.startsWith('@')) return part
+    const lower = part.slice(1).toLowerCase()
+    if (lower === 'everyone') return <span key={key} className="mention mention--everyone">{part}</span>
+    const role = roles?.find(r => r.name.toLowerCase() === lower)
+    if (role) return <span key={key} className="mention mention--role" style={{ color: role.color }}>{part}</span>
+    const member = members?.find(m => m.userName?.toLowerCase() === lower)
+    if (member) {
+      const isMe = String(member.userId) === String(uid)
+      return <span key={key} className={`mention mention--user${isMe ? ' mention--me' : ''}`}>{part}</span>
+    }
+    return part
+  })
+}
+
+function parseRich(text, uid, members, roles, keyBase) {
+  const nodes = []
+  let buf = ''
+  let i = 0
+  let n = 0
+  const flush = () => {
+    if (!buf) return
+    mentionNodes(buf, uid, members, roles, `${keyBase}-t${n++}`).forEach(x => nodes.push(x))
+    buf = ''
+  }
+  while (i < text.length) {
+    const cm = text.slice(i).match(RICH_COLOR_OPEN)
+    if (cm) {
+      const close = text.indexOf('[/c]', i + cm[0].length)
+      if (close !== -1) {
+        flush()
+        const inner = text.slice(i + cm[0].length, close)
+        nodes.push(<span key={`${keyBase}-c${n++}`} style={{ color: '#' + cm[1] }}>{parseRich(inner, uid, members, roles, `${keyBase}-c${n}`)}</span>)
+        i = close + 4; continue
+      }
+    }
+    const two = text.substr(i, 2)
+    if (two === '**' || two === '__' || two === '~~') {
+      const close = text.indexOf(two, i + 2)
+      if (close !== -1) {
+        flush()
+        const inner = text.slice(i + 2, close)
+        const child = parseRich(inner, uid, members, roles, `${keyBase}-${n}`)
+        const key = `${keyBase}-f${n++}`
+        nodes.push(two === '**' ? <strong key={key}>{child}</strong> : two === '__' ? <u key={key}>{child}</u> : <s key={key}>{child}</s>)
+        i = close + 2; continue
+      }
+    }
+    const ch = text[i]
+    if (ch === '*' || ch === '`') {
+      const close = text.indexOf(ch, i + 1)
+      if (close !== -1) {
+        flush()
+        const inner = text.slice(i + 1, close)
+        const key = `${keyBase}-f${n++}`
+        nodes.push(ch === '*'
+          ? <em key={key}>{parseRich(inner, uid, members, roles, `${keyBase}-${n}`)}</em>
+          : <code key={key} className="msg-mono">{mentionNodes(inner, uid, members, roles, `${keyBase}-mono${n}`)}</code>)
+        i = close + 1; continue
+      }
+    }
+    buf += ch; i++
+  }
+  flush()
+  return nodes
+}
+
+function renderRichMessage(content, uid, members, roles, isRich) {
+  if (!content) return null
+  if (!isRich) return renderMentions(content, uid, members, roles)
+  return parseRich(content, uid, members, roles, 'r')
+}
+
+// ── Voice message player (WhatsApp-style: play/pause · waveform · speed) ────────
+const VOICE_SPEEDS = [1, 1.25, 1.5, 2]
+const VOICE_WAVE_BARS = 38
+let _voiceAudioCtx = null
+function getVoiceAudioCtx() {
+  const Ctx = window.AudioContext || window.webkitAudioContext
+  if (!Ctx) return null
+  if (!_voiceAudioCtx || _voiceAudioCtx.state === 'closed') _voiceAudioCtx = new Ctx()
+  return _voiceAudioCtx
+}
+
+function VoiceMessage({ src }) {
+  const audioRef = useRef(null)
+  const [playing, setPlaying] = useState(false)
+  const [progress, setProgress] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [speedIdx, setSpeedIdx] = useState(0)
+  const [peaks, setPeaks] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    if (!src) return undefined
+    ;(async () => {
+      try {
+        const res = await fetch(src)
+        const buf = await res.arrayBuffer()
+        const ctx = getVoiceAudioCtx()
+        if (!ctx) throw new Error('no audioctx')
+        const decoded = await ctx.decodeAudioData(buf.slice(0))
+        const raw = decoded.getChannelData(0)
+        const block = Math.floor(raw.length / VOICE_WAVE_BARS) || 1
+        const out = []
+        for (let i = 0; i < VOICE_WAVE_BARS; i++) {
+          let sum = 0
+          for (let j = 0; j < block; j++) sum += Math.abs(raw[i * block + j] || 0)
+          out.push(sum / block)
+        }
+        const max = Math.max(...out) || 1
+        if (!cancelled) setPeaks(out.map(v => Math.max(0.12, v / max)))
+      } catch {
+        if (!cancelled) setPeaks(Array.from({ length: VOICE_WAVE_BARS }, (_, i) => 0.25 + 0.55 * Math.abs(Math.sin(i * 1.3 + 0.6))))
+      }
+    })()
+    return () => { cancelled = true }
+  }, [src])
+
+  const togglePlay = () => {
+    const a = audioRef.current
+    if (!a) return
+    if (a.paused) { a.playbackRate = VOICE_SPEEDS[speedIdx]; a.play().catch(() => {}) } else a.pause()
+  }
+  const cycleSpeed = () => {
+    const next = (speedIdx + 1) % VOICE_SPEEDS.length
+    setSpeedIdx(next)
+    if (audioRef.current) audioRef.current.playbackRate = VOICE_SPEEDS[next]
+  }
+  const seek = (e) => {
+    const a = audioRef.current
+    const dur = a?.duration || duration
+    if (!a || !dur || !isFinite(dur)) return
+    const rect = e.currentTarget.getBoundingClientRect()
+    const ratio = Math.min(1, Math.max(0, (e.clientX - rect.left) / rect.width))
+    a.currentTime = ratio * dur
+    setProgress(ratio)
+  }
+  const fmt = (s) => {
+    if (!isFinite(s) || s < 0) s = 0
+    const m = Math.floor(s / 60)
+    const sec = Math.floor(s % 60)
+    return `${m}:${String(sec).padStart(2, '0')}`
+  }
+
+  const bars = peaks || Array.from({ length: VOICE_WAVE_BARS }, () => 0.3)
+  const shownTime = (playing || progress > 0) ? progress * duration : duration
+
+  return (
+    <div className="voice-msg">
+      <audio
+        ref={audioRef}
+        src={src}
+        preload="metadata"
+        onLoadedMetadata={e => {
+          const a = e.currentTarget
+          // MediaRecorder webm blobs often report Infinity until forced to seek.
+          if (a.duration === Infinity || Number.isNaN(a.duration)) { try { a.currentTime = 1e7 } catch {} }
+          else if (isFinite(a.duration)) setDuration(a.duration)
+        }}
+        onDurationChange={e => {
+          const a = e.currentTarget
+          if (isFinite(a.duration) && a.duration > 0) {
+            setDuration(a.duration)
+            if (a.currentTime > a.duration) { try { a.currentTime = 0 } catch {} }
+          }
+        }}
+        onTimeUpdate={e => { const a = e.currentTarget; if (isFinite(a.duration) && a.duration > 0) setProgress(a.currentTime / a.duration) }}
+        onPlay={() => setPlaying(true)}
+        onPause={() => setPlaying(false)}
+        onEnded={() => { setPlaying(false); setProgress(0) }}
+      />
+      <button className="voice-msg-play" onClick={togglePlay} title={playing ? 'Pause' : 'Play'}>
+        {playing
+          ? <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>
+          : <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M7 5.5v13a1 1 0 0 0 1.52.85l10.5-6.5a1 1 0 0 0 0-1.7L8.52 4.65A1 1 0 0 0 7 5.5z"/></svg>}
+      </button>
+      <div className="voice-msg-wave" onClick={seek}>
+        {bars.map((h, i) => (
+          <span
+            key={i}
+            className={`voice-bar${(i + 0.5) / bars.length <= progress ? ' voice-bar--played' : ''}`}
+            style={{ height: `${Math.round(h * 100)}%` }}
+          />
+        ))}
+      </div>
+      <div className="voice-msg-meta">
+        <span className="voice-msg-time">{fmt(shownTime)}</span>
+        <button className="voice-msg-speed" onClick={cycleSpeed} title="Playback speed">{VOICE_SPEEDS[speedIdx]}x</button>
+      </div>
+    </div>
+  )
 }
 
 // ── Moderation Inbox Panel (mod account only) ─────────────────────────────────
@@ -6760,6 +7009,14 @@ function isDefaultCommunity(item) {
   return String(item?.id || '') === 'reelms-community' || String(item?.name || '').toLowerCase() === 'reelms community'
 }
 
+function getCommunityMemberLevel(reelm, member) {
+  const roleIds = new Set((member?.roleIds || []).map(String))
+  const roles = (reelm?.roles || []).filter(r => roleIds.has(String(r.id)))
+  if (roles.some(r => isManagerRoleClient(r))) return 'admin'
+  if (roles.some(r => /beta/i.test(r.name || ''))) return 'beta'
+  return 'citizen'
+}
+
 function canManageReelmClient(reelm, uid) {
   if (!reelm || !uid) return false
   if (String(reelm.ownerId || '') === String(uid)) return true
@@ -9149,6 +9406,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [showMsgEmojiFor, setShowMsgEmojiFor] = useState(null)
   const [replyingTo, setReplyingTo] = useState(null)
   const [msgCtxMenu, setMsgCtxMenu] = useState(null)
+  const editorRef = useRef(null)
+  const savedRangeRef = useRef(null)
+  const [fmtMenu, setFmtMenu] = useState(null)
+  const [fmtColorOpen, setFmtColorOpen] = useState(false)
   useEffect(() => {
     if (!showMsgEmojiFor) return undefined
     const handler = (e) => {
@@ -9157,6 +9418,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [showMsgEmojiFor])
+  useEffect(() => {
+    if (!fmtMenu) return undefined
+    const close = (e) => { if (!e.target.closest?.('.fmt-menu')) { setFmtMenu(null); setFmtColorOpen(false) } }
+    const onKey = (e) => { if (e.key === 'Escape') { setFmtMenu(null); setFmtColorOpen(false) } }
+    const onScroll = () => { setFmtMenu(null); setFmtColorOpen(false) }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', onKey)
+    window.addEventListener('scroll', onScroll, true)
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', onKey); window.removeEventListener('scroll', onScroll, true) }
+  }, [fmtMenu])
   useEffect(() => {
     if (!msgCtxMenu) return undefined
     const handler = (e) => {
@@ -11155,10 +11426,133 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [slashMenu])
 
-  const insertSlashCommand = (opt) => {
-    const text = opt.args ? opt.cmd + ' ' : opt.cmd
+  // ── Rich text editor (contentEditable) helpers ──────────────────────────────
+  const FMT_COLORS = ['#ff4d4f', '#ff9f1c', '#ffd60a', '#34d399', '#22d3ee', '#3b82f6', '#a855f7', '#f472b6', '#ffffff', '#94a3b8', '#1f2937', '#000000']
+
+  // Move the caret to the end of the editor after we replace its contents.
+  const placeCaretAtEnd = (el) => {
+    if (!el) return
+    el.focus()
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    range.collapse(false)
+    const sel = window.getSelection()
+    sel.removeAllRanges()
+    sel.addRange(range)
+  }
+
+  // Replace the editor with plain text (used by mentions/slash/clear) and sync state.
+  const setEditorPlainText = (text) => {
     messageInputRef.current = text
     setMessageInput(text)
+    const el = editorRef.current
+    if (el) {
+      el.textContent = text
+      placeCaretAtEnd(el)
+    }
+  }
+
+  // Plain-text caret offset, so mention/slash detection keeps working in the rich editor.
+  const getCaretCharOffset = (el) => {
+    const sel = window.getSelection()
+    if (!sel || sel.rangeCount === 0 || !el) return 0
+    const range = sel.getRangeAt(0)
+    if (!el.contains(range.endContainer)) return 0
+    const pre = range.cloneRange()
+    pre.selectNodeContents(el)
+    pre.setEnd(range.endContainer, range.endOffset)
+    return pre.toString().length
+  }
+
+  const syncEditorTyping = (val) => {
+    const tMsgKey = selectedChat ? selectedChat.id : composeReelmMsgKey(selectedReelm, selectedChannel)
+    if (!tMsgKey) return
+    if (val.trim()) {
+      if (!isTypingRef.current) {
+        isTypingRef.current = true
+        socketEmitTyping(tMsgKey, { name: currentUser?.displayName || currentUser?.name || '', photo: currentUser?.photoURL || currentUser?.photo || '' })
+      }
+      clearTimeout(typingEmitTimer.current)
+      typingEmitTimer.current = setTimeout(() => {
+        isTypingRef.current = false
+        socketEmitTypingStop(tMsgKey)
+      }, 3000)
+    } else if (isTypingRef.current) {
+      isTypingRef.current = false
+      clearTimeout(typingEmitTimer.current)
+      socketEmitTypingStop(tMsgKey)
+    }
+  }
+
+  const handleEditorInput = (e) => {
+    const el = e.currentTarget
+    const val = el.innerText.replace(/\n$/, '')
+    // Clear leftover <br>/<div> so the :empty placeholder shows again.
+    if (!val.trim() && el.innerHTML !== '') el.innerHTML = ''
+    messageInputRef.current = val
+    setMessageInput(val)
+    const cursor = getCaretCharOffset(el)
+    const before = val.slice(0, cursor)
+    const mentionMatch = before.match(/@(\w*)$/)
+    if (mentionMatch) { setMentionQuery({ query: mentionMatch[1], triggerStart: cursor - mentionMatch[0].length }); setMentionSelIdx(0) }
+    else setMentionQuery(null)
+    const slashMatch = val.match(/^\/(\w*)$/)
+    if (slashMatch) { setSlashMenu({ filter: slashMatch[1] }); setSlashSelIdx(0); setSlashExpandedBot(null); setSlashShowAll(false) }
+    else { setSlashMenu(null); setSlashExpandedBot(null); setSlashShowAll(false) }
+    syncEditorTyping(val)
+  }
+
+  const handleEditorContextMenu = (e) => {
+    const sel = window.getSelection()
+    if (!sel || sel.isCollapsed || sel.rangeCount === 0 || !editorRef.current?.contains(sel.anchorNode)) return
+    e.preventDefault()
+    savedRangeRef.current = sel.getRangeAt(0).cloneRange()
+    setFmtColorOpen(false)
+    setFmtMenu({ x: e.clientX, y: e.clientY })
+  }
+
+  const restoreSavedRange = () => {
+    const el = editorRef.current
+    if (!el || !savedRangeRef.current) return false
+    el.focus()
+    const sel = window.getSelection()
+    sel.removeAllRanges()
+    sel.addRange(savedRangeRef.current)
+    return true
+  }
+
+  const applyEditorFormat = (kind) => {
+    if (!restoreSavedRange()) return
+    try { document.execCommand('styleWithCSS', false, true) } catch {}
+    if (kind === 'mono') {
+      const range = savedRangeRef.current
+      const code = document.createElement('code')
+      code.className = 'msg-mono'
+      try { range.surroundContents(code) }
+      catch { code.appendChild(range.extractContents()); range.insertNode(code) }
+    } else {
+      const cmd = { bold: 'bold', italic: 'italic', underline: 'underline', strike: 'strikeThrough' }[kind]
+      if (cmd) document.execCommand(cmd, false, null)
+    }
+    const el = editorRef.current
+    if (el) { messageInputRef.current = el.innerText.replace(/\n$/, ''); setMessageInput(messageInputRef.current) }
+    setFmtMenu(null)
+    setFmtColorOpen(false)
+  }
+
+  const applyEditorColor = (hex) => {
+    if (!restoreSavedRange()) return
+    try { document.execCommand('styleWithCSS', false, true) } catch {}
+    document.execCommand('foreColor', false, hex)
+    const el = editorRef.current
+    if (el) { messageInputRef.current = el.innerText.replace(/\n$/, ''); setMessageInput(messageInputRef.current) }
+    setFmtMenu(null)
+    setFmtColorOpen(false)
+  }
+
+  const insertSlashCommand = (opt) => {
+    const text = opt.args ? opt.cmd + ' ' : opt.cmd
+    setEditorPlainText(text)
     setSlashMenu(null)
     setSlashSelIdx(0)
     setSlashShowAll(false)
@@ -11232,8 +11626,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     const start = mentionQuery.triggerStart
     const end = start + 1 + mentionQuery.query.length
     const newText = cur.slice(0, start) + `@${opt.displayName} ` + cur.slice(end)
-    messageInputRef.current = newText
-    setMessageInput(newText)
+    setEditorPlainText(newText)
     setMentionQuery(null)
     setMentionSelIdx(0)
   }
@@ -11271,6 +11664,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const sendMessage = async () => {
     const text = messageInputRef.current.trim()
+    const richMarkup = editorHasFormatting(editorRef.current) ? serializeRichEditor(editorRef.current).trim() : ''
+    const richText = richMarkup && richMarkup !== text ? richMarkup : null
     const attach = pendingAttachment
     if (!text && !attach) return
     if (isReelmsSystemChat(selectedChat)) {
@@ -11294,6 +11689,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (attach) setPendingAttachment(null)
     messageInputRef.current = ''
     setMessageInput('')
+    if (editorRef.current) editorRef.current.innerHTML = ''
+    setFmtMenu(null)
     setReplyingTo(null)
     if (isTypingRef.current) {
       isTypingRef.current = false
@@ -11332,6 +11729,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       const textId = attach ? `${baseMessageId}_text` : baseMessageId
       const msg = {
         id: textId, text,
+        ...(richText ? { richText } : {}),
         sender: { id: currentUser.id, name: currentUser.name, photo: getPersonPhoto(currentUser) || null },
         time: now,
         ...(replySnap ? { replyTo: { id: replySnap.id, text: replySnap.text, senderName: replySnap.senderName, senderId: replySnap.senderId } } : {})
@@ -11580,8 +11978,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const renderReelmMembersPanel = (panelKey = 'reelm') => {
     if (!selectedReelm) return null
-    const members = selectedReelm.members || []
+    let members = selectedReelm.members || []
     if (members.length === 0) return null
+    if (isDefaultCommunity(selectedReelm)) {
+      const myMember = members.find(m => String(m.userId) === String(uid))
+      if (getCommunityMemberLevel(selectedReelm, myMember) === 'citizen') {
+        members = members.filter(m => String(m.userId) === String(uid) || getCommunityMemberLevel(selectedReelm, m) !== 'citizen')
+      }
+    }
     const presence = reelmPresence[selectedReelm.id] || {}
     const { groups, getMemberPresence, getMemberStatus } = buildReelmMemberGroupsClient({
       reelm: selectedReelm,
@@ -13951,7 +14355,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                         <span className="msg-reply-quote-text">{msg.replyTo.text ? msg.replyTo.text.slice(0, 120) : '📎'}</span>
                                       </div>
                                     )}
-                                    {msg.text && <div className="msg-text">{renderMentions(msg.text, uid, selectedReelm?.members, selectedReelm?.roles)}</div>}
+                                    {msg.text && <div className="msg-text">{renderRichMessage(msg.richText || msg.text, uid, selectedReelm?.members, selectedReelm?.roles, !!msg.richText)}</div>}
                                     {msg.text && (() => { const ytId = extractYouTubeId(msg.text); return ytId ? (
                                       <div className="msg-yt-embed">
                                         <iframe
@@ -13964,6 +14368,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                     ) : null })()}
                                     {msg.mediaUrl && msg.mediaType === 'image' && <img src={msg.mediaUrl} alt="" className="msg-media-img" onClick={() => setLightboxImg(msg.mediaUrl)} />}
                                     {msg.mediaUrl && msg.mediaType === 'video' && <video src={msg.mediaUrl} className="msg-media-video" controls />}
+                                    {msg.mediaUrl && msg.mediaType === 'audio' && <VoiceMessage src={msg.mediaUrl} />}
                                     {msg.mediaUrl && (msg.mediaType === 'gif' || msg.mediaType === 'sticker') && <img src={msg.mediaUrl} alt="" className={msg.mediaType === 'sticker' ? 'msg-sticker-img' : 'msg-gif-img'} />}
                                     {msg.fileUrl && (
                                       <a href={msg.fileUrl} download={msg.fileName} className="msg-doc-card">
@@ -14012,9 +14417,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                               <span className="msg-reply-quote-text">{msg.replyTo.text ? msg.replyTo.text.slice(0, 120) : '📎'}</span>
                                             </div>
                                           )}
-                                          {msg.text && <span className="bubble-text">{renderMentions(msg.text, uid, selectedReelm?.members, selectedReelm?.roles)}</span>}
+                                          {msg.text && <span className="bubble-text">{renderRichMessage(msg.richText || msg.text, uid, selectedReelm?.members, selectedReelm?.roles, !!msg.richText)}</span>}
                                           {msg.mediaUrl && msg.mediaType === 'image' && <img src={msg.mediaUrl} alt="" className="msg-media-img" onClick={() => setLightboxImg(msg.mediaUrl)} />}
                                           {msg.mediaUrl && msg.mediaType === 'video' && <video src={msg.mediaUrl} className="msg-media-video" controls />}
+                                          {msg.mediaUrl && msg.mediaType === 'audio' && <VoiceMessage src={msg.mediaUrl} />}
                                           {msg.mediaUrl && (msg.mediaType === 'gif' || msg.mediaType === 'sticker') && <img src={msg.mediaUrl} alt="" className={msg.mediaType === 'sticker' ? 'msg-sticker-img' : 'msg-gif-img'} />}
                                           {msg.fileUrl && (
                                             <a href={msg.fileUrl} download={msg.fileName} className="msg-doc-card">
@@ -14257,41 +14663,20 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           <div className={`msg-outer-row${spotifyNowPlaying ? ' msg-outer-row--spotify' : ''}`}>
                           <div className="msg-bar">
                           <div className={`msg-input-wrap${pendingAttachment ? ' msg-input-wrap--has-attach' : ''}`}>
-                            <input
-                              className="msg-input"
-                              placeholder={selectedChatSystemLocked ? 'Reelms System is read-only.' : (selectedChatBlockedEntry ? 'You blocked this user. Unblock to send messages.' : (isAnnouncement ? 'Post an announcement' : 'Message'))}
-                              disabled={!canPost}
-                              value={messageInput}
-                              onChange={e => {
-                                const val = e.target.value
-                                messageInputRef.current = val
-                                setMessageInput(val)
-                                const cursor = e.target.selectionStart
-                                const before = val.slice(0, cursor)
-                                const match = before.match(/@(\w*)$/)
-                                if (match) { setMentionQuery({ query: match[1], triggerStart: cursor - match[0].length }); setMentionSelIdx(0) }
-                                else setMentionQuery(null)
-                                const slashMatch = val.match(/^\/(\w*)$/)
-                                if (slashMatch) { setSlashMenu({ filter: slashMatch[1] }); setSlashSelIdx(0); setSlashExpandedBot(null); setSlashShowAll(false) }
-                                else { setSlashMenu(null); setSlashExpandedBot(null); setSlashShowAll(false) }
-                                const tMsgKey = selectedChat ? selectedChat.id : composeReelmMsgKey(selectedReelm, selectedChannel)
-                                if (tMsgKey) {
-                                  if (val.trim()) {
-                                    if (!isTypingRef.current) {
-                                      isTypingRef.current = true
-                                      socketEmitTyping(tMsgKey, { name: currentUser?.displayName || currentUser?.name || '', photo: currentUser?.photoURL || currentUser?.photo || '' })
-                                    }
-                                    clearTimeout(typingEmitTimer.current)
-                                    typingEmitTimer.current = setTimeout(() => {
-                                      isTypingRef.current = false
-                                      socketEmitTypingStop(tMsgKey)
-                                    }, 3000)
-                                  } else if (isTypingRef.current) {
-                                    isTypingRef.current = false
-                                    clearTimeout(typingEmitTimer.current)
-                                    socketEmitTypingStop(tMsgKey)
-                                  }
-                                }
+                            <div
+                              ref={editorRef}
+                              className="msg-input msg-input--rich"
+                              contentEditable={canPost}
+                              suppressContentEditableWarning
+                              role="textbox"
+                              aria-multiline="true"
+                              data-placeholder={selectedChatSystemLocked ? 'Reelms System is read-only.' : (selectedChatBlockedEntry ? 'You blocked this user. Unblock to send messages.' : (isAnnouncement ? 'Post an announcement' : 'Message'))}
+                              onInput={handleEditorInput}
+                              onContextMenu={handleEditorContextMenu}
+                              onPaste={e => {
+                                e.preventDefault()
+                                const txt = e.clipboardData?.getData('text/plain') || ''
+                                document.execCommand('insertText', false, txt)
                               }}
                               onKeyDown={e => {
                                 if (slashMenu && slashOptions.length > 0) {
@@ -14306,9 +14691,32 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                   else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); insertMention(mentionOptions[mentionSelIdx]); return }
                                   else if (e.key === 'Escape') { setMentionQuery(null); return }
                                 }
-                                if (e.key === 'Enter' && !e.shiftKey) sendMessage()
+                                if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
                               }}
                             />
+                            {fmtMenu && ReactDOM.createPortal(
+                              <div className="fmt-menu" style={{ left: fmtMenu.x, top: fmtMenu.y }} onMouseDown={e => e.preventDefault()} onContextMenu={e => e.preventDefault()}>
+                                {!fmtColorOpen ? (
+                                  <div className="fmt-menu-row">
+                                    <button className="fmt-btn" title="Bold" onClick={() => applyEditorFormat('bold')}><b>B</b></button>
+                                    <button className="fmt-btn" title="Italic" onClick={() => applyEditorFormat('italic')}><i>I</i></button>
+                                    <button className="fmt-btn" title="Underline" onClick={() => applyEditorFormat('underline')}><u>U</u></button>
+                                    <button className="fmt-btn" title="Strikethrough" onClick={() => applyEditorFormat('strike')}><s>S</s></button>
+                                    <button className="fmt-btn fmt-btn--mono" title="Monospace" onClick={() => applyEditorFormat('mono')}>{'</>'}</button>
+                                    <button className="fmt-btn fmt-btn--color" title="Color" onClick={() => setFmtColorOpen(true)}>
+                                      <span className="fmt-color-dot" />
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="fmt-color-grid">
+                                    {FMT_COLORS.map(c => (
+                                      <button key={c} className="fmt-color-swatch" style={{ background: c }} title={c} onClick={() => applyEditorColor(c)} />
+                                    ))}
+                                  </div>
+                                )}
+                              </div>,
+                              document.body
+                            )}
                             {pendingAttachment && (
                               <div className="msg-attach-preview">
                                 {pendingAttachment.mediaType === 'image' ? (
@@ -14340,10 +14748,15 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                   {showInputEmoji && (
                                     <div className="input-emoji-picker-wrap">
                                       <EmojiPickerReact emojiStyle={EmojiStyle.APPLE} height={320} width={280} searchDisabled previewConfig={{ showPreview: false }} onEmojiClick={d => {
-                                        const curr = messageInputRef.current || ''
-                                        const next = curr + d.emoji
-                                        messageInputRef.current = next
-                                        setMessageInput(next)
+                                        const el = editorRef.current
+                                        if (el) {
+                                          el.focus()
+                                          const sel = window.getSelection()
+                                          if (!sel.rangeCount || !el.contains(sel.anchorNode)) placeCaretAtEnd(el)
+                                          document.execCommand('insertText', false, d.emoji)
+                                          messageInputRef.current = el.innerText.replace(/\n$/, '')
+                                          setMessageInput(messageInputRef.current)
+                                        }
                                         setShowInputEmoji(false)
                                       }} />
                                     </div>

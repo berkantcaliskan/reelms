@@ -5841,6 +5841,15 @@ h6 {
   word-break: break-word;
   overflow-wrap: break-word;
   hyphens: auto;
+  white-space: pre-wrap;
+}
+.msg-text .msg-mono,
+.bubble-text .msg-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0 3px;
+  border-radius: 4px;
 }
 
 .msg-yt-embed {
@@ -5875,6 +5884,72 @@ h6 {
   border-radius: 12px;
   display: block;
 }
+
+/* Voice message player (play/pause · waveform · speed) */
+.voice-msg {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 210px;
+  max-width: 280px;
+  padding: 4px 2px;
+}
+.voice-msg-play {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  border: none;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(var(--ta-rgb), 0.85);
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.1s ease, background 0.15s ease;
+}
+.voice-msg-play:hover { transform: scale(1.06); }
+.voice-msg-wave {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  height: 30px;
+  cursor: pointer;
+  min-width: 0;
+}
+.voice-bar {
+  flex: 1 1 0;
+  min-width: 2px;
+  border-radius: 2px;
+  background: rgba(224, 201, 188, 0.32);
+  transition: background 0.12s ease;
+}
+.voice-bar--played { background: rgba(var(--ta-rgb), 0.95); }
+.voice-msg-meta {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 3px;
+}
+.voice-msg-time {
+  font-size: 0.7rem;
+  color: rgba(224, 201, 188, 0.62);
+  font-variant-numeric: tabular-nums;
+}
+.voice-msg-speed {
+  border: none;
+  background: rgba(224, 201, 188, 0.14);
+  color: rgba(224, 201, 188, 0.9);
+  font-size: 0.66rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.voice-msg-speed:hover { background: rgba(224, 201, 188, 0.26); }
 
 .msg-doc-card {
   display: flex;
@@ -6250,6 +6325,86 @@ h6 {
   outline: none;
 }
 .msg-input::placeholder { color: rgba(235, 225, 210, 0.32); }
+
+/* Rich (contentEditable) message composer */
+.msg-input--rich {
+  height: auto;
+  min-height: 22px;
+  max-height: 120px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.4;
+  cursor: text;
+}
+.msg-input--rich:empty::before {
+  content: attr(data-placeholder);
+  color: rgba(235, 225, 210, 0.32);
+  pointer-events: none;
+}
+.msg-input--rich code,
+.msg-input--rich .msg-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.92em;
+  background: rgba(255, 255, 255, 0.08);
+  padding: 0 3px;
+  border-radius: 4px;
+}
+
+/* Right-click formatting menu + color palette */
+.fmt-menu {
+  position: fixed;
+  z-index: 100000;
+  background: rgba(var(--ta-rgb, 24, 22, 28), 0.18);
+  -webkit-backdrop-filter: blur(48px) saturate(2.2);
+  backdrop-filter: blur(48px) saturate(2.2);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  padding: 6px;
+}
+.fmt-menu-row {
+  display: flex;
+  gap: 2px;
+}
+.fmt-btn {
+  width: 30px;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  color: var(--text-fg);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background 0.12s ease;
+}
+.fmt-btn:hover { background: rgba(255, 255, 255, 0.12); }
+.fmt-btn--mono { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 0.78rem; }
+.fmt-color-dot {
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: conic-gradient(#ff4d4f, #ffd60a, #34d399, #3b82f6, #a855f7, #ff4d4f);
+  border: 1.5px solid rgba(255, 255, 255, 0.5);
+}
+.fmt-color-grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 4px;
+  width: 192px;
+}
+.fmt-color-swatch {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+.fmt-color-swatch:hover { transform: scale(1.12); }
 
 /* Inline buttons (emoji · gif · voice) inside the input row */
 .msg-inline-actions {
