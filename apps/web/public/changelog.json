@@ -1,6 +1,71 @@
 {
-  "current": "0.1.0",
+  "current": "1.1",
   "releases": [
+    {
+      "version": "1.1",
+      "date": "12/06/2026",
+      "highlights": "Full Profile, Companions & E2EE",
+      "notes": [
+        "End-to-end encryption added for direct messages",
+        "Full Profile page — edit display name, bio, and more from a dedicated profile view",
+        "Built-in bots introduced — meet Reelms Companions",
+        "GIF support added in messages",
+        "Voice messages, message deletion, and reply improvements",
+        "Profile theming — users can display their profile in their own custom design",
+        "Frosted glass UI applied to more surfaces and menus",
+        "Username changes are now limited to once every 14 days"
+      ],
+      "notes_tr": [
+        "Direkt mesajlar için uçtan uca şifreleme eklendi",
+        "Tam Profil sayfası — görünen ad, biyografi ve daha fazlasını ayrı bir profil görünümünden düzenle",
+        "Yerleşik botlar tanıtıldı — Reelms Companions ile tanışın",
+        "Mesajlarda GIF desteği eklendi",
+        "Ses mesajı, mesaj silme ve yanıt geliştirmeleri",
+        "Profil teması — kullanıcılar profillerini kendi özel tasarımlarında görüntüleyebilir",
+        "Frosted glass arayüzü daha fazla yüzey ve menüye uygulandı",
+        "Kullanıcı adı değişiklikleri artık 14 günde bir ile sınırlandırıldı"
+      ],
+      "notes_de": [
+        "Ende-zu-Ende-Verschlüsselung für Direktnachrichten hinzugefügt",
+        "Vollständiges Profil — Anzeigename, Bio und mehr in einer eigenen Profilansicht bearbeiten",
+        "Integrierte Bots eingeführt — lernt Reelms Companions kennen",
+        "GIF-Unterstützung in Nachrichten hinzugefügt",
+        "Sprachnachrichten, Nachrichtenlöschung und Antwort-Verbesserungen",
+        "Profil-Design — Nutzer können Profile in ihrem eigenen Design anzeigen",
+        "Frosted-Glass-Oberfläche auf mehr Menüs und Elemente angewendet",
+        "Nutzernamen können nur noch alle 14 Tage geändert werden"
+      ],
+      "notes_es": [
+        "Cifrado de extremo a extremo añadido para mensajes directos",
+        "Perfil completo — edita el nombre, la biografía y más desde una vista de perfil dedicada",
+        "Bots integrados introducidos — conoce a Reelms Companions",
+        "Soporte para GIFs añadido en mensajes",
+        "Mensajes de voz, eliminación de mensajes y mejoras en respuestas",
+        "Temas de perfil — los usuarios pueden mostrar su perfil con su propio diseño personalizado",
+        "Interfaz de vidrio esmerilado aplicada a más superficies y menús",
+        "Los cambios de nombre de usuario ahora están limitados a una vez cada 14 días"
+      ],
+      "notes_fr": [
+        "Chiffrement de bout en bout ajouté pour les messages directs",
+        "Profil complet — modifiez le nom d'affichage, la bio et plus depuis une vue dédiée",
+        "Bots intégrés introduits — découvrez Reelms Companions",
+        "Support des GIFs ajouté dans les messages",
+        "Messages vocaux, suppression de messages et améliorations des réponses",
+        "Thème de profil — les utilisateurs peuvent afficher leur profil dans leur propre design",
+        "Interface en verre dépoli appliquée à plus de surfaces et de menus",
+        "Les changements de pseudonyme sont désormais limités à une fois toutes les 2 semaines"
+      ],
+      "notes_pt": [
+        "Criptografia de ponta a ponta adicionada para mensagens diretas",
+        "Perfil completo — edite nome de exibição, biografia e mais em uma visualização dedicada",
+        "Bots integrados introduzidos — conheça os Reelms Companions",
+        "Suporte a GIFs adicionado nas mensagens",
+        "Mensagens de voz, exclusão de mensagens e melhorias nas respostas",
+        "Tema de perfil — usuários podem exibir perfis com seu próprio design personalizado",
+        "Interface de vidro fosco aplicada a mais superfícies e menus",
+        "Alterações de nome de usuário agora são limitadas a uma vez a cada 14 dias"
+      ]
+    },
     {
       "version": "0.1.0",
       "date": "2026-03-17",

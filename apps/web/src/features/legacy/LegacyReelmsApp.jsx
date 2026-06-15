@@ -12848,7 +12848,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           <div className="accs-section-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                             Reelms
                             <span style={{ fontSize: '0.72rem', fontWeight: 400, color: 'rgba(var(--ta-rgb), 0.4)', background: 'rgba(var(--ta-rgb), 0.07)', borderRadius: 8, padding: '2px 8px' }}>
-                              Beta 1.0/2062026
+                              1.1/12062026
                             </span>
                           </div>
                           {updateAvailable ? (
@@ -12867,7 +12867,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           <div className="accs-section-title">{t('release_notes')}</div>
                           {changelog.length === 0 ? (
                             <p style={{ margin: '8px 0 0', fontSize: '0.78rem', color: 'rgba(var(--ta-rgb), 0.4)' }}>Loading…</p>
-                          ) : changelog.map(release => (
+                          ) : changelog.map(release => {
+                            const langKey = `notes_${language}`
+                            const notes = release[langKey] || release.notes || []
+                            return (
                             <div key={release.version} className="about-release">
                               <div className="about-release-header">
                                 <span className="about-release-version">v{release.version}</span>
@@ -12877,12 +12880,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 )}
                               </div>
                               <ul className="about-release-notes">
-                                {release.notes.map((note, i) => (
+                                {notes.map((note, i) => (
                                   <li key={i}>{note}</li>
                                 ))}
                               </ul>
                             </div>
-                          ))}
+                            )
+                          })}
                         </div>
                       </div>
                     )}
