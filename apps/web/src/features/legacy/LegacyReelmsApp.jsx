@@ -2394,6 +2394,7 @@ function PhotoEditModal({ previewCanvasRef, photoScale, setPhotoScale, onMouseDo
 }
 
 function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChange, status, onStatusChange, bio, onBioChange, socialLinks, onSocialLinksChange, activePlatforms, onActivePlatformsChange, iconFilter, reelms, uid, spotifyConnected, spotifyNowPlaying, onSpotifyConnect, onSpotifyDisconnect, activity, onActivityChange, onViewFullProfile, initialEditOpen = false }) {
+  const t = useT()
   const popupRef = useRef(null)
   const ppPhotoInputRef = useRef(null)
   const ppCoverInputRef = useRef(null)
