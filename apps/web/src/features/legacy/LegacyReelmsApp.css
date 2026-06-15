@@ -6328,8 +6328,7 @@ h6 {
 
 /* Rich (contentEditable) message composer */
 .msg-input--rich {
-  height: auto !important;
-  align-self: center;
+  height: auto;
   min-height: 22px;
   max-height: 120px;
   overflow-y: auto;
@@ -13930,8 +13929,8 @@ button, input, select, textarea,
 }
 .fpp-roles-section,
 .fpp-mod-section {
-  margin: 6px 12px 0;
-  padding: 6px 8px;
+  margin: 6px 0 0;
+  padding: 6px 14px;
 }
 .fpp-role-badges {
   display: flex;
