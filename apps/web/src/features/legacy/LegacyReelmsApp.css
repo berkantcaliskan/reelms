@@ -10782,15 +10782,17 @@ h6 {
 .fp-avatar-wrap--edit:hover .fp-media-edit-overlay { opacity: 1; }
 .fp-edit-profile-btn {
   display: inline-block;
-  margin-top: 8px;
-  padding: 3px 7px;
+  margin-top: 5px;
+  margin-left: 6px;
+  padding: 2px 7px;
   border-radius: 999px;
   border: 1.5px solid rgba(var(--ta-rgb), 0.3);
   background: transparent;
   color: rgba(var(--ta-rgb), 0.75);
-  font-size: 0.8rem;
+  font-size: 0.72rem;
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
+  vertical-align: middle;
 }
 .fp-edit-profile-btn:hover { border-color: rgba(var(--ta-rgb), 0.6); color: rgba(var(--ta-rgb), 0.95); background: rgba(var(--ta-rgb), 0.06); }
 .fp-edit-profile-btn--done { border-color: rgba(var(--ta-rgb), 0.55); color: rgba(var(--ta-rgb), 0.95); background: rgba(var(--ta-rgb), 0.1); }
@@ -10856,7 +10858,8 @@ h6 {
 /* "Tüm profili gör" trigger buttons */
 .profile-view-full-btn {
   display: block;
-  width: 100%;
+  width: calc(100% - 16px);
+  margin: 2px 8px 4px;
   padding: 5px 8px;
   background: none;
   border: none;
@@ -10866,9 +10869,9 @@ h6 {
   cursor: pointer;
   transition: color 0.15s, background 0.15s;
   letter-spacing: 0.02em;
-  border-radius: 0 0 8px 8px;
+  border-radius: 8px;
 }
-.profile-view-full-btn:hover { color: rgba(var(--ta-rgb),0.8); background: rgba(var(--ta-rgb),0.06); }
+.profile-view-full-btn:hover { color: rgba(var(--ta-rgb),0.8); background: rgba(var(--ta-rgb),0.06); border-radius: 8px; }
 
 .fpp-view-full-btn {
   display: block;
