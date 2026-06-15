@@ -7,8 +7,8 @@ import { authenticate } from '../middleware/authenticate.js'
 import { isReelmMember } from '../../modules/reelms/access.js'
 
 export const AI_BOT_UID = env.REELMS_AI_BOT_UID
-const AI_BOT_USERNAME = 'reelmsintelligence'
-const AI_BOT_NAME = 'Reelms Intelligence'
+const AI_BOT_USERNAME = 'reelmsai'
+const AI_BOT_NAME = 'Reelms AI'
 
 async function ensureAIBotProfile() {
   const existing = await getDoc<any>(userPk(AI_BOT_UID), 'profile').catch(() => null)

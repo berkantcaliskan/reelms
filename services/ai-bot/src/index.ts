@@ -3,7 +3,7 @@ import { ReelmsAIBot } from './ReelmsAIBot.js'
 const bot = new ReelmsAIBot()
 
 bot.start().catch((err) => {
-  console.error('[Reelms Intelligence] Başlatma hatası:', err)
+  console.error('[Reelms AI] Başlatma hatası:', err)
   process.exit(1)
 })
 

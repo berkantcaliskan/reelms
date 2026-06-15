@@ -11,8 +11,8 @@ export interface CommandContext {
 }
 
 const HELP_TEXT = [
-  '🤖 **Reelms Intelligence commands:**',
-  '`@reelms-intelligence <question>` or `/ai <question>` — Chat with AI',
+  '🤖 **Reelms AI commands:**',
+  '`@reelmsai <question>` or `/ai <question>` — Chat with AI',
   '`/summarize [n]` — Summarize the last N messages (default: 30)',
   '`/digest` — Digest of the last 24 hours',
   '`/ai-reset` — Clear chat history'

@@ -30,9 +30,9 @@ export class ReelmsAIBot {
   private digestTimers = new Map<string, NodeJS.Timeout>()
 
   async start() {
-    console.log('[Reelms Intelligence] Başlatılıyor...')
+    console.log('[Reelms AI] Başlatılıyor...')
     this.creds = await this.authenticate()
-    console.log(`[Reelms Intelligence] Auth tamam — UID: ${this.creds.uid}`)
+    console.log(`[Reelms AI] Auth tamam — UID: ${this.creds.uid}`)
     this.connect()
   }
 
@@ -93,22 +93,22 @@ export class ReelmsAIBot {
         this.trackReelm(reelm)
         this.joinChannels(reelm.channels)
       }
-      console.log(`[Reelms Intelligence] ${reelms.length} reelm'e katıldı`)
+      console.log(`[Reelms AI] ${reelms.length} reelm'e katıldı`)
     })
 
     this.socket.on('ai-bot:join-reelm', ({ reelmId, reelmName, channels }: { reelmId: string; reelmName: string; channels: ChannelRef[] }) => {
       const reelm: BotReelm = { id: reelmId, name: reelmName, channels }
       this.trackReelm(reelm)
       this.joinChannels(channels)
-      console.log(`[Reelms Intelligence] Yeni reelm'e eklendi: ${reelmName}`)
+      console.log(`[Reelms AI] Yeni reelm'e eklendi: ${reelmName}`)
     })
 
     this.socket.on('disconnect', (reason: string) => {
-      console.warn(`[Reelms Intelligence] Bağlantı kesildi: ${reason}`)
+      console.warn(`[Reelms AI] Bağlantı kesildi: ${reason}`)
     })
 
     this.socket.on('connect_error', (err: Error) => {
-      console.error(`[Reelms Intelligence] Bağlantı hatası: ${err.message}`)
+      console.error(`[Reelms AI] Bağlantı hatası: ${err.message}`)
     })
 
     this.socket.on('reelms:message', (payload: { msgKey: string; message: any }) => {

@@ -6661,9 +6661,9 @@ h6 {
   right: 0;
   width: 320px;
   height: 400px;
-  background: rgba(22, 20, 18, 0.92);
-  -webkit-backdrop-filter: blur(32px) saturate(1.6);
-  backdrop-filter: blur(32px) saturate(1.6);
+  background: rgba(var(--ta-rgb), 0.18);
+  -webkit-backdrop-filter: blur(48px) saturate(2.2);
+  backdrop-filter: blur(48px) saturate(2.2);
   border: 1px solid rgba(255,255,255,0.1);
   border-radius: 16px;
   box-shadow: 0 8px 40px rgba(0,0,0,0.45);

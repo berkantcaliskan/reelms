@@ -12276,7 +12276,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     setFullProfileTarget({ isSelf: false, user: friend })
                   }}
                 >
-                  Arkadaş profilini gör
+                  {t('bar_view_friend_profile')}
                 </button>
               )}
               {pinnedItemIds.includes(barCtxMenu.item.id) ? (
@@ -12292,7 +12292,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     })
                   }}
                 >
-                  Sabitlemeyi kaldır
+                  {t('bar_unpin')}
                 </button>
               ) : (
                 <button
@@ -12308,7 +12308,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     })
                   }}
                 >
-                  {pinnedItemIds.length >= 5 ? 'Sabitle (maks. 5)' : 'Sabitle'}
+                  {pinnedItemIds.length >= 5 ? t('bar_pin_max') : t('bar_pin')}
                 </button>
               )}
               {barCtxMenu.item.itemType === 'chat' && (
@@ -12322,7 +12322,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     toggleMuteChatById(item.id)
                   }}
                 >
-                  {mutedChatIds.map(String).includes(String(barCtxMenu.item.id)) ? 'Bildirimleri aç' : 'Bildirimleri sessize al'}
+                  {mutedChatIds.map(String).includes(String(barCtxMenu.item.id)) ? t('bar_unmute') : t('bar_mute_notifications')}
                 </button>
               )}
               {barCtxMenu.item.itemType === 'reelm' && (
@@ -12336,7 +12336,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     toggleMuteReelmById(item.id)
                   }}
                 >
-                  {mutedReelmIds.map(String).includes(String(barCtxMenu.item.id)) ? 'Bildirimleri aç' : 'Sessize al'}
+                  {mutedReelmIds.map(String).includes(String(barCtxMenu.item.id)) ? t('bar_unmute') : t('bar_mute')}
                 </button>
               )}
               <button
@@ -12349,7 +12349,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   toggleHideBarItem(item.id)
                 }}
               >
-                {hiddenBarIds.map(String).includes(String(barCtxMenu.item.id)) ? 'Dinamik sohbetlerde göster' : 'Dinamik sohbetlerde gizle'}
+                {hiddenBarIds.map(String).includes(String(barCtxMenu.item.id)) ? t('bar_show_in_dynamic') : t('bar_hide_in_dynamic')}
               </button>
               {barCtxMenu.item.itemType === 'chat' && barCtxMenu.item.type === 'dm' && (
                 <button
@@ -12362,7 +12362,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     deleteConversation(item.id)
                   }}
                 >
-                  Sohbeti sil
+                  {t('bar_delete_chat')}
                 </button>
               )}
               {barCtxMenu.item.itemType === 'chat' && barCtxMenu.item.type === 'group' && (
@@ -12376,7 +12376,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     clearChatMessages(item.id)
                   }}
                 >
-                  Sohbeti temizle
+                  {t('bar_clear_chat')}
                 </button>
               )}
             </div>

@@ -2,7 +2,7 @@
   "name": "@reelms/ai-bot",
   "version": "0.1.0",
   "private": true,
-  "description": "Reelms Intelligence — AI assistant bot service",
+  "description": "Reelms AI — AI assistant bot service",
   "type": "module",
   "main": "src/index.ts",
   "scripts": {

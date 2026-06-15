@@ -26,8 +26,8 @@ export async function handleAsk(ctx: CommandContext): Promise<string> {
 
   if (!args.trim()) {
     return [
-      '👋 Hi! I\'m Reelms Intelligence.',
-      'Use `@reelms-intelligence <question>` or `/ai <question>` to ask me anything.',
+      '👋 Hi! I\'m Reelms AI.',
+      'Use `@reelmsai <question>` or `/ai <question>` to ask me anything.',
       'Use `/summarize [n]` to summarize the last N messages.',
       'Use `/digest` to get today\'s digest.',
       'Use `/ai-reset` to clear chat history.'
