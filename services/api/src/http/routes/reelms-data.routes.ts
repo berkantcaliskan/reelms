@@ -488,6 +488,8 @@ export function createReelmsDataRouter(io: Server) {
   const USERNAME_RE = /^[a-z0-9._-]{3,30}$/
   const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   const REELM_ID_RE = /^[a-zA-Z0-9._-]{1,80}$/
+  const DAY_MS = 24 * 60 * 60 * 1000
+  const USERNAME_CHANGE_COOLDOWN_MS = 14 * DAY_MS
 
 
   const uniqueIndexPk = (kind: 'USERNAME' | 'EMAIL', value: string) => `${kind}#${value}`
@@ -558,11 +560,36 @@ export function createReelmsDataRouter(io: Server) {
     if (desiredUsername && !USERNAME_RE.test(desiredUsername)) return { ok: false as const, status: 400, error: 'invalid_username', code: 'auth/invalid-username' }
     if (desiredContact && !EMAIL_RE.test(desiredContact)) return { ok: false as const, status: 400, error: 'invalid_email', code: 'auth/invalid-email' }
 
+    // Limit username changes to once every 14 days. Only an actual change away from a
+    // previously set username counts — first-time setting (registration) is always allowed.
+    const previousUsername = normalizeUsername((existing as any)?.username)
+    const usernameChanged = Boolean(desiredUsername) && desiredUsername !== previousUsername
+    if (usernameChanged && previousUsername) {
+      const lastChangedAt = Number((existing as any)?.usernameChangedAt || 0)
+      const nextAllowedAt = lastChangedAt + USERNAME_CHANGE_COOLDOWN_MS
+      if (lastChangedAt && Date.now() < nextAllowedAt) {
+        const retryAfterDays = Math.ceil((nextAllowedAt - Date.now()) / DAY_MS)
+        return {
+          ok: false as const,
+          status: 403,
+          error: 'username_change_rate_limited',
+          code: 'auth/username-change-rate-limited',
+          message: `You can change your username again in ${retryAfterDays} day(s).`,
+          nextAllowedAt,
+          retryAfterDays
+        }
+      }
+    }
+
     const usernameReservation = await reserveUniqueIndex('USERNAME', desiredUsername, uid)
     if (!usernameReservation.ok) return { ok: false as const, status: 409, error: 'username_taken', code: 'auth/username-taken' }
 
     const emailReservation = await reserveUniqueIndex('EMAIL', desiredContact, uid)
     if (!emailReservation.ok) return { ok: false as const, status: 409, error: 'email_taken', code: 'auth/email-taken' }
+
+    // Stamp the change time so the cooldown can be enforced; preserve the prior stamp otherwise.
+    if (usernameChanged && previousUsername) next.usernameChangedAt = Date.now()
+    else if ((existing as any)?.usernameChangedAt != null) next.usernameChangedAt = (existing as any).usernameChangedAt
 
     return { ok: true as const, profile: next, username: usernameReservation.value, email: emailReservation.value }
   }
@@ -1761,7 +1788,7 @@ export function createReelmsDataRouter(io: Server) {
       const uid = String(req.userId)
       const existing = (await getDoc<Record<string, unknown>>(userPk(uid), 'profile').catch(() => null)) || {}
       const prepared = await prepareProfileWrite(uid, data, existing)
-      if (!prepared.ok) return res.status(prepared.status).json({ error: prepared.error, code: prepared.code })
+      if (!prepared.ok) return res.status(prepared.status).json({ error: prepared.error, code: prepared.code, message: (prepared as any).message, nextAllowedAt: (prepared as any).nextAllowedAt, retryAfterDays: (prepared as any).retryAfterDays })
 
       await putDoc(userPk(uid), 'profile', prepared.profile)
       publicProfileCache.delete(uid)
@@ -1806,7 +1833,7 @@ export function createReelmsDataRouter(io: Server) {
       const existing = (await getDoc<Record<string, unknown>>(userPk(uid), 'profile')) || {}
       const data = { ...existing, ...(req.body?.data || {}) }
       const prepared = await prepareProfileWrite(uid, data, existing)
-      if (!prepared.ok) return res.status(prepared.status).json({ error: prepared.error, code: prepared.code })
+      if (!prepared.ok) return res.status(prepared.status).json({ error: prepared.error, code: prepared.code, message: (prepared as any).message, nextAllowedAt: (prepared as any).nextAllowedAt, retryAfterDays: (prepared as any).retryAfterDays })
 
       await putDoc(userPk(uid), 'profile', prepared.profile)
       publicProfileCache.delete(uid)

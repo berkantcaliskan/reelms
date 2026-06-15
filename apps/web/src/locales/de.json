@@ -166,6 +166,7 @@
   "saved": "Gespeichert!",
   "your_name_ph": "Dein Name",
   "username_taken": "Dieser Benutzername ist bereits vergeben.",
+  "username_change_limited": "Du kannst deinen Benutzernamen in {days} Tag(en) wieder ändern.",
   "bio_placeholder": "Erzähl uns von dir...",
   "email_signin_note": "Wird zur Anmeldung bei deinem Konto verwendet.",
   "wrong_current_password": "Das aktuelle Passwort ist falsch.",

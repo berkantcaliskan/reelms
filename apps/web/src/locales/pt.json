@@ -166,6 +166,7 @@
   "saved": "Salvo!",
   "your_name_ph": "Seu nome",
   "username_taken": "Este nome de usuário já está em uso.",
+  "username_change_limited": "Você poderá alterar seu nome de usuário novamente em {days} dia(s).",
   "bio_placeholder": "Fale sobre você...",
   "email_signin_note": "Usado para entrar na sua conta.",
   "wrong_current_password": "A senha atual está incorreta.",

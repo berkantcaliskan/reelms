@@ -170,6 +170,7 @@
   "saved": "Saved!",
   "your_name_ph": "Your name",
   "username_taken": "This username is already taken.",
+  "username_change_limited": "You can change your username again in {days} day(s).",
   "bio_placeholder": "Tell us about yourself...",
   "email_signin_note": "Used to sign in to your account.",
   "wrong_current_password": "Current password is incorrect.",

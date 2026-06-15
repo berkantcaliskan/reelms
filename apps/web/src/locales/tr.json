@@ -168,6 +168,7 @@
   "saved": "Kaydedildi!",
   "your_name_ph": "Adın",
   "username_taken": "Bu kullanıcı adı zaten alınmış.",
+  "username_change_limited": "Kullanıcı adını {days} gün sonra tekrar değiştirebilirsin.",
   "bio_placeholder": "Kendinden bahset...",
   "email_signin_note": "Hesabına giriş yapmak için kullanılır.",
   "wrong_current_password": "Mevcut şifre yanlış.",
