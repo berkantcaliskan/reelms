@@ -3069,7 +3069,7 @@ function normalizeFriendProfileTarget(profile = {}) {
 
 const BOT_BIO_KEY = { 'reelmradio': 'bot_radio_bio', 'reelms-intelligence': 'bot_intelligence_bio' }
 
-function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBlock, onUnblock, onAddFriend, isFriend = true, isBlocked = false, isPending = false, nickname, onNicknameChange, canShare, onMessage, onCreateGroup, onRequestRemoteControl, voiceContext = null, moderationContext = null, roleContext = null, isSelf = false, embedded = false, canEditNickname = true, onViewFullProfile, rightPanelWidth = 0 }) {
+function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBlock, onUnblock, onAddFriend, onNudge, isFriend = true, isBlocked = false, isPending = false, nickname, onNicknameChange, canShare, onMessage, onCreateGroup, onRequestRemoteControl, voiceContext = null, moderationContext = null, roleContext = null, isSelf = false, embedded = false, canEditNickname = true, onViewFullProfile, rightPanelWidth = 0 }) {
   const t = useT()
   const popupRef = useRef(null)
   const safeFriend = normalizeFriendProfileTarget(friend || {})
@@ -3168,19 +3168,34 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
           <span className="fpp-section-label">SERVER ACTIONS</span>
           <div className="fpp-mod-list">
             {moderationContext.voiceRoom && (
-              <button type="button" className="fpp-list-action" onClick={() => { moderationContext.onJoinVoice?.(); onClose() }}>Join {moderationContext.voiceRoom.channelName || 'room'}</button>
+              <button type="button" className="fpp-list-action" onClick={() => { moderationContext.onJoinVoice?.(); onClose() }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 11.39 19a19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                Join {moderationContext.voiceRoom.channelName || 'room'}
+              </button>
             )}
             {moderationContext.canInviteVoice && (
-              <button type="button" className="fpp-list-action" onClick={() => { moderationContext.onInviteVoice?.(); onClose() }}>Invite to {moderationContext.currentRoomName || 'your room'}</button>
+              <button type="button" className="fpp-list-action" onClick={() => { moderationContext.onInviteVoice?.(); onClose() }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 11.39 19a19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                Invite to {moderationContext.currentRoomName || 'your room'}
+              </button>
             )}
             {moderationContext.canTimeout && (
-              <button type="button" className="fpp-list-action" onClick={() => { moderationContext.onTimeout?.(); onClose() }}>Timeout member…</button>
+              <button type="button" className="fpp-list-action" onClick={() => { moderationContext.onTimeout?.(); onClose() }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><polyline points="12 6 12 12 16 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                Timeout…
+              </button>
             )}
             {moderationContext.canRemove && (
-              <button type="button" className="fpp-list-action fpp-list-action--danger" onClick={() => { moderationContext.onRemove?.(); onClose() }}>Kick from Reelm…</button>
+              <button type="button" className="fpp-list-action fpp-list-action--danger" onClick={() => { moderationContext.onRemove?.(); onClose() }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.8"/><line x1="22" y1="11" x2="16" y2="11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                Kick…
+              </button>
             )}
             {moderationContext.canBan && (
-              <button type="button" className="fpp-list-action fpp-list-action--danger" onClick={() => { moderationContext.onBan?.(); onClose() }}>Ban member…</button>
+              <button type="button" className="fpp-list-action fpp-list-action--danger" onClick={() => { moderationContext.onBan?.(); onClose() }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                Ban…
+              </button>
             )}
           </div>
         </div>
@@ -3212,20 +3227,47 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
         </div>
       )}
       <div className="fpp-actions">
-        {!isSelf && !isBlocked && <button className="fpp-action-btn" onClick={() => { onMessage?.(); onClose() }}>Message</button>}
-        {!isSelf && !isBlocked && isFriend && onCreateGroup && <button className="fpp-action-btn" onClick={() => { onCreateGroup(friend); onClose() }}>Create group</button>}
-        {!isSelf && !isBlocked && isFriend && onRequestRemoteControl && <button className="fpp-action-btn" onClick={() => { onRequestRemoteControl(friend); onClose() }}>
-          <img src={channelLiveactionIcon} alt="" width="12" height="12" style={{filter:'brightness(0.8)', marginRight: 4}}/> Remote control
-        </button>}
+        {!isSelf && !isBlocked && (
+          <button className="fpp-action-btn" onClick={() => { onMessage?.(); onClose() }}>
+            <img src={newdmIcon} width="13" height="13" alt="" />
+            Message
+          </button>
+        )}
+        {!isSelf && !isBlocked && isFriend && onNudge && (
+          <button className="fpp-action-btn" onClick={() => { onNudge(friend.id, friend.name); onClose() }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M18 8h1a4 4 0 0 1 0 8h-1" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"/><line x1="6" y1="1" x2="6" y2="4" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/><line x1="10" y1="1" x2="10" y2="4" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/><line x1="14" y1="1" x2="14" y2="4" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/></svg>
+            Nudge
+          </button>
+        )}
+        {!isSelf && !isBlocked && isFriend && onCreateGroup && (
+          <button className="fpp-action-btn" onClick={() => { onCreateGroup(friend); onClose() }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.9"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/></svg>
+            Create group
+          </button>
+        )}
+        {!isSelf && !isBlocked && isFriend && onRequestRemoteControl && (
+          <button className="fpp-action-btn" onClick={() => { onRequestRemoteControl(friend); onClose() }}>
+            <img src={channelLiveactionIcon} width="13" height="13" alt="" style={{ filter: 'brightness(0.85)' }} />
+            Remote control
+          </button>
+        )}
         {canShare && (
-          <button className="fpp-action-btn" onClick={() => { navigator.clipboard?.writeText(`${safeFriend.name} (@${safeFriend.username || friend.id})`); onClose() }}>Share Profile</button>
+          <button className="fpp-action-btn" onClick={() => { navigator.clipboard?.writeText(`${safeFriend.name} (@${safeFriend.username || friend.id})`); onClose() }}>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="18" cy="5" r="3" stroke="currentColor" strokeWidth="1.9"/><circle cx="6" cy="12" r="3" stroke="currentColor" strokeWidth="1.9"/><circle cx="18" cy="19" r="3" stroke="currentColor" strokeWidth="1.9"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/></svg>
+            Share Profile
+          </button>
         )}
         {!isSelf && !isBlocked && !isFriend && onAddFriend && (isPending
           ? <button className="fpp-action-btn" disabled>Friend request sent</button>
-          : <button className="fpp-action-btn" onClick={() => { onAddFriend(friend); onClose() }}>Add Friend</button>
+          : (
+            <button className="fpp-action-btn" onClick={() => { onAddFriend(friend); onClose() }}>
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.9"/><line x1="19" y1="8" x2="19" y2="14" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/><line x1="22" y1="11" x2="16" y2="11" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/></svg>
+              Add Friend
+            </button>
+          )
         )}
-        <button className="fpp-view-full-btn" onClick={() => { onClose(); setTimeout(() => onViewFullProfile?.(friend), 50) }}>Tüm profili gör →</button>
       </div>
+      <button className="fpp-view-full-btn" onClick={() => { onClose(); setTimeout(() => onViewFullProfile?.(friend), 50) }}>Tüm profili gör →</button>
       </div>
     </div>
   )
@@ -11953,6 +11995,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         onBlock={blockUserFn}
         onUnblock={unblockUserFn}
         onAddFriend={sendFriendRequest}
+        onNudge={sendNudge}
         isFriend={friends.some(fr => String(fr.id) === String(f.id))}
         isBlocked={blocked.some(b => String(b.id) === String(f.id))}
         isPending={friendRequestsOut.map(String).includes(String(f.id))}
