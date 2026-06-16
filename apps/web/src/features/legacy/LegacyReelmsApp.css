@@ -10862,7 +10862,6 @@ h6 {
 .fp-avatar-wrap--edit:hover .fp-media-edit-overlay { opacity: 1; }
 .fp-edit-profile-btn {
   display: inline-block;
-  margin-top: 5px;
   margin-left: 6px;
   padding: 2px 7px;
   border-radius: 999px;
@@ -10872,7 +10871,7 @@ h6 {
   font-size: 0.72rem;
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
-  vertical-align: middle;
+  vertical-align: text-bottom;
 }
 .fp-edit-profile-btn:hover { border-color: rgba(var(--ta-rgb), 0.6); color: rgba(var(--ta-rgb), 0.95); background: rgba(var(--ta-rgb), 0.06); }
 .fp-edit-profile-btn--done { border-color: rgba(var(--ta-rgb), 0.55); color: rgba(var(--ta-rgb), 0.95); background: rgba(var(--ta-rgb), 0.1); }
