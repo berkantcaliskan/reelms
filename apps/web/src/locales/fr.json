@@ -701,7 +701,6 @@
   "bot_radio_bio": "Joue de la musique YouTube dans vos salons.",
   "bot_intelligence_bio": "Votre assistant IA — discutez, résumez des messages et obtenez des digests quotidiens.",
   "bots_group_label": "Bots",
-
   "slash_commands_header": "Commandes",
   "slash_see_more": "Voir {n} de plus…",
   "slash_cmd_ai_desc": "Discuter avec l'IA",
@@ -714,5 +713,16 @@
   "slash_cmd_queue_desc": "Afficher la file d'attente musicale",
   "slash_cmd_stop_desc": "Arrêter la lecture",
   "community_citizens_hidden": "Des centaines de Citizens sont ici avec toi. Nous ne le partageons pas publiquement car nous respectons la vie privée.",
-  "see_full_profile": "Voir le profil complet"
+  "see_full_profile": "Voir le profil complet",
+  "done": "Terminé",
+  "add_bio": "Ajouter une bio...",
+  "socials": "Réseaux sociaux",
+  "send_message": "Envoyer un message",
+  "request_sent": "Demande envoyée",
+  "mutual_reelms": "Reelms communs",
+  "connected": "Connecté",
+  "activity": "Activité",
+  "no_active_activity": "Aucune activité active",
+  "more": "de plus",
+  "friend": "Ami"
 }

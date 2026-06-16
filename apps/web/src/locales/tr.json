@@ -130,14 +130,12 @@
   "channel_full": "Bu kanal şu anda dolu",
   "use_blur": "Arka planı bulanıklaştır",
   "coming_soon": "Yakında",
-
   "sounds": "Sesler",
   "sounds_desc": "Her bildirim türü için bir ses seç. Önizlemek için ikona tıkla.",
   "spectrum": "Spektrum",
   "spectrum_primary": "Birincil",
   "spectrum_accent": "İkincil",
   "msg_requests_section": "Mesaj istekleri",
-
   "typography": "Tipografi",
   "typography_desc": "Uygulamada kullanılan yazı tiplerini özelleştir.",
   "headers_label": "Başlıklar",
@@ -188,8 +186,6 @@
   "password_updated": "Şifre başarıyla güncellendi.",
   "update_password": "Şifreyi güncelle",
   "password_update_failed": "Şifre güncellenemedi. Tekrar dene.",
-  "back": "Geri",
-  "confirm": "Onayla",
   "connected_accounts": "Bağlı hesaplar",
   "spotify_connected": "Spotify hesabın bağlı.",
   "spotify_connect_desc": "Müzik etkinliğini paylaşmak için Spotify hesabını bağla.",
@@ -537,7 +533,6 @@
   "feedback_placeholder": "Deneyimini anlat, bir hata bildir ya da fikir paylaş…",
   "feedback_sent": "Mesaj gönderildi! Teşekkürler.",
   "feedback_error": "Gönderilemedi. Lütfen tekrar dene.",
-
   "terms_of_service": "Kullanım Koşulları",
   "privacy_policy": "Gizlilik Politikası",
   "legal_consent_1": "Devam ederek ",
@@ -565,7 +560,6 @@
   "privacy_s4_body": "Verileriniz endüstri standardı yöntemlerle korunmaktadır.",
   "privacy_s5_title": "5. Hesap Silme",
   "privacy_s5_body": "Hesabınızı ve verilerinizi istediğiniz zaman silebilirsiniz.",
-
   "cat_beginning": "Başlangıç",
   "cat_text": "Metin",
   "cat_voice": "Ses & Video",
@@ -575,7 +569,6 @@
   "ch_voice_room": "Sesli Oda",
   "ch_video_room": "Video Odası",
   "ch_space": "alan",
-
   "tpl_gaming_name": "Gaming & Esports",
   "tpl_gaming_desc": "Oyuncular ve espor meraklıları için ideal.",
   "tpl_gaming_begin": "everything, turnuvalar",
@@ -624,7 +617,6 @@
   "tpl_lifestyle_text": "sohbet, günlük keşif, tarifler ve tüyolar, rutin tavsiyeleri, fotoğraf galerisi",
   "tpl_lifestyle_mm": "çay sohbeti, deneyim paylaşımı, motivasyon odası",
   "tpl_lifestyle_live": "alan",
-
   "welcome_to_reelm": "Reelm'ine hoş geldin.",
   "email_or_username_ph": "E-posta veya kullanıcı adı",
   "forgot_password": "Unuttum?",
@@ -639,7 +631,6 @@
   "no_account_signup_first": "Hesap bulunamadı. Lütfen önce kayıt ol.",
   "too_many_login_attempts": "Çok fazla deneme. Lütfen daha sonra tekrar dene.",
   "signin_failed_retry": "Giriş başarısız. Lütfen tekrar dene.",
-
   "month_jan": "Ocak",
   "month_feb": "Şubat",
   "month_mar": "Mart",
@@ -655,7 +646,6 @@
   "day_ph": "Gün",
   "month_ph": "Ay",
   "year_ph": "Yıl",
-
   "audio_section": "Ses",
   "microphone_label": "Mikrofon",
   "microphone_desc": "Ses iletişimi için giriş aygıtı.",
@@ -696,7 +686,6 @@
   "res_720p": "720p",
   "res_1080p": "1080p",
   "res_4k": "4K",
-
   "permissions_label": "İzinler",
   "permissions_coming_soon": "İzin sistemi yakında geliyor.",
   "add_members": "Üye ekle",
@@ -712,7 +701,6 @@
   "bot_radio_bio": "Kanallarında YouTube'dan müzik çalar.",
   "bot_intelligence_bio": "AI asistanın — sohbet et, mesajları özetle, günlük özet al.",
   "bots_group_label": "Botlar",
-
   "slash_commands_header": "Komutlar",
   "slash_see_more": "{n} tane daha gör…",
   "slash_cmd_ai_desc": "AI ile sohbet et",
@@ -725,5 +713,16 @@
   "slash_cmd_queue_desc": "Müzik sırasını göster",
   "slash_cmd_stop_desc": "Çalmayı durdur",
   "community_citizens_hidden": "Seninle birlikte yüzlerce Citizen burada. Gizliliği önemsediğimiz için herkese açık paylaşmıyoruz.",
-  "see_full_profile": "Tüm profili gör"
+  "see_full_profile": "Tüm profili gör",
+  "done": "Tamam",
+  "add_bio": "Biyografi ekle...",
+  "socials": "Sosyal Medya",
+  "send_message": "Mesaj Gönder",
+  "request_sent": "İstek Gönderildi",
+  "mutual_reelms": "Ortak Reelmler",
+  "connected": "Bağlı",
+  "activity": "Aktivite",
+  "no_active_activity": "Aktif aktivite yok",
+  "more": "kişi daha",
+  "friend": "Arkadaş"
 }

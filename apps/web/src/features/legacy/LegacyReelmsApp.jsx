@@ -3267,7 +3267,7 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
           )
         )}
       </div>
-      <button className="fpp-view-full-btn" onClick={() => { onClose(); setTimeout(() => onViewFullProfile?.(friend), 50) }}>Tüm profili gör →</button>
+      <button className="fpp-view-full-btn" onClick={() => { onClose(); setTimeout(() => onViewFullProfile?.(friend), 50) }}>{t('see_full_profile')} →</button>
       </div>
     </div>
   )
@@ -3277,6 +3277,7 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
 }
 
 function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onMessage, onAddFriend, onRemove, onBlock, onUnblock, isFriend, isBlocked, isPending, onOpenFriend, spotifyNowPlaying, spotifyConnected, onPhotoChange, onCoverChange, onBioChange, onNameChange, onSocialLinksChange, profileBio, socialLinks, activePlatforms, lastSeenLabel }) {
+  const t = useT()
   const [visible, setVisible] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [editingName, setEditingName] = useState(false)
@@ -3397,7 +3398,7 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
                   <button
                     className={`fp-edit-profile-btn${editMode ? ' fp-edit-profile-btn--done' : ''}`}
                     onClick={() => { setEditMode(v => !v); setEditingBio(false); setEditingSocial(null); setEditingName(false) }}
-                  >{editMode ? 'Done' : 'Edit Profile'}</button>
+                  >{editMode ? t('done') : t('edit_profile')}</button>
                 )}
               </div>
               {user.activity?.name && <div className="fp-activity"><ActivityBadge activity={user.activity} /></div>}
@@ -3409,16 +3410,16 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
                   <div className="fp-bio-edit">
                     <textarea className="fp-bio-textarea" value={bioInput} autoFocus
                       onChange={e => { if (e.target.value.length <= 240) setBioInput(e.target.value) }}
-                      placeholder="Tell us about yourself..." />
+                      placeholder={t('bio_placeholder')} />
                     <div className="fp-bio-controls">
                       <span className="fp-bio-count">{bioInput.length}/240</span>
-                      <button className="fp-bio-save" onClick={() => { onBioChange?.(bioInput); setEditingBio(false) }}>Save</button>
-                      <button className="fp-bio-cancel" onClick={() => setEditingBio(false)}>Cancel</button>
+                      <button className="fp-bio-save" onClick={() => { onBioChange?.(bioInput); setEditingBio(false) }}>{t('save')}</button>
+                      <button className="fp-bio-cancel" onClick={() => setEditingBio(false)}>{t('cancel')}</button>
                     </div>
                   </div>
                 ) : (
                   <div className="fp-editable-row">
-                    <p className={`fp-bio${!displayBio ? ' fp-bio--empty' : ''}`}>{displayBio || 'Add a bio...'}</p>
+                    <p className={`fp-bio${!displayBio ? ' fp-bio--empty' : ''}`}>{displayBio || t('add_bio')}</p>
                     {editMode && (
                       <button className="fp-inline-edit-btn" onClick={() => { setBioInput(displayBio || ''); setEditingBio(true) }}>
                         <PencilIcon />
@@ -3432,7 +3433,7 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
             {(hasSocials || (isSelf && editMode)) && (
               <div className={`fp-section${editMode ? ' fp-section--editable' : ''}`}>
                 <div className="fp-editable-row">
-                  <span className="fp-section-label">SOCIALS</span>
+                  <span className="fp-section-label">{t('socials').toUpperCase()}</span>
                   {editMode && (
                     <button className="fp-inline-edit-btn" onClick={() => setEditingSocial(v => v ? null : 'open')}>
                       <PencilIcon />
@@ -3480,12 +3481,12 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
 
             {!isSelf && (
               <div className="fp-actions">
-                {!isBlocked && onMessage && <button className="fp-action-btn fp-action-btn--primary" onClick={() => { onMessage(); handleClose() }}>Mesaj Gönder</button>}
-                {!isBlocked && !isFriend && !isPending && onAddFriend && <button className="fp-action-btn" onClick={() => { onAddFriend(user); handleClose() }}>Arkadaş Ekle</button>}
-                {!isBlocked && !isFriend && isPending && <button className="fp-action-btn" disabled>İstek Gönderildi</button>}
-                {!isBlocked && isFriend && onRemove && <button className="fp-action-btn fp-action-danger" onClick={() => { onRemove(user.id); handleClose() }}>Arkadaşlıktan Çıkar</button>}
-                {isBlocked && onUnblock && <button className="fp-action-btn" onClick={() => { onUnblock(user.id); handleClose() }}>Engeli Kaldır</button>}
-                {!isBlocked && onBlock && <button className="fp-action-btn fp-action-danger" onClick={() => { onBlock(user); handleClose() }}>Engelle</button>}
+                {!isBlocked && onMessage && <button className="fp-action-btn fp-action-btn--primary" onClick={() => { onMessage(); handleClose() }}>{t('send_message')}</button>}
+                {!isBlocked && !isFriend && !isPending && onAddFriend && <button className="fp-action-btn" onClick={() => { onAddFriend(user); handleClose() }}>{t('add_friend')}</button>}
+                {!isBlocked && !isFriend && isPending && <button className="fp-action-btn" disabled>{t('request_sent')}</button>}
+                {!isBlocked && isFriend && onRemove && <button className="fp-action-btn fp-action-danger" onClick={() => { onRemove(user.id); handleClose() }}>{t('remove_friend')}</button>}
+                {isBlocked && onUnblock && <button className="fp-action-btn" onClick={() => { onUnblock(user.id); handleClose() }}>{t('unblock')}</button>}
+                {!isBlocked && onBlock && <button className="fp-action-btn fp-action-danger" onClick={() => { onBlock(user); handleClose() }}>{t('block')}</button>}
               </div>
             )}
           </div>
@@ -3493,7 +3494,7 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
           <div className="fp-sidebar">
             {isSelf && friends.length > 0 && (
               <div className="fp-sidebar-card">
-                <span className="fp-section-label">ARKADAŞLAR</span>
+                <span className="fp-section-label">{t('friends').toUpperCase()}</span>
                 <div className="fp-friends-list">
                   {friends.slice(0, 12).map(f => (
                     <button key={f.id} className="fp-friend-row" onClick={() => onOpenFriend?.(f)}>
@@ -3502,16 +3503,16 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
                           ? <img src={f.photo || f.photoURL || f.avatar} alt={f.name || ''} />
                           : (f.name || '?').charAt(0).toUpperCase()}
                       </div>
-                      <span className="fp-friend-name">{f.name || f.username || 'Arkadaş'}</span>
+                      <span className="fp-friend-name">{f.name || f.username || t('friend')}</span>
                     </button>
                   ))}
-                  {friends.length > 12 && <span className="fp-friends-more">+{friends.length - 12} kişi daha</span>}
+                  {friends.length > 12 && <span className="fp-friends-more">+{friends.length - 12} {t('more')}</span>}
                 </div>
               </div>
             )}
             {reelms.length > 0 && (
               <div className="fp-sidebar-card">
-                <span className="fp-section-label">{isSelf ? 'REELMLER' : 'ORTAK REELMLER'}</span>
+                <span className="fp-section-label">{isSelf ? t('reelms').toUpperCase() : t('mutual_reelms').toUpperCase()}</span>
                 <div className="fp-reelms-list">
                   {reelms.slice(0, 8).map(r => (
                     <div key={r.id} className="fp-reelm-row">
@@ -3537,16 +3538,16 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
                     <SpotifyIcon size={16} />
                   </div>
                 ) : (
-                  <div className="fp-spotify-idle"><SpotifyIcon size={16} /><span>Bağlı</span></div>
+                  <div className="fp-spotify-idle"><SpotifyIcon size={16} /><span>{t('connected')}</span></div>
                 )}
               </div>
             )}
             <div className="fp-sidebar-card">
-              <span className="fp-section-label">AKTİVİTE</span>
+              <span className="fp-section-label">{t('activity').toUpperCase()}</span>
               <div className="fp-activity-log">
                 {user.activity?.name
                   ? <div className="fp-activity-item"><ActivityBadge activity={user.activity} /></div>
-                  : <span className="fp-activity-empty">Aktif aktivite yok</span>}
+                  : <span className="fp-activity-empty">{t('no_active_activity')}</span>}
               </div>
             </div>
           </div>
@@ -8221,7 +8222,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             let decrypted = false
             if (lookupUid) {
               try {
-                const [myKeys, theirPk] = await Promise.all([getKeyPair(), e2eeGetPublicKey(lookupUid)])
+                const [myKeys, theirPk] = await Promise.all([getOrCreateKeyPair(), e2eeGetPublicKey(lookupUid)])
                 if (myKeys && theirPk) {
                   const plaintext = decryptFromSender(msg.text || '', theirPk, myKeys.secretKey)
                   if (plaintext != null) { displayMsg = { ...msg, text: plaintext }; decrypted = true }
@@ -9564,19 +9565,20 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       let processed = msgs
       if (msgKey.startsWith('dm_')) {
         // Attempt to decrypt legacy E2EE messages; new messages are sent as plaintext.
-        const myKeys = await getKeyPair().catch(() => null)
+        // getOrCreateKeyPair (not getKeyPair) avoids a race condition where the app-load
+        // key-registration hasn't resolved yet but the DM is already opening.
         const peerUid = msgKey.slice(3).split('_').find(id => id !== String(uid)) || ''
+        const [myKeys, peerPk] = await Promise.all([
+          getOrCreateKeyPair().catch(() => null),
+          peerUid ? e2eeGetPublicKey(peerUid).catch(() => null) : Promise.resolve(null),
+        ])
         processed = await Promise.all(msgs.map(async m => {
           if (!m.enc || !m.text) return m
           const senderUid = String(m.sender?.id || m.userId || m.authorId || '')
-          const lookupUid = senderUid === String(uid) ? peerUid : senderUid
-          if (myKeys && lookupUid) {
+          if (myKeys && peerPk) {
             try {
-              const theirPk = await e2eeGetPublicKey(lookupUid)
-              if (theirPk) {
-                const plaintext = decryptFromSender(m.text, theirPk, myKeys.secretKey)
-                if (plaintext != null) return { ...m, text: plaintext }
-              }
+              const plaintext = decryptFromSender(m.text, peerPk, myKeys.secretKey)
+              if (plaintext != null) return { ...m, text: plaintext }
             } catch {}
           }
           if (senderUid === String(uid)) {
@@ -13561,7 +13563,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                   setFullProfileTarget({ isSelf: false, user: friend })
                                 }}
                               >
-                                Tüm profili gör →
+                                {t('see_full_profile')} →
                               </button>
                             )}
                           </div>
