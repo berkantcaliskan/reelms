@@ -15719,8 +15719,17 @@ button, input, select, textarea,
   .panel-system {
     margin: 0 !important;
     border-radius: 0 !important;
+    background: transparent !important;
     -webkit-backdrop-filter: none !important;
     backdrop-filter: none !important;
+  }
+
+  /* Middle panel merges with background */
+  .panel.panel-middle {
+    background: transparent !important;
+    -webkit-backdrop-filter: none !important;
+    backdrop-filter: none !important;
+    border-left: 1px solid rgba(var(--ta-rgb), 0.12) !important;
   }
 
   /* ── Panel overlay: frosted glass sliding panels ─── */
