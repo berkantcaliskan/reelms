@@ -6246,8 +6246,7 @@ h6 {
   align-items: center;
   align-self: stretch;
   gap: 4px;
-  height: auto;
-  min-height: 52px;
+  height: 56px;
   padding: 4px 8px;
   flex-shrink: 0;
   background: rgba(var(--ta-rgb), 0.18);
@@ -6258,7 +6257,8 @@ h6 {
   border-radius: 30px;
   margin: 0 12px 12px 12px;
   animation: msg-bar-slide-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  overflow: hidden;
 }
 
 @media (max-width: 600px) {
@@ -6304,8 +6304,9 @@ h6 {
   position: relative;
   display: flex;
   align-items: center;
-  height: 46px;
-  min-width: 180px;
+  height: 48px;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .msg-input {
@@ -10439,7 +10440,7 @@ h6 {
   padding: 0 20px 16px;
 }
 .forums-header-title {
-  font-family: 'Dela Gothic One', sans-serif;
+  font-family: 'Dela Gothic One', sans-serif !important;
   font-size: 22px;
   font-weight: 400;
   background: linear-gradient(90deg, #b99887, #68c586);
