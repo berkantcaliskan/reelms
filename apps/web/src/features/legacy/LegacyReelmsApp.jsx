@@ -7649,6 +7649,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [serverActionMinutes, setServerActionMinutes] = useState(10)
   const [inviteFriendSearch, setInviteFriendSearch] = useState('')
   const [rightPanelNoRoleSearch, setRightPanelNoRoleSearch] = useState('')
+  const [reelmMemberSearch, setReelmMemberSearch] = useState('')
+  const [reelmMemberSearchOpen, setReelmMemberSearchOpen] = useState(false)
+  const reelmSearchInputRef = useRef(null)
   const [changelog, setChangelog] = useState([])
   const [, setCurrentVersion] = useState(null)
   const [showMenu, setShowMenu] = useState(false)
@@ -9492,10 +9495,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [newMsgId, setNewMsgId] = useState(null)
   const [moderationWarning, setModerationWarning] = useState('')
   useEffect(() => {
-    if (msgListRef.current) {
-      msgListRef.current.scrollTop = msgListRef.current.scrollHeight
-    }
-  }, [messages, selectedChat, selectedReelm])
+    const el = msgListRef.current
+    if (!el) return undefined
+    // Jump to the newest message. Scroll once now, then again after the next
+    // paint so a channel switch lands at the bottom even before row heights
+    // (avatars/images) have fully settled.
+    const toBottom = () => { el.scrollTop = el.scrollHeight }
+    toBottom()
+    const raf = requestAnimationFrame(toBottom)
+    return () => cancelAnimationFrame(raf)
+  }, [messages, selectedChat, selectedReelm, selectedChannel?.id])
   const [showPlusMenu, setShowPlusMenu] = useState(false)
   const [barCtxMenu, setBarCtxMenu] = useState(null) // { x, y, item }
 
@@ -11398,8 +11407,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const modDeleteMessage = (msgKey, msgId) => {
     if (String(msgKey || '').startsWith('dm_') && String(msgKey || '').slice(3).split('_').some(isReelmsSystemUid)) return
-    messageDelete(msgKey, msgId).catch(() => {})
-    setMessages(prev => ({ ...prev, [msgKey]: (prev[msgKey] || []).filter(m => String(m.id) !== String(msgId)) }))
+    let snapshot = null
+    setMessages(prev => {
+      snapshot = prev[msgKey] || []
+      return { ...prev, [msgKey]: snapshot.filter(m => String(m.id) !== String(msgId)) }
+    })
+    messageDelete(msgKey, msgId).catch((err) => {
+      // Server refused (e.g. not allowed) — roll back so the UI matches reality
+      // instead of the message silently re-appearing on the next refetch.
+      if (snapshot) setMessages(prev => ({ ...prev, [msgKey]: snapshot }))
+      setModerationWarning(err?.status === 403 ? 'You are not allowed to delete this message.' : 'Message could not be deleted.')
+      setTimeout(() => setModerationWarning(''), 4000)
+    })
   }
 
   const modDeletePost = async (postId) => {
@@ -12089,37 +12108,77 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         </React.Fragment>
       )
     }
+    const globalQuery = reelmMemberSearch.trim().toLowerCase()
+    const matchesGlobal = (m) => !globalQuery
+      || String((getMemberPresence(m).userName || m.userName || '')).toLowerCase().includes(globalQuery)
+      || String(m.username || '').toLowerCase().includes(globalQuery)
     return (
-      <div className="rp-members-panel">
-        <span className="rp-members-header">In this Reelm</span>
-        {groups.map(group => {
-          const list = group.noRole && group.members.length > 18 && rightPanelNoRoleSearch.trim()
-            ? group.members.filter(m => String((getMemberPresence(m).userName || m.userName || '')).toLowerCase().includes(rightPanelNoRoleSearch.trim().toLowerCase()))
-            : group.members
-          return (
-            <div key={`${panelKey}-${group.role.id}`} className={`rp-role-section${group.noRole ? ' rp-role-section--no-role' : ''}`}>
-              <div className="rp-role-section-header" style={{ color: group.role.color }}>
-                <span>{group.isBotsGroup ? t('bots_group_label') : group.role.name}</span>
-                <span className="rp-role-section-count">{group.members.length}</span>
+      <div className="rp-members-panel-wrap">
+        <div className="rp-members-panel">
+          <span className="rp-members-header">In this Reelm</span>
+          {groups.map(group => {
+            let list = group.members.filter(matchesGlobal)
+            if (group.noRole && group.members.length > 18 && rightPanelNoRoleSearch.trim()) {
+              const nq = rightPanelNoRoleSearch.trim().toLowerCase()
+              list = list.filter(m => String((getMemberPresence(m).userName || m.userName || '')).toLowerCase().includes(nq))
+            }
+            if (globalQuery && list.length === 0) return null
+            return (
+              <div key={`${panelKey}-${group.role.id}`} className={`rp-role-section${group.noRole ? ' rp-role-section--no-role' : ''}`}>
+                <div className="rp-role-section-header" style={{ color: group.role.color }}>
+                  <span>{group.isBotsGroup ? t('bots_group_label') : group.role.name}</span>
+                  <span className="rp-role-section-count">{globalQuery ? list.length : group.members.length}</span>
+                </div>
+                {!globalQuery && group.noRole && group.members.length > 18 && (
+                  <input
+                    className="rp-no-role-search"
+                    value={rightPanelNoRoleSearch}
+                    onChange={e => setRightPanelNoRoleSearch(e.target.value)}
+                    placeholder="Search no-role members…"
+                  />
+                )}
+                <div className={`rp-members-group${group.noRole ? ' rp-members-group-offline' : ''}`}>{list.map(renderMember)}</div>
               </div>
-              {group.noRole && group.members.length > 18 && (
-                <input
-                  className="rp-no-role-search"
-                  value={rightPanelNoRoleSearch}
-                  onChange={e => setRightPanelNoRoleSearch(e.target.value)}
-                  placeholder="Search no-role members…"
-                />
-              )}
-              <div className={`rp-members-group${group.noRole ? ' rp-members-group-offline' : ''}`}>{list.map(renderMember)}</div>
+            )
+          })}
+          {showCitizenNotice && (
+            <div className="rp-citizen-notice">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+              <span>{t('community_citizens_hidden')}</span>
             </div>
-          )
-        })}
-        {showCitizenNotice && (
-          <div className="rp-citizen-notice">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-            <span>{t('community_citizens_hidden')}</span>
-          </div>
-        )}
+          )}
+          <div className="rp-members-bottom-spacer" />
+        </div>
+        <div className="rp-members-fade" />
+        <div className={`rp-member-search${reelmMemberSearchOpen ? ' rp-member-search--open' : ''}`}>
+          <input
+            ref={reelmSearchInputRef}
+            className="rp-member-search-input"
+            value={reelmMemberSearch}
+            onChange={e => setReelmMemberSearch(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Escape') { setReelmMemberSearch(''); setReelmMemberSearchOpen(false) } }}
+            placeholder={t('search')}
+            aria-label={t('search')}
+            tabIndex={reelmMemberSearchOpen ? 0 : -1}
+          />
+          <button
+            type="button"
+            className="rp-member-search-btn"
+            title={t('search')}
+            onClick={() => {
+              setReelmMemberSearchOpen(open => {
+                const next = !open
+                if (!next) setReelmMemberSearch('')
+                else setTimeout(() => reelmSearchInputRef.current?.focus(), 60)
+                return next
+              })
+            }}
+          >
+            {reelmMemberSearchOpen && reelmMemberSearch
+              ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/></svg>
+              : <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2"/><line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>}
+          </button>
+        </div>
       </div>
     )
   }
@@ -12918,8 +12977,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             return (
                             <div key={release.version} className="about-release">
                               <div className="about-release-header">
-                                <span className="about-release-version">v{release.version}</span>
-                                <span className="about-release-date">{release.date}</span>
+                                <span className="about-release-version">{release.label || `v${release.version}`}</span>
+                                {!release.label && <span className="about-release-date">{release.date}</span>}
                                 {release.highlights && (
                                   <span className="about-release-highlight">{release.highlights}</span>
                                 )}

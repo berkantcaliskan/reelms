@@ -3013,7 +3013,12 @@ export function createReelmsDataRouter(io: Server) {
       const data = target.data as any
       const authorId = String(data?.userId || data?.authorId || data?.sender?.id || '')
       const isSystemAdmin = await isSystemAdminUid(uid).catch(() => false)
-      if (uid !== env.REELMS_MODERATION_UID && !isSystemAdmin && authorId !== uid) return res.status(403).json({ error: 'forbidden' })
+      // Authorized reelm roles (manageModeration / managers) can delete any message in
+      // their channel; everyone else may only delete their own message.
+      const canModerateReelm = access.kind === 'reelm'
+        && (await canUseReelmPermission(uid, access.reelmId, 'manageModeration').catch(() => false)
+          || await canManageReelm(uid, access.reelmId).catch(() => false))
+      if (uid !== env.REELMS_MODERATION_UID && !isSystemAdmin && authorId !== uid && !canModerateReelm) return res.status(403).json({ error: 'forbidden' })
 
       await deleteDoc(chanPk(msgKey), target.sk)
       const payload = { msgKey, msgId }
