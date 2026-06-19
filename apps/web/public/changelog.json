@@ -3,9 +3,15 @@
   "releases": [
     {
       "version": "1.1",
+      "label": "1.1/12062026",
       "date": "12/06/2026",
       "highlights": "Full Profile, Companions & E2EE",
       "notes": [
+        "Rich text formatting in messages — bold, italic, underline, strikethrough, monospace and color by right-clicking selected text",
+        "Voice messages now play inline with a waveform and adjustable speed (1x–2x)",
+        "Search members directly in the reelm member panel",
+        "Message deletion fixed — deletions now stick; authorized roles can delete any message and members can delete their own",
+        "Visual polish: forums title and GIF picker frosted glass",
         "End-to-end encryption added for direct messages",
         "Full Profile page — edit display name, bio, and more from a dedicated profile view",
         "Built-in bots introduced — meet Reelms Companions",
@@ -16,6 +22,11 @@
         "Username changes are now limited to once every 14 days"
       ],
       "notes_tr": [
+        "Mesajlarda zengin metin biçimlendirme — seçili yazıya sağ tıkla kalın, italik, altı çizili, üstü çizili, monospace ve renk",
+        "Ses mesajları artık ses dalgası ve ayarlanabilir hızla (1x–2x) mesaj içinde oynatılıyor",
+        "Reelm üye panelinde üye arama",
+        "Mesaj silme düzeltildi — silinenler artık geri gelmiyor; yetkili roller tüm mesajları, kişiler kendi mesajlarını silebilir",
+        "Görsel rötuşlar: forums başlığı ve GIF kartı buzlu cam efekti",
         "Direkt mesajlar için uçtan uca şifreleme eklendi",
         "Tam Profil sayfası — görünen ad, biyografi ve daha fazlasını ayrı bir profil görünümünden düzenle",
         "Yerleşik botlar tanıtıldı — Reelms Companions ile tanışın",
@@ -26,6 +37,11 @@
         "Kullanıcı adı değişiklikleri artık 14 günde bir ile sınırlandırıldı"
       ],
       "notes_de": [
+        "Rich-Text-Formatierung in Nachrichten — Fett, Kursiv, Unterstrichen, Durchgestrichen, Monospace und Farbe per Rechtsklick auf den markierten Text",
+        "Sprachnachrichten werden jetzt inline mit Wellenform und einstellbarer Geschwindigkeit (1x–2x) abgespielt",
+        "Mitgliedersuche direkt im Reelm-Mitgliederbereich",
+        "Nachrichtenlöschung behoben — Löschungen bleiben bestehen; berechtigte Rollen können alle Nachrichten löschen, Mitglieder ihre eigenen",
+        "Optische Verbesserungen: Forums-Titel und GIF-Auswahl-Glaseffekt",
         "Ende-zu-Ende-Verschlüsselung für Direktnachrichten hinzugefügt",
         "Vollständiges Profil — Anzeigename, Bio und mehr in einer eigenen Profilansicht bearbeiten",
         "Integrierte Bots eingeführt — lernt Reelms Companions kennen",
@@ -36,6 +52,11 @@
         "Nutzernamen können nur noch alle 14 Tage geändert werden"
       ],
       "notes_es": [
+        "Formato de texto enriquecido en mensajes — negrita, cursiva, subrayado, tachado, monoespaciado y color con clic derecho sobre el texto seleccionado",
+        "Los mensajes de voz ahora se reproducen en línea con forma de onda y velocidad ajustable (1x–2x)",
+        "Búsqueda de miembros directamente en el panel de miembros del reelm",
+        "Eliminación de mensajes corregida — las eliminaciones se mantienen; los roles autorizados pueden eliminar cualquier mensaje y los miembros los suyos",
+        "Mejoras visuales: título de foros y vidrio esmerilado del selector de GIF",
         "Cifrado de extremo a extremo añadido para mensajes directos",
         "Perfil completo — edita el nombre, la biografía y más desde una vista de perfil dedicada",
         "Bots integrados introducidos — conoce a Reelms Companions",
@@ -46,6 +67,11 @@
         "Los cambios de nombre de usuario ahora están limitados a una vez cada 14 días"
       ],
       "notes_fr": [
+        "Mise en forme du texte dans les messages — gras, italique, souligné, barré, monospace et couleur par clic droit sur le texte sélectionné",
+        "Les messages vocaux se lisent désormais en ligne avec une forme d'onde et une vitesse réglable (1x–2x)",
+        "Recherche de membres directement dans le panneau des membres du reelm",
+        "Suppression de messages corrigée — les suppressions persistent ; les rôles autorisés peuvent supprimer tout message et les membres les leurs",
+        "Améliorations visuelles : titre des forums et verre dépoli du sélecteur de GIF",
         "Chiffrement de bout en bout ajouté pour les messages directs",
         "Profil complet — modifiez le nom d'affichage, la bio et plus depuis une vue dédiée",
         "Bots intégrés introduits — découvrez Reelms Companions",
@@ -56,6 +82,11 @@
         "Les changements de pseudonyme sont désormais limités à une fois toutes les 2 semaines"
       ],
       "notes_pt": [
+        "Formatação de texto nas mensagens — negrito, itálico, sublinhado, tachado, monoespaçado e cor com clique direito no texto selecionado",
+        "Mensagens de voz agora tocam na conversa com forma de onda e velocidade ajustável (1x–2x)",
+        "Busca de membros diretamente no painel de membros do reelm",
+        "Exclusão de mensagens corrigida — as exclusões agora permanecem; funções autorizadas podem excluir qualquer mensagem e os membros as suas",
+        "Melhorias visuais: título dos fóruns e vidro fosco do seletor de GIF",
         "Criptografia de ponta a ponta adicionada para mensagens diretas",
         "Perfil completo — edite nome de exibição, biografia e mais em uma visualização dedicada",
         "Bots integrados introduzidos — conheça os Reelms Companions",
@@ -67,7 +98,8 @@
       ]
     },
     {
-      "version": "0.1.0",
+      "version": "1",
+      "label": "1/2062026",
       "date": "2026-03-17",
       "highlights": "First stable release",
       "notes": [
