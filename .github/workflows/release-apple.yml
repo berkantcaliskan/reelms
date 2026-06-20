@@ -1,0 +1,96 @@
+name: Release Apple
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+jobs:
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Build macOS app
+        working-directory: apps/desktop
+        run: npx tauri build --target universal-apple-darwin
+        env:
+          APPLE_SIGNING_IDENTITY: '-'
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reelms-macos
+          path: |
+            apps/desktop/src-tauri/target/universal-apple-darwin/release/bundle/dmg/*.dmg
+            apps/desktop/src-tauri/target/universal-apple-darwin/release/bundle/macos/*.app
+
+  ios:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-ios aarch64-apple-ios-sim x86_64-apple-ios
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Set up signing certificate
+        if: ${{ secrets.APPLE_CERTIFICATE != '' }}
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_PROVISIONING_PROFILE: ${{ secrets.APPLE_PROVISIONING_PROFILE }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          CERTIFICATE_PATH=$RUNNER_TEMP/certificate.p12
+          PP_PATH=$RUNNER_TEMP/profile.mobileprovision
+          KEYCHAIN_PATH=$RUNNER_TEMP/app-signing.keychain-db
+
+          echo -n "$APPLE_CERTIFICATE" | base64 --decode -o $CERTIFICATE_PATH
+          echo -n "$APPLE_PROVISIONING_PROFILE" | base64 --decode -o $PP_PATH
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security set-keychain-settings -lut 21600 $KEYCHAIN_PATH
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" $KEYCHAIN_PATH
+          security import $CERTIFICATE_PATH -P "$APPLE_CERTIFICATE_PASSWORD" -A -t cert -f pkcs12 -k $KEYCHAIN_PATH
+          security list-keychain -d user -s $KEYCHAIN_PATH
+
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
+
+      - name: Init iOS project
+        working-directory: apps/desktop
+        run: npx tauri ios init
+
+      - name: Build iOS IPA
+        working-directory: apps/desktop
+        run: npx tauri ios build
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reelms-ios
+          path: apps/desktop/src-tauri/gen/apple/build/arm64/*.ipa
