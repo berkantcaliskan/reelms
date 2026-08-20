@@ -12572,23 +12572,32 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       .filter(c => !(c.type === 'dm' && blockedIds.has(String(c.friendId || ''))))
                       .filter(c => showHiddenBarItems || !hiddenBarIds.map(String).includes(String(c.id)))
 
-                    // Identify chats grouped inside folders
-                    const folderedChatIdSet = new Set((chatFolders || []).flatMap(f => f.chatIds || []).map(String))
-                    const standaloneChats = topChatItems.filter(c => !folderedChatIdSet.has(String(c.id)))
+                    // Identify items (chats or reelms) grouped inside folders
+                    const folderedIdSet = new Set((chatFolders || []).flatMap(f => f.chatIds || []).map(String))
+                    const standaloneChats = topChatItems.filter(c => !folderedIdSet.has(String(c.id)))
+                    const standaloneReelms = reelms
+                      .filter(r => showHiddenBarItems || !hiddenBarIds.map(String).includes(String(r.id)))
+                      .filter(r => !folderedIdSet.has(String(r.id)))
 
-                    // Folder items that contain existing valid chats
+                    // Folder items that contain existing valid chats or reelms
                     const folderItems = (chatFolders || []).map(f => {
-                      const fChats = (f.chatIds || []).map(cid => chats.find(c => String(c.id) === String(cid))).filter(Boolean)
+                      const fItems = (f.chatIds || []).map(cid => {
+                        const chatMatch = (chats || []).find(c => String(c.id) === String(cid))
+                        if (chatMatch) return { ...chatMatch, itemType: 'chat' }
+                        const reelmMatch = (reelms || []).find(r => String(r.id) === String(cid))
+                        if (reelmMatch) return { ...reelmMatch, itemType: 'reelm' }
+                        return null
+                      }).filter(Boolean)
                       return {
                         ...f,
                         itemType: 'folder',
-                        chats: fChats,
-                        updatedAt: Math.max(f.createdAt || 0, ...fChats.map(c => c.updatedAt || 0))
+                        chats: fItems,
+                        updatedAt: Math.max(f.createdAt || 0, ...fItems.map(c => c.updatedAt || 0))
                       }
                     }).filter(f => f.chats.length > 0)
 
                     const allItemsFlat = [
-                      ...reelms.filter(r => showHiddenBarItems || !hiddenBarIds.map(String).includes(String(r.id))).map(r => ({ ...r, itemType: 'reelm' })),
+                      ...standaloneReelms.map(r => ({ ...r, itemType: 'reelm' })),
                       ...standaloneChats.map(c => ({ ...c, itemType: 'chat' })),
                       ...folderItems
                     ]
@@ -12600,8 +12609,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     return allItems.map(item => {
                       if (item.itemType === 'folder') {
                         const folderChats = item.chats || []
-                        const folderUnread = folderChats.reduce((sum, c) => sum + getChatUnreadCount(c), 0)
-                        const isFolderActive = folderChats.some(c => selectedChat?.id === c.id)
+                        const folderUnread = folderChats.reduce((sum, c) => sum + (c.itemType === 'chat' ? getChatUnreadCount(c) : (unreadCounts[c.id] || 0)), 0)
+                        const isFolderActive = folderChats.some(c => (c.itemType === 'reelm' ? selectedReelm?.id === c.id : selectedChat?.id === c.id))
                         return (
                           <div
                             key={item.id}
@@ -12655,11 +12664,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 {folderChats.length === 2 ? (
                                   <div className="folder-avatar-grid folder-avatar-grid--2">
                                     {folderChats.slice(0, 2).map((c, i) => {
-                                      const src = getChatAvatarSrc(c)
-                                      const name = getChatDisplayName(c)
+                                      const src = c.itemType === 'chat' ? getChatAvatarSrc(c) : c.image
+                                      const name = c.itemType === 'chat' ? getChatDisplayName(c) : c.name
                                       return (
                                         <div key={c.id || i} className={`folder-mini-avatar folder-mini-avatar--diag-${i + 1}`}>
-                                          {src ? <img src={src} alt={name} draggable={false} /> : (name || '?').charAt(0).toUpperCase()}
+                                          {src ? <img src={src} alt={name} draggable={false} /> : isDefaultCommunity(c) ? <ReelmsCommunityGlyph /> : (name || '?').charAt(0).toUpperCase()}
                                         </div>
                                       )
                                     })}
@@ -12667,11 +12676,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 ) : folderChats.length === 3 ? (
                                   <div className="folder-avatar-grid folder-avatar-grid--3">
                                     {folderChats.slice(0, 3).map((c, i) => {
-                                      const src = getChatAvatarSrc(c)
-                                      const name = getChatDisplayName(c)
+                                      const src = c.itemType === 'chat' ? getChatAvatarSrc(c) : c.image
+                                      const name = c.itemType === 'chat' ? getChatDisplayName(c) : c.name
                                       return (
                                         <div key={c.id || i} className={`folder-mini-avatar folder-mini-avatar--tri-${i + 1}`}>
-                                          {src ? <img src={src} alt={name} draggable={false} /> : (name || '?').charAt(0).toUpperCase()}
+                                          {src ? <img src={src} alt={name} draggable={false} /> : isDefaultCommunity(c) ? <ReelmsCommunityGlyph /> : (name || '?').charAt(0).toUpperCase()}
                                         </div>
                                       )
                                     })}
@@ -12679,14 +12688,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 ) : (
                                   <div className="folder-avatar-grid folder-avatar-grid--4">
                                     {folderChats.slice(0, 4).map((c, i) => {
-                                      const src = getChatAvatarSrc(c)
-                                      const name = getChatDisplayName(c)
+                                      const src = c.itemType === 'chat' ? getChatAvatarSrc(c) : c.image
+                                      const name = c.itemType === 'chat' ? getChatDisplayName(c) : c.name
                                       return (
                                         <div key={c.id || i} className={`folder-mini-avatar folder-mini-avatar--grid-${i + 1}`}>
                                           {i === 3 && folderChats.length > 4 ? (
                                             <span className="folder-mini-more">+{folderChats.length - 3}</span>
                                           ) : (
-                                            src ? <img src={src} alt={name} draggable={false} /> : (name || '?').charAt(0).toUpperCase()
+                                            src ? <img src={src} alt={name} draggable={false} /> : isDefaultCommunity(c) ? <ReelmsCommunityGlyph /> : (name || '?').charAt(0).toUpperCase()
                                           )}
                                         </div>
                                       )
@@ -12704,17 +12713,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       }
 
                       // Standalone Chat / Reelm item
+                      const canDrag = !isDefaultCommunity(item)
                       return (
                         <div
                           key={item.id}
                           data-bar-id={item.id}
                           className={'bar-item bar-item--' + item.itemType + (isDefaultCommunity(item) ? ' bar-item--community-root' : '') + (item.itemType === 'reelm' && mutedReelmIds.map(String).includes(String(item.id)) ? ' bar-item--muted' : '') + (item.itemType === 'chat' && item.type === 'dm' && isUserActive(item.friendId) ? ' bar-item--online' : '') + ((item.itemType === 'reelm' ? selectedReelm?.id : selectedChat?.id) === item.id ? ' bar-item-active' : '')}
-                          draggable={item.itemType === 'chat'}
+                          draggable={canDrag}
                           onDragStart={(e) => {
-                            if (item.itemType === 'chat') {
+                            if (canDrag) {
                               _barDragId = String(item.id)
                               e.dataTransfer.setData('text/plain', String(item.id))
-                              e.dataTransfer.setData('application/x-reelms-chat', String(item.id))
+                              e.dataTransfer.setData('application/x-reelms-bar-item', String(item.id))
                               e.dataTransfer.effectAllowed = 'move'
                             }
                           }}
@@ -12723,7 +12733,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             document.querySelectorAll('.bar-item--dragover').forEach(el => el.classList.remove('bar-item--dragover'))
                           }}
                           onDragOver={(e) => {
-                            if (item.itemType === 'chat') {
+                            if (canDrag) {
                               e.preventDefault()
                               e.stopPropagation()
                               e.dataTransfer.dropEffect = 'move'
@@ -12740,19 +12750,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             e.stopPropagation()
                             e.currentTarget.classList.remove('bar-item--dragover')
                             document.querySelectorAll('.bar-item--dragover').forEach(el => el.classList.remove('bar-item--dragover'))
-                            if (item.itemType !== 'chat') return
                             const fromId = String(_barDragId || e.dataTransfer.getData('text/plain') || '')
                             _barDragId = null
                             if (!fromId || fromId === String(item.id)) return
                             
                             const currentFolders = chatFoldersRef.current || []
-                            // Check if the dragged item is already in a folder
+                            // Check if either item is already in a folder
                             const nextFolders = currentFolders.map(f => ({
                               ...f,
                               chatIds: (f.chatIds || []).filter(cid => String(cid) !== fromId && String(cid) !== String(item.id))
                             })).filter(f => (f.chatIds || []).length > 0)
 
-                            // Create a new folder with the two chats
+                            // Create a new folder with the two items
                             const newFolder = {
                               id: 'folder_' + Date.now(),
                               name: 'Group',
@@ -14421,7 +14430,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
                             {upcomingEvents.length === 0 ? (
                               <div className="reelm-events-empty" onClick={() => { if (isAuthorized) setShowCreateEventModal(selectedReelm.id) }}>
-                                <span>{t('no_upcoming_events') || 'No upcoming events'}</span>
+                                <span>{t('no_upcoming_events') === 'no_upcoming_events' ? 'No upcoming events' : t('no_upcoming_events')}</span>
                               </div>
                             ) : (
                               <div className="reelm-events-list">
@@ -14629,7 +14638,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                           >
                                             <span className="reelm-subchannel-branch" />
                                             <span className={"reelm-channel-label" + (isSubSelected ? " reelm-channel-label-active" : "")}>
-                                              <span className="reelm-channel-prefix">↳ #</span>
+                                              <span className="reelm-channel-prefix">#</span>
                                               {editingChannelId === sub.id ? (
                                                 <input
                                                   className="reelm-channel-name-input"

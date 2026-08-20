@@ -724,5 +724,14 @@
   "activity": "Activity",
   "no_active_activity": "No active activity",
   "more": "more",
-  "friend": "Friend"
+  "friend": "Friend",
+  "no_upcoming_events": "No upcoming events",
+  "events": "Events",
+  "create_event": "Create Event",
+  "view_all_events": "View all events",
+  "create_subchannel": "Create Subchannel",
+  "reelm_events": "Reelm Events",
+  "event_title": "Event Title",
+  "date_and_time": "Date & Time",
+  "location_or_room": "Location / Channel"
 }

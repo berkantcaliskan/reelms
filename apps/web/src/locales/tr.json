@@ -724,5 +724,14 @@
   "activity": "Aktivite",
   "no_active_activity": "Aktif aktivite yok",
   "more": "kişi daha",
-  "friend": "Arkadaş"
+  "friend": "Arkadaş",
+  "no_upcoming_events": "Yaklaşan etkinlik yok",
+  "events": "Etkinlikler",
+  "create_event": "Etkinlik Oluştur",
+  "view_all_events": "Tüm etkinlikleri gör",
+  "create_subchannel": "Alt Kanal Oluştur",
+  "reelm_events": "Reelm Etkinlikleri",
+  "event_title": "Etkinlik Başlığı",
+  "date_and_time": "Tarih ve Saat",
+  "location_or_room": "Konum / Kanal"
 }
