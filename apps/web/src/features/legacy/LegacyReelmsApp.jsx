@@ -773,9 +773,24 @@ function PillSelect({ value, onChange, options }) {
 }
 
 const THEMES = [
-  { id: 'default',  name: 'Default',         accent: '#b99887', accentRgb: '185,152,135', base: '#0c0c20', baseRgb: '12,12,32' },
+  {
+    id: 'default',
+    name: 'Charcoal',
+    accent: '#b99887',
+    accentRgb: '185,152,135',
+    base: '#121315',
+    baseRgb: '18,19,21',
+    surfacePrimary: '#181A1D',
+    surfaceElevated: '#1E2024',
+    surfaceHover: '#24262B',
+    borderSubtle: 'rgba(255,255,255,0.06)',
+    borderStrong: 'rgba(255,255,255,0.10)',
+    noAccentGlow: true,
+    noGradient: true,
+  },
   { id: 'gece',     name: 'Night',           accent: '#b99887', accentRgb: '185,152,135', base: '#1e1c1a', baseRgb: '30,28,26', grainOpacity: 0.12, noAccentGlow: true },
   { id: 'stone',    name: 'Soft Light',      accent: '#c8bfa8', accentRgb: '200,191,168', base: '#383835', baseRgb: '56,56,53', noGradient: true },
+  { id: 'classic',  name: 'Midnight Purple', accent: '#b99887', accentRgb: '185,152,135', base: '#0c0c20', baseRgb: '12,12,32' },
   { id: 'lavender', name: 'Purple Sunlight', accent: '#c0a8e0', accentRgb: '192,168,224', base: '#120d1a', baseRgb: '18,13,26' },
   { id: 'dusk',     name: 'Purple Nightlight', accent: '#9070c0', accentRgb: '144,112,192', base: '#0d0a18', baseRgb: '13,10,24' },
   { id: 'rose',     name: 'Rose',            accent: '#e8a4b8', accentRgb: '232,164,184', base: '#1a0d12', baseRgb: '26,13,18' },
@@ -1126,7 +1141,7 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
         <div className="accs-section-title">{t('background')}</div>
         <div className="cust-bg-area">
           {customization.bgImage ? (
-            <div className="cust-bg-preview" style={normalizeMediaUrl(customization.bgImage) ? { backgroundImage: `url(${normalizeMediaUrl(customization.bgImage)})` } : {}}>
+            <div className="cust-bg-preview" style={{ backgroundImage: `url("${normalizeMediaUrl(customization.bgImage) || customization.bgImage}")` }}>
               <button className="cust-bg-remove" onClick={() => onChange({ bgImage: null })}>{t('remove')}</button>
             </div>
           ) : (
@@ -1141,8 +1156,16 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
               if (!file) return
               ;(async () => {
                 try {
-                  const url = await uploadProfileImageFile(file, 'profile-background')
-                  onChange({ bgImage: url })
+                  let url = null
+                  try {
+                    url = await uploadProfileImageFile(file, 'profile-background')
+                  } catch {
+                    url = await compressImageToDataUrl(file)
+                  }
+                  if (!url) {
+                    url = await compressImageToDataUrl(file)
+                  }
+                  if (url) onChange({ bgImage: url })
                 } catch (err) {
                   console.warn('Background image could not be processed:', err)
                 }
@@ -7417,6 +7440,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     root.style.setProperty('--tb', effectiveBase)
     root.style.setProperty('--tb-rgb', effectiveBaseRgb)
     root.style.setProperty('--text-fg', effectiveTextColor)
+    root.style.setProperty('--surface-primary', activeTheme.surfacePrimary || 'rgba(24, 26, 29, 0.85)')
+    root.style.setProperty('--surface-elevated', activeTheme.surfaceElevated || '#1E2024')
+    root.style.setProperty('--surface-hover', activeTheme.surfaceHover || '#24262B')
+    root.style.setProperty('--border-subtle', activeTheme.borderSubtle || 'rgba(255, 255, 255, 0.06)')
+    root.style.setProperty('--border-strong', activeTheme.borderStrong || 'rgba(255, 255, 255, 0.10)')
     if (activeTheme.grainOpacity != null) {
       root.style.setProperty('--grain-opacity', String(activeTheme.grainOpacity))
     } else {
@@ -7428,9 +7456,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       root.style.removeProperty('--tb')
       root.style.removeProperty('--tb-rgb')
       root.style.removeProperty('--text-fg')
+      root.style.removeProperty('--surface-primary')
+      root.style.removeProperty('--surface-elevated')
+      root.style.removeProperty('--surface-hover')
+      root.style.removeProperty('--border-subtle')
+      root.style.removeProperty('--border-strong')
       root.style.removeProperty('--grain-opacity')
     }
-  }, [effectiveAccent, effectiveAccentRgb, effectiveBase, effectiveBaseRgb, effectiveTextColor, activeTheme.grainOpacity])
+  }, [effectiveAccent, effectiveAccentRgb, effectiveBase, effectiveBaseRgb, effectiveTextColor, activeTheme])
 
   const [chats, setChats] = useState([])
   const chatsRef = useRef([])
@@ -7684,6 +7717,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const reelmTemplates = getReelmTemplates(getT(language))
   const activeTemplate = selectedTemplateId ? reelmTemplates.find(t => t.id === selectedTemplateId) ?? null : null
   const BODY_FONTS = [
+    { id: 'karla', label: 'Karla', family: "'Karla', sans-serif" },
+    { id: 'figtree', label: 'Figtree', family: "'Figtree', sans-serif" },
     { id: 'be-vietnam-pro', label: 'Be Vietnam Pro', family: "'Be Vietnam Pro', sans-serif" },
     { id: 'plus-jakarta-sans', label: 'Plus Jakarta Sans', family: "'Plus Jakarta Sans', sans-serif" },
     { id: 'line-seed-jp', label: 'LINE Seed JP', family: "'LINE Seed JP', sans-serif" },
@@ -7694,7 +7729,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     { id: 'inter', label: 'Inter', family: "'Inter', sans-serif" },
     { id: 'sour-gummy', label: 'Sour Gummy', family: "'Sour Gummy', sans-serif" },
   ]
-  const [bodyFont, setBodyFont] = useState('be-vietnam-pro')
+  const [bodyFont, setBodyFont] = useState('karla')
   useEffect(() => {
     const font = BODY_FONTS.find(f => f.id === bodyFont) || BODY_FONTS[0]
     const fontName = font.family.split(',')[0].replace(/'/g, '').trim()
@@ -7734,6 +7769,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [shareTarget, setShareTarget] = useState(null)
   const [showChatList, setShowChatList] = useState(false)
   const [chatListFilter, setChatListFilter] = useState('all')
+  const [showChatFilterMore, setShowChatFilterMore] = useState(false)
   const [chatListSearch, setChatListSearch] = useState('')
   const [mutedReelmIds, setMutedReelmIds] = useState([])
   const mutedReelmIdsRef = useRef([])
@@ -7743,6 +7779,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   useEffect(() => { mutedChatIdsRef.current = mutedChatIds.map(String) }, [mutedChatIds])
   const [hiddenBarIds, setHiddenBarIds] = useState([])
   const [showHiddenBarItems, setShowHiddenBarItems] = useState(false)
+  const [chatFolders, setChatFolders] = useState([])
+  const [openFolderId, setOpenFolderId] = useState(null)
+  const [draggedBarItem, setDraggedBarItem] = useState(null)
+  const draggedBarItemRef = useRef(null)
+  const [dragOverBarItemId, setDragOverBarItemId] = useState(null)
+  const [renamingFolderId, setRenamingFolderId] = useState(null)
+  const [folderNameInput, setFolderNameInput] = useState('')
+  const [showBlockedModal, setShowBlockedModal] = useState(false)
+  const saveChatFolders = (folders) => {
+    setChatFolders(folders)
+    scheduleUserPersist('chat_folders', folders)
+  }
   const [lastSeenAllowList, setLastSeenAllowList] = useState([])
   const [friends, setFriends] = useState([])
   const [blocked, setBlocked] = useState([])
@@ -7942,6 +7990,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       if (Array.isArray(data.muted_reelms)) setMutedReelmIds(data.muted_reelms.map(String))
       if (Array.isArray(data.muted_chats)) setMutedChatIds(data.muted_chats.map(String))
       if (Array.isArray(data.hidden_bar_items)) setHiddenBarIds(data.hidden_bar_items.map(String))
+      if (Array.isArray(data.chat_folders)) setChatFolders(data.chat_folders)
       if (data.bar_prefs?.showHidden === true) setShowHiddenBarItems(true)
       if (Array.isArray(data.last_seen_allow_list)) setLastSeenAllowList(data.last_seen_allow_list.map(String))
       if (Array.isArray(data.feed_nav) && data.feed_nav.length === ALL_FEED_NAV.length) setFeedNavOrder(data.feed_nav)
@@ -7997,6 +8046,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       else if (sk === 'muted_reelms') setStableArray(setMutedReelmIds, Array.isArray(v) ? v.map(String) : [])
       else if (sk === 'muted_chats') setStableArray(setMutedChatIds, Array.isArray(v) ? v.map(String) : [])
       else if (sk === 'hidden_bar_items') setStableArray(setHiddenBarIds, Array.isArray(v) ? v.map(String) : [])
+      else if (sk === 'chat_folders') setStableArray(setChatFolders, Array.isArray(v) ? v : [])
       else if (sk === 'bar_prefs') { if (v && typeof v === 'object') setShowHiddenBarItems(v.showHidden === true) }
       else if (sk === 'last_seen_allow_list') setStableArray(setLastSeenAllowList, Array.isArray(v) ? v.map(String) : [])
       else if (sk === 'spotify_connected') setSpotifyConnected(v === true || v === 'true')
@@ -9364,7 +9414,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setProfileBio(currentUser.bio || '')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id])
-  const PANEL_DEFAULT = 250
+  const PANEL_DEFAULT = 230
   const [leftWidth, setLeftWidth] = useState(PANEL_DEFAULT)
   const [rightWidth, setRightWidth] = useState(PANEL_DEFAULT)
   const dragState = useRef(null)
@@ -9395,19 +9445,19 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     barPrevIdSetRef.current = new Set(currentIds)
     const prev = barPositionsRef.current
     const next = {}
-    items.forEach(el => { next[el.dataset.barId] = el.getBoundingClientRect().left })
+    items.forEach(el => { next[el.dataset.barId] = el.getBoundingClientRect().top })
     const hadPrev = barInitializedRef.current
     barInitializedRef.current = true
     barPositionsRef.current = next
     if (!hadPrev || setChanged) return
     items.forEach(el => {
       const id = el.dataset.barId
-      const prevLeft = prev[id]
-      const currLeft = next[id]
-      if (prevLeft === undefined || currLeft === undefined) return
-      const dx = prevLeft - currLeft
-      if (Math.abs(dx) < 2) return
-      el.style.transform = `translateX(${dx}px)`
+      const prevTop = prev[id]
+      const currTop = next[id]
+      if (prevTop === undefined || currTop === undefined) return
+      const dy = prevTop - currTop
+      if (Math.abs(dy) < 2) return
+      el.style.transform = `translateY(${dy}px)`
       requestAnimationFrame(() => {
         el.style.transition = 'transform 0.38s cubic-bezier(0.34, 1.2, 0.64, 1)'
         el.style.transform = ''
@@ -9515,6 +9565,24 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
   }, [barCtxMenu])
+
+  useEffect(() => {
+    if (!showChatFilterMore) return
+    const handler = (e) => { if (!e.target.closest('.chat-list-filter-more-wrap')) setShowChatFilterMore(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [showChatFilterMore])
+
+  useEffect(() => {
+    if (!openFolderId) return
+    const handler = (e) => {
+      if (!e.target.closest('.bar-folder-drawer') && !e.target.closest('.bar-item--folder')) {
+        setOpenFolderId(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [openFolderId])
 
   useEffect(() => {
     const onMouseMove = (e) => {
@@ -12218,93 +12286,316 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         activeTheme.noAccentGlow ? 'theme-no-accent-glow' : '',
       ].filter(Boolean).join(' ')}
       style={{
-        '--bg-image': customization.bgImage ? `url("${customization.bgImage}")` : 'none',
+        '--bg-image': customization.bgImage ? `url("${normalizeMediaUrl(customization.bgImage) || customization.bgImage}")` : 'none',
         // Outside panels: ~60% blur. Panels add extra blur on top (via backdrop-filter).
         '--bg-blur-outside': customization.reduceBlur ? '12px' : '16px',
         '--bg-blur-panel-extra': customization.reduceBlur ? '10px' : '12px',
       }}
     >
       {customization.bgImage && (
-        <div className="dashboard-bg" key={customization.bgImage} />
+        <div className="dashboard-bg" style={{ backgroundImage: `url("${normalizeMediaUrl(customization.bgImage) || customization.bgImage}")` }} key={customization.bgImage} />
       )}
       <div className={`dashboard-fg${isMobile && (selectedReelm || selectedChat) ? ' dashboard-fg--no-nav' : ''}`}>
-        <header className="app-header" style={showMenu ? { filter: 'blur(4px)' } : {}}>
-          <div className="logo-area" style={{ cursor: 'pointer' }} onClick={goHome}>
-            <img src={reelmsLogo} alt="Reelms" className="logo" style={{ filter: headerIconThemeFilter(effectiveAccent) }} />
-            <span className="app-name">Reelms</span>
+        <div className="dashboard-top-row su-drop su-drop-1" style={showMenu ? { filter: 'blur(4px)' } : {}}>
+          <div className="sidebar-logo-area" style={{ cursor: 'pointer' }} onClick={goHome} title="Reelms">
+            <img src={reelmsLogo} alt="Reelms" className="sidebar-logo" style={{ filter: headerIconThemeFilter(effectiveAccent) }} />
           </div>
-          <div className="header-icons-group">
+          <div className="dashboard-top-actions">
             {!isMobile && (
-              <button className="header-settings-btn" onClick={toggleFriendsPopup} style={{ opacity: showFriendsPopup ? 0 : 1 }}>
-                <img src={friendsIcon} alt="Friends" className="header-icon" style={{ filter: activeTheme.id === 'gece' ? headerIconThemeFilter(effectiveAccent) : 'hue-rotate(220deg) saturate(1.96) brightness(0.14)' }} />
-              </button>
+              <div className={`profile-card${showProfilePopup ? ' profile-card-active' : ''}`} onClick={() => setShowProfilePopup(true)} style={{ cursor: 'pointer' }}>
+                <img src={getPersonPhoto(currentUser) || avatarUIcon} alt="Avatar" className="profile-avatar" />
+                <div className="profile-info">
+                  <div className="profile-name-row">
+                    <span className={`profile-name${(currentUser.name || '').length > 14 ? ' profile-name--small' : ''}${spotifyNowPlaying ? ' profile-name--listening' : ''}`}>{currentUser.name}</span>
+                    <span className="profile-status-dot" style={{ background: { online: '#4ade80', idle: '#fbbf24', busy: '#f87171', invisible: '#9ca3af' }[profileStatus] }} />
+                  </div>
+                  {spotifyNowPlaying && (
+                    <div className="profile-nowplaying" aria-live="polite">
+                      <span className="profile-nowplaying-track">{spotifyNowPlaying.name}</span>
+                      <span className="profile-nowplaying-sep"> • </span>
+                      <span className="profile-nowplaying-artist">{spotifyNowPlaying.artist}</span>
+                    </div>
+                  )}
+                  {serverRole && <span className="profile-role">{serverRole}</span>}
+                  {currentActivity?.name && <ActivityBadge activity={currentActivity} />}
+                </div>
+              </div>
             )}
-            <button className="header-settings-btn" onClick={toggleNotifPopup} style={{ opacity: showNotificationsPopup ? 0 : 1 }}>
-              <span className="notif-icon-wrap">
-                <img src={notificationIcon} alt="Notifications" className="header-icon" style={{ filter: activeTheme.id === 'gece' ? headerIconThemeFilter(effectiveAccent) : 'hue-rotate(220deg) saturate(1.96) brightness(0.14)' }} />
-                {notifications.length > notifSeenCount && (
-                  <span className="notif-badge">{capBadge(notifications.length - notifSeenCount)}</span>
-                )}
-              </span>
-            </button>
-            <button className="header-settings-btn" style={{ marginLeft: '5px' }} onClick={() => { setShowSettings(v => { if (!v) setSelectedSettingsCategory(null); return !v }); setSelectedReelm(null); setSelectedChat(null); setShowDiscover(false); setShowFriendsPanel(false) }}>
-              <SettingsIcon isNight={activeTheme.id === 'gece'} />
-            </button>
-          </div>
-        </header>
-
-        <div style={{ position: 'relative', flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-          <div className="dashboard-mid-row su-drop su-drop-1" style={showMenu ? { filter: 'blur(4px)' } : {}}>
-            <div className="chats-row">
-              <button
-                className="new-chat-btn"
-                onClick={() => setShowMenu(!showMenu)}
-                title="New"
-              >
-                <img src={newIcon} alt="New" className="header-new-icon" style={{ filter: newIconThemeFilter(effectiveAccent) }} />
-              </button>
-              <div className="chats-row-divider" />
-              {msgRequests.length > 0 && (
-                <button
-                  className={`bar-item${showMsgRequests ? ' bar-item-active' : ''}`}
-                  title="Message requests"
-                  onClick={() => { setShowMsgRequests(v => !v); setSelectedChat(null); setSelectedReelm(null); setShowDiscover(false); setShowSettings(false) }}
-                  style={{ position: 'relative', flexShrink: 0 }}
-                >
-                  <span className="bar-item-wrap">
-                    <div className="bar-item-avatar" style={{ fontSize: '15px' }}>✉</div>
-                    <span className="bar-item-badge">{msgRequests.length > 9 ? '9+' : msgRequests.length}</span>
-                  </span>
+            <div className="header-icons-group">
+              {!isMobile && (
+                <button className="header-settings-btn" onClick={toggleFriendsPopup} style={{ opacity: showFriendsPopup ? 0 : 1 }}>
+                  <img src={friendsIcon} alt="Friends" className="header-icon" style={{ filter: (activeTheme.id === 'gece' || activeTheme.id === 'default') ? headerIconThemeFilter(effectiveAccent) : 'hue-rotate(220deg) saturate(1.96) brightness(0.14)' }} />
                 </button>
               )}
-              <div className="chats-list-horizontal">
-                {(() => {
-                  const blockedIds = new Set((blocked || []).map(b => String(b.id || b.userId || '')))
-                  const topChatItems = (Array.isArray(chats) ? chats : [])
-                    .filter(c => !(c.type === 'dm' && blockedIds.has(String(c.friendId || ''))))
-                    .filter(c => showHiddenBarItems || !hiddenBarIds.map(String).includes(String(c.id)))
-                  const allItemsFlat = [
-                    ...reelms.filter(r => showHiddenBarItems || !hiddenBarIds.map(String).includes(String(r.id))).map(r => ({ ...r, itemType: 'reelm' })),
-                    ...topChatItems.map(c => ({ ...c, itemType: 'chat' }))
-                  ]
-                  const pinnedItems = pinnedItemIds.map(id => allItemsFlat.find(i => i.id === id)).filter(Boolean)
-                  const unpinnedItems = allItemsFlat.filter(i => !pinnedItemIds.includes(i.id)).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-                  const allItems = [...pinnedItems, ...unpinnedItems]
-                  if (allItems.length === 0) return <p className="no-chats-text-bar">Start a conversation</p>
-                  return (
-                    <div className="chats-scroll-horizontal" ref={barScrollRef}>
-                      {allItems.map(item => (
+              <button className="header-settings-btn" onClick={toggleNotifPopup} style={{ opacity: showNotificationsPopup ? 0 : 1 }}>
+                <span className="notif-icon-wrap">
+                  <img src={notificationIcon} alt="Notifications" className="header-icon" style={{ filter: (activeTheme.id === 'gece' || activeTheme.id === 'default') ? headerIconThemeFilter(effectiveAccent) : 'hue-rotate(220deg) saturate(1.96) brightness(0.14)' }} />
+                  {notifications.length > notifSeenCount && (
+                    <span className="notif-badge">{capBadge(notifications.length - notifSeenCount)}</span>
+                  )}
+                </span>
+              </button>
+              <button className="header-settings-btn" style={{ marginLeft: '5px' }} onClick={() => { setShowSettings(v => { if (!v) setSelectedSettingsCategory(null); return !v }); setSelectedReelm(null); setSelectedChat(null); setShowDiscover(false); setShowFriendsPanel(false) }}>
+                <SettingsIcon isNight={activeTheme.id === 'gece' || activeTheme.id === 'default'} />
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {msgCtxMenu && (
+          <div
+            className="msg-ctx-menu msg-ctx-menu-fixed"
+            style={{ position: 'fixed', left: msgCtxMenu.x, top: msgCtxMenu.y, zIndex: 9999 }}
+          >
+            <button className="msg-ctx-item" onClick={() => { setReplyingTo(msgCtxMenu.replyInfo); setMsgCtxMenu(null) }}>{t('reply')}</button>
+            {msgCtxMenu.canDelete && <button className="msg-ctx-item msg-ctx-item--danger" onClick={() => { modDeleteMessage(msgCtxMenu.chatKey, msgCtxMenu.msgId); setMsgCtxMenu(null) }}>{t('delete')}</button>}
+          </div>
+        )}
+
+        <div
+          className="panel-system"
+          style={showMenu ? { filter: 'blur(4px)' } : {}}
+          onTouchStart={isMobile ? (e) => {
+            mobileTouchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+          } : undefined}
+          onTouchEnd={isMobile ? (e) => {
+            if (!mobileTouchRef.current) return
+            const dx = e.changedTouches[0].clientX - mobileTouchRef.current.x
+            const dy = e.changedTouches[0].clientY - mobileTouchRef.current.y
+            mobileTouchRef.current = null
+            if (Math.abs(dy) > Math.abs(dx) || Math.abs(dx) < 40) return
+            if (mobileLeftPanelOpen) { setMobileLeftPanelOpen(false); return }
+            if (mobileRightPanelOpen) { setMobileRightPanelOpen(false); return }
+            if (!selectedReelm) return
+            if (dx > 0) setMobileLeftPanelOpen(true)
+            else setMobileRightPanelOpen(true)
+          } : undefined}
+        >
+          {!isMobile && (
+            <>
+              <aside className="dashboard-dynamic-sidebar">
+                <button
+                  className="new-chat-btn sidebar-new-btn"
+                  onClick={() => setShowMenu(!showMenu)}
+                  title="New"
+                >
+                  <img src={newIcon} alt="New" className="header-new-icon" style={{ filter: newIconThemeFilter(effectiveAccent) }} />
+                </button>
+                <div className="sidebar-divider" />
+                <div className="chats-list-vertical" ref={barScrollRef}>
+                  {(() => {
+                    const blockedIds = new Set((blocked || []).map(b => String(b.id || b.userId || '')))
+                    const topChatItems = (Array.isArray(chats) ? chats : [])
+                      .filter(c => !(c.type === 'dm' && blockedIds.has(String(c.friendId || ''))))
+                      .filter(c => showHiddenBarItems || !hiddenBarIds.map(String).includes(String(c.id)))
+
+                    // Identify chats grouped inside folders
+                    const folderedChatIdSet = new Set((chatFolders || []).flatMap(f => f.chatIds || []).map(String))
+                    const standaloneChats = topChatItems.filter(c => !folderedChatIdSet.has(String(c.id)))
+
+                    // Folder items that contain existing valid chats
+                    const folderItems = (chatFolders || []).map(f => {
+                      const fChats = (f.chatIds || []).map(cid => chats.find(c => String(c.id) === String(cid))).filter(Boolean)
+                      return {
+                        ...f,
+                        itemType: 'folder',
+                        chats: fChats,
+                        updatedAt: Math.max(f.createdAt || 0, ...fChats.map(c => c.updatedAt || 0))
+                      }
+                    }).filter(f => f.chats.length > 0)
+
+                    const allItemsFlat = [
+                      ...reelms.filter(r => showHiddenBarItems || !hiddenBarIds.map(String).includes(String(r.id))).map(r => ({ ...r, itemType: 'reelm' })),
+                      ...standaloneChats.map(c => ({ ...c, itemType: 'chat' })),
+                      ...folderItems
+                    ]
+                    const pinnedItems = pinnedItemIds.map(id => allItemsFlat.find(i => i.id === id)).filter(Boolean)
+                    const unpinnedItems = allItemsFlat.filter(i => !pinnedItemIds.includes(i.id)).sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
+                    const allItems = [...pinnedItems, ...unpinnedItems]
+                    if (allItems.length === 0) return null
+
+                    return allItems.map(item => {
+                      if (item.itemType === 'folder') {
+                        const folderChats = item.chats || []
+                        const folderUnread = folderChats.reduce((sum, c) => sum + getChatUnreadCount(c), 0)
+                        const isFolderActive = folderChats.some(c => selectedChat?.id === c.id)
+                        const isDragOver = dragOverBarItemId === item.id
+                        return (
+                          <div
+                            key={item.id}
+                            data-bar-id={item.id}
+                            className={`bar-item bar-item--folder${isFolderActive ? ' bar-item-active' : ''}${isDragOver ? ' bar-item--dragover' : ''}`}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setOpenFolderId(prev => prev === item.id ? null : item.id)
+                            }}
+                            onContextMenu={(e) => {
+                              e.preventDefault()
+                              const rect = e.currentTarget.getBoundingClientRect()
+                              setBarCtxMenu({
+                                x: Math.round(rect.right + 8),
+                                y: Math.round(Math.min(rect.top, Math.max(10, window.innerHeight - 240))),
+                                item
+                              })
+                            }}
+                            onDragOver={(e) => {
+                              const dragged = draggedBarItem || draggedBarItemRef.current
+                              if (dragged && String(dragged.id) !== String(item.id) && dragged.itemType === 'chat') {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                e.dataTransfer.dropEffect = 'move'
+                                if (dragOverBarItemId !== item.id) setDragOverBarItemId(item.id)
+                              }
+                            }}
+                            onDragLeave={(e) => {
+                              if (e.currentTarget.contains(e.relatedTarget)) return
+                              if (dragOverBarItemId === item.id) setDragOverBarItemId(null)
+                            }}
+                            onDrop={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setDragOverBarItemId(null)
+                              const dragged = draggedBarItem || draggedBarItemRef.current
+                              const fromId = dragged?.id || e.dataTransfer.getData('text/plain')
+                              if (!fromId || String(fromId) === String(item.id)) return
+                              const draggedChat = (Array.isArray(chats) ? chats : []).find(c => String(c.id) === String(fromId))
+                              if (!draggedChat) return
+
+                              if ((item.chatIds || []).includes(draggedChat.id)) return
+                              const next = chatFolders.map(f => {
+                                if (f.id === item.id) return { ...f, chatIds: [...(f.chatIds || []), draggedChat.id] }
+                                return f
+                              })
+                              saveChatFolders(next)
+                              setDraggedBarItem(null)
+                              draggedBarItemRef.current = null
+                            }}
+                            title={item.name || 'Chat Group'}
+                          >
+                            <span className="bar-item-wrap">
+                              <div className="bar-item-avatar bar-item-avatar--folder">
+                                {folderChats.length === 2 ? (
+                                  <div className="folder-avatar-grid folder-avatar-grid--2">
+                                    {folderChats.slice(0, 2).map((c, i) => {
+                                      const src = getChatAvatarSrc(c)
+                                      const name = getChatDisplayName(c)
+                                      return (
+                                        <div key={c.id || i} className={`folder-mini-avatar folder-mini-avatar--diag-${i + 1}`}>
+                                          {src ? <img src={src} alt={name} draggable={false} /> : (name || '?').charAt(0).toUpperCase()}
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                ) : folderChats.length === 3 ? (
+                                  <div className="folder-avatar-grid folder-avatar-grid--3">
+                                    {folderChats.slice(0, 3).map((c, i) => {
+                                      const src = getChatAvatarSrc(c)
+                                      const name = getChatDisplayName(c)
+                                      return (
+                                        <div key={c.id || i} className={`folder-mini-avatar folder-mini-avatar--tri-${i + 1}`}>
+                                          {src ? <img src={src} alt={name} draggable={false} /> : (name || '?').charAt(0).toUpperCase()}
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                ) : (
+                                  <div className="folder-avatar-grid folder-avatar-grid--4">
+                                    {folderChats.slice(0, 4).map((c, i) => {
+                                      const src = getChatAvatarSrc(c)
+                                      const name = getChatDisplayName(c)
+                                      return (
+                                        <div key={c.id || i} className={`folder-mini-avatar folder-mini-avatar--grid-${i + 1}`}>
+                                          {i === 3 && folderChats.length > 4 ? (
+                                            <span className="folder-mini-more">+{folderChats.length - 3}</span>
+                                          ) : (
+                                            src ? <img src={src} alt={name} draggable={false} /> : (name || '?').charAt(0).toUpperCase()
+                                          )}
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                )}
+                              </div>
+                              {folderUnread > 0 && (
+                                <span className="bar-item-badge">{capBadge(folderUnread)}</span>
+                              )}
+                              {pinnedItemIds.includes(item.id) && <span className="bar-item-pin-dot" />}
+                            </span>
+                          </div>
+                        )
+                      }
+
+                      // Standalone Chat / Reelm item
+                      const isDragOver = dragOverBarItemId === item.id
+                      return (
                         <div
                           key={item.id}
                           data-bar-id={item.id}
-                          className={'bar-item bar-item--' + item.itemType + (isDefaultCommunity(item) ? ' bar-item--community-root' : '') + (item.itemType === 'reelm' && mutedReelmIds.map(String).includes(String(item.id)) ? ' bar-item--muted' : '') + (item.itemType === 'chat' && item.type === 'dm' && isUserActive(item.friendId) ? ' bar-item--online' : '') + ((item.itemType === 'reelm' ? selectedReelm?.id : selectedChat?.id) === item.id ? ' bar-item-active' : '')}
+                          className={'bar-item bar-item--' + item.itemType + (isDefaultCommunity(item) ? ' bar-item--community-root' : '') + (item.itemType === 'reelm' && mutedReelmIds.map(String).includes(String(item.id)) ? ' bar-item--muted' : '') + (item.itemType === 'chat' && item.type === 'dm' && isUserActive(item.friendId) ? ' bar-item--online' : '') + ((item.itemType === 'reelm' ? selectedReelm?.id : selectedChat?.id) === item.id ? ' bar-item-active' : '') + (isDragOver ? ' bar-item--dragover' : '')}
+                          draggable={item.itemType === 'chat'}
+                          onDragStart={(e) => {
+                            if (item.itemType === 'chat') {
+                              e.dataTransfer.setData('text/plain', String(item.id))
+                              e.dataTransfer.setData('application/x-bar-item', JSON.stringify({ id: item.id, itemType: item.itemType }))
+                              e.dataTransfer.effectAllowed = 'move'
+                              setDraggedBarItem(item)
+                              draggedBarItemRef.current = item
+                            }
+                          }}
+                          onDragEnd={() => {
+                            setDraggedBarItem(null)
+                            draggedBarItemRef.current = null
+                            setDragOverBarItemId(null)
+                          }}
+                          onDragOver={(e) => {
+                            const dragged = draggedBarItem || draggedBarItemRef.current
+                            if (dragged && String(dragged.id) !== String(item.id) && dragged.itemType === 'chat' && item.itemType === 'chat') {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              e.dataTransfer.dropEffect = 'move'
+                              if (dragOverBarItemId !== item.id) setDragOverBarItemId(item.id)
+                            }
+                          }}
+                          onDragLeave={(e) => {
+                            if (e.currentTarget.contains(e.relatedTarget)) return
+                            if (dragOverBarItemId === item.id) setDragOverBarItemId(null)
+                          }}
+                          onDrop={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            setDragOverBarItemId(null)
+                            const dragged = draggedBarItem || draggedBarItemRef.current
+                            const fromId = dragged?.id || e.dataTransfer.getData('text/plain')
+                            if (!fromId || String(fromId) === String(item.id)) return
+                            const draggedChat = (Array.isArray(chats) ? chats : []).find(c => String(c.id) === String(fromId))
+                            if (!draggedChat || item.itemType !== 'chat') return
+
+                            // Create a new folder with item and draggedChat
+                            const newFolder = {
+                              id: 'folder_' + Date.now(),
+                              name: 'Group',
+                              chatIds: [item.id, draggedChat.id],
+                              createdAt: Date.now()
+                            }
+                            saveChatFolders([...(chatFolders || []), newFolder])
+                            setDraggedBarItem(null)
+                            draggedBarItemRef.current = null
+                          }}
                           onClick={() => {
                             if (item.itemType !== 'reelm') clearUnread(item.id)
                             if (item.itemType === 'reelm') { setSelectedReelm(item); setSelectedChat(null); setShowDiscover(false); setShowFriendsPanel(false); setShowSettings(false); setReelmLoading(true); setTimeout(() => setReelmLoading(false), 350) }
                             else { setSelectedChat(item); setSelectedReelm(null); setSelectedChannel(null); setShowDiscover(false); setShowFriendsPanel(false); setShowSettings(false) }
                           }}
-                          onContextMenu={(e) => { e.preventDefault(); setBarCtxMenu({ x: e.clientX, y: e.clientY, item }) }}
-                          title={item.name}
+                          onContextMenu={(e) => {
+                            e.preventDefault()
+                            const rect = e.currentTarget.getBoundingClientRect()
+                            setBarCtxMenu({
+                              x: Math.round(rect.right + 8),
+                              y: Math.round(Math.min(rect.top, Math.max(10, window.innerHeight - 240))),
+                              item
+                            })
+                          }}
+                          title={item.itemType === 'reelm' ? (isDefaultCommunity(item) ? 'Community' : item.name) : getChatDisplayName(item)}
                         >
                           <span className={`bar-item-wrap${item.id === recentlyBumpedChatId ? ' bar-item-bumped' : ''}`}>
                             <div className={`bar-item-avatar${item.itemType === 'reelm' ? ' bar-item-avatar--server' : ' bar-item-avatar--profile'}${isDefaultCommunity(item) ? ' bar-item-avatar--community' : ''}`}>
@@ -12312,7 +12603,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 const avatarSrc = item.itemType === 'chat' ? getChatAvatarSrc(item) : item.image
                                 const label = item.itemType === 'chat' ? getChatDisplayName(item) : item.name
                                 return avatarSrc
-                                  ? <img src={avatarSrc} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: item._type === 'reelm' ? '12px' : '50%' }} />
+                                  ? <img src={avatarSrc} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '14px' }} />
                                   : isDefaultCommunity(item) ? <ReelmsCommunityGlyph /> : (label || '?').charAt(0).toUpperCase()
                               })()}
                             </div>
@@ -12325,38 +12616,64 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               <span className="bar-item-status-dot" style={{ background: STATUS_COLORS[getUserStatus(item.friendId)] || STATUS_COLORS.offline }} />
                             )}
                           </span>
-                          <span className="bar-item-label">{item.itemType === 'reelm' ? (isDefaultCommunity(item) ? 'Community' : item.name) : getChatDisplayName(item)}</span>
                         </div>
-                      ))}
-                    </div>
-                  )
-                })()}
-              </div>
-            </div>
-
-            {!isMobile && (
-              <div className="dashboard-top-right" style={{ width: rightWidth }}>
-                <div className={`profile-card${showProfilePopup ? ' profile-card-active' : ''}`} onClick={() => setShowProfilePopup(true)} style={{ cursor: 'pointer' }}>
-                  <img src={getPersonPhoto(currentUser) || avatarUIcon} alt="Avatar" className="profile-avatar" />
-                  <div className="profile-info">
-                    <div className="profile-name-row">
-                      <span className={`profile-name${(currentUser.name || '').length > 14 ? ' profile-name--small' : ''}${spotifyNowPlaying ? ' profile-name--listening' : ''}`}>{currentUser.name}</span>
-                      <span className="profile-status-dot" style={{ background: { online: '#4ade80', idle: '#fbbf24', busy: '#f87171', invisible: '#9ca3af' }[profileStatus] }} />
-                    </div>
-                    {spotifyNowPlaying && (
-                      <div className="profile-nowplaying" aria-live="polite">
-                        <span className="profile-nowplaying-track">{spotifyNowPlaying.name}</span>
-                        <span className="profile-nowplaying-sep"> • </span>
-                        <span className="profile-nowplaying-artist">{spotifyNowPlaying.artist}</span>
-                      </div>
-                    )}
-                    {serverRole && <span className="profile-role">{serverRole}</span>}
-                    {currentActivity?.name && <ActivityBadge activity={currentActivity} />}
-                  </div>
+                      )
+                    })
+                  })()}
                 </div>
-              </div>
-            )}
-          </div>
+                <div className="sidebar-divider" />
+                <div className="dynamic-bar-bottom-actions">
+                  <button
+                    className={`bar-item bar-item-nav${(showChatList || (selectedChat && !selectedReelm)) && !showDiscover && !showSettings && !showFeed && !showFriendsPanel ? ' bar-item-active' : ''}`}
+                    onClick={() => {
+                      setSelectedReelm(null)
+                      setSelectedChat(null)
+                      setShowChatList(true)
+                      setChatListFilter('all')
+                      setShowDiscover(false)
+                      setShowFeed(false)
+                      setShowFriendsPanel(false)
+                      setShowSettings(false)
+                      setShowMsgRequests(false)
+                    }}
+                    title={t('messages')}
+                  >
+                    <span className="bar-item-wrap">
+                      <div className="bar-item-avatar bar-item-avatar--nav">
+                        <img src={channelTextIcon} alt="Messages" className="bar-nav-icon bar-nav-icon--msg" style={{ filter: categoryIconFilter(effectiveAccent) }} />
+                      </div>
+                      {totalUnread > 0 && (
+                        <span className="bar-item-badge">{capBadge(totalUnread)}</span>
+                      )}
+                    </span>
+                  </button>
+
+                  <button
+                    className={`bar-item bar-item-nav${showDiscover ? ' bar-item-active' : ''}`}
+                    onClick={() => {
+                      setShowDiscover(true)
+                      setSelectedReelm(null)
+                      setSelectedChat(null)
+                      setShowChatList(false)
+                      setShowFeed(false)
+                      setShowFriendsPanel(false)
+                      setShowSettings(false)
+                      setShowMsgRequests(false)
+                      setDiscoverQuery('')
+                    }}
+                    title={t('discover')}
+                  >
+                    <span className="bar-item-wrap">
+                      <div className="bar-item-avatar bar-item-avatar--nav">
+                        <img src={discoverIcon} alt="Discover" className="bar-nav-icon" />
+                      </div>
+                    </span>
+                  </button>
+                </div>
+              </aside>
+              <div className="panel-divider dynamic-bar-divider" />
+            </>
+          )}
 
           {msgCtxMenu && (
             <div
@@ -12368,11 +12685,159 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             </div>
           )}
 
+          {openFolderId && (() => {
+            const folder = (chatFolders || []).find(f => f.id === openFolderId)
+            if (!folder) return null
+            const folderChats = (folder.chatIds || []).map(cid => chats.find(c => String(c.id) === String(cid))).filter(Boolean)
+            return (
+              <div
+                className="bar-folder-drawer"
+                style={{
+                  position: 'fixed',
+                  left: 68,
+                  top: Math.max(60, Math.min(window.innerHeight - 320, 100)),
+                  zIndex: 9999
+                }}
+              >
+                <div className="bar-folder-drawer-header">
+                  {renamingFolderId === folder.id ? (
+                    <input
+                      className="bar-folder-rename-input"
+                      value={folderNameInput}
+                      onChange={e => setFolderNameInput(e.target.value)}
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          saveChatFolders(chatFolders.map(f => f.id === folder.id ? { ...f, name: folderNameInput.trim() || 'Group' } : f))
+                          setRenamingFolderId(null)
+                        } else if (e.key === 'Escape') setRenamingFolderId(null)
+                      }}
+                      onBlur={() => {
+                        saveChatFolders(chatFolders.map(f => f.id === folder.id ? { ...f, name: folderNameInput.trim() || 'Group' } : f))
+                        setRenamingFolderId(null)
+                      }}
+                      autoFocus
+                    />
+                  ) : (
+                    <span className="bar-folder-title" onDoubleClick={() => { setRenamingFolderId(folder.id); setFolderNameInput(folder.name || 'Group') }}>
+                      {folder.name || 'Group'}
+                    </span>
+                  )}
+                  <button
+                    type="button"
+                    className="bar-folder-ungroup-btn"
+                    onClick={() => {
+                      saveChatFolders(chatFolders.filter(f => f.id !== folder.id))
+                      setOpenFolderId(null)
+                    }}
+                    title="Disband group"
+                  >
+                    Ungroup
+                  </button>
+                </div>
+                <div className="bar-folder-items">
+                  {folderChats.map(c => {
+                    const avatarSrc = getChatAvatarSrc(c)
+                    const displayName = getChatDisplayName(c)
+                    const unread = getChatUnreadCount(c)
+                    const isActive = selectedChat?.id === c.id
+                    return (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className={`bar-folder-item${isActive ? ' bar-folder-item-active' : ''}`}
+                        onClick={() => {
+                          setSelectedChat(c)
+                          setSelectedReelm(null)
+                          setSelectedChannel(null)
+                          setShowDiscover(false)
+                          setShowSettings(false)
+                          setShowFriendsPanel(false)
+                          clearUnread(c.id)
+                          setOpenFolderId(null)
+                        }}
+                      >
+                        <div className="discover-result-avatar" style={{ width: 28, height: 28, fontSize: '0.75rem', flexShrink: 0 }}>
+                          {avatarSrc ? <img src={avatarSrc} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : (displayName || '?').charAt(0).toUpperCase()}
+                        </div>
+                        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.8rem' }}>
+                          {displayName}
+                        </span>
+                        {unread > 0 && <span className="bar-item-badge" style={{ position: 'static' }}>{capBadge(unread)}</span>}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )
+          })()}
+
           {barCtxMenu && (
             <div
               className="bar-ctx-menu"
               style={{ position: 'fixed', left: barCtxMenu.x, top: barCtxMenu.y, zIndex: 9999 }}
             >
+              {barCtxMenu.item.itemType === 'folder' && (
+                <>
+                  <button
+                    type="button"
+                    className="bar-ctx-menu-item"
+                    onClick={() => {
+                      saveChatFolders(chatFolders.filter(f => f.id !== barCtxMenu.item.id))
+                      setOpenFolderId(null)
+                      setBarCtxMenu(null)
+                    }}
+                  >
+                    Ungroup
+                  </button>
+                  <button
+                    type="button"
+                    className="bar-ctx-menu-item"
+                    onClick={() => {
+                      (barCtxMenu.item.chatIds || []).forEach(cid => clearUnread(cid))
+                      setBarCtxMenu(null)
+                    }}
+                  >
+                    Mark all as read
+                  </button>
+                  {(() => {
+                    const fChatIds = barCtxMenu.item.chatIds || []
+                    const allMuted = fChatIds.length > 0 && fChatIds.every(cid => mutedChatIds.map(String).includes(String(cid)))
+                    return (
+                      <button
+                        type="button"
+                        className="bar-ctx-menu-item"
+                        onClick={() => {
+                          let nextMuted = [...mutedChatIds]
+                          if (allMuted) {
+                            nextMuted = nextMuted.filter(id => !fChatIds.map(String).includes(String(id)))
+                          } else {
+                            fChatIds.forEach(id => {
+                              if (!nextMuted.map(String).includes(String(id))) nextMuted.push(String(id))
+                            })
+                          }
+                          setMutedChatIds(nextMuted)
+                          scheduleUserPersist('muted_chats', nextMuted)
+                          setBarCtxMenu(null)
+                        }}
+                      >
+                        {allMuted ? 'Unmute all' : 'Mute all'}
+                      </button>
+                    )
+                  })()}
+                  <button
+                    type="button"
+                    className="bar-ctx-menu-item"
+                    onClick={() => {
+                      setRenamingFolderId(barCtxMenu.item.id)
+                      setFolderNameInput(barCtxMenu.item.name || 'Group')
+                      setOpenFolderId(barCtxMenu.item.id)
+                      setBarCtxMenu(null)
+                    }}
+                  >
+                    Rename group
+                  </button>
+                </>
+              )}
               {barCtxMenu.item.type === 'dm' && (
                 <button
                   className="bar-ctx-menu-item"
@@ -12625,26 +13090,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             </div>
           )}
 
-          <div
-            className="panel-system"
-            style={showMenu ? { filter: 'blur(4px)' } : {}}
-            onTouchStart={isMobile ? (e) => {
-              mobileTouchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
-            } : undefined}
-            onTouchEnd={isMobile ? (e) => {
-              if (!mobileTouchRef.current) return
-              const dx = e.changedTouches[0].clientX - mobileTouchRef.current.x
-              const dy = e.changedTouches[0].clientY - mobileTouchRef.current.y
-              mobileTouchRef.current = null
-              if (Math.abs(dy) > Math.abs(dx) || Math.abs(dx) < 40) return
-              // If a panel is already open, close it first
-              if (mobileLeftPanelOpen) { setMobileLeftPanelOpen(false); return }
-              if (mobileRightPanelOpen) { setMobileRightPanelOpen(false); return }
-              if (!selectedReelm) return
-              if (dx > 0) setMobileLeftPanelOpen(true)
-              else setMobileRightPanelOpen(true)
-            } : undefined}
-          >
             {(mobileLeftPanelOpen || mobileRightPanelOpen) && isMobile && (
               <div
                 className="mobile-panel-backdrop"
@@ -13077,18 +13522,22 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       })}
                     </div>
                   </div>
-                  <div className="left-panel-bottom-bar">
-                    <button className={`lpb-btn${showDiscover ? ' lpb-btn-active' : ''}`} onClick={() => { setShowDiscover(true); setSelectedReelm(null); setShowFeed(false); setDiscoverQuery('') }}><img src={discoverIcon} alt="Discover" className="lpb-icon" /></button>
-                    <button className={`lpb-feed-wrap lpb-btn lpb-feed-active`} onClick={() => setShowFeed(false)}>
-                      <img src={feedIcon} alt="Feed" className="lpb-feed-icon" />
-                    </button>
-                    <button className="lpb-btn" onClick={() => { setShowFeed(false); setSelectedReelm(null); setSelectedChat(null); setShowChatList(true); setChatListFilter('all') }}>
-                      <span className="lpb-icon-wrap">
-                        <img src={messagesIcon} alt="Messages" className="lpb-icon" />
-                        {totalUnread > 0 && <span className="lpb-badge">{capBadge(totalUnread)}</span>}
-                      </span>
-                    </button>
-                  </div>
+                  {selectedReelm && !isMobile && (
+                    <div className="reelm-left-bottom-feed-bar">
+                      <button
+                        type="button"
+                        className={`reelm-left-bottom-feed-btn${showFeed ? ' reelm-left-bottom-feed-btn--active' : ''}`}
+                        onClick={() => {
+                          setShowFeed(f => !f)
+                          setShowDiscover(false)
+                          setSelectedChat(null)
+                        }}
+                        title={showFeed ? (t('chat') || 'Chat') : `${selectedReelm.name || 'Reelm'} Feed`}
+                      >
+                        <img src={feedIcon} alt="Feed" className="reelm-left-bottom-feed-icon" />
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div
                   className="panel-divider panel-divider-draggable"
@@ -13105,7 +13554,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   {renderReelmMembersPanel('right-1')}
                 </div>
               </>
-            ) : ((isMod ? false : (showChatList || selectedChat)) || selectedReelm) ? (
+            ) : !showDiscover && !showSettings && !showFriendsPanel && !showMsgRequests && ((isMod ? false : (showChatList || selectedChat)) || selectedReelm) ? (
               <>
                 <div className={`panel panel-left${isMobile && mobileLeftPanelOpen ? ' panel-left--open' : ''}${isMobile && !selectedReelm && showChatList && !selectedChat ? ' panel-left--chat' : ''}`} style={isMobile ? undefined : { flex: `0 0 ${leftWidth}px` }}>
                   {showChatList && !selectedReelm && (
@@ -13114,31 +13563,77 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         <span className="chat-list-sidebar-title">{t('messages')}</span>
                         <div className="chat-list-filter-row">
                           {(() => {
-                            const blockedIds = new Set((blocked || []).map(b => String(b.id || b.userId || '')))
-                            const filters = [
-                              { key: 'all', label: t('all_filter'), count: chats.reduce((sum, c) => sum + getChatUnreadCount(c), 0) },
-                              { key: 'unread', label: t('unread_filter'), count: chats.filter(c => getChatUnreadCount(c) > 0).length },
-                              { key: 'groups', label: t('groups_filter'), count: chats.filter(c => c.type === 'group').reduce((sum, c) => sum + getChatUnreadCount(c), 0) },
-                              { key: 'friends', label: 'Friends', count: friends.length },
-                              { key: 'blocked', label: 'Blocked', count: Math.max(blocked.length, chats.filter(c => c.type === 'dm' && blockedIds.has(String(c.friendId || ''))).length) },
-                            ]
-                            return filters.map(cat => (
-                              <button
-                                key={cat.key}
-                                className={`chat-list-cat-btn${chatListFilter === cat.key ? ' chat-list-cat-btn-active' : ''}${cat.count > 0 ? ' chat-list-cat-btn--has-count' : ''}`}
-                                onClick={() => { setChatListFilter(cat.key); setSelectedChat(null) }}
-                              >
-                                <span>{cat.label}</span>
-                                {cat.count > 0 && <span className="chat-list-cat-count">{capBadge(cat.count)}</span>}
-                              </button>
-                            ))
+                            const allUnread = chats.reduce((sum, c) => sum + getChatUnreadCount(c), 0)
+                            const unreadCount = chats.filter(c => getChatUnreadCount(c) > 0).length
+                            const groupsUnread = chats.filter(c => c.type === 'group').reduce((sum, c) => sum + getChatUnreadCount(c), 0)
+                            return (
+                              <>
+                                <button
+                                  type="button"
+                                  className={`chat-list-cat-btn${chatListFilter === 'all' ? ' chat-list-cat-btn-active' : ''}`}
+                                  onClick={() => { setChatListFilter('all'); setSelectedChat(null); setShowChatFilterMore(false) }}
+                                >
+                                  <span>{t('all_filter') || 'All'}</span>
+                                  {allUnread > 0 && <span className="chat-list-cat-count">{capBadge(allUnread)}</span>}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  className={`chat-list-cat-btn${chatListFilter === 'unread' ? ' chat-list-cat-btn-active' : ''}`}
+                                  onClick={() => { setChatListFilter('unread'); setSelectedChat(null); setShowChatFilterMore(false) }}
+                                >
+                                  <span>{t('unread_filter') || 'Unread'}</span>
+                                  {unreadCount > 0 && <span className="chat-list-cat-count">{capBadge(unreadCount)}</span>}
+                                </button>
+
+                                <button
+                                  type="button"
+                                  className={`chat-list-cat-btn${chatListFilter === 'requests' ? ' chat-list-cat-btn-active' : ''}`}
+                                  onClick={() => { setChatListFilter('requests'); setSelectedChat(null); setShowChatFilterMore(false) }}
+                                >
+                                  <span>Requests</span>
+                                  {msgRequests.length > 0 && <span className="chat-list-cat-count">{capBadge(msgRequests.length)}</span>}
+                                </button>
+
+                                <div className="chat-list-filter-more-wrap" style={{ position: 'relative' }}>
+                                  <button
+                                    type="button"
+                                    className={`chat-list-more-btn${['groups', 'friends'].includes(chatListFilter) ? ' chat-list-more-btn--active' : ''}`}
+                                    onClick={() => setShowChatFilterMore(v => !v)}
+                                    title="More filters"
+                                  >
+                                    •••
+                                  </button>
+                                  {showChatFilterMore && (
+                                    <div className="chat-list-more-menu">
+                                      <button
+                                        type="button"
+                                        className={`chat-list-more-item${chatListFilter === 'groups' ? ' chat-list-more-item--active' : ''}`}
+                                        onClick={() => { setChatListFilter('groups'); setSelectedChat(null); setShowChatFilterMore(false) }}
+                                      >
+                                        <span>{t('groups_filter') || 'Groups'}</span>
+                                        {groupsUnread > 0 && <span className="chat-list-cat-count">{capBadge(groupsUnread)}</span>}
+                                      </button>
+                                      <button
+                                        type="button"
+                                        className={`chat-list-more-item${chatListFilter === 'friends' ? ' chat-list-more-item--active' : ''}`}
+                                        onClick={() => { setChatListFilter('friends'); setSelectedChat(null); setShowChatFilterMore(false) }}
+                                      >
+                                        <span>Friends</span>
+                                        {friends.length > 0 && <span className="chat-list-cat-count" style={{ background: 'rgba(var(--ta-rgb), 0.2)', color: 'var(--ta)' }}>{friends.length}</span>}
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </>
+                            )
                           })()}
                         </div>
                         <input
                           className="chat-list-search"
                           value={chatListSearch}
                           onChange={e => setChatListSearch(e.target.value)}
-                          placeholder={chatListFilter === 'friends' ? 'Search friends…' : (chatListFilter === 'groups' ? 'Search groups…' : (chatListFilter === 'blocked' ? 'Search blocked users…' : 'Search conversations…'))}
+                          placeholder={chatListFilter === 'friends' ? 'Search friends…' : (chatListFilter === 'groups' ? 'Search groups…' : (chatListFilter === 'requests' ? 'Search requests…' : 'Search conversations…'))}
                         />
                       </div>
                       {isMobile && reelms.length > 0 && (
@@ -13169,12 +13664,62 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       )}
                       <div className="chat-list-sidebar-items">
                         {(() => {
-                          const blockedIds = new Set((blocked || []).map(b => String(b.id || b.userId || '')))
-                          const blockedRows = (blocked || []).map(b => {
-                            const existing = chats.find(c => c.type === 'dm' && String(c.friendId || '') === String(b.id || b.userId || ''))
-                            return existing || { id: dmConvId(uid, b.id || b.userId), convId: dmConvId(uid, b.id || b.userId), friendId: b.id || b.userId, type: 'dm', name: b.name || b.username || 'Blocked user', username: b.username, photo: b.photo || b.avatar || null, blockedOnly: true }
-                          })
                           const q = chatListSearch.trim().toLowerCase()
+                          if (chatListFilter === 'requests') {
+                            const reqRows = (msgRequests || []).filter(r => {
+                              const label = String(r.fromName || r.name || r.fromUsername || r.username || '').toLowerCase()
+                              return !q || label.includes(q)
+                            })
+                            if (!reqRows.length) return <p className="chat-list-empty">No message requests.</p>
+                            return reqRows.map(req => {
+                              const requesterName = req.fromName || req.name || 'User'
+                              const requesterPhoto = req.fromPhoto || req.photo || null
+                              const requesterUsername = req.fromUsername || req.username
+                              return (
+                                <div key={req.id || req.fromId} className="chat-list-row chat-list-row--request" style={{ cursor: 'default' }}>
+                                  <div className="chat-list-avatar-wrap">
+                                    <div className="discover-result-avatar" style={{ width: 36, height: 36, fontSize: '0.9rem', flexShrink: 0 }}>
+                                      {requesterPhoto
+                                        ? <img src={requesterPhoto} alt={requesterName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                                        : requesterName.charAt(0).toUpperCase()}
+                                    </div>
+                                  </div>
+                                  <div className="discover-result-info" style={{ flex: 1, minWidth: 0 }}>
+                                    <span className="discover-result-name">{requesterName}</span>
+                                    <span className="discover-result-meta" style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                      {req.lastMessage || (requesterUsername ? `@${requesterUsername}` : 'Wants to message you')}
+                                    </span>
+                                  </div>
+                                  <div className="friend-req-actions" style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                                    <button
+                                      className="friend-add-btn"
+                                      style={{ padding: '3px 8px', fontSize: '0.72rem' }}
+                                      title="Accept"
+                                      onClick={() => {
+                                        const peer = { id: req.fromId || req.id, name: requesterName, username: requesterUsername, photo: requesterPhoto }
+                                        const updated = msgRequests.filter(r => (r.id !== req.id && r.fromId !== req.fromId))
+                                        setMsgRequests(updated)
+                                        saveMsgRequests(updated)
+                                        const newChat = createOrGetDMChat(peer)
+                                        setSelectedChat(newChat)
+                                        setShowChatList(false)
+                                      }}
+                                    >✓</button>
+                                    <button
+                                      className="friend-reject-btn"
+                                      style={{ padding: '3px 8px', fontSize: '0.72rem' }}
+                                      title="Decline"
+                                      onClick={() => {
+                                        const updated = msgRequests.filter(r => (r.id !== req.id && r.fromId !== req.fromId))
+                                        setMsgRequests(updated)
+                                        saveMsgRequests(updated)
+                                      }}
+                                    >×</button>
+                                  </div>
+                                </div>
+                              )
+                            })
+                          }
                           if (chatListFilter === 'friends') {
                             const friendRows = (friends || []).filter(f => {
                               const label = String(nicknames[f.id] || f.name || f.username || '').toLowerCase()
@@ -13204,21 +13749,19 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           let filtered = [...chats]
                           if (chatListFilter === 'unread') filtered = filtered.filter(c => getChatUnreadCount(c) > 0)
                           if (chatListFilter === 'groups') filtered = chats.filter(c => c.type === 'group')
-                          if (chatListFilter === 'blocked') filtered = blockedRows
                           if (q) filtered = filtered.filter(c => {
                             const peer = getChatPeer(c) || {}
                             return [getChatDisplayName(c), c.name, c.username, peer.username, c.lastMessage].some(value => String(value || '').toLowerCase().includes(q))
                           })
-                          if (filtered.length === 0) return <p className="chat-list-empty">{chatListFilter === 'blocked' ? 'No blocked users.' : t('no_chats_yet')}</p>
+                          if (filtered.length === 0) return <p className="chat-list-empty">{t('no_chats_yet')}</p>
                           return filtered.map(c => {
-                            const blockedRow = c.type === 'dm' && blockedIds.has(String(c.friendId || ''))
                             const unread = getChatUnreadCount(c)
                             const avatarSrc = getChatAvatarSrc(c)
                             const displayName = getChatDisplayName(c)
                             return (
                             <div
                               key={c.id}
-                              className={`chat-list-row${selectedChat?.id === c.id ? ' chat-list-row--active' : ''}${blockedRow ? ' chat-list-row--blocked' : ''}${unread > 0 ? ' chat-list-row--unread' : ''}`}
+                              className={`chat-list-row${selectedChat?.id === c.id ? ' chat-list-row--active' : ''}${unread > 0 ? ' chat-list-row--unread' : ''}`}
                               onClick={() => {
                                 setSelectedChat(c); setSelectedChannel(null); setSelectedReelm(null); setShowChatList(false); clearUnread(c.id)
                               }}
@@ -13234,28 +13777,17 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               </div>
                               <div className="discover-result-info">
                                 <span className="discover-result-name">{displayName}</span>
-                                {blockedRow && <span className="chat-list-row-badge">Blocked</span>}
                               </div>
                               {unread > 0 && (
                                 <span className="notif-badge chat-list-unread-count">{capBadge(unread)}</span>
                               )}
-                              {chatListFilter === 'blocked' ? (
-                                <button
-                                  className="friend-reject-btn chat-list-delete-btn chat-list-icon-btn"
-                                  type="button"
-                                  title="Unblock"
-                                  aria-label="Unblock user"
-                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); unblockUserFn(c.friendId) }}
-                                >×</button>
-                              ) : (
-                                <button
-                                  className="friend-reject-btn chat-list-delete-btn chat-list-icon-btn"
-                                  type="button"
-                                  title="Delete conversation"
-                                  aria-label="Delete conversation"
-                                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteConversation(c.id) }}
-                                >×</button>
-                              )}
+                              <button
+                                className="friend-reject-btn chat-list-delete-btn chat-list-icon-btn"
+                                type="button"
+                                title="Delete conversation"
+                                aria-label="Delete conversation"
+                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteConversation(c.id) }}
+                              >×</button>
                             </div>
                           )})
                         })()}
@@ -13861,18 +14393,22 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       </button>
                     </div>
                   )}
-                  <div className="left-panel-bottom-bar">
-                    <button className={`lpb-btn${showDiscover ? ' lpb-btn-active' : ''}`} onClick={() => { setShowDiscover(true); setSelectedReelm(null); setSelectedChat(null); setDiscoverQuery('') }}><img src={discoverIcon} alt="Discover" className="lpb-icon" /></button>
-                    <button className={`lpb-feed-wrap lpb-btn${showFeed ? ' lpb-btn-active' : ''}`} onClick={() => { setShowFeed(true); setShowDiscover(false); setSelectedChat(null); setShowFriendsPanel(false); setShowSettings(false); setShowChatList(false) }}>
-                      <img src={feedIcon} alt="Feed" className="lpb-feed-icon" />
-                    </button>
-                    <button className="lpb-btn" onClick={() => { setSelectedReelm(null); setSelectedChat(null); setShowChatList(true); setChatListFilter('all') }}>
-                      <span className="lpb-icon-wrap">
-                        <img src={messagesIcon} alt="Messages" className="lpb-icon" />
-                        {totalUnread > 0 && <span className="lpb-badge">{capBadge(totalUnread)}</span>}
-                      </span>
-                    </button>
-                  </div>
+                  {selectedReelm && !isMobile && (
+                    <div className="reelm-left-bottom-feed-bar">
+                      <button
+                        type="button"
+                        className={`reelm-left-bottom-feed-btn${showFeed ? ' reelm-left-bottom-feed-btn--active' : ''}`}
+                        onClick={() => {
+                          setShowFeed(f => !f)
+                          setShowDiscover(false)
+                          setSelectedChat(null)
+                        }}
+                        title={showFeed ? (t('chat') || 'Chat') : `${selectedReelm.name || 'Reelm'} Feed`}
+                      >
+                        <img src={feedIcon} alt="Feed" className="reelm-left-bottom-feed-icon" />
+                      </button>
+                    </div>
+                  )}
                 </div>
                 <div
                   className="panel-divider panel-divider-draggable"
@@ -14783,7 +15319,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             </div>
                           )}
                           <div className={`msg-outer-row${spotifyNowPlaying ? ' msg-outer-row--spotify' : ''}`}>
-                          <div className="msg-bar">
+                            <div className="msg-bar">
                           <div className={`msg-input-wrap${pendingAttachment ? ' msg-input-wrap--has-attach' : ''}`}>
                             <div
                               ref={editorRef}
@@ -15309,7 +15845,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                 })()}
               </div>
             ) : showFriendsPanel ? (
-              <div className="panel panel-middle discover-panel">
+              <div className="panel panel-middle discover-panel" style={{ position: 'relative' }}>
                 <button className="discover-back-btn" onClick={() => { setShowFriendsPanel(false); setShowFeed(true) }}>
                   <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
                 </button>
@@ -15359,7 +15895,46 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         </div>
                       ))
                   }
+                  {blocked && blocked.length > 0 && (
+                    <>
+                      <div className="friends-section-divider" />
+                      <p className="friends-section-label">Blocked Users ({blocked.length})</p>
+                      {blocked.map((b, i) => (
+                        <div key={b.id || i} className="discover-result-row">
+                          <div className="discover-result-avatar">
+                            {getPersonPhoto(b)
+                              ? <img src={getPersonPhoto(b)} alt={b.name || ''} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                              : (b.name || b.username || '?').charAt(0).toUpperCase()
+                            }
+                          </div>
+                          <div className="discover-result-info">
+                            <span className="discover-result-name">{b.name || b.username || 'Blocked user'}</span>
+                            <span className="discover-result-type">{b.username ? `@${b.username}` : 'Blocked'}</span>
+                          </div>
+                          <button
+                            className="friend-add-btn"
+                            style={{ background: 'rgba(var(--ta-rgb), 0.15)', borderColor: 'rgba(var(--ta-rgb), 0.3)', color: 'var(--ta)' }}
+                            onClick={() => unblockUserFn(b.id || b.userId)}
+                          >
+                            Unblock
+                          </button>
+                        </div>
+                      ))}
+                    </>
+                  )}
                 </div>
+                <button
+                  type="button"
+                  className="friends-blocked-btn"
+                  onClick={() => setShowBlockedModal(true)}
+                  title="View & manage blocked users"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+                  </svg>
+                  <span>Blocked ({blocked ? blocked.length : 0})</span>
+                </button>
               </div>
             ) : isMod ? (
               <div className="panel panel-middle" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
@@ -15568,15 +16143,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     </>
                   )
                 })()}
-                <button
-                  className="welcome-discover-btn su-drop su-drop-4"
-                  onClick={() => { setShowDiscover(true); setDiscoverQuery('') }}
-                >
-                  <img src={discoverIcon} alt="Discover" className="welcome-discover-icon" />
-                </button>
               </div>
             )}
-          </div>
 
           {showProfilePopup && (
             <ProfilePopup
