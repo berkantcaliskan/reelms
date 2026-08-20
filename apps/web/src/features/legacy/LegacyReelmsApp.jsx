@@ -12879,7 +12879,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           {openFolderId && (() => {
             const folder = (chatFolders || []).find(f => f.id === openFolderId)
             if (!folder) return null
-            const folderChats = (folder.chatIds || []).map(cid => chats.find(c => String(c.id) === String(cid))).filter(Boolean)
+            const folderItems = (folder.chatIds || []).map(cid => {
+              const chatMatch = (chats || []).find(c => String(c.id) === String(cid))
+              if (chatMatch) return { ...chatMatch, itemType: 'chat' }
+              const reelmMatch = (reelms || []).find(r => String(r.id) === String(cid))
+              if (reelmMatch) return { ...reelmMatch, itemType: 'reelm' }
+              return null
+            }).filter(Boolean)
+
             return (
               <div
                 className="bar-folder-drawer"
@@ -12909,8 +12916,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       autoFocus
                     />
                   ) : (
-                    <span className="bar-folder-title" onDoubleClick={() => { setRenamingFolderId(folder.id); setFolderNameInput(folder.name || 'Group') }}>
+                    <span
+                      className="bar-folder-title"
+                      onClick={() => { setRenamingFolderId(folder.id); setFolderNameInput(folder.name || 'Group') }}
+                      title="Click to rename"
+                      style={{ cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4 }}
+                    >
                       {folder.name || 'Group'}
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" style={{ opacity: 0.6 }}><path d="M12 20h9M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                     </span>
                   )}
                   <button
@@ -12926,34 +12939,47 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   </button>
                 </div>
                 <div className="bar-folder-items">
-                  {folderChats.map(c => {
-                    const avatarSrc = getChatAvatarSrc(c)
-                    const displayName = getChatDisplayName(c)
-                    const unread = getChatUnreadCount(c)
-                    const isActive = selectedChat?.id === c.id
+                  {folderItems.map(c => {
+                    const avatarSrc = c.itemType === 'chat' ? getChatAvatarSrc(c) : c.image
+                    const displayName = c.itemType === 'chat' ? getChatDisplayName(c) : c.name
+                    const unread = c.itemType === 'chat' ? getChatUnreadCount(c) : (unreadCounts[c.id] || 0)
+                    const isActive = (c.itemType === 'reelm' ? selectedReelm?.id === c.id : selectedChat?.id === c.id)
                     return (
                       <button
                         key={c.id}
                         type="button"
                         className={`bar-folder-item${isActive ? ' bar-folder-item-active' : ''}`}
                         onClick={() => {
-                          setSelectedChat(c)
-                          setSelectedReelm(null)
-                          setSelectedChannel(null)
-                          setShowDiscover(false)
-                          setShowSettings(false)
-                          setShowFriendsPanel(false)
-                          clearUnread(c.id)
+                          if (c.itemType === 'reelm') {
+                            setSelectedReelm(c)
+                            setSelectedChat(null)
+                            setSelectedChannel(null)
+                            setShowDiscover(false)
+                            setShowSettings(false)
+                            setShowFriendsPanel(false)
+                            setReelmLoading(true)
+                            setTimeout(() => setReelmLoading(false), 350)
+                          } else {
+                            setSelectedChat(c)
+                            setSelectedReelm(null)
+                            setSelectedChannel(null)
+                            setShowDiscover(false)
+                            setShowSettings(false)
+                            setShowFriendsPanel(false)
+                            clearUnread(c.id)
+                          }
                           setOpenFolderId(null)
                         }}
                       >
-                        <div className="discover-result-avatar" style={{ width: 28, height: 28, fontSize: '0.75rem', flexShrink: 0 }}>
-                          {avatarSrc ? <img src={avatarSrc} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} /> : (displayName || '?').charAt(0).toUpperCase()}
+                        <div className="discover-result-avatar" style={{ width: 28, height: 28, fontSize: '0.75rem', flexShrink: 0, borderRadius: c.itemType === 'reelm' ? 8 : '50%' }}>
+                          {avatarSrc
+                            ? <img src={avatarSrc} alt={displayName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: c.itemType === 'reelm' ? 8 : '50%' }} />
+                            : isDefaultCommunity(c) ? <ReelmsCommunityGlyph /> : (displayName || '?').charAt(0).toUpperCase()}
                         </div>
-                        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.8rem' }}>
+                        <span style={{ flex: 1, minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontSize: '0.82rem', textAlign: 'left' }}>
                           {displayName}
                         </span>
-                        {unread > 0 && <span className="bar-item-badge" style={{ position: 'static' }}>{capBadge(unread)}</span>}
+                        {unread > 0 && <span className="bar-item-badge" style={{ position: 'static', margin: 0 }}>{capBadge(unread)}</span>}
                       </button>
                     )
                   })}
