@@ -12723,6 +12723,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           onDragStart={(e) => {
                             if (canDrag) {
                               _barDragId = String(item.id)
+                              e.currentTarget.classList.add('bar-item--dragging')
                               e.dataTransfer.setData('text/plain', String(item.id))
                               e.dataTransfer.setData('application/x-reelms-bar-item', String(item.id))
                               e.dataTransfer.effectAllowed = 'move'
@@ -12730,6 +12731,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           }}
                           onDragEnd={() => {
                             _barDragId = null
+                            document.querySelectorAll('.bar-item--dragging').forEach(el => el.classList.remove('bar-item--dragging'))
                             document.querySelectorAll('.bar-item--dragover').forEach(el => el.classList.remove('bar-item--dragover'))
                           }}
                           onDragOver={(e) => {
@@ -12748,7 +12750,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           onDrop={(e) => {
                             e.preventDefault()
                             e.stopPropagation()
-                            e.currentTarget.classList.remove('bar-item--dragover')
+                            document.querySelectorAll('.bar-item--dragging').forEach(el => el.classList.remove('bar-item--dragging'))
                             document.querySelectorAll('.bar-item--dragover').forEach(el => el.classList.remove('bar-item--dragover'))
                             const fromId = String(_barDragId || e.dataTransfer.getData('text/plain') || '')
                             _barDragId = null
