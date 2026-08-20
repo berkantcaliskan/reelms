@@ -157,6 +157,24 @@ const isReelmsSystemChat = (chat) => {
     || String(chat.name || chat.displayName || '').toLowerCase() === 'reelms system'
 }
 
+// Module-level drag tracker — outside React so it's never stale in any closure
+let _barDragId = null
+
+function formatEventTime(isoOrTimestamp) {
+  if (!isoOrTimestamp) return ''
+  const d = new Date(isoOrTimestamp)
+  if (isNaN(d.getTime())) return String(isoOrTimestamp)
+  const now = new Date()
+  const isToday = d.toDateString() === now.toDateString()
+  const tmr = new Date(now)
+  tmr.setDate(tmr.getDate() + 1)
+  const isTomorrow = d.toDateString() === tmr.toDateString()
+  const timePart = d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  if (isToday) return `Today · ${timePart}`
+  if (isTomorrow) return `Tomorrow · ${timePart}`
+  return `${d.toLocaleDateString([], { month: 'short', day: 'numeric' })} · ${timePart}`
+}
+
 function EyeIcon({ open }) {
   if (open) {
     return (
@@ -7780,16 +7798,20 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [hiddenBarIds, setHiddenBarIds] = useState([])
   const [showHiddenBarItems, setShowHiddenBarItems] = useState(false)
   const [chatFolders, setChatFolders] = useState([])
+  const chatFoldersRef = useRef([])
+  useEffect(() => { chatFoldersRef.current = chatFolders || [] }, [chatFolders])
   const [openFolderId, setOpenFolderId] = useState(null)
-  const [draggedBarItem, setDraggedBarItem] = useState(null)
-  const draggedBarItemRef = useRef(null)
-  const [dragOverBarItemId, setDragOverBarItemId] = useState(null)
   const [renamingFolderId, setRenamingFolderId] = useState(null)
   const [folderNameInput, setFolderNameInput] = useState('')
   const [showBlockedModal, setShowBlockedModal] = useState(false)
+  const [showCreateEventModal, setShowCreateEventModal] = useState(null)
+  const [showAllEventsModal, setShowAllEventsModal] = useState(null)
+  const [eventCtxMenu, setEventCtxMenu] = useState(null)
   const saveChatFolders = (folders) => {
-    setChatFolders(folders)
-    scheduleUserPersist('chat_folders', folders)
+    const list = Array.isArray(folders) ? folders : []
+    chatFoldersRef.current = list
+    setChatFolders(list)
+    scheduleUserPersist('chat_folders', list)
   }
   const [lastSeenAllowList, setLastSeenAllowList] = useState([])
   const [friends, setFriends] = useState([])
@@ -9690,6 +9712,15 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }, [channelCtxMenu])
 
   useEffect(() => {
+    if (!eventCtxMenu) return
+    const handler = (e) => {
+      if (!e.target.closest('.reelm-channel-ctx-menu')) setEventCtxMenu(null)
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [eventCtxMenu])
+
+  useEffect(() => {
     if (!openCategoryMenu) return
     const handler = (e) => {
       if (!e.target.closest('.reelm-category-ctx-menu')) setOpenCategoryMenu(null)
@@ -11304,6 +11335,158 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (selectedChannel?.id === chId) setSelectedChannel(null)
   }
 
+  const createSubchannel = (reelmId, catId, parentChId) => {
+    const newSubchannel = {
+      id: 'subch-' + Date.now(),
+      name: 'new-subchannel',
+      type: 'text',
+      parentId: parentChId,
+      createdAt: Date.now()
+    }
+    const updater = prev => ({
+      ...prev,
+      categories: (prev.categories || []).map(c => c.id !== catId ? c : {
+        ...c,
+        channels: (c.channels || []).map(ch => ch.id !== parentChId ? ch : {
+          ...ch,
+          subchannels: [...(ch.subchannels || []), newSubchannel]
+        })
+      })
+    })
+    setReelms(prev => {
+      const next = prev.map(r => r.id !== reelmId ? r : updater(r))
+      scheduleUserPersist('reelms', next)
+      return next
+    })
+    setSelectedReelm(prev => {
+      const next = updater(prev)
+      persistReelmCore(next)
+      return next
+    })
+    setEditingChannelId(newSubchannel.id)
+    setEditingChannelName('')
+  }
+
+  const deleteSubchannel = (reelmId, catId, parentChId, subChId) => {
+    const updater = prev => ({
+      ...prev,
+      categories: (prev.categories || []).map(c => c.id !== catId ? c : {
+        ...c,
+        channels: (c.channels || []).map(ch => ch.id !== parentChId ? ch : {
+          ...ch,
+          subchannels: (ch.subchannels || []).filter(s => s.id !== subChId)
+        })
+      })
+    })
+    setReelms(prev => {
+      const next = prev.map(r => r.id !== reelmId ? r : updater(r))
+      scheduleUserPersist('reelms', next)
+      return next
+    })
+    setSelectedReelm(prev => {
+      const next = updater(prev)
+      persistReelmCore(next)
+      return next
+    })
+    if (selectedChannel?.id === subChId) setSelectedChannel(null)
+  }
+
+  const saveSubchannelName = (reelmId, catId, parentChId, subChId) => {
+    const name = editingChannelName.trim()
+    if (!name) { setEditingChannelId(null); return }
+    const updater = prev => ({
+      ...prev,
+      categories: (prev.categories || []).map(c => c.id !== catId ? c : {
+        ...c,
+        channels: (c.channels || []).map(ch => ch.id !== parentChId ? ch : {
+          ...ch,
+          subchannels: (ch.subchannels || []).map(s => s.id !== subChId ? s : { ...s, name })
+        })
+      })
+    })
+    setReelms(prev => {
+      const next = prev.map(r => r.id !== reelmId ? r : updater(r))
+      scheduleUserPersist('reelms', next)
+      return next
+    })
+    setSelectedReelm(prev => {
+      const next = updater(prev)
+      persistReelmCore(next)
+      return next
+    })
+    setEditingChannelId(null)
+  }
+
+  const createReelmEvent = (reelmId, eventData) => {
+    const newEvent = {
+      id: 'ev-' + Date.now(),
+      title: eventData.title || 'New Event',
+      description: eventData.description || '',
+      startTime: eventData.startTime || new Date(Date.now() + 86400000).toISOString(),
+      location: eventData.location || '',
+      createdBy: uid,
+      interestedUids: [uid],
+      createdAt: Date.now()
+    }
+    const updater = prev => ({
+      ...prev,
+      events: [...(prev.events || []), newEvent]
+    })
+    setReelms(prev => {
+      const next = prev.map(r => r.id !== reelmId ? r : updater(r))
+      scheduleUserPersist('reelms', next)
+      return next
+    })
+    setSelectedReelm(prev => {
+      const next = updater(prev)
+      persistReelmCore(next)
+      return next
+    })
+    setShowCreateEventModal(null)
+  }
+
+  const deleteReelmEvent = (reelmId, eventId) => {
+    const updater = prev => ({
+      ...prev,
+      events: (prev.events || []).filter(e => e.id !== eventId)
+    })
+    setReelms(prev => {
+      const next = prev.map(r => r.id !== reelmId ? r : updater(r))
+      scheduleUserPersist('reelms', next)
+      return next
+    })
+    setSelectedReelm(prev => {
+      const next = updater(prev)
+      persistReelmCore(next)
+      return next
+    })
+  }
+
+  const toggleEventInterest = (reelmId, eventId) => {
+    const updater = prev => ({
+      ...prev,
+      events: (prev.events || []).map(e => {
+        if (e.id !== eventId) return e
+        const uids = e.interestedUids || []
+        const has = uids.includes(uid)
+        return {
+          ...e,
+          interestedUids: has ? uids.filter(u => u !== uid) : [...uids, uid]
+        }
+      })
+    })
+    setReelms(prev => {
+      const next = prev.map(r => r.id !== reelmId ? r : updater(r))
+      scheduleUserPersist('reelms', next)
+      return next
+    })
+    setSelectedReelm(prev => {
+      const next = updater(prev)
+      persistReelmCore(next)
+      return next
+    })
+  }
+
   const updateReelmImage = (reelmId, imageDataUrl) => {
     const updater = r => ({ ...r, image: imageDataUrl })
     setReelms(prev => {
@@ -12419,12 +12602,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         const folderChats = item.chats || []
                         const folderUnread = folderChats.reduce((sum, c) => sum + getChatUnreadCount(c), 0)
                         const isFolderActive = folderChats.some(c => selectedChat?.id === c.id)
-                        const isDragOver = dragOverBarItemId === item.id
                         return (
                           <div
                             key={item.id}
                             data-bar-id={item.id}
-                            className={`bar-item bar-item--folder${isFolderActive ? ' bar-item-active' : ''}${isDragOver ? ' bar-item--dragover' : ''}`}
+                            className={`bar-item bar-item--folder${isFolderActive ? ' bar-item-active' : ''}`}
                             onClick={(e) => {
                               e.stopPropagation()
                               setOpenFolderId(prev => prev === item.id ? null : item.id)
@@ -12439,36 +12621,32 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               })
                             }}
                             onDragOver={(e) => {
-                              const dragged = draggedBarItem || draggedBarItemRef.current
-                              if (dragged && String(dragged.id) !== String(item.id) && dragged.itemType === 'chat') {
-                                e.preventDefault()
-                                e.stopPropagation()
-                                e.dataTransfer.dropEffect = 'move'
-                                if (dragOverBarItemId !== item.id) setDragOverBarItemId(item.id)
+                              e.preventDefault()
+                              e.stopPropagation()
+                              e.dataTransfer.dropEffect = 'move'
+                              if (_barDragId && _barDragId !== String(item.id)) {
+                                e.currentTarget.classList.add('bar-item--dragover')
                               }
                             }}
                             onDragLeave={(e) => {
-                              if (e.currentTarget.contains(e.relatedTarget)) return
-                              if (dragOverBarItemId === item.id) setDragOverBarItemId(null)
+                              e.currentTarget.classList.remove('bar-item--dragover')
                             }}
                             onDrop={(e) => {
                               e.preventDefault()
                               e.stopPropagation()
-                              setDragOverBarItemId(null)
-                              const dragged = draggedBarItem || draggedBarItemRef.current
-                              const fromId = dragged?.id || e.dataTransfer.getData('text/plain')
-                              if (!fromId || String(fromId) === String(item.id)) return
-                              const draggedChat = (Array.isArray(chats) ? chats : []).find(c => String(c.id) === String(fromId))
-                              if (!draggedChat) return
-
-                              if ((item.chatIds || []).includes(draggedChat.id)) return
-                              const next = chatFolders.map(f => {
-                                if (f.id === item.id) return { ...f, chatIds: [...(f.chatIds || []), draggedChat.id] }
+                              e.currentTarget.classList.remove('bar-item--dragover')
+                              document.querySelectorAll('.bar-item--dragover').forEach(el => el.classList.remove('bar-item--dragover'))
+                              const fromId = String(_barDragId || e.dataTransfer.getData('text/plain') || '')
+                              _barDragId = null
+                              if (!fromId || fromId === String(item.id)) return
+                              const alreadyIn = (item.chatIds || []).map(String).includes(fromId)
+                              if (alreadyIn) return
+                              const currentFolders = chatFoldersRef.current || []
+                              const next = currentFolders.map(f => {
+                                if (f.id === item.id) return { ...f, chatIds: [...(f.chatIds || []), fromId] }
                                 return f
                               })
                               saveChatFolders(next)
-                              setDraggedBarItem(null)
-                              draggedBarItemRef.current = null
                             }}
                             title={item.name || 'Chat Group'}
                           >
@@ -12526,60 +12704,62 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       }
 
                       // Standalone Chat / Reelm item
-                      const isDragOver = dragOverBarItemId === item.id
                       return (
                         <div
                           key={item.id}
                           data-bar-id={item.id}
-                          className={'bar-item bar-item--' + item.itemType + (isDefaultCommunity(item) ? ' bar-item--community-root' : '') + (item.itemType === 'reelm' && mutedReelmIds.map(String).includes(String(item.id)) ? ' bar-item--muted' : '') + (item.itemType === 'chat' && item.type === 'dm' && isUserActive(item.friendId) ? ' bar-item--online' : '') + ((item.itemType === 'reelm' ? selectedReelm?.id : selectedChat?.id) === item.id ? ' bar-item-active' : '') + (isDragOver ? ' bar-item--dragover' : '')}
+                          className={'bar-item bar-item--' + item.itemType + (isDefaultCommunity(item) ? ' bar-item--community-root' : '') + (item.itemType === 'reelm' && mutedReelmIds.map(String).includes(String(item.id)) ? ' bar-item--muted' : '') + (item.itemType === 'chat' && item.type === 'dm' && isUserActive(item.friendId) ? ' bar-item--online' : '') + ((item.itemType === 'reelm' ? selectedReelm?.id : selectedChat?.id) === item.id ? ' bar-item-active' : '')}
                           draggable={item.itemType === 'chat'}
                           onDragStart={(e) => {
                             if (item.itemType === 'chat') {
+                              _barDragId = String(item.id)
                               e.dataTransfer.setData('text/plain', String(item.id))
-                              e.dataTransfer.setData('application/x-bar-item', JSON.stringify({ id: item.id, itemType: item.itemType }))
+                              e.dataTransfer.setData('application/x-reelms-chat', String(item.id))
                               e.dataTransfer.effectAllowed = 'move'
-                              setDraggedBarItem(item)
-                              draggedBarItemRef.current = item
                             }
                           }}
                           onDragEnd={() => {
-                            setDraggedBarItem(null)
-                            draggedBarItemRef.current = null
-                            setDragOverBarItemId(null)
+                            _barDragId = null
+                            document.querySelectorAll('.bar-item--dragover').forEach(el => el.classList.remove('bar-item--dragover'))
                           }}
                           onDragOver={(e) => {
-                            const dragged = draggedBarItem || draggedBarItemRef.current
-                            if (dragged && String(dragged.id) !== String(item.id) && dragged.itemType === 'chat' && item.itemType === 'chat') {
+                            if (item.itemType === 'chat') {
                               e.preventDefault()
                               e.stopPropagation()
                               e.dataTransfer.dropEffect = 'move'
-                              if (dragOverBarItemId !== item.id) setDragOverBarItemId(item.id)
+                              if (_barDragId && _barDragId !== String(item.id)) {
+                                e.currentTarget.classList.add('bar-item--dragover')
+                              }
                             }
                           }}
                           onDragLeave={(e) => {
-                            if (e.currentTarget.contains(e.relatedTarget)) return
-                            if (dragOverBarItemId === item.id) setDragOverBarItemId(null)
+                            e.currentTarget.classList.remove('bar-item--dragover')
                           }}
                           onDrop={(e) => {
                             e.preventDefault()
                             e.stopPropagation()
-                            setDragOverBarItemId(null)
-                            const dragged = draggedBarItem || draggedBarItemRef.current
-                            const fromId = dragged?.id || e.dataTransfer.getData('text/plain')
-                            if (!fromId || String(fromId) === String(item.id)) return
-                            const draggedChat = (Array.isArray(chats) ? chats : []).find(c => String(c.id) === String(fromId))
-                            if (!draggedChat || item.itemType !== 'chat') return
+                            e.currentTarget.classList.remove('bar-item--dragover')
+                            document.querySelectorAll('.bar-item--dragover').forEach(el => el.classList.remove('bar-item--dragover'))
+                            if (item.itemType !== 'chat') return
+                            const fromId = String(_barDragId || e.dataTransfer.getData('text/plain') || '')
+                            _barDragId = null
+                            if (!fromId || fromId === String(item.id)) return
+                            
+                            const currentFolders = chatFoldersRef.current || []
+                            // Check if the dragged item is already in a folder
+                            const nextFolders = currentFolders.map(f => ({
+                              ...f,
+                              chatIds: (f.chatIds || []).filter(cid => String(cid) !== fromId && String(cid) !== String(item.id))
+                            })).filter(f => (f.chatIds || []).length > 0)
 
-                            // Create a new folder with item and draggedChat
+                            // Create a new folder with the two chats
                             const newFolder = {
                               id: 'folder_' + Date.now(),
                               name: 'Group',
-                              chatIds: [item.id, draggedChat.id],
+                              chatIds: [String(item.id), fromId],
                               createdAt: Date.now()
                             }
-                            saveChatFolders([...(chatFolders || []), newFolder])
-                            setDraggedBarItem(null)
-                            draggedBarItemRef.current = null
+                            saveChatFolders([...nextFolders, newFolder])
                           }}
                           onClick={() => {
                             if (item.itemType !== 'reelm') clearUnread(item.id)
@@ -12603,7 +12783,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 const avatarSrc = item.itemType === 'chat' ? getChatAvatarSrc(item) : item.image
                                 const label = item.itemType === 'chat' ? getChatDisplayName(item) : item.name
                                 return avatarSrc
-                                  ? <img src={avatarSrc} alt={label} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '14px' }} />
+                                  ? <img src={avatarSrc} alt={label} draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '14px', pointerEvents: 'none' }} />
                                   : isDefaultCommunity(item) ? <ReelmsCommunityGlyph /> : (label || '?').charAt(0).toUpperCase()
                               })()}
                             </div>
@@ -14190,6 +14370,103 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           }}
                         />
                       </div>
+
+                      {/* Events Section directly below Reelm cover */}
+                      {(() => {
+                        const myMember = selectedReelm.members?.find(m => m.userId === uid)
+                        const myRoles = (selectedReelm.roles || []).filter(r => (myMember?.roleIds || []).includes(r.id))
+                        const isAuthorized = canManageReelmClient(selectedReelm, uid) || myRoles.some(isManagerRoleClient)
+                        const allEvents = Array.isArray(selectedReelm.events) ? [...selectedReelm.events] : []
+                        const now = Date.now()
+                        const upcomingEvents = allEvents
+                          .filter(ev => !ev.startTime || new Date(ev.startTime).getTime() >= now - 3600000)
+                          .sort((a, b) => new Date(a.startTime || 0).getTime() - new Date(b.startTime || 0).getTime())
+                        const displayedEvents = upcomingEvents.slice(0, 2)
+                        const hasMore = upcomingEvents.length > 2
+
+                        return (
+                          <div
+                            className="reelm-events-sidebar-section"
+                            onContextMenu={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setEventCtxMenu({ x: e.clientX, y: e.clientY, reelmId: selectedReelm.id, isAuthorized })
+                            }}
+                          >
+                            <div className="reelm-events-header">
+                              <div className="reelm-events-title-wrap" onClick={() => setShowAllEventsModal(selectedReelm.id)}>
+                                <svg className="reelm-events-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                  <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+                                  <line x1="16" y1="2" x2="16" y2="6"/>
+                                  <line x1="8" y1="2" x2="8" y2="6"/>
+                                  <line x1="3" y1="10" x2="21" y2="10"/>
+                                </svg>
+                                <span className="reelm-events-title">{t('events') || 'Events'}</span>
+                                {upcomingEvents.length > 0 && <span className="reelm-events-count">{upcomingEvents.length}</span>}
+                              </div>
+                              {isAuthorized && (
+                                <button
+                                  type="button"
+                                  className="reelm-events-add-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    setShowCreateEventModal(selectedReelm.id)
+                                  }}
+                                  title="Create Event"
+                                >
+                                  +
+                                </button>
+                              )}
+                            </div>
+
+                            {upcomingEvents.length === 0 ? (
+                              <div className="reelm-events-empty" onClick={() => { if (isAuthorized) setShowCreateEventModal(selectedReelm.id) }}>
+                                <span>{t('no_upcoming_events') || 'No upcoming events'}</span>
+                              </div>
+                            ) : (
+                              <div className="reelm-events-list">
+                                {displayedEvents.map(ev => {
+                                  const isInterested = (ev.interestedUids || []).includes(uid)
+                                  const interestedCount = (ev.interestedUids || []).length
+                                  const dateStr = formatEventTime(ev.startTime)
+                                  return (
+                                    <div key={ev.id} className="reelm-event-card" onClick={() => setShowAllEventsModal(selectedReelm.id)}>
+                                      <div className="reelm-event-card-top">
+                                        <span className="reelm-event-date-badge">{dateStr}</span>
+                                        <button
+                                          type="button"
+                                          className={`reelm-event-rsvp-btn${isInterested ? ' reelm-event-rsvp-btn--active' : ''}`}
+                                          onClick={(e) => {
+                                            e.stopPropagation()
+                                            toggleEventInterest(selectedReelm.id, ev.id)
+                                          }}
+                                          title={isInterested ? 'You are interested' : 'Mark as interested'}
+                                        >
+                                          ★ {interestedCount > 0 ? interestedCount : ''}
+                                        </button>
+                                      </div>
+                                      <div className="reelm-event-info">
+                                        <span className="reelm-event-name">{ev.title}</span>
+                                        {ev.location && <span className="reelm-event-location">📍 {ev.location}</span>}
+                                      </div>
+                                    </div>
+                                  )
+                                })}
+                                {hasMore && (
+                                  <button
+                                    type="button"
+                                    className="reelm-events-view-all-btn"
+                                    onClick={() => setShowAllEventsModal(selectedReelm.id)}
+                                  >
+                                    {t('view_all_events') || `View all events (${upcomingEvents.length})`} →
+                                  </button>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })()}
+
                       <div className="reelm-categories-scroll">
                       {selectedReelm.categories.map(cat => (
                         <div key={cat.id} className="reelm-category">
@@ -14215,117 +14492,170 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           {!cat.collapsed && (
                             <div className="reelm-channels">
                               {cat.channels.map(ch => (
-                                <div key={ch.id} className={`reelm-channel${ch.isFlyingRoom ? ' reelm-channel-flying' : ''}${(unreadCounts[`${selectedReelm.id}_${ch.id}`] || 0) > 0 ? ' reelm-channel--unread' : ''}`} onClick={() => {
-                                    setChannelCtxMenu(null); setSelectedChannel(ch); clearReelmChannelUnread(selectedReelm.id, ch.id)
-                                    if (['voice', 'video', 'liveaction', 'stage'].includes(ch.type) && (selectedReelm.autoJoinVoice !== false) && voiceChannel?.channelId !== ch.id) {
-                                      joinVoiceChannel(selectedReelm.id, ch.id, ch.name)
-                                    }
-                                  }}
-                                  onDragOver={e => { if (['voice', 'video', 'liveaction', 'stage'].includes(ch.type) && canManageVoiceClient(selectedReelm, uid)) e.preventDefault() }}
-                                  onDrop={e => {
-                                    if (!['voice', 'video', 'liveaction', 'stage'].includes(ch.type) || !canManageVoiceClient(selectedReelm, uid)) return
-                                    e.preventDefault(); e.stopPropagation()
-                                    let payload = e.dataTransfer.getData('application/x-reelms-member') || e.dataTransfer.getData('text/plain')
-                                    try {
-                                      const member = JSON.parse(payload)
-                                      if ((member?.type === 'voice-participant' || member?.type === 'reelm-member') && String(member.reelmId) === String(selectedReelm.id)) {
-                                        moveMemberToVoiceChannel(selectedReelm.id, ch.id, ch.name, { userId: member.userId, userName: member.userName, userPhoto: member.userPhoto })
+                                <React.Fragment key={ch.id}>
+                                  <div className={`reelm-channel${ch.isFlyingRoom ? ' reelm-channel-flying' : ''}${(unreadCounts[`${selectedReelm.id}_${ch.id}`] || 0) > 0 ? ' reelm-channel--unread' : ''}`} onClick={() => {
+                                      setChannelCtxMenu(null); setSelectedChannel(ch); clearReelmChannelUnread(selectedReelm.id, ch.id)
+                                      if (['voice', 'video', 'liveaction', 'stage'].includes(ch.type) && (selectedReelm.autoJoinVoice !== false) && voiceChannel?.channelId !== ch.id) {
+                                        joinVoiceChannel(selectedReelm.id, ch.id, ch.name)
                                       }
-                                    } catch { /* noop */ }
-                                  }}
-                                  onContextMenu={e => {
-                                    e.preventDefault()
-                                    const myMember = selectedReelm.members?.find(m => m.userId === uid)
-                                    const myRoles = (selectedReelm.roles || []).filter(r => (myMember?.roleIds || []).includes(r.id))
-                                    const isAuthorized = canManageReelmClient(selectedReelm, uid) || myRoles.some(isManagerRoleClient)
-                                    if (!isAuthorized) return
-                                    setChannelCtxMenu({ x: e.clientX, y: e.clientY, catId: cat.id, chId: ch.id, chType: ch.type, catChannelCount: cat.channels.length })
-                                  }}
-                                >
-                                  <span className={"reelm-channel-label" + (selectedChannel?.id === ch.id ? " reelm-channel-label-active" : "")}>
-                                    {(ch.type === 'announcement' || ch.type === 'text') && (
-                                      <span className="reelm-channel-prefix">#</span>
-                                    )}
-                                    {editingChannelId === ch.id ? (
-                                      <input
-                                        className="reelm-channel-name-input"
-                                        value={editingChannelName}
-                                        onChange={e => setEditingChannelName(e.target.value)}
-                                        onKeyDown={e => {
-                                          if (e.key === 'Enter') saveChannelName(selectedReelm.id, cat.id, ch.id)
-                                          if (e.key === 'Escape') setEditingChannelId(null)
-                                        }}
-                                        onBlur={() => saveChannelName(selectedReelm.id, cat.id, ch.id)}
-                                        placeholder={['voice', 'video', 'liveaction', 'stage'].includes(ch.type) ? 'Room name' : 'channel-name'}
-                                        autoFocus
-                                      />
-                                    ) : (
-                                      <span className="reelm-channel-name">{ch.name}</span>
-                                    )}
-                                    {(unreadCounts[`${selectedReelm.id}_${ch.id}`] || 0) > 0 && (
-                                      <span className="reelm-channel-unread-badge">{capBadge(unreadCounts[`${selectedReelm.id}_${ch.id}`])}</span>
-                                    )}
-                                  </span>
-                                  {['voice', 'video', 'liveaction', 'stage'].includes(ch.type) && editingChannelId !== ch.id && newVoiceChannelId !== ch.id && (() => {
-                                    const participants = vcParticipantsFor(selectedReelm.id, ch.id)
-                                    const count = participants.length || vcCountFor(selectedReelm.id, ch.id)
-                                    return (
-                                      <div className={`reelm-channel-voice-meta${count > 0 ? ' reelm-channel-voice-meta--active' : ''}`}>
-                                        <span className="reelm-channel-capacity">{count}/{ch.capacity == null || ch.capacity === 0 ? '+' : ch.capacity}</span>
-                                        {participants.length > 0 && (
-                                          <div className="reelm-channel-voice-users" title={participants.map(p => p.userName || 'Member').join(', ')}>
-                                            {participants.slice(0, 3).map(p => (
-                                              <span
-                                                key={p.userId}
-                                                className="reelm-channel-voice-user"
-                                                draggable={String(p.userId) !== String(uid) && canManageVoiceClient(selectedReelm, uid)}
-                                                onDragStart={(e) => {
-                                                  const payload = JSON.stringify({ type: 'voice-participant', reelmId: selectedReelm.id, channelId: ch.id, userId: p.userId, userName: p.userName, userPhoto: p.userPhoto })
-                                                  e.dataTransfer.setData('application/x-reelms-member', payload)
-                                                  e.dataTransfer.setData('text/plain', payload)
-                                                  e.dataTransfer.effectAllowed = 'move'
-                                                }}
-                                                onClick={(e) => {
-                                                  if (String(p.userId) === String(uid) || !canManageVoiceClient(selectedReelm, uid)) return
-                                                  e.stopPropagation()
-                                                  const rect = e.currentTarget.getBoundingClientRect()
-                                                  setVoiceRoomUserMenu({ x: rect.left + 8, y: rect.bottom + 4, reelmId: selectedReelm.id, channelId: ch.id, userId: p.userId, userName: p.userName, userPhoto: p.userPhoto })
-                                                }}
-                                                onContextMenu={(e) => {
-                                                  e.preventDefault()
-                                                  e.stopPropagation()
-                                                  if (String(p.userId) === String(uid) || !canManageVoiceClient(selectedReelm, uid)) return
-                                                  setVoiceRoomUserMenu({ x: e.clientX, y: e.clientY, reelmId: selectedReelm.id, channelId: ch.id, userId: p.userId, userName: p.userName, userPhoto: p.userPhoto })
-                                                }}
-                                              >
-                                                <span className="reelm-channel-voice-avatar">
-                                                  {p.userPhoto ? <img src={p.userPhoto} alt="" /> : <span>{(p.userName || '?').charAt(0).toUpperCase()}</span>}
-                                                </span>
-                                                <span className="reelm-channel-voice-name">{p.userName || 'Member'}</span>
-                                              </span>
-                                            ))}
-                                            {participants.length > 3 && <span className="reelm-channel-voice-more">+{participants.length - 3}</span>}
-                                          </div>
-                                        )}
-                                      </div>
-                                    )
-                                  })()}
-                                  {ch.isFlyingRoom && editingChannelId !== ch.id && (
-                                    <span className="reelm-flying-badge" title={`Expires in ${formatTimeLeft(ch.expiresAt)}`}>
-                                      {flyingRoomTick >= 0 && formatTimeLeft(ch.expiresAt)}
+                                    }}
+                                    onDragOver={e => { if (['voice', 'video', 'liveaction', 'stage'].includes(ch.type) && canManageVoiceClient(selectedReelm, uid)) e.preventDefault() }}
+                                    onDrop={e => {
+                                      if (!['voice', 'video', 'liveaction', 'stage'].includes(ch.type) || !canManageVoiceClient(selectedReelm, uid)) return
+                                      e.preventDefault(); e.stopPropagation()
+                                      let payload = e.dataTransfer.getData('application/x-reelms-member') || e.dataTransfer.getData('text/plain')
+                                      try {
+                                        const member = JSON.parse(payload)
+                                        if ((member?.type === 'voice-participant' || member?.type === 'reelm-member') && String(member.reelmId) === String(selectedReelm.id)) {
+                                          moveMemberToVoiceChannel(selectedReelm.id, ch.id, ch.name, { userId: member.userId, userName: member.userName, userPhoto: member.userPhoto })
+                                        }
+                                      } catch { /* noop */ }
+                                    }}
+                                    onContextMenu={e => {
+                                      e.preventDefault()
+                                      const myMember = selectedReelm.members?.find(m => m.userId === uid)
+                                      const myRoles = (selectedReelm.roles || []).filter(r => (myMember?.roleIds || []).includes(r.id))
+                                      const isAuthorized = canManageReelmClient(selectedReelm, uid) || myRoles.some(isManagerRoleClient)
+                                      if (!isAuthorized) return
+                                      setChannelCtxMenu({ x: e.clientX, y: e.clientY, catId: cat.id, chId: ch.id, chType: ch.type, catChannelCount: cat.channels.length })
+                                    }}
+                                  >
+                                    <span className={"reelm-channel-label" + (selectedChannel?.id === ch.id ? " reelm-channel-label-active" : "")}>
+                                      {(ch.type === 'announcement' || ch.type === 'text') && (
+                                        <span className="reelm-channel-prefix">#</span>
+                                      )}
+                                      {editingChannelId === ch.id ? (
+                                        <input
+                                          className="reelm-channel-name-input"
+                                          value={editingChannelName}
+                                          onChange={e => setEditingChannelName(e.target.value)}
+                                          onKeyDown={e => {
+                                            if (e.key === 'Enter') saveChannelName(selectedReelm.id, cat.id, ch.id)
+                                            if (e.key === 'Escape') setEditingChannelId(null)
+                                          }}
+                                          onBlur={() => saveChannelName(selectedReelm.id, cat.id, ch.id)}
+                                          placeholder={['voice', 'video', 'liveaction', 'stage'].includes(ch.type) ? 'Room name' : 'channel-name'}
+                                          autoFocus
+                                        />
+                                      ) : (
+                                        <span className="reelm-channel-name">{ch.name}</span>
+                                      )}
+                                      {(unreadCounts[`${selectedReelm.id}_${ch.id}`] || 0) > 0 && (
+                                        <span className="reelm-channel-unread-badge">{capBadge(unreadCounts[`${selectedReelm.id}_${ch.id}`])}</span>
+                                      )}
                                     </span>
-                                  )}
-                                  {newVoiceChannelId === ch.id && (
-                                    <div className="reelm-ch-capacity-picker" onClick={e => e.stopPropagation()}>
-                                      {[2, 4, 8, 16].map(cap => (
-                                        <button key={cap} className={`reelm-ch-cap-pick-btn${ch.capacity === cap ? ' active' : ''}`}
-                                          onClick={() => { saveChannelCapacity(selectedReelm.id, cat.id, ch.id, cap); setNewVoiceChannelId(null) }}>{cap}</button>
-                                      ))}
-                                      <button className={`reelm-ch-cap-pick-btn${ch.capacity === 0 ? ' active' : ''}`}
-                                        onClick={() => { saveChannelCapacity(selectedReelm.id, cat.id, ch.id, 0); setNewVoiceChannelId(null) }}>+</button>
+                                    {['voice', 'video', 'liveaction', 'stage'].includes(ch.type) && editingChannelId !== ch.id && newVoiceChannelId !== ch.id && (() => {
+                                      const participants = vcParticipantsFor(selectedReelm.id, ch.id)
+                                      const count = participants.length || vcCountFor(selectedReelm.id, ch.id)
+                                      return (
+                                        <div className={`reelm-channel-voice-meta${count > 0 ? ' reelm-channel-voice-meta--active' : ''}`}>
+                                          <span className="reelm-channel-capacity">{count}/{ch.capacity == null || ch.capacity === 0 ? '+' : ch.capacity}</span>
+                                          {participants.length > 0 && (
+                                            <div className="reelm-channel-voice-users" title={participants.map(p => p.userName || 'Member').join(', ')}>
+                                              {participants.slice(0, 3).map(p => (
+                                                <span
+                                                  key={p.userId}
+                                                  className="reelm-channel-voice-user"
+                                                  draggable={String(p.userId) !== String(uid) && canManageVoiceClient(selectedReelm, uid)}
+                                                  onDragStart={(e) => {
+                                                    const payload = JSON.stringify({ type: 'voice-participant', reelmId: selectedReelm.id, channelId: ch.id, userId: p.userId, userName: p.userName, userPhoto: p.userPhoto })
+                                                    e.dataTransfer.setData('application/x-reelms-member', payload)
+                                                    e.dataTransfer.setData('text/plain', payload)
+                                                    e.dataTransfer.effectAllowed = 'move'
+                                                  }}
+                                                  onClick={(e) => {
+                                                    if (String(p.userId) === String(uid) || !canManageVoiceClient(selectedReelm, uid)) return
+                                                    e.stopPropagation()
+                                                    const rect = e.currentTarget.getBoundingClientRect()
+                                                    setVoiceRoomUserMenu({ x: rect.left + 8, y: rect.bottom + 4, reelmId: selectedReelm.id, channelId: ch.id, userId: p.userId, userName: p.userName, userPhoto: p.userPhoto })
+                                                  }}
+                                                  onContextMenu={(e) => {
+                                                    e.preventDefault()
+                                                    e.stopPropagation()
+                                                    if (String(p.userId) === String(uid) || !canManageVoiceClient(selectedReelm, uid)) return
+                                                    setVoiceRoomUserMenu({ x: e.clientX, y: e.clientY, reelmId: selectedReelm.id, channelId: ch.id, userId: p.userId, userName: p.userName, userPhoto: p.userPhoto })
+                                                  }}
+                                                >
+                                                  <span className="reelm-channel-voice-avatar">
+                                                    {p.userPhoto ? <img src={p.userPhoto} alt="" /> : <span>{(p.userName || '?').charAt(0).toUpperCase()}</span>}
+                                                  </span>
+                                                  <span className="reelm-channel-voice-name">{p.userName || 'Member'}</span>
+                                                </span>
+                                              ))}
+                                              {participants.length > 3 && <span className="reelm-channel-voice-more">+{participants.length - 3}</span>}
+                                            </div>
+                                          )}
+                                        </div>
+                                      )
+                                    })()}
+                                    {ch.isFlyingRoom && editingChannelId !== ch.id && (
+                                      <span className="reelm-flying-badge" title={`Expires in ${formatTimeLeft(ch.expiresAt)}`}>
+                                        {flyingRoomTick >= 0 && formatTimeLeft(ch.expiresAt)}
+                                      </span>
+                                    )}
+                                    {newVoiceChannelId === ch.id && (
+                                      <div className="reelm-ch-capacity-picker" onClick={e => e.stopPropagation()}>
+                                        {[2, 4, 8, 16].map(cap => (
+                                          <button key={cap} className={`reelm-ch-cap-pick-btn${ch.capacity === cap ? ' active' : ''}`}
+                                            onClick={() => { saveChannelCapacity(selectedReelm.id, cat.id, ch.id, cap); setNewVoiceChannelId(null) }}>{cap}</button>
+                                        ))}
+                                        <button className={`reelm-ch-cap-pick-btn${ch.capacity === 0 ? ' active' : ''}`}
+                                          onClick={() => { saveChannelCapacity(selectedReelm.id, cat.id, ch.id, 0); setNewVoiceChannelId(null) }}>+</button>
+                                      </div>
+                                    )}
+                                  </div>
+                                  {ch.subchannels && ch.subchannels.length > 0 && (
+                                    <div className="reelm-subchannels-tree">
+                                      {ch.subchannels.map(sub => {
+                                        const isSubSelected = selectedChannel?.id === sub.id
+                                        return (
+                                          <div
+                                            key={sub.id}
+                                            className={`reelm-channel reelm-subchannel${isSubSelected ? ' reelm-channel--active' : ''}${(unreadCounts[`${selectedReelm.id}_${sub.id}`] || 0) > 0 ? ' reelm-channel--unread' : ''}`}
+                                            onClick={() => {
+                                              setChannelCtxMenu(null)
+                                              setSelectedChannel(sub)
+                                              clearReelmChannelUnread(selectedReelm.id, sub.id)
+                                            }}
+                                            onContextMenu={e => {
+                                              e.preventDefault()
+                                              e.stopPropagation()
+                                              const myMember = selectedReelm.members?.find(m => m.userId === uid)
+                                              const myRoles = (selectedReelm.roles || []).filter(r => (myMember?.roleIds || []).includes(r.id))
+                                              const isAuthorized = canManageReelmClient(selectedReelm, uid) || myRoles.some(isManagerRoleClient)
+                                              if (!isAuthorized) return
+                                              setChannelCtxMenu({ x: e.clientX, y: e.clientY, catId: cat.id, chId: sub.id, parentChId: ch.id, isSubchannel: true, chType: sub.type })
+                                            }}
+                                          >
+                                            <span className="reelm-subchannel-branch" />
+                                            <span className={"reelm-channel-label" + (isSubSelected ? " reelm-channel-label-active" : "")}>
+                                              <span className="reelm-channel-prefix">↳ #</span>
+                                              {editingChannelId === sub.id ? (
+                                                <input
+                                                  className="reelm-channel-name-input"
+                                                  value={editingChannelName}
+                                                  onChange={e => setEditingChannelName(e.target.value)}
+                                                  onKeyDown={e => {
+                                                    if (e.key === 'Enter') saveSubchannelName(selectedReelm.id, cat.id, ch.id, sub.id)
+                                                    if (e.key === 'Escape') setEditingChannelId(null)
+                                                  }}
+                                                  onBlur={() => saveSubchannelName(selectedReelm.id, cat.id, ch.id, sub.id)}
+                                                  placeholder="subchannel-name"
+                                                  autoFocus
+                                                />
+                                              ) : (
+                                                <span className="reelm-channel-name">{sub.name}</span>
+                                              )}
+                                              {(unreadCounts[`${selectedReelm.id}_${sub.id}`] || 0) > 0 && (
+                                                <span className="reelm-channel-unread-badge">{capBadge(unreadCounts[`${selectedReelm.id}_${sub.id}`])}</span>
+                                              )}
+                                            </span>
+                                          </div>
+                                        )
+                                      })}
                                     </div>
                                   )}
-                                </div>
+                                </React.Fragment>
                               ))}
                             </div>
                           )}
@@ -16783,44 +17113,271 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       {channelCtxMenu && ReactDOM.createPortal(
         <div className="reelm-channel-ctx-menu" style={{ top: channelCtxMenu.y, left: channelCtxMenu.x }}
           onMouseDown={e => e.stopPropagation()}>
-          <button className="reelm-channel-ctx-item" onClick={() => {
-            setEditingChannelId(channelCtxMenu.chId)
-            setEditingChannelName(selectedReelm.categories.flatMap(c => c.channels).find(ch => ch.id === channelCtxMenu.chId)?.name || '')
-            setChannelCtxMenu(null)
-          }}>{t('edit_name')}</button>
-          <button className="reelm-channel-ctx-item" onClick={() => setChannelCtxMenu(null)}>{t('edit_permissions')}</button>
-          {channelCtxMenu.chType === 'voice' && (() => {
-            const ctxCh = selectedReelm?.categories.flatMap(c => c.channels).find(c => c.id === channelCtxMenu.chId)
-            const currentCap = ctxCh?.capacity ?? 8
-            return (
-              <div className="reelm-channel-ctx-capacity">
-                <div className="reelm-channel-ctx-capacity-label">{t('capacity')}</div>
-                <div className="reelm-channel-ctx-capacity-grid">
-                  {[2, 4, 8, 16].map(cap => (
-                    <button
-                      key={cap}
-                      className={`reelm-channel-ctx-cap-btn${currentCap === cap ? ' active' : ''}`}
-                      onClick={() => saveChannelCapacity(selectedReelm.id, channelCtxMenu.catId, channelCtxMenu.chId, cap)}
-                    >{cap}</button>
-                  ))}
-                  <button
-                    className={`reelm-channel-ctx-cap-btn reelm-channel-ctx-cap-unlimited${currentCap === 0 ? ' active' : ''}`}
-                    onClick={() => saveChannelCapacity(selectedReelm.id, channelCtxMenu.catId, channelCtxMenu.chId, 0)}
-                  >{t('unlimited')}</button>
-                </div>
-              </div>
-            )
-          })()}
-          <button
-            className={`reelm-channel-ctx-item reelm-channel-ctx-danger${channelCtxMenu.catChannelCount <= 1 ? ' reelm-channel-ctx-disabled' : ''}`}
-            disabled={channelCtxMenu.catChannelCount <= 1}
-            onClick={() => {
-              if (channelCtxMenu.catChannelCount <= 1) return
-              deleteChannel(selectedReelm.id, channelCtxMenu.catId, channelCtxMenu.chId)
-              setChannelCtxMenu(null)
-            }}>{t('delete_channel')}</button>
+          {channelCtxMenu.isSubchannel ? (
+            <>
+              <button className="reelm-channel-ctx-item" onClick={() => {
+                setEditingChannelId(channelCtxMenu.chId)
+                const sub = (selectedReelm?.categories || [])
+                  .flatMap(c => c.channels || [])
+                  .flatMap(ch => ch.subchannels || [])
+                  .find(s => s.id === channelCtxMenu.chId)
+                setEditingChannelName(sub?.name || '')
+                setChannelCtxMenu(null)
+              }}>{t('edit_name')}</button>
+              <button
+                className="reelm-channel-ctx-item reelm-channel-ctx-danger"
+                onClick={() => {
+                  deleteSubchannel(selectedReelm.id, channelCtxMenu.catId, channelCtxMenu.parentChId, channelCtxMenu.chId)
+                  setChannelCtxMenu(null)
+                }}>{t('delete_channel') || 'Delete Subchannel'}</button>
+            </>
+          ) : (
+            <>
+              <button className="reelm-channel-ctx-item" onClick={() => {
+                setEditingChannelId(channelCtxMenu.chId)
+                setEditingChannelName(selectedReelm.categories.flatMap(c => c.channels).find(ch => ch.id === channelCtxMenu.chId)?.name || '')
+                setChannelCtxMenu(null)
+              }}>{t('edit_name')}</button>
+              <button className="reelm-channel-ctx-item" onClick={() => {
+                createSubchannel(selectedReelm.id, channelCtxMenu.catId, channelCtxMenu.chId)
+                setChannelCtxMenu(null)
+              }}>+ {t('create_subchannel') || 'Create Subchannel'}</button>
+              <button className="reelm-channel-ctx-item" onClick={() => setChannelCtxMenu(null)}>{t('edit_permissions')}</button>
+              {channelCtxMenu.chType === 'voice' && (() => {
+                const ctxCh = selectedReelm?.categories.flatMap(c => c.channels).find(c => c.id === channelCtxMenu.chId)
+                const currentCap = ctxCh?.capacity ?? 8
+                return (
+                  <div className="reelm-channel-ctx-capacity">
+                    <div className="reelm-channel-ctx-capacity-label">{t('capacity')}</div>
+                    <div className="reelm-channel-ctx-capacity-grid">
+                      {[2, 4, 8, 16].map(cap => (
+                        <button
+                          key={cap}
+                          className={`reelm-channel-ctx-cap-btn${currentCap === cap ? ' active' : ''}`}
+                          onClick={() => saveChannelCapacity(selectedReelm.id, channelCtxMenu.catId, channelCtxMenu.chId, cap)}
+                        >{cap}</button>
+                      ))}
+                      <button
+                        className={`reelm-channel-ctx-cap-btn reelm-channel-ctx-cap-unlimited${currentCap === 0 ? ' active' : ''}`}
+                        onClick={() => saveChannelCapacity(selectedReelm.id, channelCtxMenu.catId, channelCtxMenu.chId, 0)}
+                      >{t('unlimited')}</button>
+                    </div>
+                  </div>
+                )
+              })()}
+              <button
+                className={`reelm-channel-ctx-item reelm-channel-ctx-danger${channelCtxMenu.catChannelCount <= 1 ? ' reelm-channel-ctx-disabled' : ''}`}
+                disabled={channelCtxMenu.catChannelCount <= 1}
+                onClick={() => {
+                  if (channelCtxMenu.catChannelCount <= 1) return
+                  deleteChannel(selectedReelm.id, channelCtxMenu.catId, channelCtxMenu.chId)
+                  setChannelCtxMenu(null)
+                }}>{t('delete_channel')}</button>
+            </>
+          )}
         </div>,
         document.body
+      )}
+      {eventCtxMenu && ReactDOM.createPortal(
+        <div
+          className="reelm-channel-ctx-menu"
+          style={{ top: eventCtxMenu.y, left: eventCtxMenu.x }}
+          onMouseDown={e => e.stopPropagation()}
+        >
+          {eventCtxMenu.isAuthorized && (
+            <button
+              className="reelm-channel-ctx-item"
+              onClick={() => {
+                setShowCreateEventModal(eventCtxMenu.reelmId)
+                setEventCtxMenu(null)
+              }}
+            >
+              + {t('create_event') || 'Create Event'}
+            </button>
+          )}
+          <button
+            className="reelm-channel-ctx-item"
+            onClick={() => {
+              setShowAllEventsModal(eventCtxMenu.reelmId)
+              setEventCtxMenu(null)
+            }}
+          >
+            {t('view_all_events') || 'View All Events'}
+          </button>
+        </div>,
+        document.body
+      )}
+      {showCreateEventModal && (() => {
+        const targetReelm = reelms.find(r => r.id === showCreateEventModal) || selectedReelm
+        return (
+          <div className="invite-modal-overlay" onClick={() => setShowCreateEventModal(null)}>
+            <div className="invite-modal reelm-event-modal" onClick={e => e.stopPropagation()}>
+              <div className="invite-modal-title">{t('create_event') || 'Create Event'}</div>
+              <div className="invite-modal-reelm-name">{targetReelm?.name || 'Reelm Event'}</div>
+              <form onSubmit={(e) => {
+                e.preventDefault()
+                const fd = new FormData(e.target)
+                const title = fd.get('title')
+                const description = fd.get('description')
+                const start = fd.get('startTime')
+                const location = fd.get('location')
+                if (!title) return
+                createReelmEvent(showCreateEventModal, {
+                  title,
+                  description,
+                  startTime: start ? new Date(start).toISOString() : new Date(Date.now() + 86400000).toISOString(),
+                  location
+                })
+              }}>
+                <div className="invite-modal-code-label">{t('event_title') || 'Event Title'} *</div>
+                <input name="title" className="invite-modal-search" placeholder="e.g. Community Game Night" required autoFocus style={{ marginBottom: 12 }} />
+
+                <div className="invite-modal-code-label">{t('date_and_time') || 'Date & Time'} *</div>
+                <input name="startTime" type="datetime-local" className="invite-modal-search" required defaultValue={new Date(Date.now() + 3600000).toISOString().slice(0, 16)} style={{ marginBottom: 12 }} />
+
+                <div className="invite-modal-code-label">{t('location_or_room') || 'Location / Channel'}</div>
+                <input name="location" className="invite-modal-search" placeholder="e.g. #general or Voice Room 1" style={{ marginBottom: 12 }} />
+
+                <div className="invite-modal-code-label">{t('description') || 'Description'}</div>
+                <textarea name="description" className="invite-modal-search" placeholder="What will happen in this event?" rows={3} style={{ resize: 'none', height: 70, marginBottom: 16 }} />
+
+                <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+                  <button type="button" className="invite-modal-copy-btn" onClick={() => setShowCreateEventModal(null)} style={{ background: 'rgba(var(--ta-rgb), 0.12)' }}>
+                    {t('cancel') || 'Cancel'}
+                  </button>
+                  <button type="submit" className="invite-modal-copy-btn">
+                    {t('create') || 'Create Event'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )
+      })()}
+      {showAllEventsModal && (() => {
+        const targetReelm = reelms.find(r => r.id === showAllEventsModal) || selectedReelm
+        if (!targetReelm) return null
+        const myMember = targetReelm.members?.find(m => m.userId === uid)
+        const myRoles = (targetReelm.roles || []).filter(r => (myMember?.roleIds || []).includes(r.id))
+        const isAuthorized = canManageReelmClient(targetReelm, uid) || myRoles.some(isManagerRoleClient)
+        const events = Array.isArray(targetReelm.events) ? [...targetReelm.events] : []
+        const sorted = events.sort((a, b) => new Date(a.startTime || 0).getTime() - new Date(b.startTime || 0).getTime())
+
+        return (
+          <div className="invite-modal-overlay" onClick={() => setShowAllEventsModal(null)}>
+            <div className="invite-modal reelm-event-modal" style={{ maxWidth: 460 }} onClick={e => e.stopPropagation()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <div className="invite-modal-title">{t('reelm_events') || 'Reelm Events'}</div>
+                {isAuthorized && (
+                  <button
+                    type="button"
+                    className="invite-modal-copy-btn"
+                    style={{ fontSize: '0.78rem', padding: '4px 10px' }}
+                    onClick={() => {
+                      setShowAllEventsModal(null)
+                      setShowCreateEventModal(targetReelm.id)
+                    }}
+                  >
+                    + {t('create_event') || 'Create'}
+                  </button>
+                )}
+              </div>
+              <div className="invite-modal-reelm-name">{targetReelm.name}</div>
+
+              <div className="reelm-events-modal-list" style={{ maxHeight: 360, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+                {sorted.length === 0 ? (
+                  <div className="reelm-events-empty" style={{ padding: 24, textAlign: 'center' }}>
+                    {t('no_upcoming_events') || 'No upcoming events for this Reelm.'}
+                  </div>
+                ) : (
+                  sorted.map(ev => {
+                    const isInterested = (ev.interestedUids || []).includes(uid)
+                    const count = (ev.interestedUids || []).length
+                    return (
+                      <div key={ev.id} className="reelm-event-card" style={{ padding: 12 }}>
+                        <div className="reelm-event-card-top">
+                          <span className="reelm-event-date-badge">{formatEventTime(ev.startTime)}</span>
+                          <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                            <button
+                              type="button"
+                              className={`reelm-event-rsvp-btn${isInterested ? ' reelm-event-rsvp-btn--active' : ''}`}
+                              onClick={() => toggleEventInterest(targetReelm.id, ev.id)}
+                            >
+                              ★ {count > 0 ? `${count} Interested` : 'Interested'}
+                            </button>
+                            {isAuthorized && (
+                              <button
+                                type="button"
+                                className="reelm-event-del-btn"
+                                onClick={() => deleteReelmEvent(targetReelm.id, ev.id)}
+                                title="Delete event"
+                              >
+                                ✕
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                        <div className="reelm-event-info" style={{ marginTop: 6 }}>
+                          <span className="reelm-event-name" style={{ fontSize: '0.92rem' }}>{ev.title}</span>
+                          {ev.location && <span className="reelm-event-location">📍 {ev.location}</span>}
+                          {ev.description && <p style={{ margin: '4px 0 0 0', fontSize: '0.78rem', opacity: 0.8 }}>{ev.description}</p>}
+                        </div>
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+                <button type="button" className="invite-modal-copy-btn" onClick={() => setShowAllEventsModal(null)}>
+                  {t('close') || 'Close'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
+      {showBlockedModal && (
+        <div className="invite-modal-overlay" onClick={() => setShowBlockedModal(false)}>
+          <div className="invite-modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
+            <div className="invite-modal-title">Blocked Users</div>
+            <div className="invite-modal-reelm-name" style={{ marginBottom: 12 }}>Users you have blocked</div>
+            <div style={{ maxHeight: 320, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 8 }}>
+              {(!blocked || blocked.length === 0) ? (
+                <div style={{ textAlign: 'center', padding: '24px 0', opacity: 0.6, fontSize: '0.85rem' }}>
+                  No blocked users.
+                </div>
+              ) : (
+                blocked.map(b => (
+                  <div key={b.id || b.userId} className="friend-row" style={{ padding: '8px 12px' }}>
+                    <div className="friend-avatar" style={{ width: 34, height: 34 }}>
+                      {getPersonPhoto(b)
+                        ? <img src={getPersonPhoto(b)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                        : (b.displayName || b.name || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="friend-info" style={{ flex: 1, minWidth: 0 }}>
+                      <span className="friend-name">{b.displayName || b.name || 'User'}</span>
+                      {b.username && <span className="friend-meta">@{b.username}</span>}
+                    </div>
+                    <button
+                      type="button"
+                      className="friend-add-btn"
+                      style={{ background: 'rgba(var(--ta-rgb), 0.15)', borderColor: 'rgba(var(--ta-rgb), 0.3)', color: 'var(--ta)' }}
+                      onClick={() => unblockUserFn(b.id || b.userId)}
+                    >
+                      Unblock
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+              <button type="button" className="invite-modal-copy-btn" onClick={() => setShowBlockedModal(false)}>
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {shareTarget && (
         <ShareModal

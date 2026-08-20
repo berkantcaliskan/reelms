@@ -2100,6 +2100,24 @@ h6 {
   border: none;
   padding: 0;
   outline: none;
+  user-select: none;
+  -webkit-user-select: none;
+  cursor: pointer;
+}
+
+/* Prevent child elements inside bar items from capturing drag/mouse events */
+.dashboard-dynamic-sidebar .bar-item * {
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.dashboard-dynamic-sidebar .bar-item img,
+.dashboard-dynamic-sidebar .bar-item-avatar img {
+  -webkit-user-drag: none;
+  user-drag: none;
+  pointer-events: none;
+  draggable: false;
 }
 
 .dashboard-dynamic-sidebar .bar-item::before {
@@ -12604,11 +12622,18 @@ h6 {
   border-radius: 14px;
 }
 
+.bar-item--dragover {
+  outline: 2px dashed var(--ta) !important;
+  outline-offset: 3px !important;
+  border-radius: 16px !important;
+  transform: scale(1.12);
+  transition: transform 0.12s ease;
+}
+
 .bar-item--dragover .bar-item-avatar {
   border-color: var(--ta) !important;
-  background: rgba(var(--ta-rgb), 0.22) !important;
-  transform: scale(1.12);
-  box-shadow: 0 0 16px rgba(var(--ta-rgb), 0.4);
+  background: rgba(var(--ta-rgb), 0.28) !important;
+  box-shadow: 0 0 16px rgba(var(--ta-rgb), 0.6) !important;
 }
 
 .folder-avatar-grid {
@@ -16793,3 +16818,210 @@ button, input, select, textarea,
   background: rgba(var(--ta-rgb), 0.12);
   color: rgba(var(--ta-rgb), 0.95);
 }
+
+/* ─── Reelm Subchannels ─────────────────────────────────────────────────── */
+.reelm-subchannels-tree {
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  margin-left: 14px;
+  padding-left: 10px;
+  border-left: 1.5px solid rgba(var(--ta-rgb), 0.18);
+  gap: 2px;
+  margin-top: 2px;
+  margin-bottom: 4px;
+}
+
+.reelm-subchannel {
+  position: relative;
+  padding: 4px 8px !important;
+  font-size: 0.82rem !important;
+  min-height: 28px !important;
+}
+
+.reelm-subchannel-branch {
+  position: absolute;
+  left: -10px;
+  top: 50%;
+  width: 8px;
+  height: 1.5px;
+  background: rgba(var(--ta-rgb), 0.22);
+  pointer-events: none;
+}
+
+/* ─── Reelm Events Sidebar Widget ───────────────────────────────────────── */
+.reelm-events-sidebar-section {
+  padding: 8px 12px 10px 12px;
+  border-bottom: 1px solid rgba(var(--ta-rgb), 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.reelm-events-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.reelm-events-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.reelm-events-icon {
+  color: var(--ta);
+  opacity: 0.85;
+}
+
+.reelm-events-title {
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: rgba(var(--ta-rgb), 0.85);
+}
+
+.reelm-events-count {
+  font-size: 0.65rem;
+  font-weight: 700;
+  background: rgba(var(--ta-rgb), 0.16);
+  color: var(--ta);
+  padding: 1px 6px;
+  border-radius: 999px;
+}
+
+.reelm-events-add-btn {
+  background: none;
+  border: none;
+  color: rgba(var(--ta-rgb), 0.6);
+  font-size: 1.1rem;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 4px;
+  border-radius: 4px;
+  transition: color 0.12s, background 0.12s;
+}
+.reelm-events-add-btn:hover {
+  color: var(--ta);
+  background: rgba(var(--ta-rgb), 0.12);
+}
+
+.reelm-events-empty {
+  font-size: 0.75rem;
+  color: rgba(var(--ta-rgb), 0.45);
+  padding: 3px 0 2px 0;
+  user-select: none;
+}
+
+.reelm-events-list {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.reelm-event-card {
+  background: rgba(var(--ta-rgb), 0.06);
+  border: 1px solid rgba(var(--ta-rgb), 0.1);
+  border-radius: 9px;
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.reelm-event-card:hover {
+  background: rgba(var(--ta-rgb), 0.11);
+  border-color: rgba(var(--ta-rgb), 0.2);
+}
+
+.reelm-event-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.reelm-event-date-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--ta);
+  opacity: 0.9;
+}
+
+.reelm-event-rsvp-btn {
+  background: rgba(var(--ta-rgb), 0.1);
+  border: 1px solid rgba(var(--ta-rgb), 0.16);
+  border-radius: 6px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  color: rgba(var(--ta-rgb), 0.8);
+  padding: 1px 6px;
+  cursor: pointer;
+  transition: all 0.12s;
+}
+.reelm-event-rsvp-btn:hover {
+  background: rgba(var(--ta-rgb), 0.2);
+  color: var(--ta);
+}
+.reelm-event-rsvp-btn--active {
+  background: rgba(var(--ta-rgb), 0.28) !important;
+  border-color: var(--ta) !important;
+  color: var(--ta) !important;
+}
+
+.reelm-event-del-btn {
+  background: none;
+  border: none;
+  color: rgba(248, 113, 113, 0.7);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 0 4px;
+  border-radius: 4px;
+}
+.reelm-event-del-btn:hover {
+  color: #f87171;
+  background: rgba(248, 113, 113, 0.15);
+}
+
+.reelm-event-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.reelm-event-name {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: rgba(var(--ta-rgb), 0.95);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reelm-event-location {
+  font-size: 0.68rem;
+  color: rgba(var(--ta-rgb), 0.55);
+  margin-top: 1px;
+}
+
+.reelm-events-view-all-btn {
+  background: none;
+  border: none;
+  color: var(--ta);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: left;
+  padding: 3px 0 0 0;
+  cursor: pointer;
+  opacity: 0.8;
+  transition: opacity 0.12s;
+}
+.reelm-events-view-all-btn:hover {
+  opacity: 1;
+  text-decoration: underline;
+}
+
