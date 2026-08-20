@@ -12623,9 +12623,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             onContextMenu={(e) => {
                               e.preventDefault()
                               const rect = e.currentTarget.getBoundingClientRect()
+                              const estimatedHeight = 240
+                              const fitsBelow = rect.top + estimatedHeight <= window.innerHeight - 10
+                              const y = fitsBelow
+                                ? Math.round(rect.top)
+                                : Math.round(Math.max(10, rect.bottom - estimatedHeight))
                               setBarCtxMenu({
                                 x: Math.round(rect.right + 8),
-                                y: Math.round(Math.min(rect.top, Math.max(10, window.innerHeight - 240))),
+                                y,
                                 item
                               })
                             }}
@@ -12780,9 +12785,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           onContextMenu={(e) => {
                             e.preventDefault()
                             const rect = e.currentTarget.getBoundingClientRect()
+                            const estimatedHeight = item.itemType === 'chat' && item.type === 'dm' ? 260 : 220
+                            const fitsBelow = rect.top + estimatedHeight <= window.innerHeight - 10
+                            const y = fitsBelow
+                              ? Math.round(rect.top)
+                              : Math.round(Math.max(10, rect.bottom - estimatedHeight))
                             setBarCtxMenu({
                               x: Math.round(rect.right + 8),
-                              y: Math.round(Math.min(rect.top, Math.max(10, window.innerHeight - 240))),
+                              y,
                               item
                             })
                           }}
@@ -12988,10 +12998,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             )
           })()}
 
-          {barCtxMenu && (
+          {barCtxMenu && ReactDOM.createPortal(
             <div
               className="bar-ctx-menu"
-              style={{ position: 'fixed', left: barCtxMenu.x, top: barCtxMenu.y, zIndex: 9999 }}
+              style={{ position: 'fixed', left: barCtxMenu.x, top: barCtxMenu.y, zIndex: 99999 }}
             >
               {barCtxMenu.item.itemType === 'folder' && (
                 <>
@@ -13167,7 +13177,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   {t('bar_clear_chat')}
                 </button>
               )}
-            </div>
+            </div>,
+            document.body
           )}
 
           {showInviteModal && selectedReelm && (
