@@ -12614,8 +12614,8 @@ h6 {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(var(--ta-rgb), 0.08);
-  border: 1px dashed rgba(var(--ta-rgb), 0.35);
+  background: var(--surface-elevated, #1E2024);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
   position: relative;
   overflow: hidden;
   padding: 0;
