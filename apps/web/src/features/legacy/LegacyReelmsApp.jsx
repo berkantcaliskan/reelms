@@ -793,20 +793,21 @@ function PillSelect({ value, onChange, options }) {
 const THEMES = [
   {
     id: 'default',
-    name: 'Charcoal',
+    name: 'RedSun Dark',
     accent: '#b99887',
     accentRgb: '185,152,135',
-    base: '#121315',
-    baseRgb: '18,19,21',
-    surfacePrimary: '#181A1D',
-    surfaceElevated: '#1E2024',
-    surfaceHover: '#24262B',
-    borderSubtle: 'rgba(255,255,255,0.06)',
-    borderStrong: 'rgba(255,255,255,0.10)',
+    base: '#2c2522',
+    baseRgb: '44,37,34',
+    surfacePrimary: '#362e2a',
+    surfaceElevated: '#413732',
+    surfaceHover: '#4c413b',
+    borderSubtle: 'rgba(255,255,255,0.08)',
+    borderStrong: 'rgba(255,255,255,0.14)',
     noAccentGlow: true,
     noGradient: true,
   },
   { id: 'gece',     name: 'Night',           accent: '#b99887', accentRgb: '185,152,135', base: '#1e1c1a', baseRgb: '30,28,26', grainOpacity: 0.12, noAccentGlow: true },
+  { id: 'charcoal', name: 'Charcoal',        accent: '#b99887', accentRgb: '185,152,135', base: '#121315', baseRgb: '18,19,21', surfacePrimary: '#181A1D', surfaceElevated: '#1E2024', surfaceHover: '#24262B', borderSubtle: 'rgba(255,255,255,0.06)', borderStrong: 'rgba(255,255,255,0.10)', noAccentGlow: true, noGradient: true },
   { id: 'stone',    name: 'Soft Light',      accent: '#c8bfa8', accentRgb: '200,191,168', base: '#383835', baseRgb: '56,56,53', noGradient: true },
   { id: 'classic',  name: 'Midnight Purple', accent: '#b99887', accentRgb: '185,152,135', base: '#0c0c20', baseRgb: '12,12,32' },
   { id: 'lavender', name: 'Purple Sunlight', accent: '#c0a8e0', accentRgb: '192,168,224', base: '#120d1a', baseRgb: '18,13,26' },
@@ -7059,12 +7060,12 @@ function buildProfileThemeStyle(person) {
   if (!cfg || typeof cfg !== 'object') return undefined
   const theme = THEMES.find(th => th.id === cfg.themeId) || THEMES[0]
   const accent = typeof cfg.customAccent === 'string' && cfg.customAccent ? cfg.customAccent : (theme.accent || '#b99887')
-  const base = typeof cfg.customBase === 'string' && cfg.customBase ? cfg.customBase : (theme.base || '#120e1e')
+  const base = typeof cfg.customBase === 'string' && cfg.customBase ? cfg.customBase : (theme.base || '#2c2522')
   return {
     '--fpp-theme-accent': accent,
     '--fpp-theme-accent-rgb': rgbCssValue(accent, rgbCssValue(theme.accentRgb, '185,152,135')),
     '--fpp-theme-base': base,
-    '--fpp-theme-base-rgb': rgbCssValue(base, rgbCssValue(theme.baseRgb, '18,14,30')),
+    '--fpp-theme-base-rgb': rgbCssValue(base, rgbCssValue(theme.baseRgb, '44,37,34')),
   }
 }
 
@@ -7396,7 +7397,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     const tc = customization.customTextColor || 'white'
     if (tc === 'black') return 'rgba(20, 14, 30, 0.9)'
     if (tc === 'theme') return effectiveAccent
-    return 'rgba(235, 225, 210, 0.88)'
+    return 'rgba(226, 215, 204, 0.88)'
   })()
 
   useEffect(() => {
@@ -7818,6 +7819,53 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [blocked, setBlocked] = useState([])
   const [chatProfileCache, setChatProfileCache] = useState({})
   const profileLookupCacheRef = useRef(new Map())
+
+  // Desktop/Web top header live ticker notification preview
+  const [topTicker, setTopTicker] = useState(null)
+  const [topTickerExiting, setTopTickerExiting] = useState(false)
+  const topTickerTimerRef = useRef(null)
+  const topTickerExitTimerRef = useRef(null)
+
+  const pauseTopTickerTimer = useCallback(() => {
+    if (topTickerTimerRef.current) clearTimeout(topTickerTimerRef.current)
+    if (topTickerExitTimerRef.current) clearTimeout(topTickerExitTimerRef.current)
+    setTopTickerExiting(false)
+  }, [])
+
+  const resumeTopTickerTimer = useCallback(() => {
+    if (topTickerTimerRef.current) clearTimeout(topTickerTimerRef.current)
+    if (topTickerExitTimerRef.current) clearTimeout(topTickerExitTimerRef.current)
+    topTickerTimerRef.current = setTimeout(() => {
+      setTopTickerExiting(true)
+      topTickerExitTimerRef.current = setTimeout(() => {
+        setTopTicker(null)
+        setTopTickerExiting(false)
+      }, 380)
+    }, 2800)
+  }, [])
+
+  const triggerTopTicker = useCallback(({ sender, text, avatar, fallbackInitial, link }) => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) return
+    if (!text && !sender) return
+    if (topTickerTimerRef.current) clearTimeout(topTickerTimerRef.current)
+    if (topTickerExitTimerRef.current) clearTimeout(topTickerExitTimerRef.current)
+    setTopTickerExiting(false)
+    setTopTicker({
+      sender: sender || '',
+      text: text || '',
+      avatar: avatar || null,
+      fallbackInitial: fallbackInitial || '',
+      link: link || null,
+      key: Date.now(),
+    })
+    topTickerTimerRef.current = setTimeout(() => {
+      setTopTickerExiting(true)
+      topTickerExitTimerRef.current = setTimeout(() => {
+        setTopTicker(null)
+        setTopTickerExiting(false)
+      }, 380)
+    }, 4500)
+  }, [])
   const [msgRequests, setMsgRequests] = useState([])
   const [friendRequestsOut, setFriendRequestsOut] = useState([])
   const [messageRequestsOut, setMessageRequestsOut] = useState([])
@@ -8388,8 +8436,28 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               }
             }
             if (link && title) {
-              if (isDmKey) pushDashToast({ id: `dm_${msgKey}_${msg.id || Date.now()}`, text: title.slice(0, 180), link })
-              else addNotification(title.slice(0, 180), link)
+              if (isDmKey) {
+                pushDashToast({ id: `dm_${msgKey}_${msg.id || Date.now()}`, text: title.slice(0, 180), link })
+                const senderName = msg.sender?.name || (transientChat || chat)?.name || 'Kullanıcı'
+                triggerTopTicker({
+                  sender: senderName,
+                  text: effectiveText || (msg.enc ? 'Şifreli mesaj' : 'Yeni bir mesaj'),
+                  avatar: getPersonPhoto(msg.sender) || getPersonPhoto(transientChat || chat) || null,
+                  fallbackInitial: (senderName || '?').charAt(0),
+                  link
+                })
+              } else {
+                addNotification(title.slice(0, 180), link)
+                const reelm = reelmsRef.current.find(r => String(msgKey).startsWith(`${r.id}_`))
+                const senderName = msg.sender?.name || 'Üye'
+                triggerTopTicker({
+                  sender: senderName,
+                  text: effectiveText || 'Yeni bir mesaj',
+                  avatar: reelm?.image || null,
+                  fallbackInitial: (reelm?.name || senderName || '?').charAt(0),
+                  link
+                })
+              }
             }
           }
         }
@@ -8961,6 +9029,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       return next
     })
     pushDashToast({ id: n.id, text, link })
+    triggerTopTicker({ sender: 'Bildirim', text, link })
   }
   const deleteNotification = (id) => {
     setNotifications(prev => {
@@ -9551,11 +9620,51 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   useEffect(() => {
     if (!msgCtxMenu) return undefined
     const handler = (e) => {
-      if (!e.target.closest('.msg-ctx-menu-fixed') && !e.target.closest('.msg-ctx-btn')) setMsgCtxMenu(null)
+      if (!e.target.closest('.msg-ctx-menu-fixed')) setMsgCtxMenu(null)
     }
     document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    document.addEventListener('touchstart', handler)
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      document.removeEventListener('touchstart', handler)
+    }
   }, [msgCtxMenu])
+
+  const msgLongPressTimerRef = useRef(null)
+  const msgTouchStartPosRef = useRef({ x: 0, y: 0 })
+
+  const handleMsgTouchStart = (e, msg, chatKey, canDelete) => {
+    if (selectedChatSystemLocked) return
+    const touch = e.touches?.[0]
+    if (!touch) return
+    msgTouchStartPosRef.current = { x: touch.clientX, y: touch.clientY }
+    if (msgLongPressTimerRef.current) clearTimeout(msgLongPressTimerRef.current)
+    msgLongPressTimerRef.current = setTimeout(() => {
+      if (navigator.vibrate) try { navigator.vibrate(40) } catch {}
+      setMsgCtxMenu({
+        x: Math.min(touch.clientX, window.innerWidth - 160),
+        y: Math.min(touch.clientY, window.innerHeight - 120),
+        msgId: msg.id,
+        chatKey,
+        canDelete,
+        replyInfo: { id: msg.id, text: msg.text || '', senderName: msg.sender?.name || '', senderId: msg.sender?.id }
+      })
+    }, 450)
+  }
+
+  const handleMsgTouchMove = (e) => {
+    const touch = e.touches?.[0]
+    if (!touch) return
+    const dx = Math.abs(touch.clientX - msgTouchStartPosRef.current.x)
+    const dy = Math.abs(touch.clientY - msgTouchStartPosRef.current.y)
+    if (dx > 10 || dy > 10) {
+      if (msgLongPressTimerRef.current) clearTimeout(msgLongPressTimerRef.current)
+    }
+  }
+
+  const handleMsgTouchEnd = () => {
+    if (msgLongPressTimerRef.current) clearTimeout(msgLongPressTimerRef.current)
+  }
   const [lightboxImg, setLightboxImg] = useState(null)
   const [showInputEmoji, setShowInputEmoji] = useState(false)
   const [showGifPicker, setShowGifPicker] = useState(false)
@@ -12480,8 +12589,37 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       )}
       <div className={`dashboard-fg${isMobile && (selectedReelm || selectedChat) ? ' dashboard-fg--no-nav' : ''}`}>
         <div className="dashboard-top-row su-drop su-drop-1" style={showMenu ? { filter: 'blur(4px)' } : {}}>
-          <div className="sidebar-logo-area" style={{ cursor: 'pointer' }} onClick={goHome} title="Reelms">
-            <img src={reelmsLogo} alt="Reelms" className="sidebar-logo" style={{ filter: headerIconThemeFilter(effectiveAccent) }} />
+          <div className="dashboard-top-left-wrap">
+            <div className="sidebar-logo-area" style={{ cursor: 'pointer' }} onClick={goHome} title="Reelms">
+              <img src={reelmsLogo} alt="Reelms" className="sidebar-logo" style={{ filter: headerIconThemeFilter(effectiveAccent) }} />
+            </div>
+            {!isMobile && topTicker && (
+              <div
+                key={topTicker.key}
+                className={`top-header-ticker ${topTickerExiting ? 'top-header-ticker--exit' : 'top-header-ticker--enter'}`}
+                onClick={() => {
+                  if (topTicker.link) navigateToNotificationLink(topTicker.link)
+                  setTopTicker(null)
+                }}
+                onMouseEnter={pauseTopTickerTimer}
+                onMouseLeave={resumeTopTickerTimer}
+                title="Görüntülemek için tıkla"
+              >
+                <div className="top-header-ticker-inner">
+                  {topTicker.avatar ? (
+                    <img src={topTicker.avatar} alt="" className="top-header-ticker-avatar" />
+                  ) : topTicker.fallbackInitial ? (
+                    <div className="top-header-ticker-letter">{topTicker.fallbackInitial}</div>
+                  ) : (
+                    <div className="top-header-ticker-dot" />
+                  )}
+                  <span className="top-header-ticker-text">
+                    {topTicker.sender && <strong className="top-header-ticker-sender">{topTicker.sender}: </strong>}
+                    <span className="top-header-ticker-body">{topTicker.text}</span>
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
           <div className="dashboard-top-actions">
             {!isMobile && (
@@ -12528,7 +12666,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         {msgCtxMenu && (
           <div
             className="msg-ctx-menu msg-ctx-menu-fixed"
-            style={{ position: 'fixed', left: msgCtxMenu.x, top: msgCtxMenu.y, zIndex: 9999 }}
+            style={{
+              position: 'fixed',
+              left: Math.max(8, Math.min(msgCtxMenu.x, window.innerWidth - 150)),
+              top: Math.max(8, Math.min(msgCtxMenu.y, window.innerHeight - 100)),
+              zIndex: 9999
+            }}
           >
             <button className="msg-ctx-item" onClick={() => { setReplyingTo(msgCtxMenu.replyInfo); setMsgCtxMenu(null) }}>{t('reply')}</button>
             {msgCtxMenu.canDelete && <button className="msg-ctx-item msg-ctx-item--danger" onClick={() => { modDeleteMessage(msgCtxMenu.chatKey, msgCtxMenu.msgId); setMsgCtxMenu(null) }}>{t('delete')}</button>}
@@ -12874,16 +13017,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               </aside>
               <div className="panel-divider dynamic-bar-divider" />
             </>
-          )}
-
-          {msgCtxMenu && (
-            <div
-              className="msg-ctx-menu msg-ctx-menu-fixed"
-              style={{ position: 'fixed', left: msgCtxMenu.x, top: msgCtxMenu.y, zIndex: 9999 }}
-            >
-              <button className="msg-ctx-item" onClick={() => { setReplyingTo(msgCtxMenu.replyInfo); setMsgCtxMenu(null) }}>{t('reply')}</button>
-              {msgCtxMenu.canDelete && <button className="msg-ctx-item msg-ctx-item--danger" onClick={() => { modDeleteMessage(msgCtxMenu.chatKey, msgCtxMenu.msgId); setMsgCtxMenu(null) }}>{t('delete')}</button>}
-            </div>
           )}
 
           {openFolderId && (() => {
@@ -15352,7 +15485,27 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               if (!isBubbleMode) return (
                                 <React.Fragment key={msg.id}>
                                   {showDateSep && <div className="bubble-date-sep"><span>{msgDateLabel}</span></div>}
-                                <div className={`msg-row${msg.id === newMsgId ? ' msg-row-new' : ''}${isMod ? ' msg-row-mod' : ''}${blocked.some(b => b.id === sender.id) ? ' msg-row-blocked' : ''}`} onDoubleClick={() => !selectedChatSystemLocked && setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id })} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); if (!selectedChatSystemLocked) setMsgCtxMenu({ x: e.clientX, y: e.clientY, msgId: msg.id, chatKey: msgKey2, canDelete: canDeleteMsg, replyInfo: { id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id } }) }}>
+                                <div
+                                  className={`msg-row${msg.id === newMsgId ? ' msg-row-new' : ''}${isMod ? ' msg-row-mod' : ''}${blocked.some(b => b.id === sender.id) ? ' msg-row-blocked' : ''}`}
+                                  onDoubleClick={() => !selectedChatSystemLocked && setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id })}
+                                  onContextMenu={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    if (!selectedChatSystemLocked) {
+                                      setMsgCtxMenu({
+                                        x: Math.min(e.clientX, window.innerWidth - 160),
+                                        y: Math.min(e.clientY, window.innerHeight - 120),
+                                        msgId: msg.id,
+                                        chatKey: msgKey2,
+                                        canDelete: canDeleteMsg,
+                                        replyInfo: { id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id }
+                                      })
+                                    }
+                                  }}
+                                  onTouchStart={(e) => handleMsgTouchStart(e, msg, msgKey2, canDeleteMsg)}
+                                  onTouchMove={handleMsgTouchMove}
+                                  onTouchEnd={handleMsgTouchEnd}
+                                >
                                   <div className="msg-avatar">
                                     {(sender.photo || sender.image)
                                       ? <img src={sender.photo || sender.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
@@ -15363,13 +15516,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                     <div className="msg-header">
                                       <span className="msg-name">{sender.name}</span>
                                       <span className="msg-time">{formatTime(msg.time)}</span>
-                                      {!selectedChatSystemLocked && (
-                                        <div className="msg-ctx-menu-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
-                                          <button className="msg-ctx-btn" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMsgCtxMenu(prev => prev?.msgId === msg.id ? null : { x: r.left, y: r.bottom + 4, msgId: msg.id, chatKey: msgKey2, canDelete: canDeleteMsg, replyInfo: { id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id } }) }}>
-                                            <svg width="3" height="12" viewBox="0 0 3 12" fill="currentColor"><circle cx="1.5" cy="1.5" r="1.5"/><circle cx="1.5" cy="6" r="1.5"/><circle cx="1.5" cy="10.5" r="1.5"/></svg>
-                                          </button>
-                                        </div>
-                                      )}
                                       {!selectedChatSystemLocked && <div className="msg-react-ctrl">
                                         <button className="msg-react-btn msg-react-plus" title="+1" onClick={() => toggleReaction(msgKey2, msg.id, '+')}><img src={newIcon} alt="+" style={{ width: '12px', height: '12px', display: 'block', opacity: 0.65 }} /></button>
                                         <div className="msg-react-emoji-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
@@ -15428,7 +15574,27 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               return (
                                 <div key={msg.id}>
                                   {showDateSep && <div className="bubble-date-sep"><span>{msgDateLabel}</span></div>}
-                                  <div className={`bubble-row${isOwn ? ' bubble-row--own' : ' bubble-row--other'}${msg.id === newMsgId ? ' msg-row-new' : ''}`} onDoubleClick={() => !selectedChatSystemLocked && setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id })} onContextMenu={(e) => { e.preventDefault(); e.stopPropagation(); if (!selectedChatSystemLocked) setMsgCtxMenu({ x: e.clientX, y: e.clientY, msgId: msg.id, chatKey: msgKey2, canDelete: canDeleteMsg, replyInfo: { id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id } }) }}>
+                                  <div
+                                    className={`bubble-row${isOwn ? ' bubble-row--own' : ' bubble-row--other'}${msg.id === newMsgId ? ' msg-row-new' : ''}`}
+                                    onDoubleClick={() => !selectedChatSystemLocked && setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id })}
+                                    onContextMenu={(e) => {
+                                      e.preventDefault();
+                                      e.stopPropagation();
+                                      if (!selectedChatSystemLocked) {
+                                        setMsgCtxMenu({
+                                          x: Math.min(e.clientX, window.innerWidth - 160),
+                                          y: Math.min(e.clientY, window.innerHeight - 120),
+                                          msgId: msg.id,
+                                          chatKey: msgKey2,
+                                          canDelete: canDeleteMsg,
+                                          replyInfo: { id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id }
+                                        })
+                                      }
+                                    }}
+                                    onTouchStart={(e) => handleMsgTouchStart(e, msg, msgKey2, canDeleteMsg)}
+                                    onTouchMove={handleMsgTouchMove}
+                                    onTouchEnd={handleMsgTouchEnd}
+                                  >
                                     {!isOwn && (
                                       <div className="bubble-avatar bubble-avatar--clickable" onClick={e => sender.id && openFriendProfile({ id: sender.id, name: sender.name, photo: sender.photo || sender.image || null }, e)}>
                                         {(sender.photo || sender.image)
@@ -15466,11 +15632,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                         </div>
                                         )}
                                         {!selectedChatSystemLocked && <div className="msg-react-ctrl">
-                                          <div className="msg-ctx-menu-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
-                                            <button className="msg-ctx-btn" onClick={(e) => { const r = e.currentTarget.getBoundingClientRect(); setMsgCtxMenu(prev => prev?.msgId === msg.id ? null : { x: r.left, y: r.bottom + 4, msgId: msg.id, chatKey: msgKey2, canDelete: canDeleteMsg, replyInfo: { id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id } }) }}>
-                                              <svg width="3" height="12" viewBox="0 0 3 12" fill="currentColor"><circle cx="1.5" cy="1.5" r="1.5"/><circle cx="1.5" cy="6" r="1.5"/><circle cx="1.5" cy="10.5" r="1.5"/></svg>
-                                            </button>
-                                          </div>
                                           <button className="msg-react-btn msg-react-plus" title="+1" onClick={() => toggleReaction(msgKey2, msg.id, '+')}><img src={newIcon} alt="+" style={{ width: '12px', height: '12px', display: 'block', opacity: 0.65 }} /></button>
                                           <div className="msg-react-emoji-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
                                             <button className="msg-react-btn" title="Tepki ekle" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowMsgEmojiFor(f => f?.msgId === String(msg.id) ? null : { msgKey: msgKey2, msgId: String(msg.id) }); }}>
@@ -16321,204 +16482,182 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             ) : (
               <div className="panel panel-middle home-panel">
                 {(() => {
-                  const sortedReelms = [...reelms].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-                  const sortedChats = [...chats].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-                  const hour = new Date().getHours()
-                  const greetingWord = customization.customGreeting || (
-                    hour >= 5 && hour < 12 ? 'Good morning'
-                    : hour >= 12 && hour < 17 ? 'Good afternoon'
-                    : hour >= 17 && hour < 21 ? 'Good evening'
-                    : 'Good night'
-                  )
+                  const greetingWord = customization.customGreeting || 'Hey'
                   const greetName = currentUser?.name || currentUser?.username || ''
-                  const ArrowRight = () => (
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                      <polyline points="9 18 15 12 9 6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                  )
+
                   if (isMobile) {
-                    return (
-                      <div className="mobile-home-cards">
-                        <div className="home-greeting">
-                          {greetingWord}{greetName ? `, ${greetName}!` : '!'}
-                        </div>
-                        {/* Your Reelms card - rectangle */}
-                        <div className="mobile-home-card mobile-home-card-reelms">
-                          <div className="mobile-home-card-header">
-                            <img src={readyreelmIcon} alt="" className="mobile-home-card-icon" />
-                            <span className="mobile-home-card-title">Your Reelms</span>
-                          </div>
-                          <div className="mobile-home-card-list">
-                            {sortedReelms.length > 0 ? sortedReelms.slice(0, 4).map(r => (
-                              <button key={r.id} className="mobile-home-card-item" onClick={() => handleSelectReelm(r)}>
-                                <div className="mobile-home-card-item-avatar mobile-home-card-item-avatar--server">
-                                  {r.image ? <img src={r.image} alt={r.name} /> : (r.name || '?').charAt(0)}
-                                </div>
-                                <span className="mobile-home-card-item-name">{r.name}</span>
-                                {unreadCounts[r.id] > 0 && <span className="mobile-home-card-item-badge">{capBadge(unreadCounts[r.id])}</span>}
-                              </button>
-                            )) : <span className="mobile-home-card-empty">No reelms yet.</span>}
-                          </div>
-                          <button className="mobile-home-card-viewall" onClick={() => { setShowDiscover(true); setDiscoverQuery('') }}>
-                            Discover Reelms <ArrowRight />
-                          </button>
-                        </div>
-                        {/* Messages + Notifications - two squares */}
-                        <div className="mobile-home-cards-row">
-                          <div className="mobile-home-card mobile-home-card-messages">
-                            <div className="mobile-home-card-header">
-                              <img src={newdmIcon} alt="" className="mobile-home-card-icon" />
-                              <span className="mobile-home-card-title">Messages</span>
-                            </div>
-                            <div className="mobile-home-card-list">
-                              {sortedChats.length > 0 ? sortedChats.slice(0, 3).map(c => {
-                                const avatarSrc = getChatAvatarSrc(c)
-                                const displayName = getChatDisplayName(c)
-                                return (
-                                  <button key={c.id} className="mobile-home-card-item" onClick={() => { setSelectedChat(c); setSelectedReelm(null); setSelectedChannel(null); setShowChatList(false); setShowFeed(false); setShowDiscover(false) }}>
-                                    <div className="mobile-home-card-item-avatar">
-                                      {avatarSrc ? <img src={avatarSrc} alt={displayName} /> : (displayName || '?').charAt(0)}
-                                    </div>
-                                    <span className="mobile-home-card-item-name">{displayName}</span>
-                                    {unreadCounts[c.id] > 0 && <span className="mobile-home-card-item-badge">{capBadge(unreadCounts[c.id])}</span>}
-                                  </button>
-                                )
-                              }) : <span className="mobile-home-card-empty">All caught up.</span>}
-                            </div>
-                            <button className="mobile-home-card-viewall" onClick={() => { setSelectedChat(null); setShowChatList(true); setChatListFilter('all') }}>
-                              All <ArrowRight />
-                            </button>
-                          </div>
-                          <div className="mobile-home-card mobile-home-card-notifs">
-                            <div className="mobile-home-card-header">
-                              <img src={notificationIcon} alt="" className="mobile-home-card-icon" />
-                              <span className="mobile-home-card-title">Notifications</span>
-                            </div>
-                            <div className="mobile-home-card-list">
-                              {notifications.length > 0 ? notifications.slice(0, 3).map(n => (
-                                <button
-                                  key={n.id}
-                                  className="mobile-home-card-item"
-                                  onClick={() => { if (n.link?.type !== 'reelm_invite') { navigateToNotificationLink(n.link); deleteNotification(n.id) } }}
-                                >
-                                  <span className="mobile-home-card-item-name" style={{ whiteSpace: 'normal', lineHeight: 1.3 }}>{n.text}</span>
-                                </button>
-                              )) : <span className="mobile-home-card-empty">All caught up.</span>}
-                            </div>
-                            <button className="mobile-home-card-viewall" onClick={toggleNotifPopup}>
-                              All <ArrowRight />
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )
+                    return null
                   }
+
+                  // Desktop & Web Floating Hub
+                  const now = Date.now()
+                  const LONG_INACTIVE_MS = 3 * 24 * 60 * 60 * 1000 // 3 days
+
+                  const allReelmsList = (Array.isArray(reelms) ? reelms : []).map(r => {
+                    const unread = Number(unreadCounts[r.id] || 0)
+                    const updatedAt = Number(r.updatedAt || 0)
+                    const isLongInactive = !updatedAt || (now - updatedAt > LONG_INACTIVE_MS)
+                    return {
+                      type: 'reelm',
+                      id: `reelm_${r.id}`,
+                      rawId: r.id,
+                      name: r.name || 'Reelm',
+                      image: r.image || null,
+                      unread: unread,
+                      isLongInactive: isLongInactive && unread === 0,
+                      item: r,
+                      updatedAt: updatedAt,
+                    }
+                  })
+
+                  const allChatsList = (Array.isArray(chats) ? chats : []).map(c => {
+                    const displayName = getChatDisplayName(c)
+                    const avatarSrc = getChatAvatarSrc(c)
+                    const unread = getChatUnreadCount(c)
+                    const isGroup = c.type === 'group'
+                    const updatedAt = Number(c.updatedAt || 0)
+                    const isLongInactive = !updatedAt || (now - updatedAt > LONG_INACTIVE_MS)
+                    return {
+                      type: 'chat',
+                      id: `chat_${c.id}`,
+                      rawId: c.id,
+                      name: displayName || (isGroup ? 'Group Chat' : 'Direct Message'),
+                      image: avatarSrc || null,
+                      unread: unread,
+                      isLongInactive: isLongInactive && unread === 0,
+                      isGroup,
+                      item: c,
+                      updatedAt: updatedAt,
+                    }
+                  })
+
+                  // Combine all nodes
+                  const allNodes = [...allReelmsList, ...allChatsList]
+
+                  // Sort nodes: unread items first (highest unread first), then by most recently updated
+                  allNodes.sort((a, b) => {
+                    if (b.unread !== a.unread) return b.unread - a.unread
+                    return b.updatedAt - a.updatedAt
+                  })
+
+                  const totalUnreadCount = allNodes.reduce((sum, n) => sum + (n.unread > 0 ? n.unread : 0), 0)
+                  const unreadConversationsCount = allNodes.filter(n => n.unread > 0).length
+
                   return (
-                    <>
-                      <div className="home-greeting">
-                        {greetingWord}{greetName ? `, ${greetName}!` : '!'}
+                    <div className="floating-hub-wrapper">
+                      <div className="floating-hub-header">
+                        <h1 className="floating-hub-greeting">
+                          {greetingWord}{greetName ? `, ${greetName}!` : '!'}
+                        </h1>
+                        {totalUnreadCount > 0 && (
+                          <div className="floating-hub-subtext floating-hub-subtext--has-unread">
+                            <span className="floating-hub-subtext-dot" />
+                            {totalUnreadCount} okunmamış mesaj ({unreadConversationsCount} sohbet)
+                          </div>
+                        )}
                       </div>
-                      <div className="home-sections">
-                        {/* Your Reelms, recently */}
-                        <div className="home-section">
-                          <div className="home-section-header">
-                            <img src={readyreelmIcon} alt="" className="home-section-icon" />
-                            <span className="home-section-title">Your Reelms, recently</span>
-                          </div>
-                          <div className="home-section-body">
-                            {sortedReelms.length > 0 ? (
-                              <div className="home-section-list">
-                                {sortedReelms.slice(0, 5).map(r => (
-                                  <button key={r.id} className="home-item" onClick={() => handleSelectReelm(r)}>
-                                    <div className="home-item-avatar home-item-avatar--server">
-                                      {r.image
-                                        ? <img src={r.image} alt={r.name} className="home-item-avatar-img" />
-                                        : <span className="home-item-avatar-letter">{(r.name || '?').charAt(0)}</span>
-                                      }
-                                    </div>
-                                    <span className="home-item-name">{r.name}</span>
-                                    {unreadCounts[r.id] > 0 && <span className="home-item-badge">{unreadCounts[r.id]}</span>}
-                                  </button>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="home-empty">No reelms yet.</p>
-                            )}
-                            <button className="home-section-viewall" onClick={() => { setShowDiscover(false); setShowFriendsPanel(false); setShowSettings(false); setShowMsgRequests(false) }}>
-                              All Reelms <ArrowRight />
-                            </button>
-                          </div>
-                        </div>
 
-                        {/* Messages */}
-                        <div className="home-section">
-                          <div className="home-section-header">
-                            <img src={newdmIcon} alt="" className="home-section-icon" />
-                            <span className="home-section-title">Messages</span>
-                          </div>
-                          <div className="home-section-body">
-                            {sortedChats.length > 0 ? (
-                              <div className="home-section-list">
-                                {sortedChats.slice(0, 5).map(c => {
-                                  const avatarSrc = getChatAvatarSrc(c)
-                                  const displayName = getChatDisplayName(c)
-                                  return (
-                                    <button key={c.id} className="home-item" onClick={() => { setSelectedChat(c); setSelectedReelm(null); setSelectedChannel(null); setShowChatList(false); setShowFeed(false); setShowDiscover(false) }}>
-                                      <div className="home-item-avatar">
-                                        {avatarSrc
-                                          ? <img src={avatarSrc} alt={displayName} className="home-item-avatar-img" />
-                                          : <span className="home-item-avatar-letter">{(displayName || '?').charAt(0)}</span>
-                                        }
-                                      </div>
-                                      <span className="home-item-name">{displayName}</span>
-                                      {unreadCounts[c.id] > 0 && <span className="home-item-badge">{unreadCounts[c.id]}</span>}
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                            ) : (
-                              <p className="home-empty">You're all caught up.</p>
-                            )}
-                            <button className="home-section-viewall" onClick={() => { setSelectedChat(null); setShowChatList(true); setChatListFilter('all') }}>
-                              All Messages <ArrowRight />
-                            </button>
-                          </div>
-                        </div>
+                      {allNodes.length > 0 ? (
+                        <div className="floating-hub-stage">
+                          {allNodes.map((node, index) => {
+                            const driftClass = `floating-node-drift-${index % 6}`
+                            const hasUnread = node.unread > 0
+                            const sizeClass = hasUnread
+                              ? 'floating-node--size-large'
+                              : (node.isLongInactive ? 'floating-node--size-small' : 'floating-node--size-normal')
 
-                        {/* Notifications */}
-                        <div className="home-section">
-                          <div className="home-section-header">
-                            <img src={notificationIcon} alt="" className="home-section-icon" />
-                            <span className="home-section-title">Notifications</span>
+                            return (
+                              <button
+                                key={node.id}
+                                type="button"
+                                className={`floating-node ${driftClass} ${sizeClass}${hasUnread ? ' floating-node--has-unread' : ''}`}
+                                onClick={() => {
+                                  if (node.type === 'reelm') {
+                                    handleSelectReelm(node.item)
+                                  } else {
+                                    setSelectedChat(node.item)
+                                    setSelectedReelm(null)
+                                    setSelectedChannel(null)
+                                    setShowChatList(false)
+                                    setShowFeed(false)
+                                    setShowDiscover(false)
+                                  }
+                                }}
+                                title={`${node.name}${hasUnread ? ` (${node.unread} yeni mesaj)` : ''}`}
+                              >
+                                <div className="floating-node-orb">
+                                  {node.image ? (
+                                    <img src={node.image} alt={node.name} className="floating-node-avatar-img" />
+                                  ) : (
+                                    <span className="floating-node-avatar-letter">
+                                      {(node.name || '?').charAt(0)}
+                                    </span>
+                                  )}
+
+                                  {/* Small indicator icon for item type */}
+                                  <div className="floating-node-type-indicator">
+                                    {node.type === 'reelm' ? (
+                                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
+                                        <line x1="4" y1="22" x2="4" y2="15"/>
+                                      </svg>
+                                    ) : node.isGroup ? (
+                                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                        <circle cx="9" cy="7" r="4"/>
+                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                                      </svg>
+                                    ) : (
+                                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                        <circle cx="12" cy="7" r="4"/>
+                                      </svg>
+                                    )}
+                                  </div>
+
+                                  {/* Unread badge on top right */}
+                                  {hasUnread && (
+                                    <span className="floating-node-badge">
+                                      {capBadge(node.unread)}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="floating-node-tooltip">
+                                  <span>{node.name}</span>
+                                </div>
+                              </button>
+                            )
+                          })}
+                        </div>
+                      ) : (
+                        <div className="floating-hub-empty">
+                          <div className="floating-hub-empty-orb">
+                            <img src={readyreelmIcon} alt="" />
                           </div>
-                          <div className="home-section-body">
-                            {notifications.length > 0 ? (
-                              <div className="home-section-list">
-                                {notifications.slice(0, 5).map(n => (
-                                  <button
-                                    key={n.id}
-                                    className="home-item home-item--notif"
-                                    onClick={() => {
-                                      if (n.link?.type !== 'reelm_invite') {
-                                        navigateToNotificationLink(n.link)
-                                        deleteNotification(n.id)
-                                      }
-                                    }}
-                                  >
-                                    <span className="home-item-notif-text">{n.text}</span>
-                                  </button>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="home-empty">You're all caught up.</p>
-                            )}
-                            <button className="home-section-viewall" onClick={toggleNotifPopup}>
-                              All Notifications <ArrowRight />
+                          <h3 className="floating-hub-empty-title">Henüz sohbet veya Reelm yok</h3>
+                          <p className="floating-hub-empty-desc">
+                            Topluluklara katılmak için Reelm keşfedebilir veya arkadaşlarınızla sohbet başlatabilirsiniz.
+                          </p>
+                          <div className="floating-hub-empty-actions">
+                            <button
+                              type="button"
+                              className="floating-hub-empty-btn"
+                              onClick={() => { setShowDiscover(true); setDiscoverQuery('') }}
+                            >
+                              Reelm Keşfet
+                            </button>
+                            <button
+                              type="button"
+                              className="floating-hub-empty-btn"
+                              onClick={() => { setSelectedChat(null); setShowChatList(true); setChatListFilter('all') }}
+                            >
+                              Sohbetler
                             </button>
                           </div>
                         </div>
-                      </div>
-                    </>
+                      )}
+                    </div>
                   )
                 })()}
               </div>
