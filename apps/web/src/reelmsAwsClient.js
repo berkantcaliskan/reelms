@@ -394,7 +394,7 @@ export async function loadReelmDocuments(reelmId) {
 }
 
 export function connectReelmsSocket(handlers) {
-  const { onUserDoc, onReelmDoc, onReelmManagerDoc, onReelmCoreSnapshot, onAppDoc, onMessage, onMessageDeleted, onMessagesCleared, onReaction, onVoicePosition, onVcEvent, onVcError, onVcCount, onVcCounts, onVcParticipants, onVcState, onPresence, onTyping, onTypingStop, onProfileUpdated, onReelmAccessRevoked, onReelmMemberJoined, onReelmMemberRemoved, onReelmMemberLeft, onJoinRequestRejected, onJoinRequestApproved, onReelmTimeout, onReelmTimeoutRemoved, onReelmBanned, onReelmClosed, onConnect, onReadReceipt } = handlers
+  const { onUserDoc, onReelmDoc, onReelmManagerDoc, onReelmCoreSnapshot, onAppDoc, onMessage, onMessageEdited, onMessageDeleted, onMessagesCleared, onPinnedMessage, onReaction, onVoicePosition, onVcEvent, onVcError, onVcCount, onVcCounts, onVcParticipants, onVcState, onPresence, onTyping, onTypingStop, onProfileUpdated, onReelmAccessRevoked, onReelmMemberJoined, onReelmMemberRemoved, onReelmMemberLeft, onJoinRequestRejected, onJoinRequestApproved, onReelmTimeout, onReelmTimeoutRemoved, onReelmBanned, onReelmClosed, onConnect, onReadReceipt } = handlers
   const run = async () => {
     const token = await getIdToken()
     if (!token) return
@@ -442,11 +442,17 @@ export function connectReelmsSocket(handlers) {
     socket.on('reelms:message', (msg) => {
       if (msg?.msgKey && msg?.message) onMessage?.(msg.msgKey, msg.message)
     })
+    socket.on('reelms:message-edited', (msg) => {
+      if (msg?.msgKey && msg?.msgId && msg?.message) onMessageEdited?.(msg.msgKey, msg.msgId, msg.message)
+    })
     socket.on('reelms:message-deleted', (msg) => {
       if (msg?.msgKey && msg?.msgId) onMessageDeleted?.(msg.msgKey, msg.msgId)
     })
     socket.on('reelms:messages-cleared', (msg) => {
       if (msg?.msgKey) onMessagesCleared?.(msg.msgKey)
+    })
+    socket.on('reelms:pinned-message', (msg) => {
+      if (msg?.msgKey) onPinnedMessage?.(msg.msgKey, msg.pinnedMessage || null)
     })
     socket.on('reelms:reaction', (msg) => {
       if (msg?.msgKey && msg?.msgId && msg?.emoji) onReaction?.(msg)
@@ -757,9 +763,28 @@ export async function messageDelete(msgKey, msgId) {
   })
 }
 
+export async function messageEdit(msgKey, msgId, text) {
+  return await api(`/api/v1/messages/${encodeURIComponent(msgKey)}/${encodeURIComponent(msgId)}`, {
+    method: 'PATCH',
+    body: JSON.stringify({ text }),
+  })
+}
+
 export async function messageDeleteConversation(msgKey) {
   await api(`/api/v1/messages/${encodeURIComponent(msgKey)}`, {
     method: 'DELETE',
+  })
+}
+
+export async function pinsGet(msgKey) {
+  const res = await api(`/api/v1/pins/${encodeURIComponent(msgKey)}`, { allowNotFound: true })
+  return res?.pinnedMessage || null
+}
+
+export async function pinSet(msgKey, pinnedMessage) {
+  return await api(`/api/v1/pins/${encodeURIComponent(msgKey)}`, {
+    method: 'POST',
+    body: JSON.stringify({ pinnedMessage }),
   })
 }
 

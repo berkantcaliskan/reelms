@@ -47,6 +47,7 @@ import resharePostIcon from '../../assets/icons/resharepost-icon_reelms.svg'
 import forwardPostIcon from '../../assets/icons/forwardpost-icon_reelms.svg'
 import { getApiBaseUrl, getPublicWebUrl } from '../../config/api'
 import './LegacyReelmsApp.css'
+import { fetchVoiceToken, createLivekitSession } from '../voice/livekitManager.js'
 import {
   REELM_CACHE,
   patchReelmCache,
@@ -80,7 +81,10 @@ import {
   messagesGet,
   messageSend,
   messageDelete,
+  messageEdit,
   messageDeleteConversation,
+  pinsGet,
+  pinSet,
   reactionsGet,
   reactionsToggle,
   socialNotify,
@@ -2514,6 +2518,7 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
     const handler = (e) => {
       if (e.target.closest('.pp-social-ctx-menu')) return
       if (e.target.closest('.pp-social-add-menu')) return
+      if (e.target.closest('.profile-card')) return
       setSocialCtxMenu(null)
       if (popupRef.current && !popupRef.current.contains(e.target)) {
         onClose()
@@ -3895,7 +3900,303 @@ function VoiceMessage({ src }) {
   )
 }
 
-// ── Moderation Inbox Panel (mod account only) ─────────────────────────────────
+function VirtualMessageList({
+  msgs,
+  isBubbleMode,
+  uid,
+  isMod,
+  blocked,
+  selectedChatSystemLocked,
+  selectedReelm,
+  selectedChat,
+  msgKey2,
+  newMsgId,
+  t,
+  canPinInChannel,
+  pinnedMessage,
+  setReplyingTo,
+  setMsgCtxMenu,
+  handleMsgTouchStart,
+  handleMsgTouchMove,
+  handleMsgTouchEnd,
+  toggleReaction,
+  showMsgEmojiFor,
+  setShowMsgEmojiFor,
+  setLightboxImg,
+  openFriendProfile,
+  dmReadReceipts,
+  msgReactions,
+  msgListRef,
+}) {
+  const formatTime = useCallback((tm) => (tm instanceof Date ? tm : new Date(tm)).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), [])
+  const formatDateLabel = useCallback((tm) => {
+    const d = tm instanceof Date ? tm : new Date(tm)
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const yesterday = new Date(today); yesterday.setDate(today.getDate() - 1)
+    const msgDay = new Date(d); msgDay.setHours(0, 0, 0, 0)
+    if (msgDay.getTime() === today.getTime()) return 'Today'
+    if (msgDay.getTime() === yesterday.getTime()) return 'Yesterday'
+    return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' })
+  }, [])
+
+  const isNearBottomRef = useRef(true)
+  const lastMsgCountRef = useRef(msgs.length)
+
+  const handleScroll = useCallback(() => {
+    const el = msgListRef.current
+    if (!el) return
+    const distanceFromBottom = el.scrollHeight - el.scrollTop - el.clientHeight
+    isNearBottomRef.current = distanceFromBottom <= 180
+  }, [msgListRef])
+
+  useEffect(() => {
+    const el = msgListRef.current
+    if (!el) return undefined
+    el.addEventListener('scroll', handleScroll, { passive: true })
+    return () => el.removeEventListener('scroll', handleScroll)
+  }, [msgListRef, handleScroll])
+
+  useEffect(() => {
+    const el = msgListRef.current
+    if (!el || msgs.length === 0) return
+    const isNew = msgs.length !== lastMsgCountRef.current
+    lastMsgCountRef.current = msgs.length
+    if (isNearBottomRef.current || isNew) {
+      const raf = requestAnimationFrame(() => {
+        el.scrollTop = el.scrollHeight
+      })
+      return () => cancelAnimationFrame(raf)
+    }
+  }, [msgs.length, msgKey2, msgListRef])
+
+  return (
+    <>
+      {msgs.map((msg, index) => {
+        if (!msg) return null
+
+        const prevMsg = index > 0 ? msgs[index - 1] : null
+        const msgDateLabel = formatDateLabel(msg.time)
+        const prevDateLabel = prevMsg ? formatDateLabel(prevMsg.time) : null
+        const showDateSep = msgDateLabel !== prevDateLabel
+
+        const sender = (msg.sender && typeof msg.sender === 'object') ? msg.sender : { id: '', name: '?', photo: null, image: null }
+        const isOwn = String(sender.id || '') === String(uid)
+        const canDeleteMsg = !selectedChatSystemLocked && (isMod || isOwn || (selectedReelm && hasReelmPermissionClient(selectedReelm, uid, 'manageModeration')))
+        const isPinned = Boolean(pinnedMessage && String(pinnedMessage.id) === String(msg.id))
+        const msgData = { id: msg.id, text: msg.text || '', sender, time: msg.time, mediaUrl: msg.mediaUrl, mediaType: msg.mediaType }
+
+        return (
+          <React.Fragment key={msg.id || `msg-${index}`}>
+            {showDateSep && <div className="bubble-date-sep"><span>{msgDateLabel}</span></div>}
+            {msg.isSystem ? (
+              <div className={`msg-system-row${msg.id === newMsgId ? ' msg-row-new' : ''}`}>
+                <span className="msg-system-text">{msg.text}</span>
+                <span className="msg-system-time">{formatTime(msg.time)}</span>
+              </div>
+            ) : !isBubbleMode ? (
+              <div
+                className={`msg-row${msg.id === newMsgId ? ' msg-row-new' : ''}${isMod ? ' msg-row-mod' : ''}${blocked.some(b => b.id === sender.id) ? ' msg-row-blocked' : ''}`}
+                onDoubleClick={() => !selectedChatSystemLocked && setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id })}
+                onContextMenu={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  if (!selectedChatSystemLocked) {
+                    setMsgCtxMenu({
+                      x: Math.min(e.clientX, window.innerWidth - 160),
+                      y: Math.min(e.clientY, window.innerHeight - 120),
+                      msgId: msg.id,
+                      chatKey: msgKey2,
+                      canDelete: canDeleteMsg,
+                      canPin: canPinInChannel,
+                      isPinned,
+                      msgData,
+                      isOwn,
+                      msgText: msg.text || '',
+                      replyInfo: { id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id }
+                    })
+                  }
+                }}
+                onTouchStart={(e) => handleMsgTouchStart(e, msg, msgKey2, canDeleteMsg, isOwn, canPinInChannel, isPinned)}
+                onTouchMove={handleMsgTouchMove}
+                onTouchEnd={handleMsgTouchEnd}
+              >
+                <div className="msg-avatar">
+                  {(sender.photo || sender.image)
+                    ? <img src={sender.photo || sender.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                    : (sender.name || '?').charAt(0).toUpperCase()
+                  }
+                </div>
+                <div className="msg-body">
+                  <div className="msg-header">
+                    <span className="msg-name">{sender.name}</span>
+                    <span className="msg-time">{formatTime(msg.time)}</span>
+                    {!selectedChatSystemLocked && (
+                      <div className="msg-react-ctrl">
+                        <button className="msg-react-btn msg-react-plus" title="+1" onClick={() => toggleReaction(msgKey2, msg.id, '+')}>
+                          <img src={newIcon} alt="+" style={{ width: '12px', height: '12px', display: 'block', opacity: 0.65 }} />
+                        </button>
+                        <div className="msg-react-emoji-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+                          <button className="msg-react-btn" title="Tepki ekle" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowMsgEmojiFor(f => f?.msgId === String(msg.id) ? null : { msgKey: msgKey2, msgId: String(msg.id) }) }}>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><path d="M8 14s1.5 2 4 2 4-2 4-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="9" cy="10" r="1" fill="currentColor"/><circle cx="15" cy="10" r="1" fill="currentColor"/></svg>
+                          </button>
+                          {showMsgEmojiFor?.msgId === String(msg.id) && (
+                            <div className="msg-emoji-picker-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+                              <EmojiPickerReact emojiStyle={EmojiStyle.APPLE} height={320} width={280} searchDisabled previewConfig={{ showPreview: false }} onEmojiClick={d => toggleReaction(msgKey2, msg.id, d.emoji)} />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {msg.replyTo && (
+                    <div className="msg-reply-quote">
+                      <span className="msg-reply-quote-name">{msg.replyTo.senderName}</span>
+                      <span className="msg-reply-quote-text">{msg.replyTo.text ? msg.replyTo.text.slice(0, 120) : '📎'}</span>
+                    </div>
+                  )}
+                  {msg.text && (
+                    <div className="msg-text">
+                      {renderRichMessage(msg.richText || msg.text, uid, selectedReelm?.members, selectedReelm?.roles, !!msg.richText)}
+                      {(msg.isEdited || msg.editedAt) && <span className="msg-edited-tag">({t ? t('edited') : 'Düzenlendi'})</span>}
+                    </div>
+                  )}
+                  {msg.text && (() => { const ytId = extractYouTubeId(msg.text); return ytId ? (
+                    <div className="msg-yt-embed">
+                      <iframe
+                        src={`https://www.youtube-nocookie.com/embed/${ytId}`}
+                        title="YouTube video"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : null })()}
+                  {msg.mediaUrl && msg.mediaType === 'image' && <img src={msg.mediaUrl} alt="" className="msg-media-img" onClick={() => setLightboxImg(msg.mediaUrl)} />}
+                  {msg.mediaUrl && msg.mediaType === 'video' && <video src={msg.mediaUrl} className="msg-media-video" controls />}
+                  {msg.mediaUrl && msg.mediaType === 'audio' && <VoiceMessage src={msg.mediaUrl} />}
+                  {msg.mediaUrl && (msg.mediaType === 'gif' || msg.mediaType === 'sticker') && <img src={msg.mediaUrl} alt="" className={msg.mediaType === 'sticker' ? 'msg-sticker-img' : 'msg-gif-img'} />}
+                  {msg.fileUrl && (
+                    <a href={msg.fileUrl} download={msg.fileName} className="msg-doc-card">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                      <div className="msg-doc-info"><span className="msg-doc-name">{msg.fileName}</span><span className="msg-doc-size">{msg.fileSize ? (msg.fileSize/1024<1024 ? (msg.fileSize/1024).toFixed(1)+' KB' : (msg.fileSize/1048576).toFixed(1)+' MB') : ''}</span></div>
+                    </a>
+                  )}
+                  {Object.keys(msgReactions[msgKey2]?.[String(msg.id)] || {}).length > 0 && (
+                    <div className="msg-reactions">
+                      {Object.entries(msgReactions[msgKey2]?.[String(msg.id)] || {}).map(([emoji, users]) => (
+                        <button key={emoji} className={`${emoji === '+' ? 'reaction-pill--plus' : `reaction-pill${users.includes(String(uid)) ? ' reaction-pill--mine' : ''}`}`} onClick={() => toggleReaction(msgKey2, msg.id, emoji)}>
+                          {emoji === '+' ? <span>+{users.length}</span> : <>{emoji} <span>{users.length}</span></>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div
+                className={`bubble-row${isOwn ? ' bubble-row--own' : ' bubble-row--other'}${msg.id === newMsgId ? ' msg-row-new' : ''}`}
+                onDoubleClick={() => !selectedChatSystemLocked && setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id })}
+                onContextMenu={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  if (!selectedChatSystemLocked) {
+                    setMsgCtxMenu({
+                      x: Math.min(e.clientX, window.innerWidth - 160),
+                      y: Math.min(e.clientY, window.innerHeight - 120),
+                      msgId: msg.id,
+                      chatKey: msgKey2,
+                      canDelete: canDeleteMsg,
+                      canPin: canPinInChannel,
+                      isPinned,
+                      msgData,
+                      isOwn,
+                      msgText: msg.text || '',
+                      replyInfo: { id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id }
+                    })
+                  }
+                }}
+                onTouchStart={(e) => handleMsgTouchStart(e, msg, msgKey2, canDeleteMsg, isOwn, canPinInChannel, isPinned)}
+                onTouchMove={handleMsgTouchMove}
+                onTouchEnd={handleMsgTouchEnd}
+              >
+                {!isOwn && (
+                  <div className="bubble-avatar bubble-avatar--clickable" onClick={e => sender.id && openFriendProfile({ id: sender.id, name: sender.name, photo: sender.photo || sender.image || null }, e)}>
+                    {(sender.photo || sender.image)
+                      ? <img src={sender.photo || sender.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                      : (sender.name || '?').charAt(0).toUpperCase()
+                    }
+                  </div>
+                )}
+                <div className="bubble-content">
+                  {!isOwn && selectedChat?.type === 'group' && <span className="bubble-sender-name">{sender.name}</span>}
+                  <div className="bubble-and-time">
+                    {msg.mediaUrl && (msg.mediaType === 'gif' || msg.mediaType === 'sticker') && !msg.text ? (
+                      <img src={msg.mediaUrl} alt="" className={msg.mediaType === 'sticker' ? 'msg-sticker-img' : 'msg-gif-img'} />
+                    ) : msg.mediaUrl && msg.mediaType === 'image' && !msg.text && !msg.fileUrl ? (
+                      <img src={msg.mediaUrl} alt="" className="msg-media-img" onClick={() => setLightboxImg(msg.mediaUrl)} style={{ cursor: 'pointer' }} />
+                    ) : (
+                    <div className={`bubble${isOwn ? ' bubble--own' : ' bubble--other'}`}>
+                      {msg.replyTo && (
+                        <div className="msg-reply-quote msg-reply-quote--bubble">
+                          <span className="msg-reply-quote-name">{msg.replyTo.senderName}</span>
+                          <span className="msg-reply-quote-text">{msg.replyTo.text ? msg.replyTo.text.slice(0, 120) : '📎'}</span>
+                        </div>
+                      )}
+                      {msg.text && (
+                        <span className="bubble-text">
+                          {renderRichMessage(msg.richText || msg.text, uid, selectedReelm?.members, selectedReelm?.roles, !!msg.richText)}
+                          {(msg.isEdited || msg.editedAt) && <span className="msg-edited-tag">({t ? t('edited') : 'Düzenlendi'})</span>}
+                        </span>
+                      )}
+                      {msg.mediaUrl && msg.mediaType === 'image' && <img src={msg.mediaUrl} alt="" className="msg-media-img" onClick={() => setLightboxImg(msg.mediaUrl)} />}
+                      {msg.mediaUrl && msg.mediaType === 'video' && <video src={msg.mediaUrl} className="msg-media-video" controls />}
+                      {msg.mediaUrl && msg.mediaType === 'audio' && <VoiceMessage src={msg.mediaUrl} />}
+                      {msg.mediaUrl && (msg.mediaType === 'gif' || msg.mediaType === 'sticker') && <img src={msg.mediaUrl} alt="" className={msg.mediaType === 'sticker' ? 'msg-sticker-img' : 'msg-gif-img'} />}
+                      {msg.fileUrl && (
+                        <a href={msg.fileUrl} download={msg.fileName} className="msg-doc-card">
+                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                          <div className="msg-doc-info"><span className="msg-doc-name">{msg.fileName}</span></div>
+                        </a>
+                      )}
+                    </div>
+                    )}
+                    {!selectedChatSystemLocked && <div className="msg-react-ctrl">
+                      <button className="msg-react-btn msg-react-plus" title="+1" onClick={() => toggleReaction(msgKey2, msg.id, '+')}><img src={newIcon} alt="+" style={{ width: '12px', height: '12px', display: 'block', opacity: 0.65 }} /></button>
+                      <div className="msg-react-emoji-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+                        <button className="msg-react-btn" title="Tepki ekle" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowMsgEmojiFor(f => f?.msgId === String(msg.id) ? null : { msgKey: msgKey2, msgId: String(msg.id) }) }}>
+                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><path d="M8 14s1.5 2 4 2 4-2 4-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="9" cy="10" r="1" fill="currentColor"/><circle cx="15" cy="10" r="1" fill="currentColor"/></svg>
+                        </button>
+                        {showMsgEmojiFor?.msgId === String(msg.id) && (
+                          <div className="msg-emoji-picker-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+                            <EmojiPickerReact emojiStyle={EmojiStyle.APPLE} height={320} width={280} searchDisabled previewConfig={{ showPreview: false }} onEmojiClick={d => toggleReaction(msgKey2, msg.id, d.emoji)} />
+                          </div>
+                        )}
+                      </div>
+                    </div>}
+                    <span className="bubble-time">{formatTime(msg.time)}</span>
+                  </div>
+                  {Object.keys(msgReactions[msgKey2]?.[String(msg.id)] || {}).length > 0 && (
+                    <div className="msg-reactions msg-reactions--bubble">
+                      {Object.entries(msgReactions[msgKey2]?.[String(msg.id)] || {}).map(([emoji, users]) => (
+                        <button key={emoji} className={`reaction-pill${users.includes(String(uid)) ? ' reaction-pill--mine' : ''}`} onClick={() => toggleReaction(msgKey2, msg.id, emoji)}>
+                          {emoji} <span>{users.length}</span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {isOwn && dmReadReceipts[msgKey2] && String(dmReadReceipts[msgKey2].lastMsgId) === String(msg.id) && dmReadReceipts[msgKey2].photo && (
+                  <div className="bubble-read-receipt">
+                    <img src={dmReadReceipts[msgKey2].photo} alt="" className="bubble-receipt-avatar" />
+                  </div>
+                )}
+              </div>
+            )}
+          </React.Fragment>
+        )
+      })}
+    </>
+  )
+}
 
 function SpatialRoom({ voicePositions, voiceParticipants, myUid, myUser, onMyMove }) {
   const ROOM_W = 280
@@ -4051,6 +4352,7 @@ const REELM_PERMISSION_OPTIONS = [
   { key: 'manageInvites', label: 'Invites', note: 'Can invite even if member invites are off.' },
   { key: 'manageJoinRequests', label: 'Join requests', note: 'Can approve or reject join requests.' },
   { key: 'manageModeration', label: 'Moderation', note: 'Can timeout/ban regular members.' },
+  { key: 'pinMessages', label: 'Pin messages', note: 'Can pin and unpin messages in channels.' },
   { key: 'createVaporRoom', label: 'Create vapor rooms', note: 'Can create temporary vapor rooms in any category.' },
   { key: 'manageReelm', label: 'Full admin', note: 'Can manage all server permissions.' },
 ]
@@ -7622,6 +7924,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const audioAnalyzersRef = useRef({})
   const localStreamRef = useRef(null)
+  const livekitSessionRef = useRef(null)
   const screenStreamRef = useRef(null)
   const screenTrackIdsRef = useRef(new Set()) // track IDs belonging to screen share
   const peersRef = useRef({})
@@ -8469,6 +8772,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       },
       onMessageDeleted: (msgKey, msgId) => {
         setMessages(prev => ({ ...prev, [msgKey]: (prev[msgKey] || []).filter(m => String(m.id) !== String(msgId)) }))
+      },
+      onMessageEdited: (msgKey, msgId, message) => {
+        setMessages(prev => ({
+          ...prev,
+          [msgKey]: (prev[msgKey] || []).map(m => String(m.id) === String(msgId)
+            ? { ...m, ...message, text: message.text, isEdited: true, editedAt: message.editedAt || Date.now() }
+            : m
+          )
+        }))
+      },
+      onPinnedMessage: (msgKey, pinnedMessage) => {
+        setPinnedMessages(prev => ({ ...prev, [msgKey]: pinnedMessage || null }))
       },
       onReaction: ({ msgKey, msgId, emoji, users }) => {
         const id = String(msgId)
@@ -9556,7 +9871,49 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [msgReactions, setMsgReactions] = useState({})
   const [showMsgEmojiFor, setShowMsgEmojiFor] = useState(null)
   const [replyingTo, setReplyingTo] = useState(null)
+  const [editingMessage, setEditingMessage] = useState(null)
+  const [pinnedMessages, setPinnedMessages] = useState({})
   const [msgCtxMenu, setMsgCtxMenu] = useState(null)
+
+  const canPinInChannel = selectedChat
+    ? !isReelmsSystemChat(selectedChat)
+    : Boolean(selectedReelm?.ownerId === uid || hasReelmPermissionClient(selectedReelm, uid, 'pinMessages') || hasReelmPermissionClient(selectedReelm, uid, 'manageModeration') || hasReelmPermissionClient(selectedReelm, uid, 'manageReelm'))
+
+  useEffect(() => {
+    const msgKey = selectedChat ? selectedChat.id : composeReelmMsgKey(selectedReelm, selectedChannel)
+    if (!msgKey) return
+    pinsGet(msgKey).then(p => {
+      setPinnedMessages(prev => ({ ...prev, [msgKey]: p || null }))
+    }).catch(() => {})
+  }, [selectedChat?.id, selectedReelm?.id, selectedChannel?.id])
+
+  const handlePinMessage = (chatKey, msg) => {
+    const pinPayload = {
+      id: msg.id,
+      text: msg.text || '',
+      sender: msg.sender || { name: 'Member', photo: null },
+      time: msg.time,
+      mediaUrl: msg.mediaUrl || null,
+      mediaType: msg.mediaType || null,
+    }
+    setPinnedMessages(prev => ({ ...prev, [chatKey]: pinPayload }))
+    pinSet(chatKey, pinPayload).catch(() => {
+      setModerationWarning('Could not pin message.')
+      setTimeout(() => setModerationWarning(''), 3000)
+    })
+  }
+
+  const handleUnpinMessage = (chatKey) => {
+    setPinnedMessages(prev => {
+      const next = { ...prev }
+      delete next[chatKey]
+      return next
+    })
+    pinSet(chatKey, null).catch(() => {
+      setModerationWarning('Could not unpin message.')
+      setTimeout(() => setModerationWarning(''), 3000)
+    })
+  }
   const editorRef = useRef(null)
   const savedRangeRef = useRef(null)
   const [fmtMenu, setFmtMenu] = useState(null)
@@ -9595,8 +9952,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const msgLongPressTimerRef = useRef(null)
   const msgTouchStartPosRef = useRef({ x: 0, y: 0 })
 
-  const handleMsgTouchStart = (e, msg, chatKey, canDelete) => {
-    if (selectedChatSystemLocked) return
+  const handleMsgTouchStart = (e, msg, chatKey, canDelete, isOwn, canPin, isPinned) => {
+    if (isReelmsSystemChat(selectedChat)) return
     const touch = e.touches?.[0]
     if (!touch) return
     msgTouchStartPosRef.current = { x: touch.clientX, y: touch.clientY }
@@ -9609,6 +9966,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         msgId: msg.id,
         chatKey,
         canDelete,
+        canPin: Boolean(canPin),
+        isPinned: Boolean(isPinned),
+        msgData: { id: msg.id, text: msg.text || '', sender: msg.sender, time: msg.time, mediaUrl: msg.mediaUrl, mediaType: msg.mediaType },
+        isOwn: Boolean(isOwn ?? (String(msg?.sender?.id || msg?.userId || '') === String(uid))),
+        msgText: msg.text || '',
         replyInfo: { id: msg.id, text: msg.text || '', senderName: msg.sender?.name || '', senderId: msg.sender?.id }
       })
     }, 450)
@@ -10421,6 +10783,57 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       setVoiceMuted(shouldStartMuted); setVoiceVideoOn(false); setVoiceScreenSharing(false)
       if (shouldStartMuted) addNotification('You joined as a listener. A moderator can make you a speaker.')
       vcRoomRef.current = { reelmId, channelId }
+
+      // SFU negotiation: Check if server provides LiveKit SFU for this voice room
+      const roomKey = `${reelmId}_${channelId}`
+      const authToken = await getIdToken().catch(() => null)
+      if (authToken) {
+        try {
+          const sfuData = await fetchVoiceToken(BACKEND_URL, authToken, roomKey, !shouldStartMuted)
+          if (sfuData?.sfuEnabled && sfuData?.token && sfuData?.url) {
+            const session = await createLivekitSession({
+              url: sfuData.url,
+              token: sfuData.token,
+              audioConstraints: { noiseSuppression, echoCancellation, autoGainControl: noiseSuppression },
+              onTrackSubscribed: (track, publication, participant) => {
+                const pId = participant.identity
+                if (track.kind === 'audio') {
+                  const mediaStream = new MediaStream([track.mediaStreamTrack])
+                  setVoiceParticipants(prev => {
+                    const exists = prev.some(p => String(p.userId) === String(pId))
+                    if (exists) return prev.map(p => String(p.userId) === String(pId) ? { ...p, stream: mediaStream } : p)
+                    return [...prev, { userId: pId, userName: participant.name || 'Member', userPhoto: null, isMuted: false, isVideoOn: false, stream: mediaStream }]
+                  })
+                  playRemoteStream(pId, mediaStream)
+                } else if (track.kind === 'video') {
+                  const mediaStream = new MediaStream([track.mediaStreamTrack])
+                  const isScreen = track.source === 'screen_share'
+                  setVoiceParticipants(prev => prev.map(p => String(p.userId) === String(pId)
+                    ? (isScreen ? { ...p, isScreenSharing: true, screenStream: mediaStream } : { ...p, isVideoOn: true, stream: mediaStream })
+                    : p
+                  ))
+                }
+              },
+              onActiveSpeakersChanged: (speakers) => {
+                const speakerIds = new Set(speakers.map(s => String(s.identity)))
+                setSpeakingUsers(speakerIds)
+              },
+              onParticipantDisconnected: (participant) => {
+                const pId = participant.identity
+                setVoiceParticipants(prev => prev.filter(p => String(p.userId) !== String(pId)))
+                stopRemoteAudio(pId)
+              },
+              onDisconnected: () => {
+                livekitSessionRef.current = null
+              },
+            })
+            livekitSessionRef.current = session
+          }
+        } catch (sfuErr) {
+          console.warn('[LiveKit SFU] Connection failed, continuing on P2P mesh:', sfuErr)
+        }
+      }
+
       // Announce join via Socket.IO — server broadcasts to room, replies come through handleVcEvent
       socketVcJoin(reelmId, channelId, currentUser.name, currentUser.photo || null)
       // Join spatial position channel
@@ -10453,6 +10866,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }
 
   const leaveVoiceChannel = () => {
+    if (livekitSessionRef.current) {
+      try { livekitSessionRef.current.disconnect() } catch { /* noop */ }
+      livekitSessionRef.current = null
+    }
     const vc = vcRoomRef.current
     if (vc) { socketVcLeave(vc.reelmId, vc.channelId); vcRoomRef.current = null }
     if (voiceChannel) { const k = `${voiceChannel.reelmId}_vc_${voiceChannel.channelId}`; socketLeaveChannel(k) }
@@ -12058,6 +12475,35 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     const richText = richMarkup && richMarkup !== text ? richMarkup : null
     const attach = pendingAttachment
     if (!text && !attach) return
+
+    // If currently editing an existing message
+    if (editingMessage) {
+      const editText = text
+      if (!editText) return
+      const eMsgId = editingMessage.id
+      const eChatKey = editingMessage.chatKey
+      setEditingMessage(null)
+      messageInputRef.current = ''
+      setMessageInput('')
+      if (editorRef.current) editorRef.current.innerHTML = ''
+      setFmtMenu(null)
+
+      // Optimistic update
+      setMessages(prev => ({
+        ...prev,
+        [eChatKey]: (prev[eChatKey] || []).map(m => String(m.id) === String(eMsgId)
+          ? { ...m, text: editText, isEdited: true, editedAt: Date.now() }
+          : m
+        )
+      }))
+
+      messageEdit(eChatKey, eMsgId, editText).catch(() => {
+        setModerationWarning('Message could not be edited.')
+        setTimeout(() => setModerationWarning(''), 3000)
+      })
+      return
+    }
+
     if (isReelmsSystemChat(selectedChat)) {
       setModerationWarning('Reelms System is a read-only server notification inbox.')
       return
@@ -12161,8 +12607,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     }
   }
 
-  // Clear pending attachment and reply state when switching channel or chat
-  useEffect(() => { setPendingAttachment(null); setReplyingTo(null); setMsgCtxMenu(null) }, [selectedChannel?.id, selectedChat?.id])
+  // Clear pending attachment, reply and edit state when switching channel or chat
+  useEffect(() => { setPendingAttachment(null); setReplyingTo(null); setEditingMessage(null); setMsgCtxMenu(null) }, [selectedChannel?.id, selectedChat?.id])
 
   // Track active chat key for sound routing
   useEffect(() => {
@@ -12585,8 +13031,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           </div>
           <div className="dashboard-top-actions">
             {!isMobile && (
-              <div className={`profile-card${showProfilePopup ? ' profile-card-active' : ''}`} onClick={() => setShowProfilePopup(true)} style={{ cursor: 'pointer' }}>
-                <img src={getPersonPhoto(currentUser) || avatarUIcon} alt="Avatar" className="profile-avatar" />
+              <div className={`profile-card${showProfilePopup ? ' profile-card-active' : ''}`} onClick={() => setShowProfilePopup(v => !v)} style={{ cursor: 'pointer' }}>
                 <div className="profile-info">
                   <div className="profile-name-row">
                     <span className={`profile-name${(currentUser.name || '').length > 14 ? ' profile-name--small' : ''}${spotifyNowPlaying ? ' profile-name--listening' : ''}`}>{currentUser.name}</span>
@@ -12602,6 +13047,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   {serverRole && <span className="profile-role">{serverRole}</span>}
                   {currentActivity?.name && <ActivityBadge activity={currentActivity} />}
                 </div>
+                <img src={getPersonPhoto(currentUser) || avatarUIcon} alt="Avatar" className="profile-avatar" />
               </div>
             )}
             <div className="header-icons-group">
@@ -12618,7 +13064,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   )}
                 </span>
               </button>
-              <button className="header-settings-btn" style={{ marginLeft: '5px' }} onClick={() => { setShowSettings(v => { if (!v) setSelectedSettingsCategory(null); return !v }); setSelectedReelm(null); setSelectedChat(null); setShowDiscover(false); setShowFriendsPanel(false) }}>
+              <button className="header-settings-btn" onClick={() => { setShowSettings(v => { if (!v) setSelectedSettingsCategory(null); return !v }); setSelectedReelm(null); setSelectedChat(null); setShowDiscover(false); setShowFriendsPanel(false) }}>
                 <SettingsIcon isNight={activeTheme.id === 'gece' || activeTheme.id === 'default'} />
               </button>
             </div>
@@ -12636,6 +13082,47 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             }}
           >
             <button className="msg-ctx-item" onClick={() => { setReplyingTo(msgCtxMenu.replyInfo); setMsgCtxMenu(null) }}>{t('reply')}</button>
+            {msgCtxMenu.isOwn && msgCtxMenu.msgText && !isReelmsSystemChat(selectedChat) && (
+              <button
+                className="msg-ctx-item"
+                onClick={() => {
+                  setEditingMessage({ id: msgCtxMenu.msgId, text: msgCtxMenu.msgText, chatKey: msgCtxMenu.chatKey })
+                  setMessageInput(msgCtxMenu.msgText)
+                  if (editorRef.current) editorRef.current.innerText = msgCtxMenu.msgText
+                  setMsgCtxMenu(null)
+                  setTimeout(() => {
+                    if (editorRef.current) {
+                      editorRef.current.focus()
+                      try {
+                        const range = document.createRange()
+                        const sel = window.getSelection()
+                        range.selectNodeContents(editorRef.current)
+                        range.collapse(false)
+                        sel.removeAllRanges()
+                        sel.addRange(range)
+                      } catch {}
+                    }
+                  }, 50)
+                }}
+              >
+                {t('edit')}
+              </button>
+            )}
+            {msgCtxMenu.canPin && !isReelmsSystemChat(selectedChat) && (
+              <button
+                className="msg-ctx-item"
+                onClick={() => {
+                  if (msgCtxMenu.isPinned) {
+                    handleUnpinMessage(msgCtxMenu.chatKey)
+                  } else {
+                    handlePinMessage(msgCtxMenu.chatKey, msgCtxMenu.msgData)
+                  }
+                  setMsgCtxMenu(null)
+                }}
+              >
+                {msgCtxMenu.isPinned ? t('unpin_message') : t('pin_message')}
+              </button>
+            )}
             {msgCtxMenu.canDelete && <button className="msg-ctx-item msg-ctx-item--danger" onClick={() => { modDeleteMessage(msgCtxMenu.chatKey, msgCtxMenu.msgId); setMsgCtxMenu(null) }}>{t('delete')}</button>}
           </div>
         )}
@@ -15406,6 +15893,41 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             </span>
                           </div>
                         )}
+                        {pinnedMessages[msgKey] && (
+                          <div
+                            className="channel-pinned-banner"
+                            onClick={() => {
+                              const pId = pinnedMessages[msgKey]?.id
+                              if (pId) {
+                                setNewMsgId(pId)
+                                setTimeout(() => setNewMsgId(null), 2000)
+                              }
+                            }}
+                          >
+                            <div className="channel-pinned-content">
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="channel-pinned-icon">
+                                <line x1="12" y1="17" x2="12" y2="22"/>
+                                <path d="M5 17h14v-1.76a2 2 0 0 0-1.11-1.79l-1.78-.9A2 2 0 0 1 15 10.76V6h1a2 2 0 0 0 0-4H8a2 2 0 0 0 0 4h1v4.76a2 2 0 0 1-1.11 1.79l-1.78.9A2 2 0 0 0 5 15.24Z"/>
+                              </svg>
+                              <div className="channel-pinned-text-wrap">
+                                <span className="channel-pinned-author">{pinnedMessages[msgKey].sender?.name || 'Member'}:</span>
+                                <span className="channel-pinned-snippet">{pinnedMessages[msgKey].text || (pinnedMessages[msgKey].mediaUrl ? '📎 Medya' : '')}</span>
+                              </div>
+                            </div>
+                            {canPinInChannel && (
+                              <button
+                                className="channel-pinned-unpin-btn"
+                                title={t('unpin_message') || 'Sabitlemeyi Kaldır'}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  handleUnpinMessage(msgKey)
+                                }}
+                              >
+                                <svg width="11" height="11" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
+                              </button>
+                            )}
+                          </div>
+                        )}
                         <div className="msg-list" ref={msgListRef}>
                           <div className="msg-list-spacer" />
                           {selectedChat && msgs.length === 0 && (
@@ -15417,217 +15939,36 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               <span>{t('e2ee_dm_notice')}</span>
                             </div>
                           )}
-                          {(() => {
-                            const isBubbleMode = !!selectedChat
-                            const formatTime = (t) => (t instanceof Date ? t : new Date(t)).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })
-                            const formatDateLabel = (t) => {
-                              const d = t instanceof Date ? t : new Date(t)
-                              const today = new Date(); today.setHours(0,0,0,0)
-                              const yesterday = new Date(today); yesterday.setDate(today.getDate()-1)
-                              const msgDay = new Date(d); msgDay.setHours(0,0,0,0)
-                              if (msgDay.getTime() === today.getTime()) return 'Today'
-                              if (msgDay.getTime() === yesterday.getTime()) return 'Yesterday'
-                              return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long' })
-                            }
-                            let lastDateLabel = null
-                            const msgKey2 = selectedChat ? selectedChat.id : composeReelmMsgKey(selectedReelm, selectedChannel)
-                            return msgs.map(msg => {
-                              const msgDateLabel = formatDateLabel(msg.time)
-                              const showDateSep = msgDateLabel !== lastDateLabel
-                              if (showDateSep) lastDateLabel = msgDateLabel
-                              const sender = (msg.sender && typeof msg.sender === 'object') ? msg.sender : { id: '', name: '?', photo: null, image: null }
-                              const isOwn = String(sender.id || '') === String(uid)
-                              const canDeleteMsg = !selectedChatSystemLocked && (isMod || isOwn || (selectedReelm && hasReelmPermissionClient(selectedReelm, uid, 'manageModeration')))
-                              if (msg.isSystem) return (
-                                <div key={msg.id} className={`msg-system-row${msg.id === newMsgId ? ' msg-row-new' : ''}`}>
-                                  <span className="msg-system-text">{msg.text}</span>
-                                  <span className="msg-system-time">{formatTime(msg.time)}</span>
-                                </div>
-                              )
-                              if (!isBubbleMode) return (
-                                <React.Fragment key={msg.id}>
-                                  {showDateSep && <div className="bubble-date-sep"><span>{msgDateLabel}</span></div>}
-                                <div
-                                  className={`msg-row${msg.id === newMsgId ? ' msg-row-new' : ''}${isMod ? ' msg-row-mod' : ''}${blocked.some(b => b.id === sender.id) ? ' msg-row-blocked' : ''}`}
-                                  onDoubleClick={() => !selectedChatSystemLocked && setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id })}
-                                  onContextMenu={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    if (!selectedChatSystemLocked) {
-                                      setMsgCtxMenu({
-                                        x: Math.min(e.clientX, window.innerWidth - 160),
-                                        y: Math.min(e.clientY, window.innerHeight - 120),
-                                        msgId: msg.id,
-                                        chatKey: msgKey2,
-                                        canDelete: canDeleteMsg,
-                                        replyInfo: { id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id }
-                                      })
-                                    }
-                                  }}
-                                  onTouchStart={(e) => handleMsgTouchStart(e, msg, msgKey2, canDeleteMsg)}
-                                  onTouchMove={handleMsgTouchMove}
-                                  onTouchEnd={handleMsgTouchEnd}
-                                >
-                                  <div className="msg-avatar">
-                                    {(sender.photo || sender.image)
-                                      ? <img src={sender.photo || sender.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-                                      : (sender.name || '?').charAt(0).toUpperCase()
-                                    }
-                                  </div>
-                                  <div className="msg-body">
-                                    <div className="msg-header">
-                                      <span className="msg-name">{sender.name}</span>
-                                      <span className="msg-time">{formatTime(msg.time)}</span>
-                                      {!selectedChatSystemLocked && <div className="msg-react-ctrl">
-                                        <button className="msg-react-btn msg-react-plus" title="+1" onClick={() => toggleReaction(msgKey2, msg.id, '+')}><img src={newIcon} alt="+" style={{ width: '12px', height: '12px', display: 'block', opacity: 0.65 }} /></button>
-                                        <div className="msg-react-emoji-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
-                                          <button className="msg-react-btn" title="Tepki ekle" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowMsgEmojiFor(f => f?.msgId === String(msg.id) ? null : { msgKey: msgKey2, msgId: String(msg.id) }); }}>
-                                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><path d="M8 14s1.5 2 4 2 4-2 4-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="9" cy="10" r="1" fill="currentColor"/><circle cx="15" cy="10" r="1" fill="currentColor"/></svg>
-                                          </button>
-                                          {showMsgEmojiFor?.msgId === String(msg.id) && (
-                                            <div className="msg-emoji-picker-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
-                                              <EmojiPickerReact emojiStyle={EmojiStyle.APPLE} height={320} width={280} searchDisabled previewConfig={{ showPreview: false }} onEmojiClick={d => toggleReaction(msgKey2, msg.id, d.emoji)} />
-                                            </div>
-                                          )}
-                                        </div>
-                                      </div>}
-                                    </div>
-                                    {msg.replyTo && (
-                                      <div className="msg-reply-quote">
-                                        <span className="msg-reply-quote-name">{msg.replyTo.senderName}</span>
-                                        <span className="msg-reply-quote-text">{msg.replyTo.text ? msg.replyTo.text.slice(0, 120) : '📎'}</span>
-                                      </div>
-                                    )}
-                                    {msg.text && <div className="msg-text">{renderRichMessage(msg.richText || msg.text, uid, selectedReelm?.members, selectedReelm?.roles, !!msg.richText)}</div>}
-                                    {msg.text && (() => { const ytId = extractYouTubeId(msg.text); return ytId ? (
-                                      <div className="msg-yt-embed">
-                                        <iframe
-                                          src={`https://www.youtube-nocookie.com/embed/${ytId}`}
-                                          title="YouTube video"
-                                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                                          allowFullScreen
-                                        />
-                                      </div>
-                                    ) : null })()}
-                                    {msg.mediaUrl && msg.mediaType === 'image' && <img src={msg.mediaUrl} alt="" className="msg-media-img" onClick={() => setLightboxImg(msg.mediaUrl)} />}
-                                    {msg.mediaUrl && msg.mediaType === 'video' && <video src={msg.mediaUrl} className="msg-media-video" controls />}
-                                    {msg.mediaUrl && msg.mediaType === 'audio' && <VoiceMessage src={msg.mediaUrl} />}
-                                    {msg.mediaUrl && (msg.mediaType === 'gif' || msg.mediaType === 'sticker') && <img src={msg.mediaUrl} alt="" className={msg.mediaType === 'sticker' ? 'msg-sticker-img' : 'msg-gif-img'} />}
-                                    {msg.fileUrl && (
-                                      <a href={msg.fileUrl} download={msg.fileName} className="msg-doc-card">
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                        <div className="msg-doc-info"><span className="msg-doc-name">{msg.fileName}</span><span className="msg-doc-size">{msg.fileSize ? (msg.fileSize/1024<1024 ? (msg.fileSize/1024).toFixed(1)+' KB' : (msg.fileSize/1048576).toFixed(1)+' MB') : ''}</span></div>
-                                      </a>
-                                    )}
-                                    {Object.keys(msgReactions[msgKey2]?.[String(msg.id)] || {}).length > 0 && (
-                                      <div className="msg-reactions">
-                                        {Object.entries(msgReactions[msgKey2]?.[String(msg.id)] || {}).map(([emoji, users]) => (
-                                          <button key={emoji} className={`${emoji === '+' ? 'reaction-pill--plus' : `reaction-pill${users.includes(String(uid)) ? ' reaction-pill--mine' : ''}`}`} onClick={() => toggleReaction(msgKey2, msg.id, emoji)}>
-                                            {emoji === '+' ? <span>+{users.length}</span> : <>{emoji} <span>{users.length}</span></>}
-                                          </button>
-                                        ))}
-                                      </div>
-                                    )}
-                                  </div>
-                                </div>
-                                </React.Fragment>
-                              )
-                              // Bubble mode (DM or group)
-                              return (
-                                <div key={msg.id}>
-                                  {showDateSep && <div className="bubble-date-sep"><span>{msgDateLabel}</span></div>}
-                                  <div
-                                    className={`bubble-row${isOwn ? ' bubble-row--own' : ' bubble-row--other'}${msg.id === newMsgId ? ' msg-row-new' : ''}`}
-                                    onDoubleClick={() => !selectedChatSystemLocked && setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id })}
-                                    onContextMenu={(e) => {
-                                      e.preventDefault();
-                                      e.stopPropagation();
-                                      if (!selectedChatSystemLocked) {
-                                        setMsgCtxMenu({
-                                          x: Math.min(e.clientX, window.innerWidth - 160),
-                                          y: Math.min(e.clientY, window.innerHeight - 120),
-                                          msgId: msg.id,
-                                          chatKey: msgKey2,
-                                          canDelete: canDeleteMsg,
-                                          replyInfo: { id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id }
-                                        })
-                                      }
-                                    }}
-                                    onTouchStart={(e) => handleMsgTouchStart(e, msg, msgKey2, canDeleteMsg)}
-                                    onTouchMove={handleMsgTouchMove}
-                                    onTouchEnd={handleMsgTouchEnd}
-                                  >
-                                    {!isOwn && (
-                                      <div className="bubble-avatar bubble-avatar--clickable" onClick={e => sender.id && openFriendProfile({ id: sender.id, name: sender.name, photo: sender.photo || sender.image || null }, e)}>
-                                        {(sender.photo || sender.image)
-                                          ? <img src={sender.photo || sender.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-                                          : (sender.name || '?').charAt(0).toUpperCase()
-                                        }
-                                      </div>
-                                    )}
-                                    <div className="bubble-content">
-                                      {!isOwn && selectedChat?.type === 'group' && <span className="bubble-sender-name">{sender.name}</span>}
-                                      <div className="bubble-and-time">
-                                        {msg.mediaUrl && (msg.mediaType === 'gif' || msg.mediaType === 'sticker') && !msg.text ? (
-                                          <img src={msg.mediaUrl} alt="" className={msg.mediaType === 'sticker' ? 'msg-sticker-img' : 'msg-gif-img'} />
-                                        ) : msg.mediaUrl && msg.mediaType === 'image' && !msg.text && !msg.fileUrl ? (
-                                          <img src={msg.mediaUrl} alt="" className="msg-media-img" onClick={() => setLightboxImg(msg.mediaUrl)} style={{ cursor: 'pointer' }} />
-                                        ) : (
-                                        <div className={`bubble${isOwn ? ' bubble--own' : ' bubble--other'}`}>
-                                          {msg.replyTo && (
-                                            <div className="msg-reply-quote msg-reply-quote--bubble">
-                                              <span className="msg-reply-quote-name">{msg.replyTo.senderName}</span>
-                                              <span className="msg-reply-quote-text">{msg.replyTo.text ? msg.replyTo.text.slice(0, 120) : '📎'}</span>
-                                            </div>
-                                          )}
-                                          {msg.text && <span className="bubble-text">{renderRichMessage(msg.richText || msg.text, uid, selectedReelm?.members, selectedReelm?.roles, !!msg.richText)}</span>}
-                                          {msg.mediaUrl && msg.mediaType === 'image' && <img src={msg.mediaUrl} alt="" className="msg-media-img" onClick={() => setLightboxImg(msg.mediaUrl)} />}
-                                          {msg.mediaUrl && msg.mediaType === 'video' && <video src={msg.mediaUrl} className="msg-media-video" controls />}
-                                          {msg.mediaUrl && msg.mediaType === 'audio' && <VoiceMessage src={msg.mediaUrl} />}
-                                          {msg.mediaUrl && (msg.mediaType === 'gif' || msg.mediaType === 'sticker') && <img src={msg.mediaUrl} alt="" className={msg.mediaType === 'sticker' ? 'msg-sticker-img' : 'msg-gif-img'} />}
-                                          {msg.fileUrl && (
-                                            <a href={msg.fileUrl} download={msg.fileName} className="msg-doc-card">
-                                              <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                              <div className="msg-doc-info"><span className="msg-doc-name">{msg.fileName}</span></div>
-                                            </a>
-                                          )}
-                                        </div>
-                                        )}
-                                        {!selectedChatSystemLocked && <div className="msg-react-ctrl">
-                                          <button className="msg-react-btn msg-react-plus" title="+1" onClick={() => toggleReaction(msgKey2, msg.id, '+')}><img src={newIcon} alt="+" style={{ width: '12px', height: '12px', display: 'block', opacity: 0.65 }} /></button>
-                                          <div className="msg-react-emoji-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
-                                            <button className="msg-react-btn" title="Tepki ekle" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowMsgEmojiFor(f => f?.msgId === String(msg.id) ? null : { msgKey: msgKey2, msgId: String(msg.id) }); }}>
-                                              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><path d="M8 14s1.5 2 4 2 4-2 4-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="9" cy="10" r="1" fill="currentColor"/><circle cx="15" cy="10" r="1" fill="currentColor"/></svg>
-                                            </button>
-                                            {showMsgEmojiFor?.msgId === String(msg.id) && (
-                                              <div className="msg-emoji-picker-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
-                                                <EmojiPickerReact emojiStyle={EmojiStyle.APPLE} height={320} width={280} searchDisabled previewConfig={{ showPreview: false }} onEmojiClick={d => toggleReaction(msgKey2, msg.id, d.emoji)} />
-                                              </div>
-                                            )}
-                                          </div>
-                                        </div>}
-                                        <span className="bubble-time">{formatTime(msg.time)}</span>
-                                      </div>
-                                      {Object.keys(msgReactions[msgKey2]?.[String(msg.id)] || {}).length > 0 && (
-                                        <div className="msg-reactions msg-reactions--bubble">
-                                          {Object.entries(msgReactions[msgKey2]?.[String(msg.id)] || {}).map(([emoji, users]) => (
-                                            <button key={emoji} className={`reaction-pill${users.includes(String(uid)) ? ' reaction-pill--mine' : ''}`} onClick={() => toggleReaction(msgKey2, msg.id, emoji)}>
-                                              {emoji} <span>{users.length}</span>
-                                            </button>
-                                          ))}
-                                        </div>
-                                      )}
-                                    </div>
-                                  </div>
-                                  {isOwn && dmReadReceipts[msgKey2] && String(dmReadReceipts[msgKey2].lastMsgId) === String(msg.id) && dmReadReceipts[msgKey2].photo && (
-                                    <div className="bubble-read-receipt">
-                                      <img src={dmReadReceipts[msgKey2].photo} alt="" className="bubble-receipt-avatar" />
-                                    </div>
-                                  )}
-                                </div>
-                              )
-                            })
-                          })()}
+                          {msgs.length > 0 && (
+                            <VirtualMessageList
+                              msgs={msgs}
+                              isBubbleMode={!!selectedChat}
+                              uid={uid}
+                              isMod={isMod}
+                              blocked={blocked}
+                              selectedChatSystemLocked={selectedChatSystemLocked}
+                              selectedReelm={selectedReelm}
+                              selectedChat={selectedChat}
+                              msgKey2={msgKey}
+                              newMsgId={newMsgId}
+                              t={t}
+                              canPinInChannel={canPinInChannel}
+                              pinnedMessage={pinnedMessages[msgKey]}
+                              setReplyingTo={setReplyingTo}
+                              setMsgCtxMenu={setMsgCtxMenu}
+                              handleMsgTouchStart={handleMsgTouchStart}
+                              handleMsgTouchMove={handleMsgTouchMove}
+                              handleMsgTouchEnd={handleMsgTouchEnd}
+                              toggleReaction={toggleReaction}
+                              showMsgEmojiFor={showMsgEmojiFor}
+                              setShowMsgEmojiFor={setShowMsgEmojiFor}
+                              setLightboxImg={setLightboxImg}
+                              openFriendProfile={openFriendProfile}
+                              dmReadReceipts={dmReadReceipts}
+                              msgReactions={msgReactions}
+                              msgListRef={msgListRef}
+                            />
+                          )}
                         </div>
                         {(() => {
                           const tMsgKey = selectedChat ? selectedChat.id : composeReelmMsgKey(selectedReelm, selectedChannel)
@@ -15774,6 +16115,25 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               </button>
                             </div>
                           )}
+                          {editingMessage && (
+                            <div className="msg-reply-banner msg-edit-banner">
+                              <div className="msg-reply-banner-content">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                  <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                  <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                                </svg>
+                                <span className="msg-reply-banner-name">{t('editing_message')}</span>
+                                <span className="msg-reply-banner-text">{editingMessage.text ? editingMessage.text.slice(0, 80) : ''}</span>
+                              </div>
+                              <button className="msg-reply-banner-cancel" onClick={() => {
+                                setEditingMessage(null)
+                                setMessageInput('')
+                                if (editorRef.current) editorRef.current.innerText = ''
+                              }}>
+                                <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/></svg>
+                              </button>
+                            </div>
+                          )}
                           {isMobile && selectedReelm && (
                             <div className="mobile-reelm-input-nav">
                               <div className="mobile-rin-left">
@@ -15838,6 +16198,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 document.execCommand('insertText', false, txt)
                               }}
                               onKeyDown={e => {
+                                if (e.key === 'Escape' && editingMessage) {
+                                  e.preventDefault()
+                                  setEditingMessage(null)
+                                  setMessageInput('')
+                                  if (editorRef.current) editorRef.current.innerText = ''
+                                  return
+                                }
                                 if (slashMenu && slashOptions.length > 0) {
                                   if (e.key === 'ArrowDown') { e.preventDefault(); setSlashSelIdx(i => Math.min(i + 1, slashOptions.length - 1)); return }
                                   else if (e.key === 'ArrowUp') { e.preventDefault(); setSlashSelIdx(i => Math.max(i - 1, 0)); return }
@@ -16520,19 +16887,82 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       </div>
 
                       {allNodes.length > 0 ? (
-                        <div className="floating-hub-stage">
+                        <div className="floating-hub-stage floating-hub-stage--magnetic">
+                          {allNodes.length > 2 && (
+                            <div className="magnetic-field-rings" aria-hidden="true">
+                              <div className="magnetic-ring magnetic-ring-1" />
+                              {allNodes.length > 5 && <div className="magnetic-ring magnetic-ring-2" />}
+                              {allNodes.length > 13 && <div className="magnetic-ring magnetic-ring-3" />}
+                            </div>
+                          )}
                           {allNodes.map((node, index) => {
                             const driftClass = `floating-node-drift-${index % 6}`
                             const hasUnread = node.unread > 0
-                            const sizeClass = hasUnread
-                              ? 'floating-node--size-large'
-                              : (node.isLongInactive ? 'floating-node--size-small' : 'floating-node--size-normal')
+                            const pos = (() => {
+                              const total = allNodes.length
+                              if (total === 1) return { x: 0, y: 0, ring: 0, isCenter: true }
+
+                              // 2 nodes: Side by side, centered horizontally
+                              if (total === 2) {
+                                const gap = isMobile ? 60 : 86
+                                return {
+                                  x: index === 0 ? -gap : gap,
+                                  y: 0,
+                                  ring: 1,
+                                  isCenter: false,
+                                }
+                              }
+
+                              // 3+ nodes: Central core (index 0) + radial magnetic orbits (rings 1, 2, 3)
+                              if (index === 0) return { x: 0, y: 0, ring: 0, isCenter: true }
+                              let ring = 1
+                              let ringIndex = 0
+                              let ringTotal = 0
+                              let radius = isMobile ? 88 : 142
+                              const yRatio = isMobile ? 0.88 : 0.78
+
+                              if (index <= 4 || total <= 5) {
+                                ring = 1
+                                ringIndex = index - 1
+                                ringTotal = Math.min(total - 1, 4)
+                                radius = total <= 3 ? (isMobile ? 80 : 126) : (isMobile ? 90 : 142)
+                                const angleOffset = -Math.PI / 2 + (ringTotal % 2 === 0 ? Math.PI / ringTotal : 0)
+                                const angle = angleOffset + (ringIndex * (2 * Math.PI / ringTotal))
+                                return { x: Math.round(Math.cos(angle) * radius), y: Math.round(Math.sin(angle) * radius * yRatio), ring, isCenter: false }
+                              } else if (index <= 12) {
+                                ring = 2
+                                ringIndex = index - 5
+                                ringTotal = Math.min(total - 5, 8)
+                                radius = isMobile ? 148 : 238
+                                const angleOffset = -Math.PI / 3
+                                const angle = angleOffset + (ringIndex * (2 * Math.PI / ringTotal))
+                                return { x: Math.round(Math.cos(angle) * radius), y: Math.round(Math.sin(angle) * radius * yRatio), ring, isCenter: false }
+                              } else {
+                                ring = 3
+                                ringIndex = index - 13
+                                ringTotal = total - 13
+                                radius = isMobile ? 195 : 325
+                                const angleOffset = -Math.PI / 4
+                                const angle = angleOffset + (ringIndex * (2 * Math.PI / ringTotal))
+                                return { x: Math.round(Math.cos(angle) * radius), y: Math.round(Math.sin(angle) * radius * yRatio), ring, isCenter: false }
+                              }
+                            })()
+
+                            const sizeClass = pos.isCenter
+                              ? (hasUnread ? 'floating-node--size-large' : 'floating-node--size-center-normal')
+                              : (hasUnread
+                                  ? 'floating-node--size-large'
+                                  : (node.isLongInactive ? 'floating-node--size-small' : 'floating-node--size-normal'))
 
                             return (
                               <button
                                 key={node.id}
                                 type="button"
-                                className={`floating-node ${driftClass} ${sizeClass}${hasUnread ? ' floating-node--has-unread' : ''}`}
+                                className={`floating-node floating-node--magnetic ${pos.isCenter ? 'floating-node--center' : ''} ${sizeClass}${hasUnread ? ' floating-node--has-unread' : ''}`}
+                                style={{
+                                  '--node-x': `${pos.x}px`,
+                                  '--node-y': `${pos.y}px`,
+                                }}
                                 onClick={() => {
                                   if (node.type === 'reelm') {
                                     handleSelectReelm(node.item)
@@ -16547,43 +16977,45 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 }}
                                 title={`${node.name}${hasUnread ? ` (${node.unread} yeni mesaj)` : ''}`}
                               >
-                                <div className="floating-node-orb">
-                                  {node.image ? (
-                                    <img src={node.image} alt={node.name} className="floating-node-avatar-img" />
-                                  ) : (
-                                    <span className="floating-node-avatar-letter">
-                                      {(node.name || '?').charAt(0)}
-                                    </span>
-                                  )}
-
-                                  {/* Small indicator icon for item type */}
-                                  <div className="floating-node-type-indicator">
-                                    {node.type === 'reelm' ? (
-                                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
-                                        <line x1="4" y1="22" x2="4" y2="15"/>
-                                      </svg>
-                                    ) : node.isGroup ? (
-                                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                                        <circle cx="9" cy="7" r="4"/>
-                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-                                      </svg>
+                                <div className={`floating-node-inner ${driftClass}`}>
+                                  <div className="floating-node-orb">
+                                    {node.image ? (
+                                      <img src={node.image} alt={node.name} className="floating-node-avatar-img" />
                                     ) : (
-                                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                                        <circle cx="12" cy="7" r="4"/>
-                                      </svg>
+                                      <span className="floating-node-avatar-letter">
+                                        {(node.name || '?').charAt(0)}
+                                      </span>
+                                    )}
+
+                                    {/* Small indicator icon for item type */}
+                                    <div className="floating-node-type-indicator">
+                                      {node.type === 'reelm' ? (
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                                          <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/>
+                                          <line x1="4" y1="22" x2="4" y2="15"/>
+                                        </svg>
+                                      ) : node.isGroup ? (
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                                          <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                                          <circle cx="9" cy="7" r="4"/>
+                                          <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                                          <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                                        </svg>
+                                      ) : (
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+                                          <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                          <circle cx="12" cy="7" r="4"/>
+                                        </svg>
+                                      )}
+                                    </div>
+
+                                    {/* Unread badge on top right */}
+                                    {hasUnread && (
+                                      <span className="floating-node-badge">
+                                        {capBadge(node.unread)}
+                                      </span>
                                     )}
                                   </div>
-
-                                  {/* Unread badge on top right */}
-                                  {hasUnread && (
-                                    <span className="floating-node-badge">
-                                      {capBadge(node.unread)}
-                                    </span>
-                                  )}
                                 </div>
                                 <div className="floating-node-tooltip">
                                   <span>{node.name}</span>

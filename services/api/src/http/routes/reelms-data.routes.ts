@@ -3028,6 +3028,81 @@ export function createReelmsDataRouter(io: Server) {
     } catch { res.status(500).json({ error: 'delete_failed' }) }
   })
 
+  router.patch('/messages/:msgKey/:msgId', async (req, res) => {
+    try {
+      const uid = String(req.userId)
+      const msgKey = decodeURIComponent(req.params.msgKey)
+      const access = await getMessageKeyAccess(uid, msgKey)
+      if (access.ok === false) return res.status(access.reason === 'invalid_key' ? 400 : 403).json({ error: access.reason })
+      if (access.kind === 'dm' && isSystemInboxDmKey(msgKey)) return res.status(403).json({ error: 'system_inbox_locked', code: 'system/inbox-locked' })
+
+      const msgId = req.params.msgId
+      const newText = String(req.body?.text || '').trim()
+      if (!newText) return res.status(400).json({ error: 'text_required' })
+
+      const items = await queryDocs(chanPk(msgKey), 'MSG#')
+      const target = items.find((i: any) => (i.data as any)?.id == msgId)
+      if (!target) return res.status(404).json({ error: 'message_not_found' })
+      const data = target.data as any
+      const authorId = String(data?.userId || data?.authorId || data?.sender?.id || '')
+      if (authorId !== uid) return res.status(403).json({ error: 'forbidden' })
+
+      const updatedMsg = {
+        ...data,
+        text: newText,
+        isEdited: true,
+        editedAt: Date.now(),
+      }
+
+      await putDoc(chanPk(msgKey), target.sk, updatedMsg)
+      const payload = { msgKey, msgId, message: updatedMsg }
+      io.to(`chan:${msgKey}`).emit('reelms:message-edited', payload)
+      if (access.kind === 'reelm') io.to(`reelm:${access.reelmId}`).emit('reelms:message-edited', payload)
+      res.json({ ok: true, message: updatedMsg })
+    } catch { res.status(500).json({ error: 'edit_failed' }) }
+  })
+
+  router.get('/pins/:msgKey', async (req, res) => {
+    try {
+      const uid = String(req.userId)
+      const msgKey = decodeURIComponent(req.params.msgKey)
+      const access = await getMessageKeyAccess(uid, msgKey)
+      if (access.ok === false) return res.status(access.reason === 'invalid_key' ? 400 : 403).json({ error: access.reason })
+      const pinned = await getDoc(chanPk(msgKey), 'PINNED_MESSAGE')
+      res.json({ pinnedMessage: pinned || null })
+    } catch { res.status(500).json({ error: 'get_pins_failed' }) }
+  })
+
+  router.post('/pins/:msgKey', async (req, res) => {
+    try {
+      const uid = String(req.userId)
+      const msgKey = decodeURIComponent(req.params.msgKey)
+      const access = await getMessageKeyAccess(uid, msgKey)
+      if (access.ok === false) return res.status(access.reason === 'invalid_key' ? 400 : 403).json({ error: access.reason })
+      if (access.kind === 'dm' && isSystemInboxDmKey(msgKey)) return res.status(403).json({ error: 'system_inbox_locked', code: 'system/inbox-locked' })
+
+      if (access.kind === 'reelm') {
+        const canPin = (await canUseReelmPermission(uid, access.reelmId, 'pinMessages').catch(() => false))
+          || (await canUseReelmPermission(uid, access.reelmId, 'manageModeration').catch(() => false))
+          || (await canManageReelm(uid, access.reelmId).catch(() => false))
+          || (await isSystemAdminUid(uid).catch(() => false))
+        if (!canPin) return res.status(403).json({ error: 'forbidden' })
+      }
+
+      const pinnedMessage = req.body?.pinnedMessage || null
+      if (pinnedMessage) {
+        await putDoc(chanPk(msgKey), 'PINNED_MESSAGE', pinnedMessage)
+      } else {
+        await deleteDoc(chanPk(msgKey), 'PINNED_MESSAGE')
+      }
+
+      const payload = { msgKey, pinnedMessage }
+      io.to(`chan:${msgKey}`).emit('reelms:pinned-message', payload)
+      if (access.kind === 'reelm') io.to(`reelm:${access.reelmId}`).emit('reelms:pinned-message', payload)
+      res.json({ ok: true, pinnedMessage })
+    } catch { res.status(500).json({ error: 'pin_failed' }) }
+  })
+
   router.get('/reactions/:msgKey', async (req, res) => {
     try {
       const msgKey = decodeURIComponent(req.params.msgKey)

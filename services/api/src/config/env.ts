@@ -81,6 +81,10 @@ const schema = z.object({
   TURN_USERNAME: optionalString(),
   TURN_CREDENTIAL: optionalString(),
 
+  LIVEKIT_URL: optionalString(),
+  LIVEKIT_API_KEY: optionalString(),
+  LIVEKIT_API_SECRET: optionalString(),
+
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
   LOG_FORMAT: z.enum(['pretty', 'json']).default('pretty'),
 

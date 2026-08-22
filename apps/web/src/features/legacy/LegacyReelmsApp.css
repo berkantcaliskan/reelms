@@ -284,7 +284,7 @@ h6 {
 .header-icons-group {
   display: flex;
   align-items: center;
-  gap: 18px;
+  gap: 16px;
 }
 
 @keyframes hpopup-float-pop {
@@ -1165,7 +1165,7 @@ h6 {
   box-shadow: 0 0 8px #e85a35;
 }
 
-/* Floating Stage & Constellation Cluster */
+/* Floating Stage & Magnetic Field Cluster */
 .floating-hub-stage {
   display: flex;
   flex-wrap: wrap;
@@ -1177,6 +1177,64 @@ h6 {
   position: relative;
   z-index: 5;
   padding: 16px;
+}
+
+.floating-hub-stage--magnetic {
+  position: relative;
+  width: 100%;
+  max-width: 720px;
+  height: 380px;
+  min-height: 340px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Magnetic Orbital Background Rings */
+.magnetic-field-rings {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.magnetic-ring {
+  position: absolute;
+  border-radius: 50%;
+  border: 1px dashed rgba(var(--ta-rgb), 0.12);
+  pointer-events: none;
+  animation: magneticRingPulse 12s ease-in-out infinite alternate;
+}
+
+.magnetic-ring-1 {
+  width: 270px;
+  height: 210px;
+  border-color: rgba(var(--ta-rgb), 0.13);
+}
+
+.magnetic-ring-2 {
+  width: 460px;
+  height: 360px;
+  border-color: rgba(var(--ta-rgb), 0.08);
+}
+
+.magnetic-ring-3 {
+  width: 630px;
+  height: 490px;
+  border-color: rgba(var(--ta-rgb), 0.05);
+}
+
+@keyframes magneticRingPulse {
+  0% { transform: scale(0.98); opacity: 0.7; }
+  50% { transform: scale(1.02); opacity: 1; }
+  100% { transform: scale(0.98); opacity: 0.7; }
 }
 
 /* Individual Floating Node */
@@ -1191,13 +1249,41 @@ h6 {
   cursor: pointer;
   position: relative;
   outline: none;
-  transition: transform 0.28s cubic-bezier(0.34, 1.56, 0.64, 1), z-index 0.2s ease;
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1), z-index 0.2s ease;
   will-change: transform;
 }
 
-.floating-node:hover {
-  transform: scale(1.14) !important;
-  z-index: 30;
+.floating-node--magnetic {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(calc(-50% + var(--node-x, 0px)), calc(-50% + var(--node-y, 0px)));
+  z-index: 10;
+}
+
+.floating-node--magnetic:hover {
+  transform: translate(calc(-50% + var(--node-x, 0px)), calc(-50% + var(--node-y, 0px))) scale(1.18) !important;
+  z-index: 50;
+}
+
+/* Center core node extra magnetic aura */
+.floating-node--center {
+  z-index: 25;
+}
+
+.floating-node--center .floating-node-orb {
+  box-shadow: 0 14px 38px rgba(0, 0, 0, 0.45), 0 0 28px rgba(var(--ta-rgb), 0.36), inset 0 1px 0 rgba(255, 255, 255, 0.22);
+}
+
+.floating-node--center.floating-node--has-unread .floating-node-orb {
+  box-shadow: 0 16px 42px rgba(0, 0, 0, 0.5), 0 0 34px rgba(232, 90, 53, 0.48), inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.floating-node-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative;
 }
 
 /* Fully Circular Orbs */
@@ -1264,6 +1350,16 @@ h6 {
   min-width: 24px;
   height: 24px;
   font-size: 12px;
+}
+
+/* Center normal (when center node has no unread): 82px */
+.floating-node--size-center-normal .floating-node-orb {
+  width: 82px;
+  height: 82px;
+  border-color: rgba(var(--ta-rgb), 0.35);
+}
+.floating-node--size-center-normal .floating-node-avatar-letter {
+  font-size: 1.75rem;
 }
 
 /* 2. Normal (Baseline / Inactive for some time): 68px */
@@ -2928,13 +3024,14 @@ h6 {
 .profile-card {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 4px 24px 4px 6px;
-  border-radius: 30px;
+  gap: 8px;
+  padding: 2px 0 2px 10px;
+  border-radius: 20px;
   cursor: pointer;
   transition: background 0.2s ease;
-  width: 100%;
-  transform: translateX(-40px);
+  width: auto;
+  max-width: 260px;
+  transform: none;
 }
 
 .profile-card:hover {
@@ -2942,16 +3039,18 @@ h6 {
 }
 
 .profile-avatar {
-  width: 42px;
-  height: 42px;
+  width: 28px;
+  height: 28px;
   border-radius: 50%;
   flex-shrink: 0;
   object-fit: cover;
+  display: block;
 }
 
 .profile-info {
   display: flex;
   flex-direction: column;
+  align-items: flex-end;
   gap: 0;
   min-width: 0;
   flex: 1;
@@ -2961,7 +3060,8 @@ h6 {
 .profile-name-row {
   display: flex;
   align-items: center;
-  gap: 7px;
+  justify-content: flex-end;
+  gap: 6px;
 }
 
 .profile-name {
@@ -3035,9 +3135,7 @@ h6 {
 
 /* Profile Card active state */
 .profile-card-active {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease;
+  background: rgba(24, 22, 24, 0.45);
 }
 
 @keyframes profilePopupIn {
@@ -6662,6 +6760,17 @@ h6 {
   mask-image: linear-gradient(to bottom, transparent 0px, transparent 54px, black 72px);
 }
 .msg-list-spacer { flex: 1; min-height: 0; }
+
+.msg-virtual-container {
+  width: 100%;
+  position: relative;
+  contain: layout paint;
+}
+
+.msg-virtual-row {
+  box-sizing: border-box;
+  padding-bottom: 12px;
+}
 
 .e2ee-dm-notice {
   display: flex;
@@ -16029,6 +16138,90 @@ button, input, select, textarea,
 .msg-reply-banner-cancel:hover {
   color: rgba(var(--ta-rgb), 0.9);
   background: rgba(var(--ta-rgb), 0.1);
+}
+
+.msg-edit-banner {
+  background: rgba(var(--ta-rgb), 0.14);
+  border-color: rgba(var(--ta-rgb), 0.28);
+}
+
+.msg-edited-tag {
+  display: inline-block;
+  margin-left: 6px;
+  font-size: 0.72rem;
+  font-style: italic;
+  opacity: 0.65;
+  color: var(--text-fg, var(--ta));
+  user-select: none;
+}
+
+.channel-pinned-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
+  margin: 4px 16px 6px;
+  background: rgba(var(--ta-rgb), 0.1);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid rgba(var(--ta-rgb), 0.18);
+  border-radius: 12px;
+  cursor: pointer;
+  z-index: 10;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.channel-pinned-banner:hover {
+  background: rgba(var(--ta-rgb), 0.16);
+  border-color: rgba(var(--ta-rgb), 0.28);
+}
+.channel-pinned-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+.channel-pinned-icon {
+  color: var(--ta);
+  flex-shrink: 0;
+}
+.channel-pinned-text-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.78rem;
+}
+.channel-pinned-author {
+  font-weight: 700;
+  color: var(--ta);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.channel-pinned-snippet {
+  color: rgba(var(--ta-rgb), 0.75);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.channel-pinned-unpin-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: rgba(var(--ta-rgb), 0.45);
+  padding: 4px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-left: 8px;
+  transition: color 0.15s, background 0.15s;
+}
+.channel-pinned-unpin-btn:hover {
+  color: rgba(var(--ta-rgb), 0.95);
+  background: rgba(var(--ta-rgb), 0.15);
 }
 
 /* msg-outer-row: wraps msg-bar + spotify inline bar side by side */

@@ -65,6 +65,7 @@ export type ReelmPermissionKey =
   | 'manageInvites'
   | 'manageJoinRequests'
   | 'manageModeration'
+  | 'pinMessages'
   | 'manageReelm'
 
 const REELM_ELEVATED_ROLE_RE = /admin|owner|founder|moderator/i
