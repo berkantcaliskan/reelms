@@ -8796,48 +8796,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     }
   }
 
+  // Clear any stale pending deeplinks so app never auto-selects or redirects to a reelm on startup
   useEffect(() => {
-    const pending = sessionStorage.getItem('reelms_pending_deeplink')
-    if (!pending || reelms.length === 0) return
-    sessionStorage.removeItem('reelms_pending_deeplink')
-    try {
-      const { type, value } = JSON.parse(pending)
-      if (type === 'reelm') {
-        const code = String(value).toUpperCase()
-        const found = reelms.find(r => r.code === code)
-        if (found) { setSelectedReelm(found); setShowFeed(false) }
-        else {
-          // Not in user's list — show join modal pre-filled
-          setJoinCodeInput(code)
-          setCreateReelmStep('joining')
-          setShowMenu(true)
-        }
-      } else if (type === 'user') {
-        const qv = String(value).trim().toLowerCase()
-        userByUsername(qv).then((profile) => {
-          if (profile) {
-            setDiscoverQuery(value)
-            setShowDiscover(true)
-          }
-        }).catch(() => {})
-      } else if (type === 'channel') {
-        let foundReelm = null
-        let foundChannel = null
-        for (const r of reelms) {
-          for (const cat of (r.categories || [])) {
-            const ch = (cat.channels || []).find(c => c.id === value)
-            if (ch) { foundReelm = r; foundChannel = ch; break }
-          }
-          if (foundChannel) break
-        }
-        if (foundReelm && foundChannel) { setSelectedReelm(foundReelm); setSelectedChannel(foundChannel); setShowFeed(false) }
-      } else if (type === 'post') {
-        setShowFeed(true)
-        setSelectedReelm(null)
-        sessionStorage.setItem('reelms_highlight_post', value)
-      }
-    } catch { /* noop */ }
-  }, [reelms])
+    try { sessionStorage.removeItem('reelms_pending_deeplink') } catch { /* noop */ }
+  }, [])
 
   // Spotify — detect OAuth callback and start/stop polling
   useEffect(() => {
