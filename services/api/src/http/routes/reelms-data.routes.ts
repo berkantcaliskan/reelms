@@ -7,7 +7,8 @@ import { authenticate } from '../middleware/authenticate.js'
 import { apiRateLimit } from '../middleware/rateLimit.js'
 import { verifyIdToken } from '../../modules/auth/authService.js'
 import { APP_PK, chanPk, deleteDoc, getDoc, putDoc, putDocIfAbsent, queryDocs, reelmPk, scanByPkPrefix, scanByPkPrefixAndSk, userPk } from '../../modules/store/docStore.js'
-import { canManageReelm, canUseReelmPermission, getActiveReelmTimeout, getMessageKeyAccess, getUserPublicProfile as getStoredPublicProfile, isReelmMember, normalizeEmail, normalizeUsername, publicProfileFromStored } from '../../modules/reelms/access.js'
+import { canManageReelm, canUseReelmPermission, getActiveReelmTimeout, getMessageKeyAccess, getReelmChannel, getUserPublicProfile as getStoredPublicProfile, isReelmMember, normalizeEmail, normalizeUsername, publicProfileFromStored } from '../../modules/reelms/access.js'
+import { recordReelmAuditLog, getReelmAuditLogs } from '../../modules/reelms/auditLog.js'
 import { autoJoinDefaultReelm, DEFAULT_REELM_ID, hasLeftDefaultReelm, setDefaultReelmLeft } from '../../modules/reelms/defaultReelm.js'
 import { isCommunityAdminUid, isSystemAdminUid, resolveCommunityAdminUids } from '../../modules/reelms/communityAdmins.js'
 import { buildUserUploadKey, getObjectStorage } from '../../modules/storage/objectStorage.js'
@@ -809,7 +810,8 @@ export function createReelmsDataRouter(io: Server) {
   }
 
   const sanitizeMessageForWrite = async (uid: string, raw: any) => {
-    const sender = await getSenderProfile(uid)
+    const isSystem = raw?.isSystem === true || raw?.sender?.id === 'system'
+    const sender = isSystem ? { id: 'system', name: 'Reelms', photo: null } : await getSenderProfile(uid)
     const now = Date.now()
     const rawTime = Number(raw?.time || raw?.createdAt || now)
     const safeTime = Number.isFinite(rawTime) && Math.abs(rawTime - now) < 1000 * 60 * 60 * 24 ? rawTime : now
@@ -821,9 +823,9 @@ export function createReelmsDataRouter(io: Server) {
       id,
       ...(text != null ? { text } : {}),
       sender,
-      userId: uid,
+      userId: isSystem ? 'system' : uid,
       authorId: uid,
-      isSystem: false,
+      isSystem,
       time: safeTime
     }
   }
@@ -2149,6 +2151,26 @@ export function createReelmsDataRouter(io: Server) {
     }
   })
 
+  router.get('/reelms/:reelmId/audit-log', async (req, res) => {
+    try {
+      const uid = String(req.userId)
+      const reelmId = String(req.params.reelmId || '')
+      if (!await canUseReelmPermission(uid, reelmId, 'viewAuditLog')) {
+        return res.status(403).json({ error: 'forbidden' })
+      }
+      const filter = {
+        action: typeof req.query.action === 'string' ? req.query.action : undefined,
+        actorId: typeof req.query.actorId === 'string' ? req.query.actorId : undefined,
+        search: typeof req.query.search === 'string' ? req.query.search : undefined,
+        startDate: typeof req.query.startDate === 'string' ? Number(req.query.startDate) : undefined,
+        endDate: typeof req.query.endDate === 'string' ? Number(req.query.endDate) : undefined,
+        limit: typeof req.query.limit === 'string' ? Number(req.query.limit) : 50
+      }
+      const data = await getReelmAuditLogs(reelmId, filter)
+      res.json({ data })
+    } catch { res.status(500).json({ error: 'audit_log_failed' }) }
+  })
+
   router.get('/reelms/:reelmId/ban-list', async (req, res) => {
     try {
       const reelmId = String(req.params.reelmId || '')
@@ -2216,6 +2238,15 @@ export function createReelmsDataRouter(io: Server) {
       io.to(`reelm:${reelmId}`).emit('reelm:member-removed', { reelmId, userId: targetUid, banned: true })
       io.to(`u:${targetUid}`).emit('reelm:banned', { reelmId, name: meta.name || null, message: banMessage })
       await pushUserNotification(targetUid, banMessage, { type: 'reelm_banned', reelmId, message: banMessage }).catch(() => {})
+
+      recordReelmAuditLog(reelmId, {
+        action: 'MEMBER_BAN',
+        actor: { id: actorUid },
+        target: { id: targetUid, name: profile.name || profile.username || 'Member', type: 'user' },
+        reason,
+        details: { summary: `Banned @${profile.username || profile.name || targetUid}${reason ? ` (Reason: ${reason})` : ''}` }
+      }, io)
+
       res.json({ data: { banned: true, banList: nextBanList } })
     } catch (err) {
       console.error('/api/v1/reelms/ban error:', err)
@@ -2256,6 +2287,15 @@ export function createReelmsDataRouter(io: Server) {
       void syncReelmMemberCopies(reelmId).catch(() => {})
       emitReelm(reelmId, 'members')
       io.to(`reelm:${reelmId}`).emit('reelm:member-removed', { reelmId, userId: targetUid, reason: reason || null })
+
+      recordReelmAuditLog(reelmId, {
+        action: 'MEMBER_KICK',
+        actor: { id: actorUid },
+        target: { id: targetUid, name: targetMember?.userName || targetMember?.name || 'Member', type: 'user' },
+        reason,
+        details: { summary: `Removed member ${targetMember?.userName || targetMember?.name || targetUid}${reason ? ` (Reason: ${reason})` : ''}` }
+      }, io)
+
       res.json({ data: { removed: true, members: filterMembersForClient(nextMembers, await getBanList(reelmId)) } })
     } catch (err) {
       console.error('/api/v1/reelms/remove-member error:', err)
@@ -2272,6 +2312,7 @@ export function createReelmsDataRouter(io: Server) {
       if (!await canUseReelmPermission(actorUid, reelmId, 'manageModeration')) return res.status(403).json({ error: 'forbidden' })
       const pk = reelmPk(reelmId)
       const currentBanList = await getBanList(reelmId)
+      const unbannedEntry = currentBanList.find((entry: any) => String(entry?.userId || entry?.id || '') === targetUid)
       const nextBanList = currentBanList.filter((entry: any) => String(entry?.userId || entry?.id || '') !== targetUid)
       await putDoc(pk, 'ban_list', nextBanList)
       emitReelm(reelmId, 'ban_list')
@@ -2281,6 +2322,14 @@ export function createReelmsDataRouter(io: Server) {
       const meta = await getDoc<any>(pk, 'meta').catch(() => null)
       io.to(`u:${targetUid}`).emit('reelm:ban-removed', { reelmId, name: meta?.name || null })
       await pushUserNotification(targetUid, `You were unbanned from ${meta?.name || 'this Reelm'}.`, { type: 'reelm_unban', reelmId }).catch(() => {})
+
+      recordReelmAuditLog(reelmId, {
+        action: 'MEMBER_UNBAN',
+        actor: { id: actorUid },
+        target: { id: targetUid, name: unbannedEntry?.name || unbannedEntry?.username || 'Member', type: 'user' },
+        details: { summary: `Unbanned @${unbannedEntry?.username || unbannedEntry?.name || targetUid}` }
+      }, io)
+
       res.json({ data: { unbanned: true, banList: nextBanList } })
     } catch { res.status(500).json({ error: 'unban_failed' }) }
   })
@@ -2349,6 +2398,19 @@ export function createReelmsDataRouter(io: Server) {
       await emitReelmManagers(reelmId, 'timeout_list').catch(() => {})
       io.to(`u:${targetUid}`).emit('reelm:timeout', { reelmId, name: meta.name || null, timeout: entry })
       await pushUserNotification(targetUid, timeoutMessage, { type: 'reelm_timeout', reelmId, expiresAt, message: timeoutMessage }).catch(() => {})
+
+      const durMins = Math.round(durationMs / 60000)
+      recordReelmAuditLog(reelmId, {
+        action: 'MEMBER_TIMEOUT',
+        actor: { id: actorUid },
+        target: { id: targetUid, name: profile.name || profile.username || 'Member', type: 'user' },
+        reason,
+        details: {
+          summary: `Timed out @${profile.username || profile.name || targetUid} for ${durMins >= 60 ? `${Math.round(durMins/60)}h` : `${durMins}m`}${reason ? ` (Reason: ${reason})` : ''}`,
+          extra: { durationMs, expiresAt }
+        }
+      }, io)
+
       res.json({ data: { timedOut: true, timeoutList: next, timeout: entry } })
     } catch (err) {
       console.error('/api/v1/reelms/timeout error:', err)
@@ -2365,6 +2427,7 @@ export function createReelmsDataRouter(io: Server) {
       if (!await canUseReelmPermission(actorUid, reelmId, 'manageModeration')) return res.status(403).json({ error: 'forbidden' })
       const pk = reelmPk(reelmId)
       const current = await getTimeoutList(reelmId)
+      const timedOutEntry = current.find((entry: any) => String(entry?.userId || entry?.id || '') === targetUid)
       const next = current.filter((entry: any) => String(entry?.userId || entry?.id || '') !== targetUid)
       await putDoc(pk, 'timeout_list', next)
       emitReelm(reelmId, 'timeout_list')
@@ -2372,6 +2435,14 @@ export function createReelmsDataRouter(io: Server) {
       const meta = await getDoc<any>(pk, 'meta').catch(() => null)
       io.to(`u:${targetUid}`).emit('reelm:timeout-removed', { reelmId, name: meta?.name || null })
       await pushUserNotification(targetUid, `Your timeout in ${meta?.name || 'this Reelm'} was removed.`, { type: 'reelm_timeout_removed', reelmId }).catch(() => {})
+
+      recordReelmAuditLog(reelmId, {
+        action: 'MEMBER_TIMEOUT_REMOVE',
+        actor: { id: actorUid },
+        target: { id: targetUid, name: timedOutEntry?.name || timedOutEntry?.username || 'Member', type: 'user' },
+        details: { summary: `Removed timeout for @${timedOutEntry?.username || timedOutEntry?.name || targetUid}` }
+      }, io)
+
       res.json({ data: { removed: true, timeoutList: next } })
     } catch { res.status(500).json({ error: 'untimeout_failed' }) }
   })
@@ -2923,6 +2994,8 @@ export function createReelmsDataRouter(io: Server) {
     } catch { res.status(500).json({ error: 'get_failed' }) }
   })
 
+  const channelUserLastMessageTimestamps = new Map<string, number>()
+
   router.post('/messages/:msgKey', async (req, res) => {
     try {
       const msgKey = decodeURIComponent(req.params.msgKey)
@@ -2933,6 +3006,27 @@ export function createReelmsDataRouter(io: Server) {
       if (access.kind === 'reelm') {
         const timeout = await getActiveReelmTimeout(String(req.userId), access.reelmId).catch(() => null)
         if (timeout) return res.status(403).json({ error: 'reelm_timeout', code: 'reelm/timeout', timeout })
+
+        const channel = await getReelmChannel(access.reelmId, access.channelId).catch(() => null)
+        const slowModeSeconds = Number(channel?.slowMode || 0)
+        if (slowModeSeconds > 0) {
+          const uid = String(req.userId)
+          const canBypass = await canUseReelmPermission(uid, access.reelmId, 'bypassSlowMode').catch(() => false)
+          if (!canBypass) {
+            const cooldownKey = `${access.reelmId}:${access.channelId}:${uid}`
+            const lastSent = channelUserLastMessageTimestamps.get(cooldownKey) || 0
+            const elapsed = (Date.now() - lastSent) / 1000
+            if (elapsed < slowModeSeconds) {
+              const retryAfter = Math.ceil(slowModeSeconds - elapsed)
+              return res.status(429).json({
+                error: 'SLOW_MODE_ACTIVE',
+                code: 'reelm/slow-mode',
+                retryAfter,
+                slowMode: slowModeSeconds
+              })
+            }
+          }
+        }
       }
 
       if (access.kind === 'dm') {
@@ -2953,6 +3047,12 @@ export function createReelmsDataRouter(io: Server) {
       const ts = String(message.time || Date.now()).padStart(15, '0')
       const sk = `MSG#${ts}#${message.id}`
       await putDoc(chanPk(msgKey), sk, message)
+
+      if (access.kind === 'reelm') {
+        const cooldownKey = `${access.reelmId}:${access.channelId}:${String(req.userId)}`
+        channelUserLastMessageTimestamps.set(cooldownKey, Date.now())
+      }
+
       const payload = { msgKey, message }
       if (access.kind === 'reelm') {
         // Chained rooms are emitted as a union, so a client joined to both the

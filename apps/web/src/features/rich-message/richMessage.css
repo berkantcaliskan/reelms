@@ -1,0 +1,429 @@
+/* ── Reelms — Rich Message System CSS (Graphite Dark Beta 2) ── */
+
+/* ── Inline Code ── */
+.msg-inline-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.86em;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 1px 5px;
+  border-radius: 4px;
+  color: #f3f4f6;
+  white-space: break-spaces;
+  word-break: break-word;
+  user-select: text;
+}
+
+/* ── Code Block Container ── */
+.msg-code-block {
+  margin: 8px 0;
+  border-radius: 8px;
+  background: #141518;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+}
+
+.msg-code-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: #1a1b20;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  user-select: none;
+}
+
+.msg-code-lang {
+  font-family: inherit;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(235, 225, 210, 0.6);
+}
+
+.msg-code-copy-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  font-size: 0.72rem;
+  font-weight: 500;
+  color: rgba(235, 225, 210, 0.75);
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.msg-code-copy-btn:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.16);
+}
+
+.msg-code-copy-btn.copied {
+  background: rgba(74, 222, 128, 0.15);
+  color: #4ade80;
+  border-color: rgba(74, 222, 128, 0.3);
+}
+
+.msg-code-content {
+  display: flex;
+  overflow-x: auto;
+  padding: 10px 0;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  tab-size: 2;
+  color: #e5e7eb;
+}
+
+.msg-code-lines {
+  display: flex;
+  flex-direction: column;
+  padding: 0 10px 0 12px;
+  text-align: right;
+  user-select: none;
+  color: rgba(255, 255, 255, 0.22);
+  font-size: 0.78rem;
+  line-height: 1.5;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.msg-code-pre {
+  margin: 0;
+  padding: 0 14px;
+  flex-grow: 1;
+  white-space: pre;
+  overflow-x: visible;
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* ── Syntax Highlighting Tokens (Graphite Palette) ── */
+.tok-kwe, .tok-key { color: #c084fc; font-weight: 500; } /* Keywords (purple) */
+.tok-str { color: #86efac; } /* Strings (soft green) */
+.tok-num { color: #fde047; } /* Numbers (warm yellow) */
+.tok-fun { color: #67e8f9; } /* Functions (cyan) */
+.tok-typ { color: #f472b6; } /* Types (soft pink) */
+.tok-com { color: #6b7280; font-style: italic; } /* Comments (muted gray) */
+.tok-ope { color: #fca5a5; } /* Operators (soft red/coral) */
+.tok-pun { color: #94a3b8; } /* Punctuation */
+
+/* ── Spoiler Text ── */
+.msg-spoiler-text {
+  display: inline-block;
+  vertical-align: baseline;
+  background: #2a2c33;
+  color: transparent !important;
+  border-radius: 4px;
+  padding: 0 4px;
+  margin: 0 1px;
+  cursor: pointer;
+  user-select: none;
+  position: relative;
+  transition: background 180ms ease, color 180ms ease;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.msg-spoiler-text * {
+  color: transparent !important;
+  opacity: 0 !important;
+  transition: opacity 180ms ease;
+}
+
+.msg-spoiler-text.is-revealed {
+  background: rgba(255, 255, 255, 0.08);
+  color: inherit !important;
+  cursor: default;
+  user-select: text;
+}
+
+.msg-spoiler-text.is-revealed * {
+  color: inherit !important;
+  opacity: 1 !important;
+}
+
+/* ── Spoiler Media ── */
+.msg-spoiler-media-wrap {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+  border-radius: 8px;
+  overflow: hidden;
+  background: #141518;
+  cursor: pointer;
+  user-select: none;
+}
+
+.msg-spoiler-media-inner {
+  display: block;
+  width: 100%;
+  height: 100%;
+  transition: filter 220ms ease, transform 220ms ease, opacity 220ms ease;
+}
+
+.msg-spoiler-media-wrap.is-hidden .msg-spoiler-media-inner {
+  filter: blur(32px) brightness(0.45) saturate(0.8);
+  transform: scale(1.08);
+  pointer-events: none;
+}
+
+.msg-spoiler-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 16, 20, 0.5);
+  backdrop-filter: blur(4px);
+  z-index: 5;
+  transition: opacity 180ms ease;
+}
+
+.msg-spoiler-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: rgba(30, 32, 38, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+}
+
+.msg-spoiler-sub {
+  margin-top: 5px;
+  font-size: 0.68rem;
+  color: rgba(235, 225, 210, 0.7);
+}
+
+/* ── Quote Block ── */
+.msg-quote-block {
+  margin: 6px 0;
+  padding: 4px 12px;
+  border-left: 3px solid var(--accent, #b99887);
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 0 6px 6px 0;
+  color: rgba(235, 225, 210, 0.88);
+  font-style: normal;
+}
+
+/* ── Links ── */
+.msg-link {
+  color: #38bdf8;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color 120ms ease;
+  word-break: break-all;
+}
+
+.msg-link:hover {
+  color: #7dd3fc;
+}
+
+/* ── Floating Formatting Toolbar ── */
+.msg-floating-toolbar {
+  position: absolute;
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px 5px;
+  background: #1e2025;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 8px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  animation: fmt-pop 130ms cubic-bezier(0.16, 1, 0.3, 1);
+  user-select: none;
+}
+
+@keyframes fmt-pop {
+  0% { opacity: 0; transform: translateY(6px) scale(0.96); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.fmt-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 26px;
+  height: 26px;
+  padding: 0 4px;
+  border: none;
+  background: transparent;
+  color: rgba(235, 225, 210, 0.8);
+  border-radius: 5px;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.fmt-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.fmt-btn.active {
+  background: rgba(185, 152, 135, 0.25);
+  color: var(--accent, #b99887);
+}
+
+.fmt-divider {
+  width: 1px;
+  height: 18px;
+  background: rgba(255, 255, 255, 0.1);
+  margin: 0 3px;
+}
+
+.fmt-color-grid {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+}
+
+.fmt-color-swatch {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  cursor: pointer;
+  transition: transform 120ms ease;
+}
+
+.fmt-color-swatch:hover {
+  transform: scale(1.2);
+  border-color: #fff;
+}
+
+/* ── Code Composer Box ── */
+.msg-code-composer {
+  margin: 6px 0;
+  border-radius: 8px;
+  background: #121316;
+  border: 1px solid var(--accent, #b99887);
+  box-shadow: 0 0 0 1px rgba(185, 152, 135, 0.2);
+  overflow: hidden;
+}
+
+.msg-code-composer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 10px;
+  background: #191a1f;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.msg-code-lang-select {
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #fff;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 0.74rem;
+  cursor: pointer;
+  outline: none;
+}
+
+.msg-code-composer-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: transparent;
+  border: none;
+  padding: 8px 12px;
+  color: #e5e7eb;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.84rem;
+  line-height: 1.5;
+  resize: vertical;
+  min-height: 80px;
+  outline: none;
+  tab-size: 2;
+}
+
+/* ── Attachment Controls in Composer ── */
+.msg-attach-spoiler-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(0, 0, 0, 0.6);
+  color: rgba(235, 225, 210, 0.8);
+  cursor: pointer;
+  transition: all 120ms ease;
+}
+
+.msg-attach-spoiler-btn.is-spoiler {
+  background: #b99887;
+  color: #121316;
+  border-color: #b99887;
+}
+
+/* ── Selection Context Menu ── */
+.msg-sel-ctx-menu {
+  position: fixed;
+  z-index: 10001;
+  background: #1c1d22;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 8px;
+  padding: 5px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.65);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 160px;
+  animation: fmt-pop 120ms ease;
+  user-select: none;
+}
+
+.msg-sel-ctx-header {
+  padding: 4px 8px;
+  font-size: 0.68rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: rgba(235, 225, 210, 0.4);
+  letter-spacing: 0.05em;
+}
+
+.msg-sel-ctx-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 5px 8px;
+  font-size: 0.8rem;
+  color: rgba(235, 225, 210, 0.9);
+  border: none;
+  background: transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 100ms ease;
+  text-align: left;
+}
+
+.msg-sel-ctx-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+
+.msg-sel-ctx-shortcut {
+  font-size: 0.72rem;
+  color: rgba(235, 225, 210, 0.4);
+}

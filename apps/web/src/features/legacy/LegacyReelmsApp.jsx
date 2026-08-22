@@ -24,7 +24,7 @@ import {
 } from '../../webAuth'
 import reelmsLogo from '../../assets/icons/reelms-logo.svg'
 import newIcon from '../../assets/icons/new-icon.svg'
-// import settingsIcon from '../../assets/icons/settings-icon.svg'
+import settingsIcon from '../../assets/icons/settings-icon.svg'
 import feedIcon from '../../assets/icons/feed-icon.svg'
 import articlesIcon from '../../assets/icons/articles-icon.svg'
 import forumsIcon from '../../assets/icons/forums-icon_reelms.svg'
@@ -40,14 +40,331 @@ import channelMultimediaIcon from '../../assets/icons/channel-multimedia.svg'
 import channelLiveactionIcon from '../../assets/icons/channel-liveaction.svg'
 import discoverIcon from '../../assets/icons/discover-icon.svg'
 import sendIcon from '../../assets/icons/send.svg'
-import messagesIcon from '../../assets/icons/messages.svg'
+import messagesIcon from '../../assets/icons/messages-icon.svg'
 import likePostIcon from '../../assets/icons/likepost-icon_reelms.svg'
 import commentPostIcon from '../../assets/icons/commentpost-icon.svg'
 import resharePostIcon from '../../assets/icons/resharepost-icon_reelms.svg'
 import forwardPostIcon from '../../assets/icons/forwardpost-icon_reelms.svg'
 import { getApiBaseUrl, getPublicWebUrl } from '../../config/api'
 import './LegacyReelmsApp.css'
+// import AuditLogTab removed; using inline component
+import { RichMessageRenderer, parseRichText } from '../rich-message/RichMessageRenderer'
+import { SpoilerMedia } from '../rich-message/SpoilerMedia'
+import { RichMessageComposerToolbar } from '../rich-message/RichMessageComposer'
+import { SEMANTIC_COLORS, SUPPORTED_LANGUAGES } from '../rich-message/richMessageTokens'
+import '../rich-message/richMessage.css'
 import { fetchVoiceToken, createLivekitSession } from '../voice/livekitManager.js'
+
+// Audit Log components
+function AuditLogView({ reelmId }) {
+  const [logs, setLogs] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [actionFilter, setActionFilter] = useState('ALL')
+  const [refreshTick, setRefreshTick] = useState(0)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    reelmGetDoc(reelmId, 'audit_log')
+      .then(data => {
+        if (cancelled) return
+        setLogs(Array.isArray(data) ? data : [])
+        setLoading(false)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLogs([])
+          setLoading(false)
+        }
+      })
+    return () => { cancelled = true }
+  }, [reelmId, refreshTick])
+
+  const ACTION_CONFIG = {
+    MEMBER_BAN: { label: 'Banned Member', color: '#ef4444', category: 'moderation' },
+    MEMBER_UNBAN: { label: 'Unbanned Member', color: '#10b981', category: 'moderation' },
+    MEMBER_KICK: { label: 'Kicked Member', color: '#f97316', category: 'moderation' },
+    MEMBER_TIMEOUT: { label: 'Timed Out Member', color: '#f59e0b', category: 'moderation' },
+    MEMBER_TIMEOUT_REMOVE: { label: 'Removed Timeout', color: '#3b82f6', category: 'moderation' },
+    MEMBER_ROLE_UPDATE: { label: 'Updated Roles', color: '#8b5cf6', category: 'roles' },
+    ROLE_CREATE: { label: 'Created Role', color: '#8b5cf6', category: 'roles' },
+    ROLE_UPDATE: { label: 'Updated Role', color: '#8b5cf6', category: 'roles' },
+    ROLE_DELETE: { label: 'Deleted Role', color: '#ef4444', category: 'roles' },
+    CHANNEL_CREATE: { label: 'Created Channel', color: '#06b6d4', category: 'channels' },
+    CHANNEL_UPDATE: { label: 'Updated Channel', color: '#06b6d4', category: 'channels' },
+    CHANNEL_DELETE: { label: 'Deleted Channel', color: '#ef4444', category: 'channels' },
+    CHANNEL_SLOWMODE_UPDATE: { label: 'Updated Slowmode', color: '#06b6d4', category: 'channels' },
+    MESSAGE_DELETE: { label: 'Deleted Message', color: '#f43f5e', category: 'messages' },
+    MESSAGE_PIN: { label: 'Pinned Message', color: '#eab308', category: 'messages' },
+    MESSAGE_UNPIN: { label: 'Unpinned Message', color: '#64748b', category: 'messages' },
+    REELM_UPDATE: { label: 'Updated Settings', color: '#a855f7', category: 'settings' },
+  }
+
+  const filteredLogs = useMemo(() => {
+    return logs.filter(entry => {
+      if (actionFilter !== 'ALL') {
+        const config = ACTION_CONFIG[entry.action]
+        if (config?.category !== actionFilter && entry.action !== actionFilter) return false
+      }
+      if (search.trim()) {
+        const q = search.toLowerCase()
+        const actorMatch = (entry.actor?.name || '').toLowerCase().includes(q) || (entry.actor?.username || '').toLowerCase().includes(q)
+        const targetMatch = (entry.target?.name || '').toLowerCase().includes(q)
+        const reasonMatch = (entry.reason || '').toLowerCase().includes(q)
+        const summaryMatch = (entry.details?.summary || '').toLowerCase().includes(q)
+        if (!actorMatch && !targetMatch && !reasonMatch && !summaryMatch) return false
+      }
+      return true
+    })
+  }, [logs, actionFilter, search])
+
+  const formatTimestamp = (ts) => {
+    if (!ts) return ''
+    const d = new Date(ts)
+    return d.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    })
+  }
+
+  return (
+    <div className="audit-log-view">
+      <div className="audit-log-controls">
+        <div className="audit-log-search-wrap">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="audit-search-icon">
+            <circle cx="11" cy="11" r="8"/>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          </svg>
+          <input
+            type="text"
+            className="audit-log-search"
+            placeholder="Search by moderator, target, or reason…"
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+          />
+          {search && (
+            <button type="button" className="audit-search-clear" onClick={() => setSearch('')}>✕</button>
+          )}
+        </div>
+
+        <div className="audit-log-filters">
+          {[
+            { id: 'ALL', label: 'All Actions' },
+            { id: 'moderation', label: 'Moderation' },
+            { id: 'roles', label: 'Roles' },
+            { id: 'channels', label: 'Channels' },
+            { id: 'settings', label: 'Settings' },
+          ].map(f => (
+            <button
+              key={f.id}
+              type="button"
+              className={`audit-filter-pill${actionFilter === f.id ? ' active' : ''}`}
+              onClick={() => setActionFilter(f.id)}
+            >
+              {f.label}
+            </button>
+          ))}
+          <button
+            type="button"
+            className="audit-refresh-btn"
+            title="Refresh logs"
+            onClick={() => setRefreshTick(t => t + 1)}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="23 4 23 10 17 10"/>
+              <polyline points="1 20 1 14 7 14"/>
+              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="audit-log-empty">Loading audit actions…</div>
+      ) : filteredLogs.length === 0 ? (
+        <div className="audit-log-empty">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="rgba(var(--ta-rgb), 0.3)" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" style={{ marginBottom: 8 }}>
+            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+            <polyline points="14 2 14 8 20 8"/>
+            <line x1="16" y1="13" x2="8" y2="13"/>
+            <line x1="16" y1="17" x2="8" y2="17"/>
+          </svg>
+          <p>No audit actions found</p>
+          <span style={{ fontSize: '12px', opacity: 0.6 }}>Actions taken by moderators will appear here.</span>
+        </div>
+      ) : (
+        <div className="audit-log-list">
+          {filteredLogs.map(entry => {
+            const config = ACTION_CONFIG[entry.action] || { label: entry.action, color: '#94a3b8' }
+            return (
+              <div key={entry.id} className="audit-log-entry">
+                <div className="audit-log-entry-header">
+                  <div className="audit-actor-info">
+                    <div className="audit-actor-avatar">
+                      {entry.actor?.photo ? (
+                        <img src={entry.actor.photo} alt="" />
+                      ) : (
+                        <span>{(entry.actor?.name || '?')[0].toUpperCase()}</span>
+                      )}
+                    </div>
+                    <div className="audit-actor-meta">
+                      <span className="audit-actor-name">{entry.actor?.name || 'Moderator'}</span>
+                      {entry.actor?.username && (
+                        <span className="audit-actor-username">@{entry.actor.username}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <span
+                    className="audit-action-badge"
+                    style={{
+                      background: `${config.color}22`,
+                      color: config.color,
+                      borderColor: `${config.color}44`
+                    }}
+                  >
+                    {config.label}
+                  </span>
+
+                  <span className="audit-timestamp" title={new Date(entry.timestamp).toLocaleString()}>
+                    {formatTimestamp(entry.timestamp)}
+                  </span>
+                </div>
+
+                {(entry.target || entry.reason || entry.details?.summary) && (
+                  <div className="audit-log-entry-body">
+                    {entry.target && (
+                      <div className="audit-target-row">
+                        <span className="audit-label">Target:</span>
+                        <span className="audit-target-name">{entry.target.name || entry.target.id}</span>
+                        {entry.target.type && <span className="audit-target-type">({entry.target.type})</span>}
+                      </div>
+                    )}
+                    {entry.reason && (
+                      <div className="audit-reason-row">
+                        <span className="audit-label">Reason:</span>
+                        <span className="audit-reason-text">"{entry.reason}"</span>
+                      </div>
+                    )}
+                    {entry.details?.summary && (
+                      <div className="audit-summary-row">
+                        <span>{entry.details.summary}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function BanListView({ reelmId, banList = [], onUnbanMember }) {
+  const [localBanList, setLocalBanList] = useState(banList)
+  const [search, setSearch] = useState('')
+
+  useEffect(() => {
+    setLocalBanList(banList)
+  }, [banList])
+
+  const filteredBans = useMemo(() => {
+    if (!search.trim()) return localBanList
+    const q = search.toLowerCase()
+    return localBanList.filter(entry =>
+      (entry.name || '').toLowerCase().includes(q) ||
+      (entry.username || '').toLowerCase().includes(q) ||
+      (entry.message || entry.reason || '').toLowerCase().includes(q)
+    )
+  }, [localBanList, search])
+
+  return (
+    <div className="ban-list-view">
+      <div className="audit-log-search-wrap" style={{ marginBottom: 14 }}>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="audit-search-icon">
+          <circle cx="11" cy="11" r="8"/>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input
+          type="text"
+          className="audit-log-search"
+          placeholder="Search banned members…"
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+        />
+        {search && (
+          <button type="button" className="audit-search-clear" onClick={() => setSearch('')}>✕</button>
+        )}
+      </div>
+
+      {filteredBans.length === 0 ? (
+        <div className="audit-log-empty">
+          <p>No banned users in this Reelm.</p>
+        </div>
+      ) : (
+        <div className="rs-members-list">
+          {filteredBans.map(entry => {
+            const entryId = String(entry.userId || entry.id || '')
+            return (
+              <div key={entryId} className="rs-member-row">
+                <div className="rs-member-avatar">
+                  {getPersonPhoto(entry)
+                    ? <img src={getPersonPhoto(entry)} alt={entry.name || ''} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                    : (entry.name || '?').charAt(0).toUpperCase()
+                  }
+                </div>
+                <div className="rs-member-info">
+                  <span className="rs-member-name">{entry.name || entry.username || 'Member'}</span>
+                  <span className="discover-result-type">
+                    {entry.username ? `@${entry.username}` : 'banned'}
+                    {entry.message || entry.reason ? ` • ${entry.message || entry.reason}` : ''}
+                  </span>
+                </div>
+                <button className="rs-add-btn" onClick={() => onUnbanMember?.(reelmId, entryId)}>Unban</button>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AuditLogTab({ reelmId, banList = [], onUnbanMember }) {
+  const [activeSubTab, setActiveSubTab] = useState('log');
+  return (
+    <div className="rs-section audit-log-tab">
+      <div className="rs-section-header" style={{ marginBottom: 16 }}>
+        <span className="rs-section-title">Audit & Moderation</span>
+        <div className="audit-subtab-nav">
+          <button
+            type="button"
+            className={`subtab-btn${activeSubTab === 'log' ? ' subtab-btn--active' : ''}`}
+            onClick={() => setActiveSubTab('log')}
+          >
+            Audit Log
+          </button>
+          <button
+            type="button"
+            className={`subtab-btn${activeSubTab === 'ban' ? ' subtab-btn--active' : ''}`}
+            onClick={() => setActiveSubTab('ban')}
+          >
+            Ban List ({banList.length})
+          </button>
+        </div>
+      </div>
+
+      {activeSubTab === 'log' && <AuditLogView reelmId={reelmId} />}
+      {activeSubTab === 'ban' && <BanListView reelmId={reelmId} banList={banList} onUnbanMember={onUnbanMember} />}
+    </div>
+  );
+}
+
 import {
   REELM_CACHE,
   patchReelmCache,
@@ -763,15 +1080,18 @@ function _hexToHsl(hex) {
 function makeIconFilter(baseHex) {
   const base = _hexToHsl(baseHex)
   return function(accent) {
-    const { h, s } = _hexToHsl(accent)
+    if (!accent || typeof accent !== 'string' || !accent.startsWith('#')) return 'none'
+    const { h, s, l } = _hexToHsl(accent)
     const rotation = h - base.h
     const satScale = base.s > 0 ? s / base.s : 1
-    return `hue-rotate(${rotation.toFixed(1)}deg) saturate(${satScale.toFixed(2)})`
+    const briScale = base.l > 0 ? l / base.l : 1
+    return `hue-rotate(${rotation.toFixed(1)}deg) saturate(${satScale.toFixed(2)}) brightness(${briScale.toFixed(2)})`
   }
 }
-const categoryIconFilter    = makeIconFilter('#68c586')
-const headerIconThemeFilter = makeIconFilter('#b99887')
-const newIconThemeFilter    = makeIconFilter('#c49c7a')
+const iconThemeFilter       = makeIconFilter('#b99887')
+const categoryIconFilter    = iconThemeFilter
+const headerIconThemeFilter = iconThemeFilter
+const newIconThemeFilter    = iconThemeFilter
 
 const capBadge = (n) => n > 99 ? '99+' : n
 const STATUS_COLORS = { online: '#4ade80', idle: '#fbbf24', busy: '#f87171', invisible: '#9ca3af', offline: '#6b7280' }
@@ -797,9 +1117,9 @@ function PillSelect({ value, onChange, options }) {
 const THEMES = [
   {
     id: 'default',
-    name: 'RedSun Dark',
-    accent: '#b99887',
-    accentRgb: '185,152,135',
+    name: 'Warm, Default',
+    accent: '#fdfcfb',
+    accentRgb: '253,252,251',
     base: '#2c2522',
     baseRgb: '44,37,34',
     surfacePrimary: '#362e2a',
@@ -822,7 +1142,7 @@ const THEMES = [
   { id: 'sky',      name: 'Earth Sky',       accent: '#7fc8e8', accentRgb: '127,200,232', base: '#0a1520', baseRgb: '10,21,32' },
   { id: 'ocean',    name: 'Ocean',           accent: '#4a96be', accentRgb: '74,150,190',  base: '#080f1a', baseRgb: '8,15,26' },
   { id: 'peach',    name: 'Sunbathe',        accent: '#f0a06a', accentRgb: '240,160,106', base: '#1a0e08', baseRgb: '26,14,8' },
-  { id: 'lemon',    name: 'Lemonade',        accent: '#c8c040', accentRgb: '200,192,64',  base: '#161400', baseRgb: '22,20,0' },
+  { id: 'lemon',    name: 'Lemonade',        accent: '#F3B38B', accentRgb: '243,179,139', base: '#161400', baseRgb: '22,20,0' },
 ]
 
 function rgbArrayFrom(value, fallback = null) {
@@ -1231,28 +1551,9 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
       <div className="accs-section">
         <div className="accs-section-title">{t('spectrum')}</div>
         <p className="accs-note" style={{ marginTop: 0, marginBottom: 12 }}>
-          <strong>{t('spectrum_primary')}</strong> is the base background color (panels keep their glass effect). <strong>{t('spectrum_accent')}</strong> is for logo, icons, and headings — channel/feed text is configured separately below.
+          <strong>{t('spectrum_accent')}</strong> is for icons, indicators, and headings — channel/feed text is configured separately below.
         </p>
         <div className="cust-tayf-row">
-          <div className="cust-tayf-picker">
-            <div className="cust-tayf-item">
-              <div
-                className={`cust-tayf-swatch${openSpectrum === 'customBase' ? ' active' : ''}`}
-                style={{ background: customization.customBase || currentTheme.base }}
-                onClick={() => setOpenSpectrum(openSpectrum === 'customBase' ? null : 'customBase')}
-              >
-                {customization.customBase && (
-                  <button type="button" className="cust-tayf-reset" onClick={e => { e.stopPropagation(); onChange({ customBase: null }); if (openSpectrum === 'customBase') setOpenSpectrum(null) }}>×</button>
-                )}
-              </div>
-              <span className="cust-tayf-label">{t('spectrum_primary')}</span>
-            </div>
-            <div
-              className={`cust-tayf-strip${openSpectrum === 'customBase' ? ' open' : ''}`}
-              onClick={e => pickSpectrum(e, 'customBase')}
-              role="presentation"
-            />
-          </div>
           <div className="cust-tayf-picker">
             <div className="cust-tayf-item">
               <div
@@ -3775,8 +4076,7 @@ function parseRich(text, uid, members, roles, keyBase) {
 
 function renderRichMessage(content, uid, members, roles, isRich) {
   if (!content) return null
-  if (!isRich) return renderMentions(content, uid, members, roles)
-  return parseRich(content, uid, members, roles, 'r')
+  return parseRichText(content, { uid, members, roles, keyPrefix: 'r' })
 }
 
 // ── Voice message player (WhatsApp-style: play/pause · waveform · speed) ────────
@@ -3982,13 +4282,29 @@ function VirtualMessageList({
         const sender = (msg.sender && typeof msg.sender === 'object') ? msg.sender : { id: '', name: '?', photo: null, image: null }
         const isOwn = String(sender.id || '') === String(uid)
         const canDeleteMsg = !selectedChatSystemLocked && (isMod || isOwn || (selectedReelm && hasReelmPermissionClient(selectedReelm, uid, 'manageModeration')))
-        const isPinned = Boolean(pinnedMessage && String(pinnedMessage.id) === String(msg.id))
+        const isPinned = Boolean(pinnedMessage && (!pinnedMessage.expiresAt || Date.now() < pinnedMessage.expiresAt) && String(pinnedMessage.id) === String(msg.id))
         const msgData = { id: msg.id, text: msg.text || '', sender, time: msg.time, mediaUrl: msg.mediaUrl, mediaType: msg.mediaType }
+
+        const isSystemMsg = Boolean(
+          msg.isSystem ||
+          msg.sender?.id === 'system' ||
+          msg.sender?.name === 'System' ||
+          msg.sender?.name === 'Reelms' ||
+          (typeof msg.text === 'string' && (
+            msg.text.includes('existed.') ||
+            msg.text.includes('created. ✦') ||
+            msg.text.includes('has entered the chat.') ||
+            msg.text.includes('Somewhere, a server whispered:') ||
+            msg.text.includes('was born into this world.') ||
+            msg.text.startsWith('✦ ') ||
+            msg.text.startsWith('👋 ')
+          ))
+        )
 
         return (
           <React.Fragment key={msg.id || `msg-${index}`}>
             {showDateSep && <div className="bubble-date-sep"><span>{msgDateLabel}</span></div>}
-            {msg.isSystem ? (
+            {isSystemMsg ? (
               <div className={`msg-system-row${msg.id === newMsgId ? ' msg-row-new' : ''}`}>
                 <span className="msg-system-text">{msg.text}</span>
                 <span className="msg-system-time">{formatTime(msg.time)}</span>
@@ -4070,10 +4386,22 @@ function VirtualMessageList({
                       />
                     </div>
                   ) : null })()}
-                  {msg.mediaUrl && msg.mediaType === 'image' && <img src={msg.mediaUrl} alt="" className="msg-media-img" onClick={() => setLightboxImg(msg.mediaUrl)} />}
-                  {msg.mediaUrl && msg.mediaType === 'video' && <video src={msg.mediaUrl} className="msg-media-video" controls />}
+                  {msg.mediaUrl && msg.mediaType === 'image' && (
+                    <SpoilerMedia isSpoiler={Boolean(msg.isSpoiler || msg.mediaSpoiler)} mediaType="image">
+                      <img src={msg.mediaUrl} alt="" className="msg-media-img" onClick={() => setLightboxImg(msg.mediaUrl)} />
+                    </SpoilerMedia>
+                  )}
+                  {msg.mediaUrl && msg.mediaType === 'video' && (
+                    <SpoilerMedia isSpoiler={Boolean(msg.isSpoiler || msg.mediaSpoiler)} mediaType="video">
+                      <video src={msg.mediaUrl} className="msg-media-video" controls />
+                    </SpoilerMedia>
+                  )}
                   {msg.mediaUrl && msg.mediaType === 'audio' && <VoiceMessage src={msg.mediaUrl} />}
-                  {msg.mediaUrl && (msg.mediaType === 'gif' || msg.mediaType === 'sticker') && <img src={msg.mediaUrl} alt="" className={msg.mediaType === 'sticker' ? 'msg-sticker-img' : 'msg-gif-img'} />}
+                  {msg.mediaUrl && (msg.mediaType === 'gif' || msg.mediaType === 'sticker') && (
+                    <SpoilerMedia isSpoiler={Boolean(msg.isSpoiler || msg.mediaSpoiler)} mediaType={msg.mediaType}>
+                      <img src={msg.mediaUrl} alt="" className={msg.mediaType === 'sticker' ? 'msg-sticker-img' : 'msg-gif-img'} />
+                    </SpoilerMedia>
+                  )}
                   {msg.fileUrl && (
                     <a href={msg.fileUrl} download={msg.fileName} className="msg-doc-card">
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -4147,10 +4475,22 @@ function VirtualMessageList({
                           {(msg.isEdited || msg.editedAt) && <span className="msg-edited-tag">({t ? t('edited') : 'Düzenlendi'})</span>}
                         </span>
                       )}
-                      {msg.mediaUrl && msg.mediaType === 'image' && <img src={msg.mediaUrl} alt="" className="msg-media-img" onClick={() => setLightboxImg(msg.mediaUrl)} />}
-                      {msg.mediaUrl && msg.mediaType === 'video' && <video src={msg.mediaUrl} className="msg-media-video" controls />}
+                      {msg.mediaUrl && msg.mediaType === 'image' && (
+                        <SpoilerMedia isSpoiler={Boolean(msg.isSpoiler || msg.mediaSpoiler)} mediaType="image">
+                          <img src={msg.mediaUrl} alt="" className="msg-media-img" onClick={() => setLightboxImg(msg.mediaUrl)} />
+                        </SpoilerMedia>
+                      )}
+                      {msg.mediaUrl && msg.mediaType === 'video' && (
+                        <SpoilerMedia isSpoiler={Boolean(msg.isSpoiler || msg.mediaSpoiler)} mediaType="video">
+                          <video src={msg.mediaUrl} className="msg-media-video" controls />
+                        </SpoilerMedia>
+                      )}
                       {msg.mediaUrl && msg.mediaType === 'audio' && <VoiceMessage src={msg.mediaUrl} />}
-                      {msg.mediaUrl && (msg.mediaType === 'gif' || msg.mediaType === 'sticker') && <img src={msg.mediaUrl} alt="" className={msg.mediaType === 'sticker' ? 'msg-sticker-img' : 'msg-gif-img'} />}
+                      {msg.mediaUrl && (msg.mediaType === 'gif' || msg.mediaType === 'sticker') && (
+                        <SpoilerMedia isSpoiler={Boolean(msg.isSpoiler || msg.mediaSpoiler)} mediaType={msg.mediaType}>
+                          <img src={msg.mediaUrl} alt="" className={msg.mediaType === 'sticker' ? 'msg-sticker-img' : 'msg-gif-img'} />
+                        </SpoilerMedia>
+                      )}
                       {msg.fileUrl && (
                         <a href={msg.fileUrl} download={msg.fileName} className="msg-doc-card">
                           <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -4591,7 +4931,7 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
     (canManageRoles || canManageMembers || canManageInvites) ? { key: 'roles', label: 'Roles and members' } : null,
     canManageChannels ? { key: 'channels', label: 'Channels' } : null,
     canManageJoinRequests ? { key: 'join_requests', label: 'Join requests' } : null,
-    canManageModeration ? { key: 'ban_list', label: 'Ban list' } : null,
+    canManageModeration ? { key: 'audit_log', label: 'Audit Actions' } : null,
     canManageModeration ? { key: 'timeouts', label: 'Timeouts' } : null,
   ].filter(Boolean), [canViewSettings, canManageOverview, canManageRoles, canManageMembers, canManageInvites, canManageChannels, canManageJoinRequests, canManageModeration])
 
@@ -5158,7 +5498,8 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
             </div>
           )}
 
-          {activeTab === 'ban_list' && canManageModeration && (
+                          {activeTab === 'audit_log' && canManageModeration && (<AuditLogTab reelmId={reelm.id} banList={banList} onUnbanMember={onUnbanMember} />)}
+          {activeTab === 'bans' && canManageModeration && (
             <div className="rs-section">
               <div className="rs-section-header">
                 <span className="rs-section-title">Ban list</span>
@@ -5647,9 +5988,48 @@ function FeedPage({ currentUser, uid, tab, selectedReelm, isMod, onReport, onMod
   })
   const [feedSort, setFeedSort] = useState('newest')
   const [feedDisplay, setFeedDisplay] = useState('posts')
+  const [feedComposerExpanded, setFeedComposerExpanded] = useState(false)
+  const [feedSortOpen, setFeedSortOpen] = useState(false)
+  const [feedDisplayOpen, setFeedDisplayOpen] = useState(false)
   const [postText, setPostText] = useState('')
   const [feedModerationWarning, setFeedModerationWarning] = useState('')
   const [posts, setPosts] = useState([])
+  const feedComposerRef = useRef(null)
+  const feedSortRef = useRef(null)
+  const feedDisplayRef = useRef(null)
+
+  const FEED_SORT_OPTIONS = [
+    { id: 'newest', label: 'Newest' },
+    { id: 'oldest', label: 'Oldest' },
+    { id: 'popular', label: 'Popular' },
+    { id: 'related', label: 'Related' },
+  ]
+
+  const FEED_DISPLAY_OPTIONS = [
+    { id: 'posts', label: 'Posts only' },
+    { id: 'posts-forums', label: 'Posts + Forums' },
+    { id: 'posts-articles', label: 'Posts + Articles' },
+    { id: 'everything', label: 'Everything' },
+  ]
+
+  useEffect(() => {
+    const handleFeedClickOutside = (e) => {
+      if (feedComposerRef.current && !feedComposerRef.current.contains(e.target)) {
+        if (!postText.trim()) {
+          setFeedComposerExpanded(false)
+          setShowPlusMenu(false)
+        }
+      }
+      if (feedSortRef.current && !feedSortRef.current.contains(e.target)) {
+        setFeedSortOpen(false)
+      }
+      if (feedDisplayRef.current && !feedDisplayRef.current.contains(e.target)) {
+        setFeedDisplayOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleFeedClickOutside)
+    return () => document.removeEventListener('mousedown', handleFeedClickOutside)
+  }, [postText])
 
   useEffect(() => {
     if (uid === 'guest') {
@@ -5844,6 +6224,8 @@ function FeedPage({ currentUser, uid, tab, selectedReelm, isMod, onReport, onMod
     const newPost = { id: Date.now().toString(), userId: uid, userName: currentUser.name, userPhoto: currentUser.photo || null, text: postText.trim(), createdAt: Date.now(), likes: [], comments: [] }
     setPosts(prev => [newPost, ...prev])
     setPostText('')
+    setFeedComposerExpanded(false)
+    setShowPlusMenu(false)
   }
 
   useEffect(() => {
@@ -6907,10 +7289,9 @@ function FeedPage({ currentUser, uid, tab, selectedReelm, isMod, onReport, onMod
           {/* Particle canvas */}
           <canvas className="news-particle-canvas" id={`news-particles-${selectedReelm?.id}`} />
         </div>
-      ) : tab !== 'feed' ? (
+      ) : (tab !== 'feed' && tab !== 'headlines') ? (
         <div className="feed-tab-panel">
           <p className="feed-tab-empty">
-            {tab === 'headlines' && 'No headlines yet.'}
             {tab === 'new' && 'Create new content.'}
           </p>
         </div>
@@ -6964,12 +7345,20 @@ function FeedPage({ currentUser, uid, tab, selectedReelm, isMod, onReport, onMod
           <div className="moderation-warning">{feedModerationWarning}</div>
         )}
 
-        {/* Context Bar */}
-        <div className="feed-context-bar">
+        {/* Context Bar (Composer) */}
+        <div
+          ref={feedComposerRef}
+          className={`feed-context-bar${feedComposerExpanded || postText.trim() ? ' feed-composer-expanded' : ' feed-composer-collapsed'}`}
+          onClick={() => {
+            if (!feedComposerExpanded) setFeedComposerExpanded(true)
+          }}
+        >
           <textarea
             className="feed-ctx-textarea"
             placeholder="What's on your mind?"
             value={postText}
+            rows={feedComposerExpanded || postText.trim() ? 3 : 1}
+            onFocus={() => setFeedComposerExpanded(true)}
             onChange={e => setPostText(e.target.value)}
           />
           <div className="feed-ctx-actions">
@@ -6989,11 +7378,11 @@ function FeedPage({ currentUser, uid, tab, selectedReelm, isMod, onReport, onMod
               </svg>
             </button>
             <div className="feed-ctx-plus-wrap">
-              <button className="feed-ctx-btn feed-ctx-plus-btn" title="More" onClick={() => setShowPlusMenu(v => !v)}>
+              <button className="feed-ctx-btn feed-ctx-plus-btn" title="More" onClick={(e) => { e.stopPropagation(); setShowPlusMenu(v => !v); }}>
                 <img src={newIcon} alt="+" className="feed-ctx-new-icon" />
               </button>
               {showPlusMenu && (
-                <div className="feed-plus-menu">
+                <div className="feed-plus-menu" onClick={e => e.stopPropagation()}>
                   <button className="feed-plus-item" onClick={() => setShowPlusMenu(false)}>
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                       <rect x="3" y="3" width="18" height="18" rx="2"/>
@@ -7007,27 +7396,88 @@ function FeedPage({ currentUser, uid, tab, selectedReelm, isMod, onReport, onMod
           </div>
         </div>
 
-        {/* Filter bars */}
-        <div className="feed-filter-bars">
-          <div className="feed-filter-row">
-            {[
-              { id: 'newest', label: 'Newest' },
-              { id: 'oldest', label: 'Oldest' },
-              { id: 'popular', label: 'Popular' },
-              { id: 'related', label: 'Related' },
-            ].map(opt => (
-              <button key={opt.id} className={`feed-filter-pill${feedSort === opt.id ? ' active' : ''}`} onClick={() => setFeedSort(opt.id)}>{opt.label}</button>
-            ))}
+        {/* Filter & Sort Dropdown Bar */}
+        <div className="feed-filter-dropdown-bar">
+          <div className="feed-dropdown-wrapper" ref={feedSortRef}>
+            <button
+              type="button"
+              className={`feed-dropdown-trigger${feedSortOpen ? ' active' : ''}`}
+              onClick={() => {
+                setFeedSortOpen(v => !v)
+                setFeedDisplayOpen(false)
+              }}
+            >
+              <span className="feed-dropdown-label">Sort by:</span>
+              <span className="feed-dropdown-val">
+                {FEED_SORT_OPTIONS.find(o => o.id === feedSort)?.label || 'Newest'}
+              </span>
+              <svg className={`feed-dropdown-chevron${feedSortOpen ? ' open' : ''}`} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            {feedSortOpen && (
+              <div className="feed-dropdown-menu">
+                {FEED_SORT_OPTIONS.map(opt => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    className={`feed-dropdown-item${feedSort === opt.id ? ' active' : ''}`}
+                    onClick={() => {
+                      setFeedSort(opt.id)
+                      setFeedSortOpen(false)
+                    }}
+                  >
+                    <span>{opt.label}</span>
+                    {feedSort === opt.id && (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
-          <div className="feed-filter-row">
-            {[
-              { id: 'posts', label: 'Posts only' },
-              { id: 'posts-forums', label: 'Posts + Forums' },
-              { id: 'posts-articles', label: 'Posts + Articles' },
-              { id: 'everything', label: 'Everything' },
-            ].map(opt => (
-              <button key={opt.id} className={`feed-filter-pill${feedDisplay === opt.id ? ' active' : ''}`} onClick={() => setFeedDisplay(opt.id)}>{opt.label}</button>
-            ))}
+
+          <div className="feed-dropdown-wrapper" ref={feedDisplayRef}>
+            <button
+              type="button"
+              className={`feed-dropdown-trigger${feedDisplayOpen ? ' active' : ''}`}
+              onClick={() => {
+                setFeedDisplayOpen(v => !v)
+                setFeedSortOpen(false)
+              }}
+            >
+              <span className="feed-dropdown-label">Show:</span>
+              <span className="feed-dropdown-val">
+                {FEED_DISPLAY_OPTIONS.find(o => o.id === feedDisplay)?.label || 'Posts only'}
+              </span>
+              <svg className={`feed-dropdown-chevron${feedDisplayOpen ? ' open' : ''}`} width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="6 9 12 15 18 9" />
+              </svg>
+            </button>
+            {feedDisplayOpen && (
+              <div className="feed-dropdown-menu">
+                {FEED_DISPLAY_OPTIONS.map(opt => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    className={`feed-dropdown-item${feedDisplay === opt.id ? ' active' : ''}`}
+                    onClick={() => {
+                      setFeedDisplay(opt.id)
+                      setFeedDisplayOpen(false)
+                    }}
+                  >
+                    <span>{opt.label}</span>
+                    {feedDisplay === opt.id && (
+                      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <polyline points="20 6 9 17 4 12" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -7361,7 +7811,7 @@ function buildProfileThemeStyle(person) {
   const cfg = person?.profileTheme || person?.customization || null
   if (!cfg || typeof cfg !== 'object') return undefined
   const theme = THEMES.find(th => th.id === cfg.themeId) || THEMES[0]
-  const accent = typeof cfg.customAccent === 'string' && cfg.customAccent ? cfg.customAccent : (theme.accent || '#b99887')
+  const accent = typeof cfg.customAccent === 'string' && cfg.customAccent ? cfg.customAccent : (theme.accent || '#fdfcfb')
   const base = typeof cfg.customBase === 'string' && cfg.customBase ? cfg.customBase : (theme.base || '#2c2522')
   return {
     '--fpp-theme-accent': accent,
@@ -7844,8 +8294,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [sessionsList, setSessionsList] = useState([])
   const [feedTab, setFeedTab] = useState('feed') // 'feed' | 'forums'
   const ALL_FEED_NAV = [
-    { key: 'feed', label: 'Headlines', icon: feedIcon },
-    { key: 'forums', label: 'Forums', icon: forumsIcon },
+    { key: 'feed', label: t('feed') || 'Feed', icon: feedIcon },
+    { key: 'forums', label: t('forums') || 'Forums', icon: forumsIcon },
   ]
   const [feedNavOrder, setFeedNavOrder] = useState(['feed', 'forums'])
   const updateFeedNavOrder = (order) => {
@@ -8366,7 +8816,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       if (Array.isArray(data.chat_folders)) setChatFolders(data.chat_folders)
       if (data.bar_prefs?.showHidden === true) setShowHiddenBarItems(true)
       if (Array.isArray(data.last_seen_allow_list)) setLastSeenAllowList(data.last_seen_allow_list.map(String))
-      if (Array.isArray(data.feed_nav) && data.feed_nav.length === ALL_FEED_NAV.length) setFeedNavOrder(data.feed_nav)
+      if (Array.isArray(data.feed_nav)) {
+        const mappedNav = data.feed_nav.map(k => k === 'headlines' ? 'feed' : k).filter(k => ALL_FEED_NAV.some(n => n.key === k))
+        if (mappedNav.length === ALL_FEED_NAV.length) setFeedNavOrder(mappedNav)
+      }
       if (typeof data.landing_view === 'string') setReelmLandingView(data.landing_view)
       if (data.lpw != null) setLeftWidth(parseInt(String(data.lpw), 10) || PANEL_DEFAULT)
       if (data.rpw != null) setRightWidth(parseInt(String(data.rpw), 10) || PANEL_DEFAULT)
@@ -12328,15 +12781,54 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     return true
   }
 
+  const insertCodeBlock = (lang = 'javascript') => {
+    const el = editorRef.current
+    if (!el) return
+    el.focus()
+    const sel = window.getSelection()
+    const selectedText = sel ? sel.toString() : ''
+    const snippet = '```' + lang + '\n' + (selectedText || '// Code here') + '\n```'
+    document.execCommand('insertText', false, snippet)
+    messageInputRef.current = el.innerText.replace(/\n$/, '')
+    setMessageInput(messageInputRef.current)
+  }
+
+  const insertLink = (title, url) => {
+    const el = editorRef.current
+    if (!el) return
+    el.focus()
+    const snippet = '[' + (title || url) + '](' + url + ')'
+    document.execCommand('insertText', false, snippet)
+    messageInputRef.current = el.innerText.replace(/\n$/, '')
+    setMessageInput(messageInputRef.current)
+  }
+
   const applyEditorFormat = (kind) => {
     if (!restoreSavedRange()) return
-    try { document.execCommand('styleWithCSS', false, true) } catch {}
-    if (kind === 'mono') {
-      const range = savedRangeRef.current
-      const code = document.createElement('code')
-      code.className = 'msg-mono'
-      try { range.surroundContents(code) }
-      catch { code.appendChild(range.extractContents()); range.insertNode(code) }
+    const sel = window.getSelection()
+    const selText = sel ? sel.toString() : ''
+
+    if (kind === 'spoiler') {
+      document.execCommand('insertText', false, selText ? '||' + selText + '||' : '||spoiler||')
+    } else if (kind === 'quote') {
+      if (selText) {
+        const quoted = selText.split('\n').map(l => '> ' + l).join('\n')
+        document.execCommand('insertText', false, quoted)
+      } else {
+        document.execCommand('insertText', false, '> ')
+      }
+    } else if (kind === 'code' || kind === 'mono') {
+      document.execCommand('insertText', false, selText ? '`' + selText + '`' : '`code`')
+    } else if (kind === 'bold') {
+      document.execCommand('insertText', false, selText ? '**' + selText + '**' : '**bold**')
+    } else if (kind === 'italic') {
+      document.execCommand('insertText', false, selText ? '*' + selText + '*' : '*italic*')
+    } else if (kind === 'underline') {
+      document.execCommand('insertText', false, selText ? '__' + selText + '__' : '__underline__')
+    } else if (kind === 'strike') {
+      document.execCommand('insertText', false, selText ? '~~' + selText + '~~' : '~~strikethrough~~')
+    } else if (kind === 'clear') {
+      document.execCommand('removeFormat', false, null)
     } else {
       const cmd = { bold: 'bold', italic: 'italic', underline: 'underline', strike: 'strikeThrough' }[kind]
       if (cmd) document.execCommand(cmd, false, null)
@@ -12347,10 +12839,15 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setFmtColorOpen(false)
   }
 
-  const applyEditorColor = (hex) => {
+  const applyEditorColor = (colorIdOrHex) => {
     if (!restoreSavedRange()) return
-    try { document.execCommand('styleWithCSS', false, true) } catch {}
-    document.execCommand('foreColor', false, hex)
+    const sel = window.getSelection()
+    const selText = sel ? sel.toString() : ''
+    if (selText) {
+      document.execCommand('insertText', false, '[color:' + colorIdOrHex + ']' + selText + '[/color]')
+    } else {
+      document.execCommand('insertText', false, '[color:' + colorIdOrHex + ']colored text[/color]')
+    }
     const el = editorRef.current
     if (el) { messageInputRef.current = el.innerText.replace(/\n$/, ''); setMessageInput(messageInputRef.current) }
     setFmtMenu(null)
@@ -12552,7 +13049,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       const imageMsg = {
         id: `${baseMessageId}_media`,
         sender: { id: currentUser.id, name: currentUser.name, photo: getPersonPhoto(currentUser) || null },
-        time: now, mediaUrl, mediaType: attach.mediaType, mediaStorage: uploadedMedia ? 's3' : 'inline', mediaId: uploadedMedia?.id || null, ...vanish,
+        time: now, mediaUrl, mediaType: attach.mediaType, isSpoiler: Boolean(attach.isSpoiler), mediaStorage: uploadedMedia ? 's3' : 'inline', mediaId: uploadedMedia?.id || null, ...vanish,
         ...(replySnap ? { replyTo: { id: replySnap.id, text: replySnap.text, senderName: replySnap.senderName, senderId: replySnap.senderId } } : {})
       }
       setMessages(prev => appendUniqueMessage(prev, msgKey, imageMsg))
@@ -12999,7 +13496,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         <div className="dashboard-top-row su-drop su-drop-1" style={showMenu ? { filter: 'blur(4px)' } : {}}>
           <div className="dashboard-top-left-wrap">
             <div className="sidebar-logo-area" style={{ cursor: 'pointer' }} onClick={goHome} title="Reelms">
-              <img src={reelmsLogo} alt="Reelms" className="sidebar-logo" style={{ filter: headerIconThemeFilter(effectiveAccent) }} />
+              <img src={reelmsLogo} alt="Reelms" className="sidebar-logo" />
             </div>
             {!isMobile && topTicker && (
               <div
@@ -13053,19 +13550,19 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             <div className="header-icons-group">
               {!isMobile && (
                 <button className="header-settings-btn" onClick={toggleFriendsPopup} style={{ opacity: showFriendsPopup ? 0 : 1 }}>
-                  <img src={friendsIcon} alt="Friends" className="header-icon" style={{ filter: (activeTheme.id === 'gece' || activeTheme.id === 'default') ? headerIconThemeFilter(effectiveAccent) : 'hue-rotate(220deg) saturate(1.96) brightness(0.14)' }} />
+                  <img src={friendsIcon} alt="Friends" className="header-icon" style={{ filter: iconThemeFilter(effectiveAccent) }} />
                 </button>
               )}
               <button className="header-settings-btn" onClick={toggleNotifPopup} style={{ opacity: showNotificationsPopup ? 0 : 1 }}>
                 <span className="notif-icon-wrap">
-                  <img src={notificationIcon} alt="Notifications" className="header-icon" style={{ filter: (activeTheme.id === 'gece' || activeTheme.id === 'default') ? headerIconThemeFilter(effectiveAccent) : 'hue-rotate(220deg) saturate(1.96) brightness(0.14)' }} />
+                  <img src={notificationIcon} alt="Notifications" className="header-icon" style={{ filter: iconThemeFilter(effectiveAccent) }} />
                   {notifications.length > notifSeenCount && (
                     <span className="notif-badge">{capBadge(notifications.length - notifSeenCount)}</span>
                   )}
                 </span>
               </button>
               <button className="header-settings-btn" onClick={() => { setShowSettings(v => { if (!v) setSelectedSettingsCategory(null); return !v }); setSelectedReelm(null); setSelectedChat(null); setShowDiscover(false); setShowFriendsPanel(false) }}>
-                <SettingsIcon isNight={activeTheme.id === 'gece' || activeTheme.id === 'default'} />
+                <img src={settingsIcon} alt="Settings" className="header-icon header-settings-icon" style={{ filter: iconThemeFilter(effectiveAccent) }} />
               </button>
             </div>
           </div>
@@ -13154,7 +13651,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   onClick={() => setShowMenu(!showMenu)}
                   title="New"
                 >
-                  <img src={newIcon} alt="New" className="header-new-icon" style={{ filter: newIconThemeFilter(effectiveAccent) }} />
+                  <img src={newIcon} alt="New" className="header-new-icon" style={{ filter: iconThemeFilter(effectiveAccent) }} />
                 </button>
                 <div className="sidebar-divider" />
                 <div className="chats-list-vertical" ref={barScrollRef}>
@@ -13433,7 +13930,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   >
                     <span className="bar-item-wrap">
                       <div className="bar-item-avatar bar-item-avatar--nav">
-                        <img src={channelTextIcon} alt="Messages" className="bar-nav-icon bar-nav-icon--msg" style={{ filter: categoryIconFilter(effectiveAccent) }} />
+                        <img src={messagesIcon} alt="Messages" className="bar-nav-icon bar-nav-icon--msg" style={{ filter: iconThemeFilter(effectiveAccent) }} />
                       </div>
                       {totalUnread > 0 && (
                         <span className="bar-item-badge">{capBadge(totalUnread)}</span>
@@ -13458,7 +13955,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   >
                     <span className="bar-item-wrap">
                       <div className="bar-item-avatar bar-item-avatar--nav">
-                        <img src={discoverIcon} alt="Discover" className="bar-nav-icon" />
+                        <img src={discoverIcon} alt="Discover" className="bar-nav-icon" style={{ filter: iconThemeFilter(effectiveAccent) }} />
                       </div>
                     </span>
                   </button>
@@ -16217,9 +16714,28 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                   else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); insertMention(mentionOptions[mentionSelIdx]); return }
                                   else if (e.key === 'Escape') { setMentionQuery(null); return }
                                 }
+                                // Rich Keyboard Shortcuts (Ctrl/Cmd + B, I, U, Shift+S, Shift+C, K, Tab)
+                                if ((e.ctrlKey || e.metaKey) && !e.altKey) {
+                                  const k = e.key.toLowerCase()
+                                  if (k === 'b') { e.preventDefault(); applyEditorFormat('bold'); return }
+                                  if (k === 'i') { e.preventDefault(); applyEditorFormat('italic'); return }
+                                  if (k === 'u') { e.preventDefault(); applyEditorFormat('underline'); return }
+                                  if (k === 's' && e.shiftKey) { e.preventDefault(); applyEditorFormat('strike'); return }
+                                  if (k === 'c' && e.shiftKey) { e.preventDefault(); applyEditorFormat('code'); return }
+                                  if (k === 'k') { e.preventDefault(); insertLink('', ''); return }
+                                }
+                                if (e.key === 'Tab') {
+                                  const sel = window.getSelection()
+                                  if (sel && sel.rangeCount) {
+                                    e.preventDefault()
+                                    document.execCommand('insertText', false, '  ')
+                                    return
+                                  }
+                                }
                                 if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
                               }}
                             />
+                            <RichMessageComposerToolbar editorRef={editorRef} onApplyFormat={applyEditorFormat} onApplyColor={applyEditorColor} onInsertCodeBlock={insertCodeBlock} onInsertLink={insertLink} isMobile={isMobile} />
                             {fmtMenu && ReactDOM.createPortal(
                               <div className="fmt-menu" style={{ left: fmtMenu.x, top: fmtMenu.y }} onMouseDown={e => e.preventDefault()} onContextMenu={e => e.preventDefault()}>
                                 {!fmtColorOpen ? (
@@ -16245,6 +16761,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             )}
                             {pendingAttachment && (
                               <div className="msg-attach-preview">
+                                <button
+                                  type="button"
+                                  className={`msg-attach-spoiler-btn${pendingAttachment?.isSpoiler ? " is-spoiler" : ""}`}
+                                  onClick={() => setPendingAttachment(prev => ({ ...prev, isSpoiler: !prev?.isSpoiler }))}
+                                  title="Toggle spoiler for attachment"
+                                >
+                                  {pendingAttachment?.isSpoiler ? "⚠️ Spoiler On" : "Mark Spoiler"}
+                                </button>
                                 {pendingAttachment.mediaType === 'image' ? (
                                   <img className="msg-attach-thumb" src={pendingAttachment.dataUrl} alt="" />
                                 ) : pendingAttachment.mediaType === 'audio' ? (
@@ -16797,11 +17321,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   onClick={() => setShowBlockedModal(true)}
                   title="View & manage blocked users"
                 >
+                  <span>Blocked ({blocked ? blocked.length : 0})</span>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="10"/>
                     <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
                   </svg>
-                  <span>Blocked ({blocked ? blocked.length : 0})</span>
                 </button>
               </div>
             ) : isMod ? (
@@ -17449,7 +17973,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         {showFriendsPopup && (
           <div className="hpopup hpopup-friends" onClick={e => e.stopPropagation()}>
             <div className="hpopup-top-row">
-              <span className="hpopup-title" style={{ fontFamily: "'Dela Gothic One', sans-serif", fontWeight: 'normal' }}>{t('friends')}</span>
+              <span className="hpopup-title" style={{ fontFamily: "'Karla', sans-serif", fontWeight: 800 }}>{t('friends')}</span>
               {friendRequests.length > 0 && <span className="notif-badge--inline">{friendRequests.length}</span>}
             </div>
             <div className="hpopup-content">
@@ -17489,7 +18013,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         {showNotificationsPopup && (
           <div className="hpopup hpopup-notifs" onClick={e => e.stopPropagation()}>
             <div className="hpopup-top-row">
-              <span className="hpopup-title" style={{ fontFamily: "'Dela Gothic One', sans-serif", fontWeight: 'normal' }}>{t('notifications')}</span>
+              <span className="hpopup-title" style={{ fontFamily: "'Karla', sans-serif", fontWeight: 800 }}>{t('notifications')}</span>
             </div>
             <div className="hpopup-content hpopup-content--scroll">
               {notifications.length === 0

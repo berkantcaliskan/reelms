@@ -66,6 +66,9 @@ export type ReelmPermissionKey =
   | 'manageJoinRequests'
   | 'manageModeration'
   | 'pinMessages'
+  | 'createVaporRoom'
+  | 'viewAuditLog'
+  | 'bypassSlowMode'
   | 'manageReelm'
 
 const REELM_ELEVATED_ROLE_RE = /admin|owner|founder|moderator/i
@@ -78,6 +81,18 @@ export function roleHasReelmPermission(role: any, permission: ReelmPermissionKey
   if (!role) return false
   if (isElevatedReelmRole(role)) return true
   if (permission === 'viewSettings') return role?.permissions?.viewSettings === true || Object.values(role?.permissions || {}).some((value) => value === true)
+  if (permission === 'viewAuditLog') {
+    return role?.permissions?.viewAuditLog === true ||
+      role?.permissions?.manageModeration === true ||
+      role?.permissions?.manageRoles === true ||
+      role?.permissions?.manageChannels === true ||
+      role?.permissions?.manageOverview === true
+  }
+  if (permission === 'bypassSlowMode') {
+    return role?.permissions?.bypassSlowMode === true ||
+      role?.permissions?.manageModeration === true ||
+      role?.permissions?.manageChannels === true
+  }
   return role?.permissions?.[permission] === true
 }
 
