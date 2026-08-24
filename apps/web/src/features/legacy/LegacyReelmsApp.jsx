@@ -1321,6 +1321,7 @@ const THEMES = [
     borderStrong: 'rgba(255,255,255,0.14)',
     grainOpacity: 0.12,
     noAccentGlow: true,
+    noGradient: true,
     isLight: false,
   },
   {
@@ -1351,6 +1352,7 @@ const THEMES = [
     surfaceHover: '#e3d3bd',
     borderSubtle: 'rgba(0,0,0,0.08)',
     borderStrong: 'rgba(0,0,0,0.14)',
+    noAccentGlow: true,
     noGradient: true,
     isLight: true,
     hasSubAccents: true,
@@ -1367,6 +1369,8 @@ const THEMES = [
     surfaceHover: '#23234d',
     borderSubtle: 'rgba(255,255,255,0.08)',
     borderStrong: 'rgba(255,255,255,0.14)',
+    noAccentGlow: true,
+    noGradient: true,
     isLight: false,
     hasSubAccents: true,
   },
@@ -1382,6 +1386,8 @@ const THEMES = [
     surfaceHover: '#2e1f54',
     borderSubtle: 'rgba(255,255,255,0.08)',
     borderStrong: 'rgba(255,255,255,0.14)',
+    noAccentGlow: true,
+    noGradient: true,
     isLight: false,
   },
 ]
@@ -4333,6 +4339,7 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
   const [mediaSaving, setMediaSaving] = useState(null)
   const fpPhotoRef = useRef(null)
   const fpCoverRef = useRef(null)
+  const fpTouchRef = useRef(null)
 
   useEffect(() => {
     const t = setTimeout(() => setVisible(true), 10)
@@ -4386,7 +4393,21 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
         }
       }}
     >
-      <div className={`fp-page${visible ? ' fp-page--in' : ''}`}>
+      <div
+        className={`fp-page${visible ? ' fp-page--in' : ''}`}
+        onTouchStart={e => {
+          fpTouchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+        }}
+        onTouchEnd={e => {
+          if (!fpTouchRef.current) return
+          const dx = e.changedTouches[0].clientX - fpTouchRef.current.x
+          const dy = e.changedTouches[0].clientY - fpTouchRef.current.y
+          fpTouchRef.current = null
+          if (dx > 50 && Math.abs(dx) > Math.abs(dy)) {
+            handleClose()
+          }
+        }}
+      >
         <button className="fp-back-btn" onClick={handleClose}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
             <path d="M19 12H5M5 12l7 7M5 12l7-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
@@ -9658,7 +9679,88 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [pendingReelmJoinIds, setPendingReelmJoinIds] = useState([])
   const [showFriendsPopup, setShowFriendsPopup] = useState(false)
   const [showNotificationsPopup, setShowNotificationsPopup] = useState(false)
+  const [showNotificationsPanel, setShowNotificationsPanel] = useState(false)
   const [showFriendsPanel, setShowFriendsPanel] = useState(false)
+  const [prevMobileTab, setPrevMobileTab] = useState('messages')
+
+  const openMobileTab = (tab) => {
+    let currentTab = 'messages'
+    if (showNotificationsPanel) currentTab = 'notifications'
+    else if (showFriendsPanel) currentTab = 'friends'
+    else if (showDiscover) currentTab = 'discover'
+    else if (showSettings) currentTab = 'settings'
+    else if (selectedChat || selectedReelm) currentTab = 'chat'
+    else if (showChatList) currentTab = 'messages'
+
+    if (currentTab !== tab) {
+      setPrevMobileTab(currentTab)
+    }
+
+    if (tab === 'discover') {
+      setShowDiscover(true)
+      setShowFriendsPanel(false)
+      setShowNotificationsPanel(false)
+      setShowNotificationsPopup(false)
+      setShowSettings(false)
+      setShowChatList(false)
+      setSelectedReelm(null)
+      setSelectedChat(null)
+      setDiscoverQuery('')
+    } else if (tab === 'friends') {
+      setShowFriendsPanel(true)
+      setShowDiscover(false)
+      setShowNotificationsPanel(false)
+      setShowNotificationsPopup(false)
+      setShowSettings(false)
+      setShowChatList(false)
+      setSelectedReelm(null)
+      setSelectedChat(null)
+    } else if (tab === 'notifications') {
+      setShowNotificationsPanel(true)
+      setShowNotificationsPopup(false)
+      setShowFriendsPanel(false)
+      setShowDiscover(false)
+      setShowSettings(false)
+      setShowChatList(false)
+      setSelectedReelm(null)
+      setSelectedChat(null)
+      setNotifSeenCount(notifications.length)
+    } else if (tab === 'messages') {
+      setShowChatList(true)
+      setShowDiscover(false)
+      setShowFriendsPanel(false)
+      setShowNotificationsPanel(false)
+      setShowNotificationsPopup(false)
+      setShowSettings(false)
+      setSelectedReelm(null)
+      setSelectedChat(null)
+    } else if (tab === 'settings') {
+      setShowSettings(true)
+      setShowDiscover(false)
+      setShowFriendsPanel(false)
+      setShowNotificationsPanel(false)
+      setShowNotificationsPopup(false)
+      setShowChatList(false)
+      setSelectedReelm(null)
+      setSelectedChat(null)
+    }
+  }
+
+  const goBackMobile = () => {
+    if (fullProfileTarget) {
+      setFullProfileTarget(null)
+      return
+    }
+    if (showSettings && selectedSettingsCategory) {
+      setSelectedSettingsCategory(null)
+      return
+    }
+    if (showNotificationsPanel || showFriendsPanel || showDiscover || showSettings || selectedChat || selectedReelm) {
+      const target = (prevMobileTab === 'notifications' && showNotificationsPanel) ? 'messages' : (prevMobileTab || 'messages')
+      openMobileTab(target)
+    }
+  }
+
   const [showSettings, setShowSettings] = useState(false)
   const [selectedSettingsCategory, setSelectedSettingsCategory] = useState('account')
   const [showHelpCenter, setShowHelpCenter] = useState(false)
@@ -9719,7 +9821,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [modDeleteTick, setModDeleteTick] = useState(0)
   const [appStoriesTick, setAppStoriesTick] = useState(0)
   const [shareTarget, setShareTarget] = useState(null)
-  const [showChatList, setShowChatList] = useState(false)
+  const [showChatList, setShowChatList] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768)
   const [chatListFilter, setChatListFilter] = useState('all')
   const [showChatFilterMore, setShowChatFilterMore] = useState(false)
   const [chatListSearch, setChatListSearch] = useState('')
@@ -10689,10 +10791,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setSelectedReelm(null)
     setShowDiscover(false)
     setShowFriendsPanel(false)
+    setShowNotificationsPanel(false)
     setShowSettings(false)
-    setShowChatList(false)
+    setShowChatList(isMobile)
     setShowFeed(false)
     setShowInsightsModal(null)
+    setShowNotificationsPopup(false)
+    setFullProfileTarget(null)
   }
 
   const toggleMuteReelmById = (reelmId) => {
@@ -14840,17 +14945,57 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   <MaskIcon src={friendsIcon} alt="Friends" className="header-icon" />
                 </button>
               )}
-              <button className="header-settings-btn" onClick={toggleNotifPopup} style={{ opacity: showNotificationsPopup ? 0 : 1 }}>
-                <span className="notif-icon-wrap">
-                  <MaskIcon src={notificationIcon} alt="Notifications" className="header-icon" />
-                  {notifications.length > notifSeenCount && (
-                    <span className="notif-badge">{capBadge(notifications.length - notifSeenCount)}</span>
-                  )}
-                </span>
-              </button>
-              <button className="header-settings-btn" onClick={() => { setShowInsightsModal(null); setShowSettings(v => { if (!v) setSelectedSettingsCategory(isMobile ? null : 'account'); return !v }); setSelectedReelm(null); setSelectedChat(null); setShowDiscover(false); setShowFriendsPanel(false) }}>
-                <MaskIcon src={settingsIcon} alt="Settings" className="header-icon header-settings-icon" />
-              </button>
+              {!isMobile && (
+                <button className="header-settings-btn" onClick={toggleNotifPopup} style={{ opacity: showNotificationsPopup ? 0 : 1 }}>
+                  <span className="notif-icon-wrap">
+                    <MaskIcon src={notificationIcon} alt="Notifications" className="header-icon" />
+                    {notifications.length > notifSeenCount && (
+                      <span className="notif-badge">{capBadge(notifications.length - notifSeenCount)}</span>
+                    )}
+                  </span>
+                </button>
+              )}
+              {isMobile ? (
+                <button
+                  className="header-settings-btn header-settings-btn--mobile-menu"
+                  onClick={() => {
+                    setShowInsightsModal(null)
+                    setShowSettings(v => {
+                      if (!v) setSelectedSettingsCategory(null)
+                      return !v
+                    })
+                    setSelectedReelm(null)
+                    setSelectedChat(null)
+                    setShowDiscover(false)
+                    setShowFriendsPanel(false)
+                  }}
+                  title="Menu"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--ta)" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" className="header-menu-burger-icon">
+                    <line x1="3" y1="6" x2="21" y2="6" />
+                    <line x1="3" y1="12" x2="21" y2="12" />
+                    <line x1="3" y1="18" x2="21" y2="18" />
+                  </svg>
+                </button>
+              ) : (
+                <button
+                  className="header-settings-btn"
+                  onClick={() => {
+                    setShowInsightsModal(null)
+                    setShowSettings(v => {
+                      if (!v) setSelectedSettingsCategory('account')
+                      return !v
+                    })
+                    setSelectedReelm(null)
+                    setSelectedChat(null)
+                    setShowDiscover(false)
+                    setShowFriendsPanel(false)
+                  }}
+                  title="Settings"
+                >
+                  <MaskIcon src={settingsIcon} alt="Settings" className="header-icon header-settings-icon" />
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -14912,7 +15057,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         )}
 
         <div
-          className="panel-system"
+          className={`panel-system${isMobile ? (mobileLeftPanelOpen ? ' panel-system--left-open' : mobileRightPanelOpen ? ' panel-system--right-open' : '') : ''}`}
           style={showMenu ? { filter: 'blur(4px)' } : {}}
           onTouchStart={isMobile ? (e) => {
             mobileTouchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
@@ -14922,12 +15067,53 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             const dx = e.changedTouches[0].clientX - mobileTouchRef.current.x
             const dy = e.changedTouches[0].clientY - mobileTouchRef.current.y
             mobileTouchRef.current = null
-            if (Math.abs(dy) > Math.abs(dx) || Math.abs(dx) < 40) return
-            if (mobileLeftPanelOpen) { setMobileLeftPanelOpen(false); return }
-            if (mobileRightPanelOpen) { setMobileRightPanelOpen(false); return }
-            if (!selectedReelm) return
-            if (dx > 0) setMobileLeftPanelOpen(true)
-            else setMobileRightPanelOpen(true)
+            if (Math.abs(dy) > Math.abs(dx) || Math.abs(dx) < 35) return
+
+            if (selectedReelm) {
+              if (dx > 45) {
+                // Swipe right: close members if open, or open channels
+                if (mobileRightPanelOpen) {
+                  setMobileRightPanelOpen(false)
+                } else if (!mobileLeftPanelOpen) {
+                  setMobileLeftPanelOpen(true)
+                } else {
+                  goBackMobile()
+                }
+              } else if (dx < -45) {
+                // Swipe left: close channels if open, or open members
+                if (mobileLeftPanelOpen) {
+                  setMobileLeftPanelOpen(false)
+                } else if (!mobileRightPanelOpen) {
+                  setMobileRightPanelOpen(true)
+                }
+              }
+              return
+            }
+
+            if (selectedChat) {
+              if (dx > 45) {
+                if (mobileRightPanelOpen) {
+                  setMobileRightPanelOpen(false)
+                } else if (!mobileLeftPanelOpen) {
+                  goBackMobile()
+                } else {
+                  setMobileLeftPanelOpen(false)
+                }
+              } else if (dx < -45) {
+                if (mobileLeftPanelOpen) {
+                  setMobileLeftPanelOpen(false)
+                } else if (!mobileRightPanelOpen && selectedChat.type === 'group') {
+                  setMobileRightPanelOpen(true)
+                }
+              }
+              return
+            }
+
+            if (dx > 45) {
+              if (showNotificationsPanel || showFriendsPanel || showDiscover || showSettings) {
+                goBackMobile()
+              }
+            }
           } : undefined}
         >
           {!isMobile && (
@@ -15785,20 +15971,21 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               />
             ) : showSettings ? (
               <div className={`settings-layout${isMobile ? (!selectedSettingsCategory ? ' settings-layout--mobile-menu' : ' settings-layout--mobile-content') : ''}`}>
-                <button
-                  type="button"
-                  className="settings-floating-close-btn"
-                  onClick={() => setShowSettings(false)}
-                  title={t('close')}
-                >
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                    <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                  </svg>
-                </button>
-
                 <div className="settings-sidebar">
                   <div className="settings-sidebar-top-row">
                     <h2 className="settings-title">{t('settings')}</h2>
+                    {!isMobile && (
+                      <button
+                        type="button"
+                        className="settings-floating-close-btn"
+                        onClick={() => setShowSettings(false)}
+                        title={t('close')}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                          <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                        </svg>
+                      </button>
+                    )}
                   </div>
                   <nav className="settings-nav">
                     {[
@@ -16357,7 +16544,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   {renderReelmMembersPanel('right-1')}
                 </div>
               </>
-            ) : !showDiscover && !showSettings && !showFriendsPanel && !showMsgRequests && ((isMod ? false : (showChatList || selectedChat)) || selectedReelm) ? (
+            ) : !showDiscover && !showSettings && !showFriendsPanel && !showNotificationsPanel && !showMsgRequests && ((isMod ? false : (showChatList || selectedChat)) || selectedReelm) ? (
               <>
                 <div className={`panel panel-left${isMobile && mobileLeftPanelOpen ? ' panel-left--open' : ''}${isMobile && !selectedReelm && showChatList && !selectedChat ? ' panel-left--chat' : ''}`} style={isMobile ? undefined : { flex: `0 0 ${leftWidth}px` }}>
                   {showChatList && !selectedReelm && (
@@ -17156,6 +17343,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 <React.Fragment key={ch.id}>
                                   <div className={`reelm-channel${ch.isFlyingRoom ? ' reelm-channel-flying' : ''}${(unreadCounts[`${selectedReelm.id}_${ch.id}`] || 0) > 0 ? ' reelm-channel--unread' : ''}`} onClick={() => {
                                       setChannelCtxMenu(null); setSelectedChannel(ch); clearReelmChannelUnread(selectedReelm.id, ch.id)
+                                      if (isMobile) setMobileLeftPanelOpen(false)
                                       if (['voice', 'video', 'liveaction', 'stage'].includes(ch.type) && (selectedReelm.autoJoinVoice !== false) && voiceChannel?.channelId !== ch.id) {
                                         joinVoiceChannel(selectedReelm.id, ch.id, ch.name)
                                       }
@@ -18165,51 +18353,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               </button>
                             </div>
                           )}
-                          {isMobile && selectedReelm && (
-                            <div className="mobile-reelm-input-nav">
-                              <div className="mobile-rin-left">
-                                <button
-                                  className="mobile-rin-btn"
-                                  onClick={() => { setSelectedReelm(null); setSelectedChat(null); setShowChatList(false); setShowFeed(false); setShowDiscover(false) }}
-                                  title="Home"
-                                >
-                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                                    <path d="M3 9.5L12 3l9 6.5V20a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V9.5z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                                    <path d="M9 21V12h6v9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                                  </svg>
-                                </button>
-                              </div>
-                              <div className="mobile-rin-right">
-                                <button
-                                  className={`mobile-rin-btn${showDiscover ? ' mobile-rin-btn--active' : ''}`}
-                                  onClick={() => { setShowDiscover(true); setSelectedReelm(null); setShowFeed(false); setDiscoverQuery('') }}
-                                  title="Discover"
-                                >
-                                  <img src={discoverIcon} alt="Discover" width="20" height="20" />
-                                </button>
-                                {showFeed ? (
-                                  <button
-                                    className="mobile-rin-btn"
-                                    onClick={() => { setShowFeed(false); setSelectedChat(null); setShowChatList(false) }}
-                                    title="Messages"
-                                  >
-                                    <span style={{ position: 'relative', display: 'flex' }}>
-                                      <img src={messagesIcon} alt="Messages" width="20" height="20" />
-                                      {totalUnread > 0 && <span className="lpb-badge">{capBadge(totalUnread)}</span>}
-                                    </span>
-                                  </button>
-                                ) : (
-                                  <button
-                                    className={`mobile-rin-btn${showFeed ? ' mobile-rin-btn--active' : ''}`}
-                                    onClick={() => { setShowFeed(true); setShowDiscover(false) }}
-                                    title="Feed"
-                                  >
-                                    <img src={feedIcon} alt="Feed" width="20" height="20" />
-                                  </button>
-                                )}
-                              </div>
-                            </div>
-                          )}
                           <div className={`msg-outer-row${spotifyNowPlaying ? ' msg-outer-row--spotify' : ''}`}>
                             <div className="msg-bar">
                           <div className={`msg-input-wrap${pendingAttachment ? ' msg-input-wrap--has-attach' : ''}`}>
@@ -18862,6 +19005,59 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   </svg>
                 </button>
               </div>
+            ) : showNotificationsPanel ? (
+              <div className="panel panel-middle discover-panel notifs-panel" style={{ position: 'relative' }}>
+                <div className="discover-header">
+                  <h2 className="discover-title">{t('notifications')}</h2>
+                </div>
+                <div className="discover-results">
+                  {notifications.length === 0
+                    ? <p className="discover-empty">{t('no_notifications')}</p>
+                    : notifications.map((n) => {
+                        const isReelmInvite = n.link?.type === 'reelm_invite'
+                        return (
+                          <div
+                            key={n.id}
+                            className="discover-result-row"
+                            onClick={() => {
+                              if (isReelmInvite) return
+                              navigateToNotificationLink(n.link)
+                              deleteNotification(n.id)
+                              setShowNotificationsPanel(false)
+                            }}
+                          >
+                            <div className="discover-result-avatar">
+                              <MaskIcon src={notificationIcon} alt="" className="header-icon" />
+                            </div>
+                            <div className="discover-result-info">
+                              <span className="discover-result-name">{n.text}</span>
+                            </div>
+                            {isReelmInvite && (
+                              <div className="friend-req-actions" onClick={e => e.stopPropagation()}>
+                                <button className="friend-add-btn" onClick={() => acceptReelmInviteNotification(n)}>Accept</button>
+                                <button className="friend-reject-btn" onClick={() => rejectReelmInviteNotification(n)}>Decline</button>
+                              </div>
+                            )}
+                            <button
+                              className="friend-reject-btn notif-row-del-btn"
+                              onClick={(e) => { e.stopPropagation(); deleteNotification(n.id) }}
+                              title="Delete"
+                            >
+                              ✕
+                            </button>
+                          </div>
+                        )
+                      })
+                  }
+                  {notifications.length > 0 && (
+                    <div style={{ padding: '14px 0', display: 'flex', justifyContent: 'center' }}>
+                      <button className="friend-add-btn notif-clear-all-btn" onClick={clearAllNotifications}>
+                        Clear all
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
             ) : isMod ? (
               <div className="panel panel-middle" style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
                 <ModInboxPanel onClose={() => {}} />
@@ -19182,35 +19378,64 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           )}
           {isMobile && !selectedReelm && !selectedChat && (
             <nav className="mobile-bottom-nav">
-              <div className="mobile-nav-pill">
-                <button
-                  className={`mobile-nav-btn${showDiscover ? ' mobile-nav-btn--active' : ''}`}
-                  onClick={() => { setShowDiscover(true); setSelectedReelm(null); setSelectedChat(null); setShowChatList(false); setShowSettings(false); setDiscoverQuery('') }}
-                  title="Discover"
-                >
-                  <img src={discoverIcon} alt="Discover" className="mobile-nav-icon" />
-                </button>
-                <button
-                  className="mobile-nav-btn mobile-nav-btn--profile"
-                  onClick={() => setFullProfileTarget({ isSelf: true, user: currentUser })}
-                  title="Profile"
-                >
-                  <div className="mobile-nav-profile-avatar">
-                    <img src={getPersonPhoto(currentUser) || avatarUIcon} alt="Profile" />
-                    <span className="mobile-nav-status-dot" style={{ background: { online: '#4ade80', idle: '#fbbf24', busy: '#f87171', invisible: '#9ca3af' }[profileStatus] }} />
-                  </div>
-                </button>
-                <button
-                  className={`mobile-nav-btn${(showChatList || selectedChat) && !showDiscover && !showSettings ? ' mobile-nav-btn--active' : ''}`}
-                  onClick={() => { setSelectedChat(null); setSelectedReelm(null); setShowChatList(true); setChatListFilter('all'); setShowDiscover(false); setShowSettings(false); setShowFriendsPanel(false) }}
-                  title="Messages"
-                >
-                  <span style={{ position: 'relative', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <img src={messagesIcon} alt="Messages" className="mobile-nav-icon" />
-                    {totalUnread > 0 && <span className="mobile-nav-badge">{capBadge(totalUnread)}</span>}
-                  </span>
-                </button>
-              </div>
+              <button
+                className={`mobile-nav-btn${showDiscover && !showSettings && !showFriendsPanel && !showNotificationsPanel ? ' mobile-nav-btn--active' : ''}`}
+                onClick={() => openMobileTab('discover')}
+                title="Discover"
+              >
+                <img src={discoverIcon} alt="Discover" className="mobile-nav-icon" />
+              </button>
+              <button
+                className={`mobile-nav-btn${showFriendsPanel && !showDiscover && !showSettings && !showNotificationsPanel ? ' mobile-nav-btn--active' : ''}`}
+                onClick={() => openMobileTab('friends')}
+                title={t('friends')}
+              >
+                <span className="mobile-nav-icon-wrap">
+                  <img src={friendsIcon} alt="Friends" className="mobile-nav-icon" />
+                  {friendRequests.length > 0 && <span className="mobile-nav-badge">{capBadge(friendRequests.length)}</span>}
+                </span>
+              </button>
+              <button
+                className={`mobile-nav-btn${showNotificationsPanel ? ' mobile-nav-btn--active' : ''}`}
+                onClick={() => openMobileTab('notifications')}
+                title={t('notifications')}
+              >
+                <span className="mobile-nav-icon-wrap">
+                  <img src={notificationIcon} alt="Notifications" className="mobile-nav-icon" />
+                  {notifications.length > notifSeenCount && (
+                    <span className="mobile-nav-badge">{capBadge(notifications.length - notifSeenCount)}</span>
+                  )}
+                </span>
+              </button>
+              <button
+                className={`mobile-nav-btn${(showChatList && !showDiscover && !showSettings && !showFriendsPanel && !showNotificationsPanel) ? ' mobile-nav-btn--active' : ''}`}
+                onClick={() => openMobileTab('messages')}
+                title={t('messages')}
+              >
+                <span className="mobile-nav-icon-wrap">
+                  <img src={messagesIcon} alt="Messages" className="mobile-nav-icon" />
+                  {totalUnread > 0 && <span className="mobile-nav-badge">{capBadge(totalUnread)}</span>}
+                </span>
+              </button>
+              <button
+                className={`mobile-nav-btn mobile-nav-btn--profile${showProfilePopup || fullProfileTarget?.isSelf ? ' mobile-nav-btn--active' : ''}`}
+                onClick={() => {
+                  let currentTab = 'messages'
+                  if (showNotificationsPanel) currentTab = 'notifications'
+                  else if (showFriendsPanel) currentTab = 'friends'
+                  else if (showDiscover) currentTab = 'discover'
+                  else if (showSettings) currentTab = 'settings'
+                  else if (selectedChat || selectedReelm) currentTab = 'chat'
+                  setPrevMobileTab(currentTab)
+                  setFullProfileTarget({ isSelf: true, user: currentUser })
+                }}
+                title="Profile"
+              >
+                <div className="mobile-nav-profile-avatar">
+                  <img src={getPersonPhoto(currentUser) || avatarUIcon} alt="Profile" />
+                  <span className="mobile-nav-status-dot" style={{ background: { online: '#4ade80', idle: '#fbbf24', busy: '#f87171', invisible: '#9ca3af' }[profileStatus] }} />
+                </div>
+              </button>
             </nav>
           )}
         </div>
@@ -19313,8 +19538,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         <span>Join a Reelm</span>
                       </button>
                     </div>
-                    
-                    <div className="menu-divider"></div>
                     
                     <div className="menu-items-row">
                       <button 
