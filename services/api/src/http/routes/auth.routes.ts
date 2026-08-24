@@ -195,9 +195,22 @@ async function createOrGetGoogleUser(googleUser: { email: string; name?: string;
       if (!creds?.uid) throw new Error('google_auth_race_lost')
       uid = String(creds.uid)
     } else {
-      const profileData: Record<string, unknown> = { id: uid, uid, contact: email, emailVerified: true, createdAt: Date.now(), updatedAt: Date.now() }
+      const profileData: Record<string, unknown> = {
+        id: uid,
+        uid,
+        contact: email,
+        emailVerified: true,
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+        needsUsername: true
+      }
       if (googleUser.name) profileData.displayName = googleUser.name
       if (googleUser.name) profileData.name = googleUser.name
+      if (googleUser.picture) {
+        profileData.photo = googleUser.picture
+        profileData.photoURL = googleUser.picture
+        profileData.avatar = googleUser.picture
+      }
       await putDoc(userPk(uid), 'profile', profileData)
       await putDocIfAbsent(`EMAIL#${email}`, 'uid', uid).catch(() => {})
     }

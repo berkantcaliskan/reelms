@@ -554,7 +554,10 @@ export function createReelmsDataRouter(io: Server) {
       next.banner = cover || null
     }
 
-    if (next.username != null) next.username = normalizeUsername(next.username)
+    if (next.username != null) {
+      next.username = normalizeUsername(next.username)
+      if (next.username) next.needsUsername = false
+    }
     if (next.contact != null) next.contact = normalizeEmail(next.contact)
     if (next.email != null) next.email = normalizeEmail(next.email)
 

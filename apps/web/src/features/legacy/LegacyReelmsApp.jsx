@@ -20466,6 +20466,134 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           onPlayerStateChange={({ paused }) => setSpotifyInlinePaused(paused)}
         />
       )}
+      {currentUser && uid !== 'guest' && Boolean(currentUser.needsUsername || !currentUser.username || currentUser.username.trim() === '') && (
+        <UsernameOnboardingModal
+          currentUser={currentUser}
+          onComplete={async (chosenUsername) => {
+            await updateUserData({ username: chosenUsername, needsUsername: false, usernameConfirmed: true })
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
+function UsernameOnboardingModal({ currentUser, onComplete }) {
+  const t = useT()
+  const [username, setUsername] = useState('')
+  const [status, setStatus] = useState('idle') // 'idle' | 'checking' | 'available' | 'taken' | 'invalid'
+  const [errorMsg, setErrorMsg] = useState('')
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const debounceTimerRef = useRef(null)
+
+  const handleInputChange = (e) => {
+    const val = e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, '').slice(0, 24)
+    setUsername(val)
+    setErrorMsg('')
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current)
+
+    if (!val) {
+      setStatus('idle')
+      return
+    }
+
+    if (val.length < 3) {
+      setStatus('invalid')
+      setErrorMsg('Kullanıcı adı en az 3 karakter olmalıdır.')
+      return
+    }
+
+    setStatus('checking')
+    debounceTimerRef.current = setTimeout(async () => {
+      try {
+        const res = await userCheckUsername(val)
+        if (res?.available) {
+          setStatus('available')
+          setErrorMsg('')
+        } else {
+          setStatus('taken')
+          setErrorMsg('Bu kullanıcı adı zaten kullanımda.')
+        }
+      } catch {
+        setStatus('idle')
+      }
+    }, 350)
+  }
+
+  const handleSubmit = async (e) => {
+    e?.preventDefault()
+    const clean = username.trim().toLowerCase()
+    if (isSubmitting || status === 'taken' || status === 'invalid' || clean.length < 3) return
+    setIsSubmitting(true)
+    setErrorMsg('')
+    try {
+      const res = await userCheckUsername(clean)
+      if (!res?.available) {
+        setStatus('taken')
+        setErrorMsg('Bu kullanıcı adı zaten kullanımda.')
+        setIsSubmitting(false)
+        return
+      }
+      await onComplete(clean)
+    } catch (err) {
+      setErrorMsg(err?.message || 'Kullanıcı adı kaydedilemedi. Lütfen tekrar deneyin.')
+      setIsSubmitting(false)
+    }
+  }
+
+  const photo = getPersonPhoto(currentUser)
+  const displayName = currentUser?.name || currentUser?.displayName || 'User'
+
+  return (
+    <div className="onboarding-modal-overlay">
+      <div className="onboarding-modal-card">
+        <div className="onboarding-avatar-wrap">
+          {photo ? (
+            <img src={photo} alt="" className="onboarding-avatar-img" />
+          ) : (
+            <div className="onboarding-avatar-placeholder">
+              {displayName.charAt(0).toUpperCase()}
+            </div>
+          )}
+        </div>
+        <h2 className="onboarding-title">Reelms'e Hoş Geldin!</h2>
+        <p className="onboarding-subtitle">
+          Merhaba <strong>{displayName}</strong>, topluluğa katılmak için lütfen benzersiz bir kullanıcı adı belirle.
+        </p>
+
+        <form onSubmit={handleSubmit} className="onboarding-form">
+          <div className={`onboarding-input-wrap${status === 'available' ? ' onboarding-input-wrap--valid' : status === 'taken' || status === 'invalid' ? ' onboarding-input-wrap--error' : ''}`}>
+            <span className="onboarding-prefix">@</span>
+            <input
+              type="text"
+              className="onboarding-input"
+              placeholder="kullanici_adi"
+              value={username}
+              onChange={handleInputChange}
+              autoFocus
+              maxLength={24}
+              disabled={isSubmitting}
+            />
+            {status === 'checking' && (
+              <span className="onboarding-spinner" />
+            )}
+            {status === 'available' && (
+              <span className="onboarding-check-icon">✓</span>
+            )}
+          </div>
+
+          {errorMsg && <p className="onboarding-error-text">{errorMsg}</p>}
+          {status === 'available' && <p className="onboarding-success-text">@{username} kullanılabilir!</p>}
+
+          <button
+            type="submit"
+            className="onboarding-submit-btn"
+            disabled={isSubmitting || username.length < 3 || status === 'taken' || status === 'invalid' || status === 'checking'}
+          >
+            {isSubmitting ? 'Kaydediliyor...' : 'Devam Et'}
+          </button>
+        </form>
+      </div>
     </div>
   )
 }
