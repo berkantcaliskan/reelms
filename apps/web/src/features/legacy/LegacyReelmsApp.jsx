@@ -10262,7 +10262,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         if (soundPrevRef.current.friendReqs >= 0 && arr.length > soundPrevRef.current.friendReqs) {
           playSound.friend()
           const latest = arr[0]
-          if (latest) pushDashToast({ id: `friend_req_${latest.id || Date.now()}`, text: `${latest.name || 'Someone'} sent you a friend request.`, link: { type: 'friends' } })
+          if (latest) triggerTopTicker({ sender: 'Arkadaşlık', text: `${latest.name || 'Biri'} sana arkadaşlık isteği gönderdi.`, link: { type: 'friends' } })
         }
         soundPrevRef.current.friendReqs = arr.length
         setStableArray(setFriendRequests, arr)
@@ -10598,7 +10598,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             }
             if (link && title) {
               if (isDmKey) {
-                pushDashToast({ id: `dm_${msgKey}_${msg.id || Date.now()}`, text: title.slice(0, 180), link })
                 const senderName = msg.sender?.name || (transientChat || chat)?.name || 'Kullanıcı'
                 triggerTopTicker({
                   sender: senderName,
@@ -11167,7 +11166,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       scheduleUserPersist('notifications', next)
       return next
     })
-    pushDashToast({ id: n.id, text, link })
     triggerTopTicker({ sender: 'Bildirim', text, link })
   }
   const deleteNotification = (id) => {
@@ -20468,11 +20466,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           onPlayerStateChange={({ paused }) => setSpotifyInlinePaused(paused)}
         />
       )}
-      <ToastStack
-        toasts={dashToasts}
-        onDismiss={dismissDashToast}
-        onNavigate={(link) => navigateToNotificationLink(link)}
-      />
     </div>
   )
 }
