@@ -3138,7 +3138,6 @@ export function createReelmsDataRouter(io: Server) {
       const access = await getMessageKeyAccess(uid, msgKey)
       if (access.ok === false) return res.status(access.reason === 'invalid_key' ? 400 : 403).json({ error: access.reason })
       if (access.kind === 'moderation') return res.status(403).json({ error: 'forbidden' })
-      if (access.kind === 'dm' && isSystemInboxDmKey(msgKey)) return res.status(403).json({ error: 'system_inbox_locked', code: 'system/inbox-locked' })
       const items = await queryDocs(chanPk(msgKey), 'MSG#')
       await Promise.all(items.map((item: any) => deleteDoc(chanPk(msgKey), item.sk)))
       const payload = { msgKey }
@@ -3154,7 +3153,6 @@ export function createReelmsDataRouter(io: Server) {
       const msgKey = decodeURIComponent(req.params.msgKey)
       const access = await getMessageKeyAccess(uid, msgKey)
       if (access.ok === false) return res.status(access.reason === 'invalid_key' ? 400 : 403).json({ error: access.reason })
-      if (access.kind === 'dm' && isSystemInboxDmKey(msgKey)) return res.status(403).json({ error: 'system_inbox_locked', code: 'system/inbox-locked' })
 
       const msgId = req.params.msgId
       const items = await queryDocs(chanPk(msgKey), 'MSG#')
@@ -3164,17 +3162,21 @@ export function createReelmsDataRouter(io: Server) {
       const authorId = String(data?.userId || data?.authorId || data?.sender?.id || '')
       const isSystemAdmin = await isSystemAdminUid(uid).catch(() => false)
       // Authorized reelm roles (manageModeration / managers) can delete any message in
-      // their channel; everyone else may only delete their own message.
+      // their channel; in DMs (including system inbox), recipient/participant can delete;
+      // otherwise author may delete their own message.
       const canModerateReelm = access.kind === 'reelm'
         && (await canUseReelmPermission(uid, access.reelmId, 'manageModeration').catch(() => false)
           || await canManageReelm(uid, access.reelmId).catch(() => false))
-      if (uid !== env.REELMS_MODERATION_UID && !isSystemAdmin && authorId !== uid && !canModerateReelm) return res.status(403).json({ error: 'forbidden' })
+      const canDeleteInDm = access.kind === 'dm'
+      if (uid !== env.REELMS_MODERATION_UID && !isSystemAdmin && authorId !== uid && !canModerateReelm && !canDeleteInDm) {
+        return res.status(403).json({ error: 'forbidden' })
+      }
 
       await deleteDoc(chanPk(msgKey), target.sk)
       const payload = { msgKey, msgId }
       io.to(`chan:${msgKey}`).emit('reelms:message-deleted', payload)
       if (access.kind === 'reelm') io.to(`reelm:${access.reelmId}`).emit('reelms:message-deleted', payload)
-      res.json({ ok: true })
+      res.json({ ok: true, deleted: msgId })
     } catch { res.status(500).json({ error: 'delete_failed' }) }
   })
 

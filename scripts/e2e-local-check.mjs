@@ -64,7 +64,7 @@ function connectSocket(token, label) {
   return new Promise((resolve, reject) => {
     const socket = io(api, {
       path: '/socket.io',
-      auth: { token },
+      auth: { token, clientId: `e2e-client-${label}-${stamp}` },
       transports: ['polling', 'websocket'],
       timeout: 4000,
       reconnection: false
@@ -163,6 +163,7 @@ async function main() {
     id: `e2e-${stamp}`,
     name: `E2E Reelm ${stamp}`,
     code: `E2E${String(stamp).slice(-4)}`,
+    joinMode: 'open',
     categories: [
       { id: 'cat-text', name: 'Text', type: 'text', channels: [{ id: 'ch-general', name: 'general', type: 'text' }] },
       { id: 'cat-voice', name: 'Voice', type: 'voice', channels: [{ id: 'ch-voice', name: 'Voice', type: 'voice', capacity: 1 }] }

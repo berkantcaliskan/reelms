@@ -57,6 +57,7 @@ import { fetchVoiceToken, createLivekitSession } from '../voice/livekitManager.j
 import { DiscordEmbedCard } from '../chat/DiscordEmbedCard.jsx'
 import { QuickSwitcherModal } from '../quick-switcher/QuickSwitcherModal.jsx'
 import { ReelmsInsights } from '../insights/ReelmsInsights.jsx'
+import { getCachedMessages, saveCachedMessages, enqueueOutboxMessage, flushOutbox, isAppOnline } from '../offline/offlineQueue.js'
 
 // Audit Log components
 function AuditLogView({ reelmId }) {
@@ -4049,7 +4050,7 @@ function normalizeFriendProfileTarget(profile = {}) {
 
 const BOT_BIO_KEY = { 'reelmradio': 'bot_radio_bio', 'reelms-intelligence': 'bot_intelligence_bio' }
 
-function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBlock, onUnblock, onAddFriend, onNudge, isFriend = true, isBlocked = false, isPending = false, nickname, onNicknameChange, canShare, onMessage, onCreateGroup, onRequestRemoteControl, voiceContext = null, moderationContext = null, roleContext = null, isSelf = false, embedded = false, canEditNickname = true, onViewFullProfile, rightPanelWidth = 0 }) {
+function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBlock, onUnblock, onAddFriend, onNudge, onMention, isFriend = true, isBlocked = false, isPending = false, nickname, onNicknameChange, canShare, onMessage, onCreateGroup, onRequestRemoteControl, voiceContext = null, moderationContext = null, roleContext = null, isSelf = false, embedded = false, canEditNickname = true, onViewFullProfile, rightPanelWidth = 0, isMutedUser = false, onToggleMuteUser = null }) {
   const t = useT()
   const popupRef = useRef(null)
   const safeFriend = normalizeFriendProfileTarget(friend || {})
@@ -4070,23 +4071,44 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
     return () => document.removeEventListener('mousedown', handler)
   }, [onClose, embedded])
 
-  const popupW = 350
+  const popupW = 340
   const friendCover = safeFriend.cover || safeFriend.coverImage || safeFriend.coverUrl || null
   const safeRect = anchorRect || { top: 96, bottom: 112, left: Math.max(8, window.innerWidth - popupW - 18), right: window.innerWidth - 18 }
 
-  // 5px gap from the right panel's left edge, regardless of panel resize
-  const panelLeftEdge = rightPanelWidth > 0 ? window.innerWidth - rightPanelWidth : safeRect.left
-  let left = panelLeftEdge - popupW - 5
-  if (left < 8) left = (safeRect.right || safeRect.left) + 8
+  // Sit directly on the left side of the members panel (.rp-members-panel)
+  const membersPanelEl = !embedded ? document.querySelector('.rp-members-panel') : null
+  const panelLeftEdge = membersPanelEl
+    ? membersPanelEl.getBoundingClientRect().left
+    : (rightPanelWidth > 0 ? window.innerWidth - rightPanelWidth : safeRect.left)
+  let left = panelLeftEdge - popupW - 8
+  if (left < 8) left = Math.max(8, (safeRect.left || safeRect.right) - popupW - 8)
   if (left < 8) left = 8
 
-  // bottom constrained to top of message input so popup never goes off screen
+  // Vertical positioning:
+  // Starts at the top of the clicked row; if in lower part of the screen,
+  // opens upwards aligning its bottom with the bottom of the clicked row.
   const msgBarEl = !embedded ? document.querySelector('.msg-bar-wrap') : null
-  const screenBottom = msgBarEl ? msgBarEl.getBoundingClientRect().top - 5 : window.innerHeight - 72
-  const maxHeight = Math.min(480, screenBottom - 8)
+  const screenBottom = msgBarEl ? msgBarEl.getBoundingClientRect().top - 6 : window.innerHeight - 72
+  const screenTop = 8
+
+  const defaultHeight = 440
+  const spaceBelow = screenBottom - safeRect.top
+  const spaceAbove = safeRect.bottom - screenTop
+
   let top = safeRect.top
-  if (top + maxHeight > screenBottom) top = screenBottom - maxHeight
-  if (top < 8) top = 8
+  let maxHeight = Math.min(520, screenBottom - screenTop)
+
+  if (spaceBelow < 340 && spaceAbove > spaceBelow) {
+    // Open upwards: bottom of popup aligns with bottom of clicked user row
+    const availableUpHeight = Math.min(520, safeRect.bottom - screenTop)
+    top = Math.max(screenTop, safeRect.bottom - defaultHeight)
+    maxHeight = availableUpHeight
+  } else {
+    // Open downwards: top of popup aligns with top of clicked user row
+    top = safeRect.top
+    maxHeight = Math.min(520, spaceBelow)
+  }
+  if (top < screenTop) top = screenTop
 
   const profileNode = (
     <div className={`friend-profile-popup${embedded ? ' friend-profile-popup--embedded' : ''}`} style={{ ...(buildProfileThemeStyle(safeFriend) || {}), ...(embedded ? {} : { top, left, width: popupW, maxHeight }) }} ref={popupRef}>
@@ -4117,12 +4139,28 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
             }}
             title="Direct Message"
           >
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
             </svg>
             <span>{t('send_message_btn', 'Message')}</span>
           </button>
-          {voiceContext && (
+
+          {onMention && (
+            <button
+              type="button"
+              className="fpp-quick-btn"
+              onClick={() => {
+                onMention?.(safeFriend.username || safeFriend.name)
+                onClose?.()
+              }}
+              title="Mention in chat"
+            >
+              <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>@</span>
+              <span>Mention</span>
+            </button>
+          )}
+
+          {voiceContext ? (
             <button
               type="button"
               className={`fpp-quick-btn${voiceContext.isMuted ? ' fpp-quick-btn--active' : ''}`}
@@ -4130,7 +4168,7 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
               title={voiceContext.isMuted ? 'Unmute User' : 'Mute User'}
             >
               {voiceContext.isMuted ? (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <line x1="1" y1="1" x2="23" y2="23"/>
                   <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/>
                   <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>
@@ -4138,7 +4176,7 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
                   <line x1="8" y1="23" x2="16" y2="23"/>
                 </svg>
               ) : (
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
                   <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
                   <line x1="12" y1="19" x2="12" y2="23"/>
@@ -4146,6 +4184,19 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
                 </svg>
               )}
               <span>{voiceContext.isMuted ? 'Unmute' : 'Mute'}</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className={`fpp-quick-btn${isMutedUser ? ' fpp-quick-btn--active' : ''}`}
+              onClick={() => onToggleMuteUser?.(safeFriend.id)}
+              title={isMutedUser ? 'Unmute User' : 'Mute User'}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M11 5L6 9H2v6h4l5 4V5z"/>
+                {isMutedUser ? <line x1="23" y1="9" x2="17" y2="15" strokeWidth="2" /> : <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />}
+              </svg>
+              <span>{isMutedUser ? 'Unmute' : 'Mute'}</span>
             </button>
           )}
         </div>
@@ -4175,7 +4226,7 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
       {roleContext && (
         <div className="fpp-roles-section">
           <div className="fpp-roles-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span className="fpp-section-label">SERVER ROLES</span>
+            <span className="fpp-section-label">REELM ROLES</span>
             {roleContext.canManageRoles && (
               <span style={{ fontSize: '0.66rem', color: 'rgba(var(--ta-rgb), 0.4)' }}>Click to assign</span>
             )}
@@ -4219,7 +4270,7 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
       )}
       {moderationContext?.canShow && !isSelf && (
         <div className="fpp-mod-section">
-          <span className="fpp-section-label">SERVER ACTIONS</span>
+          <span className="fpp-section-label">REELM ACTIONS</span>
           <div className="fpp-mod-list">
             {moderationContext.voiceRoom && (
               <button type="button" className="fpp-list-action" onClick={() => { moderationContext.onJoinVoice?.(); onClose() }}>
@@ -4242,13 +4293,13 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
             {moderationContext.canRemove && (
               <button type="button" className="fpp-list-action fpp-list-action--danger" onClick={() => { moderationContext.onRemove?.(); onClose() }}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.8"/><line x1="22" y1="11" x2="16" y2="11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-                Kick…
+                Kick from Reelm…
               </button>
             )}
             {moderationContext.canBan && (
               <button type="button" className="fpp-list-action fpp-list-action--danger" onClick={() => { moderationContext.onBan?.(); onClose() }}>
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-                Ban…
+                Ban from Reelm…
               </button>
             )}
           </div>
@@ -5029,7 +5080,7 @@ function VirtualMessageList({
 
         const sender = (msg.sender && typeof msg.sender === 'object') ? msg.sender : { id: '', name: '?', photo: null, image: null }
         const isOwn = String(sender.id || '') === String(uid)
-        const canDeleteMsg = !selectedChatSystemLocked && (isMod || isOwn || (selectedReelm && hasReelmPermissionClient(selectedReelm, uid, 'manageModeration')))
+        const canDeleteMsg = Boolean(selectedChat) || isMod || isOwn || (selectedReelm && hasReelmPermissionClient(selectedReelm, uid, 'manageModeration'))
         const isPinned = Boolean(pinnedMessage && (!pinnedMessage.expiresAt || Date.now() < pinnedMessage.expiresAt) && String(pinnedMessage.id) === String(msg.id))
         const msgData = { id: msg.id, text: msg.text || '', sender, time: msg.time, mediaUrl: msg.mediaUrl, mediaType: msg.mediaType }
 
@@ -5094,21 +5145,19 @@ function VirtualMessageList({
                   onContextMenu={(e) => {
                     e.preventDefault()
                     e.stopPropagation()
-                    if (!selectedChatSystemLocked) {
-                      setMsgCtxMenu({
-                        x: Math.min(e.clientX, window.innerWidth - 160),
-                        y: Math.min(e.clientY, window.innerHeight - 120),
-                        msgId: msg.id,
-                        chatKey: msgKey2,
-                        canDelete: canDeleteMsg,
-                        canPin: canPinInChannel,
-                        isPinned,
-                        msgData,
-                        isOwn,
-                        msgText: msg.text || '',
-                        replyInfo: { id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id }
-                      })
-                    }
+                    setMsgCtxMenu({
+                      x: Math.min(e.clientX, window.innerWidth - 160),
+                      y: Math.min(e.clientY, window.innerHeight - 120),
+                      msgId: msg.id,
+                      chatKey: msgKey2,
+                      canDelete: canDeleteMsg,
+                      canPin: !selectedChatSystemLocked && canPinInChannel,
+                      isPinned,
+                      msgData,
+                      isOwn,
+                      msgText: msg.text || '',
+                      replyInfo: { id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id }
+                    })
                   }}
                   onTouchStart={(e) => {
                     const t = e.touches[0]
@@ -5147,6 +5196,11 @@ function VirtualMessageList({
                   <div className="msg-header">
                     <span className="msg-name">{sender.name}</span>
                     <span className="msg-time">{formatTime(msg.time)}</span>
+                    {msg.isQueued && (
+                      <span className="msg-queued-pill" title="Çevrimdışı — Bağlantı geldiğinde otomatik gönderilecek">
+                        <span className="msg-queued-icon">🕒</span> {t ? (t('queued') || 'Kuyrukta') : 'Kuyrukta'}
+                      </span>
+                    )}
                     {!selectedChatSystemLocked && (
                       <div className="msg-react-ctrl">
                         <button className="msg-react-btn msg-react-plus" title="+1" onClick={() => toggleReaction(msgKey2, msg.id, '+')}>
@@ -5259,21 +5313,19 @@ function VirtualMessageList({
                   onContextMenu={(e) => {
                     e.preventDefault()
                     e.stopPropagation()
-                    if (!selectedChatSystemLocked) {
-                      setMsgCtxMenu({
-                        x: Math.min(e.clientX, window.innerWidth - 160),
-                        y: Math.min(e.clientY, window.innerHeight - 120),
-                        msgId: msg.id,
-                        chatKey: msgKey2,
-                        canDelete: canDeleteMsg,
-                        canPin: canPinInChannel,
-                        isPinned,
-                        msgData,
-                        isOwn,
-                        msgText: msg.text || '',
-                        replyInfo: { id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id }
-                      })
-                    }
+                    setMsgCtxMenu({
+                      x: Math.min(e.clientX, window.innerWidth - 160),
+                      y: Math.min(e.clientY, window.innerHeight - 120),
+                      msgId: msg.id,
+                      chatKey: msgKey2,
+                      canDelete: canDeleteMsg,
+                      canPin: !selectedChatSystemLocked && canPinInChannel,
+                      isPinned,
+                      msgData,
+                      isOwn,
+                      msgText: msg.text || '',
+                      replyInfo: { id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id }
+                    })
                   }}
                   onTouchStart={(e) => {
                     const t = e.touches[0]
@@ -5368,7 +5420,7 @@ function VirtualMessageList({
                           )}
                         </div>
                       </div>}
-                      <span className="bubble-time">{formatTime(msg.time)}</span>
+                      <span className="bubble-time">{msg.isQueued ? '🕒 ' : ''}{formatTime(msg.time)}</span>
                     </div>
                     {Object.keys(msgReactions[msgKey2]?.[String(msg.id)] || {}).length > 0 && (
                       <div className="msg-reactions msg-reactions--bubble">
@@ -5552,6 +5604,98 @@ const REELM_PERMISSION_OPTIONS = [
   { key: 'pinMessages', label: 'Pin messages', note: 'Can pin and unpin messages in channels.' },
   { key: 'createVaporRoom', label: 'Create vapor rooms', note: 'Can create temporary vapor rooms in any category.' },
   { key: 'manageReelm', label: 'Full admin', note: 'Can manage all server permissions.' },
+]
+
+const DISCORD_ROLE_PERMISSION_SECTIONS = [
+  {
+    title: 'Administrator',
+    icon: '🛡️',
+    description: 'Members with this permission have every permission and bypass channel-specific restrictions.',
+    permissions: [
+      {
+        key: 'manageReelm',
+        name: 'Administrator',
+        description: 'Grants full admin access. Can manage all server permissions and settings.',
+        danger: true,
+      }
+    ]
+  },
+  {
+    title: 'General Server Permissions',
+    icon: '⚙️',
+    description: 'Basic management access for server configuration and channel layout.',
+    permissions: [
+      {
+        key: 'viewSettings',
+        name: 'View Settings Panel',
+        description: 'Allows members to open and view the server management panel.',
+      },
+      {
+        key: 'manageOverview',
+        name: 'Manage Server Overview',
+        description: 'Allows editing server name, icon, description, discoverability, and invite rules.',
+      },
+      {
+        key: 'manageChannels',
+        name: 'Manage Channels',
+        description: 'Allows creating, renaming, reordering, and deleting channels or categories.',
+      },
+      {
+        key: 'manageRoles',
+        name: 'Manage Roles',
+        description: 'Allows creating, editing, and assigning roles positioned below this role in the hierarchy.',
+      },
+      {
+        key: 'manageModeration',
+        name: 'View Audit Log & Moderation',
+        description: 'Allows viewing audit actions and applying timeouts or bans to regular members.',
+      }
+    ]
+  },
+  {
+    title: 'Membership & Invites',
+    icon: '👥',
+    description: 'Permissions relating to adding, managing, and reviewing members.',
+    permissions: [
+      {
+        key: 'manageMembers',
+        name: 'Manage Members (Kick)',
+        description: 'Allows removing non-protected members from the server.',
+      },
+      {
+        key: 'manageInvites',
+        name: 'Create & Manage Invites',
+        description: 'Allows generating invite links and inviting friends even when regular member invites are disabled.',
+      },
+      {
+        key: 'manageJoinRequests',
+        name: 'Manage Join Requests',
+        description: 'Allows reviewing, approving, or declining incoming join requests.',
+      }
+    ]
+  },
+  {
+    title: 'Channels & Voice',
+    icon: '🔊',
+    description: 'Permissions for channel interactions, pinned messages, and voice moderation.',
+    permissions: [
+      {
+        key: 'manageVoice',
+        name: 'Manage Voice Channels',
+        description: 'Allows moving members between voice channels and disconnecting users.',
+      },
+      {
+        key: 'pinMessages',
+        name: 'Pin Messages',
+        description: 'Allows pinning and unpinning important messages in text channels.',
+      },
+      {
+        key: 'createVaporRoom',
+        name: 'Create Vapor Rooms',
+        description: 'Allows creating temporary, auto-expiring vapor channels.',
+      }
+    ]
+  }
 ]
 const REELM_ELEVATED_ROLE_RE = /admin|owner|founder|moderator/i
 
@@ -6151,6 +6295,12 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
   const [activeTab, setActiveTab] = useState('general')
   const [roles, setRoles] = useState(() => (reelm.roles || []).map((role, i) => normalizeRoleForClient(role, `role-${i}`)))
   const [members, setMembers] = useState(() => reelm.members || [])
+  const [rolesSubTab, setRolesSubTab] = useState('roles')
+  const [selectedRoleId, setSelectedRoleId] = useState(() => (reelm.roles && reelm.roles[0]?.id) || 'role-0')
+  const [roleEditorTab, setRoleEditorTab] = useState('display')
+  const [roleSearchQuery, setRoleSearchQuery] = useState('')
+  const [memberRoleFilter, setMemberRoleFilter] = useState('all')
+  const [activeRolePopoverUid, setActiveRolePopoverUid] = useState(null)
   const [editingRoleId, setEditingRoleId] = useState(null)
   const [editingRoleName, setEditingRoleName] = useState('')
   const [editingRoleColor, setEditingRoleColor] = useState('#60a5fa')
@@ -6161,6 +6311,21 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
   const [reelmNameInput, setReelmNameInput] = useState(() => reelm.name || '')
   const [reelmNameSaving, setReelmNameSaving] = useState(false)
   const [reelmNameStatus, setReelmNameStatus] = useState('')
+  const [reelmDescInput, setReelmDescInput] = useState(() => reelm.description || '')
+  const [reelmDescSaving, setReelmDescSaving] = useState(false)
+  const [reelmDescStatus, setReelmDescStatus] = useState('')
+  const [codeCopied, setCodeCopied] = useState(false)
+
+  // Channels management state
+  const [creatingCat, setCreatingCat] = useState(false)
+  const [newCatName, setNewCatName] = useState('')
+  const [newCatType, setNewCatType] = useState('text')
+  const [creatingChInCatId, setCreatingChInCatId] = useState(null)
+  const [newChName, setNewChName] = useState('')
+  const [newChType, setNewChType] = useState('text')
+  const [editingChObj, setEditingChObj] = useState(null)
+  const [permModalTarget, setPermModalTarget] = useState(null)
+
   const [showInDiscover, setShowInDiscover] = useState(() => reelm.showInDiscover ?? false)
   const [autoJoinOnInvite, setAutoJoinOnInvite] = useState(() => reelm.autoJoinOnInvite ?? false)
   const [memberInvitesEnabled, setMemberInvitesEnabled] = useState(() => reelm.memberInvitesEnabled ?? true)
@@ -6173,8 +6338,18 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
   const memberRemovalIntentRef = useRef(false)
 
   useEffect(() => {
-    setRoles((reelm.roles || []).map((role, i) => normalizeRoleForClient(role, `role-${i}`, true)))
+    const norm = (reelm.roles || []).map((role, i) => normalizeRoleForClient(role, `role-${i}`, true))
+    setRoles(norm)
     setMembers(reelm.members || [])
+    if (norm.length && !norm.some(r => r.id === selectedRoleId)) {
+      setSelectedRoleId(norm[0]?.id || null)
+    }
+    setReelmNameInput(reelm.name || '')
+    setReelmDescInput(reelm.description || '')
+    setCreatingCat(false)
+    setCreatingChInCatId(null)
+    setEditingChObj(null)
+    setPermModalTarget(null)
     setEditingRoleId(null)
     setAddingRole(false)
     setRoleMemberDirty(false)
@@ -6182,6 +6357,12 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
     setRoleMemberStatus('')
     memberRemovalIntentRef.current = false
   }, [reelm.id])
+
+  useEffect(() => {
+    if (roles.length && !roles.some(r => r.id === selectedRoleId)) {
+      setSelectedRoleId(roles[0]?.id || null)
+    }
+  }, [roles, selectedRoleId])
 
   const ownerAge = useMemo(() => {
     return currentUser?.birthDate
@@ -6211,10 +6392,8 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
   const canDeleteRole = (role) => canEditRole(role) && !isManagerRoleClient(role)
   const canToggleRoleForMember = (member, role) => canManageRoles && (canManageFullRoles || (!isManagerRoleClient(role) && !isProtectedMember(member)))
   const canActOnMember = (member) => canManageMembers && String(member?.userId || '') !== String(currentUser?.id || '') && (canManageFullRoles || !isProtectedMember(member))
-  const canViewInsights = isFullManager || permissionSet.has('viewInsights') || canManageOverview || isOwner
   const availableTabs = useMemo(() => [
     canViewSettings ? { key: 'general', label: 'General' } : null,
-    canViewInsights ? { key: 'insights', label: 'Community Insights ✦' } : null,
     canManageOverview ? { key: 'visibility', label: 'Visibility' } : null,
     (canManageRoles || canManageMembers || canManageInvites) ? { key: 'roles', label: 'Roles and members' } : null,
     canManageChannels ? { key: 'channels', label: 'Channels' } : null,
@@ -6222,7 +6401,7 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
     canManageJoinRequests ? { key: 'join_requests', label: 'Join requests' } : null,
     canManageModeration ? { key: 'audit_log', label: 'Audit Actions' } : null,
     canManageModeration ? { key: 'timeouts', label: 'Timeouts' } : null,
-  ].filter(Boolean), [canViewSettings, canViewInsights, canManageOverview, canManageRoles, canManageMembers, canManageInvites, canManageChannels, isOwner, canManageJoinRequests, canManageModeration])
+  ].filter(Boolean), [canViewSettings, canManageOverview, canManageRoles, canManageMembers, canManageInvites, canManageChannels, isOwner, canManageJoinRequests, canManageModeration])
 
   useEffect(() => {
     if (availableTabs.length && !availableTabs.some(tab => tab.key === activeTab)) setActiveTab(availableTabs[0].key)
@@ -6356,6 +6535,44 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
     saveAll(roles, members.filter(m => m.userId !== userId))
   }
 
+  const selectedRole = roles.find(r => r.id === selectedRoleId) || roles[0] || null
+
+  const handleSelectedRoleNameChange = (name) => {
+    if (!selectedRole || !canEditRole(selectedRole)) return
+    saveAll(roles.map(r => r.id === selectedRole.id ? normalizeRoleForClient({ ...r, name }, '', canManageFullRoles) : r), members)
+  }
+
+  const handleSelectedRoleColorChange = (color) => {
+    if (!selectedRole || !canEditRole(selectedRole)) return
+    saveAll(roles.map(r => r.id === selectedRole.id ? normalizeRoleForClient({ ...r, color }, '', canManageFullRoles) : r), members)
+  }
+
+  const handleCreateNewRole = () => {
+    if (!canManageRoles || roles.length >= 12) return
+    const newId = 'role-' + Date.now()
+    const newRole = normalizeRoleForClient({
+      id: newId,
+      name: `New Role ${roles.length + 1}`,
+      color: ROLE_PALETTE[roles.length % ROLE_PALETTE.length] || '#60a5fa',
+      permissions: { viewSettings: true }
+    }, '', canManageFullRoles)
+    saveAll([...roles, newRole], members)
+    setSelectedRoleId(newId)
+    setRoleEditorTab('display')
+  }
+
+  const filteredRoles = roles.filter(r =>
+    !roleSearchQuery.trim() || (r.name || '').toLowerCase().includes(roleSearchQuery.toLowerCase())
+  )
+
+  const filteredMembers = members.filter(m => {
+    const matchesSearch = !memberSearch.trim() ||
+      (m.userName || '').toLowerCase().includes(memberSearch.toLowerCase()) ||
+      (m.userId || '').toLowerCase().includes(memberSearch.toLowerCase())
+    const matchesRole = memberRoleFilter === 'all' || (m.roleIds || []).includes(memberRoleFilter)
+    return matchesSearch && matchesRole
+  })
+
   const nonMembers = friends.filter(f => !members.find(m => m.userId === f.id))
   const filteredNonMembers = memberSearch.trim()
     ? nonMembers.filter(f => f.name?.toLowerCase().includes(memberSearch.toLowerCase()))
@@ -6370,88 +6587,307 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
     try { return `until ${new Date(ts).toLocaleString()}` } catch { return 'timeout active' }
   }
 
+  const allChannels = useMemo(() => (reelm.categories || []).flatMap(c => (c.channels || []).map(ch => ({ ...ch, categoryId: c.id, categoryName: c.name }))), [reelm.categories])
+
+  const handleCreateCategory = () => {
+    if (!newCatName.trim()) return
+    const newCat = {
+      id: 'cat-' + Date.now(),
+      name: newCatName.trim(),
+      type: newCatType,
+      channels: []
+    }
+    const updated = [...(reelm.categories || []), newCat]
+    onUpdate({ ...reelm, categories: updated })
+    setCreatingCat(false)
+    setNewCatName('')
+  }
+
+  const handleDeleteCategory = (catId) => {
+    if ((reelm.categories || []).length <= 1) return
+    const cat = (reelm.categories || []).find(c => c.id === catId)
+    if (!window.confirm(`Are you sure you want to delete the "${cat?.name || 'this'}" category and all its channels?`)) return
+    const updated = (reelm.categories || []).filter(c => c.id !== catId)
+    onUpdate({ ...reelm, categories: updated })
+  }
+
+  const handleMoveCategory = (fromIndex, toIndex) => {
+    if (fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || toIndex >= (reelm.categories || []).length) return
+    const next = [...(reelm.categories || [])]
+    const [removed] = next.splice(fromIndex, 1)
+    next.splice(toIndex, 0, removed)
+    onUpdate({ ...reelm, categories: next })
+  }
+
+  const handleCreateChannel = (catId) => {
+    if (!newChName.trim()) return
+    const formattedName = newChType === 'text'
+      ? newChName.trim().toLowerCase().replace(/\s+/g, '-')
+      : newChName.trim()
+    const newChannel = {
+      id: 'ch-' + Date.now(),
+      name: formattedName,
+      type: newChType,
+      ...(newChType === 'voice' ? { capacity: 8, current: 0 } : {})
+    }
+    const updated = (reelm.categories || []).map(c => {
+      if (c.id !== catId) return c
+      return { ...c, channels: [...(c.channels || []), newChannel] }
+    })
+    onUpdate({ ...reelm, categories: updated })
+    setCreatingChInCatId(null)
+    setNewChName('')
+  }
+
+  const handleDeleteChannel = (catId, chId) => {
+    const cat = (reelm.categories || []).find(c => c.id === catId)
+    const ch = cat?.channels?.find(c => c.id === chId)
+    if (!window.confirm(`Are you sure you want to delete #${ch?.name || 'this channel'}?`)) return
+    const updated = (reelm.categories || []).map(c => {
+      if (c.id !== catId) return c
+      return { ...c, channels: (c.channels || []).filter(item => item.id !== chId) }
+    })
+    onUpdate({ ...reelm, categories: updated })
+    if (editingChObj?.chId === chId) setEditingChObj(null)
+  }
+
+  const handleMoveChannel = (catId, fromIndex, toIndex) => {
+    const cat = (reelm.categories || []).find(c => c.id === catId)
+    if (!cat || fromIndex === toIndex || fromIndex < 0 || toIndex < 0 || toIndex >= (cat.channels || []).length) return
+    const updatedChannels = [...(cat.channels || [])]
+    const [removed] = updatedChannels.splice(fromIndex, 1)
+    updatedChannels.splice(toIndex, 0, removed)
+    const updated = (reelm.categories || []).map(c => c.id !== catId ? c : { ...c, channels: updatedChannels })
+    onUpdate({ ...reelm, categories: updated })
+  }
+
+  const handleSaveChannelDetails = () => {
+    if (!editingChObj) return
+    const { catId, chId, name, topic, slowmode, isNsfw, capacity } = editingChObj
+    const formattedName = name.trim() ? name.trim().toLowerCase().replace(/\s+/g, '-') : 'channel'
+    const updated = (reelm.categories || []).map(c => {
+      if (c.id !== catId) return c
+      return {
+        ...c,
+        channels: (c.channels || []).map(ch => ch.id !== chId ? ch : {
+          ...ch,
+          name: formattedName,
+          topic: topic || '',
+          slowmode: Number(slowmode || 0),
+          isNsfw: Boolean(isNsfw),
+          ...(capacity !== undefined ? { capacity: Number(capacity) } : {})
+        })
+      }
+    })
+    onUpdate({ ...reelm, categories: updated })
+    setEditingChObj(null)
+  }
+
   return (
     <div className="settings-layout">
       <div className="settings-sidebar">
-        <div className="settings-title rs-reelm-title">
-          <button className="reelm-settings-back-btn" onClick={onClose}>
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-              <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-          {reelm.name}
-        </div>
-        <nav className="settings-nav">
-          {availableTabs.map(tab => (
-            <button
-              key={tab.key}
-              className={`settings-nav-item${activeTab === tab.key ? ' settings-nav-item-active' : ''}`}
-              onClick={() => setActiveTab(tab.key)}
-            >{tab.label}</button>
-          ))}
-        </nav>
-      </div>
-      <div className="settings-content">
-        <div className="settings-topbar">
-          <button className="settings-close-btn" onClick={onClose}>
+        <div className="settings-sidebar-top-row">
+          <h2 className="settings-title">{reelm.name}</h2>
+          <button
+            type="button"
+            className="settings-floating-close-btn"
+            onClick={onClose}
+            title={t('close') || 'Close'}
+          >
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
               <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
             </svg>
           </button>
         </div>
+        <nav className="settings-nav">
+          {availableTabs.map(tab => (
+            <button
+              key={tab.key}
+              type="button"
+              className={`settings-nav-item${activeTab === tab.key ? ' settings-nav-item-active' : ''}`}
+              onClick={() => setActiveTab(tab.key)}
+            >
+              <span className="settings-nav-item-label">{tab.label}</span>
+            </button>
+          ))}
+        </nav>
+      </div>
+      <div className="settings-content">
         <div className="settings-content-panel">
 
           {activeTab === 'general' && canViewSettings && (
-            <div className="rs-section">
+            <div className="rs-section" style={{ gap: 20 }}>
               <div className="rs-section-header">
-                <span className="rs-section-title">Reelm info</span>
+                <span className="rs-section-title">Reelm Profile & Identity</span>
               </div>
+
               {canManageOverview && !reelm.isDefault && (
-                <div className="rs-field-row">
-                  <label className="rs-field-label">Reelm name</label>
-                  <div className="rs-field-input-row">
-                    <input
-                      className="rs-field-input"
-                      value={reelmNameInput}
-                      maxLength={64}
-                      onChange={e => { setReelmNameInput(e.target.value); setReelmNameStatus('') }}
-                      placeholder="Reelm adı"
-                    />
+                <>
+                  <div className="rs-field-row">
+                    <label className="rs-field-label">Reelm Name</label>
+                    <div className="rs-field-input-row">
+                      <input
+                        className="rs-field-input"
+                        value={reelmNameInput}
+                        maxLength={64}
+                        onChange={e => { setReelmNameInput(e.target.value); setReelmNameStatus('') }}
+                        placeholder="Reelm adı"
+                      />
+                      <button
+                        className="rs-field-save-btn"
+                        disabled={reelmNameSaving || !reelmNameInput.trim() || reelmNameInput.trim() === reelm.name}
+                        onClick={async () => {
+                          const next = reelmNameInput.trim()
+                          if (!next || next === reelm.name) return
+                          setReelmNameSaving(true)
+                          setReelmNameStatus('')
+                          try {
+                            await onUpdate({ ...reelm, roles, members, name: next })
+                            setReelmNameStatus('saved')
+                          } catch { setReelmNameStatus('error') }
+                          setReelmNameSaving(false)
+                        }}
+                      >
+                        {reelmNameSaving ? '...' : reelmNameStatus === 'saved' ? '✓' : 'Save'}
+                      </button>
+                    </div>
+                    {reelmNameStatus === 'error' && <p className="rs-field-error">Could not save. Please try again.</p>}
+                  </div>
+
+                  <div className="rs-field-row" style={{ marginTop: 14 }}>
+                    <label className="rs-field-label">Reelm Description / Bio</label>
+                    <div className="rs-field-input-row" style={{ alignItems: 'flex-start' }}>
+                      <textarea
+                        className="rs-field-input"
+                        style={{ minHeight: 64, resize: 'vertical', fontFamily: 'inherit', lineHeight: 1.4 }}
+                        value={reelmDescInput}
+                        maxLength={256}
+                        onChange={e => { setReelmDescInput(e.target.value); setReelmDescStatus('') }}
+                        placeholder="Tell members what this Reelm is all about..."
+                      />
+                      <button
+                        className="rs-field-save-btn"
+                        disabled={reelmDescSaving || reelmDescInput.trim() === (reelm.description || '')}
+                        onClick={async () => {
+                          const next = reelmDescInput.trim()
+                          setReelmDescSaving(true)
+                          setReelmDescStatus('')
+                          try {
+                            await onUpdate({ ...reelm, roles, members, description: next })
+                            setReelmDescStatus('saved')
+                          } catch { setReelmDescStatus('error') }
+                          setReelmDescSaving(false)
+                        }}
+                      >
+                        {reelmDescSaving ? '...' : reelmDescStatus === 'saved' ? '✓' : 'Save'}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="rs-field-row" style={{ marginTop: 14 }}>
+                    <label className="rs-field-label">Reelm Identifier & Code</label>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <span style={{ fontSize: '0.86rem', fontWeight: 700, padding: '7px 12px', background: 'rgba(var(--ta-rgb), 0.08)', borderRadius: 10, border: '1px solid rgba(var(--ta-rgb), 0.15)', color: 'var(--ta)' }}>
+                        #{reelm.code || reelm.id}
+                      </span>
+                      <button
+                        type="button"
+                        className="cm-btn"
+                        onClick={() => {
+                          navigator.clipboard?.writeText(reelm.code || reelm.id)
+                          setCodeCopied(true)
+                          setTimeout(() => setCodeCopied(false), 2000)
+                        }}
+                      >
+                        {codeCopied ? '✓ Copied' : '📋 Copy Code'}
+                      </button>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {/* System Defaults Section */}
+              <div className="rs-section-header" style={{ marginTop: 20 }}>
+                <span className="rs-section-title">System Defaults & Preferences</span>
+              </div>
+
+              <div className="rs-channel-select-row">
+                <div>
+                  <span className="rs-channel-select-label">System Messages Channel</span>
+                  <p style={{ margin: '3px 0 0', fontSize: '0.74rem', color: 'rgba(var(--ta-rgb), 0.45)' }}>
+                    Channel where welcome greetings and member milestones appear.
+                  </p>
+                </div>
+                <select
+                  className="rs-channel-select"
+                  value={reelm.announcementChannelId || ''}
+                  onChange={e => onUpdate({ ...reelm, announcementChannelId: e.target.value })}
+                >
+                  <option value="">Default (First text channel)</option>
+                  {allChannels.filter(ch => ch.type === 'text' || ch.type === 'announcement').map(ch => (
+                    <option key={ch.id} value={ch.id}>#{ch.name} ({ch.categoryName})</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="rs-channel-select-row" style={{ marginTop: 10 }}>
+                <div>
+                  <span className="rs-channel-select-label">Default Notification Level</span>
+                  <p style={{ margin: '3px 0 0', fontSize: '0.74rem', color: 'rgba(var(--ta-rgb), 0.45)' }}>
+                    Determines default alert level for new members in this Reelm.
+                  </p>
+                </div>
+                <select
+                  className="rs-channel-select"
+                  value={reelm.defaultNotification || 'all'}
+                  onChange={e => onUpdate({ ...reelm, defaultNotification: e.target.value })}
+                >
+                  <option value="all">All Messages</option>
+                  <option value="mentions">Only @mentions</option>
+                </select>
+              </div>
+
+              <div className="rs-channel-select-row" style={{ marginTop: 10 }}>
+                <div>
+                  <span className="rs-channel-select-label">Inactive / AFK Voice Timeout</span>
+                  <p style={{ margin: '3px 0 0', fontSize: '0.74rem', color: 'rgba(var(--ta-rgb), 0.45)' }}>
+                    Automatically mute or move idle members in voice rooms.
+                  </p>
+                </div>
+                <select
+                  className="rs-channel-select"
+                  value={String(reelm.afkTimeout ?? 300)}
+                  onChange={e => onUpdate({ ...reelm, afkTimeout: Number(e.target.value) })}
+                >
+                  <option value="0">Disabled</option>
+                  <option value="300">5 minutes</option>
+                  <option value="900">15 minutes</option>
+                  <option value="1800">30 minutes</option>
+                  <option value="3600">1 hour</option>
+                </select>
+              </div>
+
+              {/* Danger Zone: Close Reelm */}
+              {canManageFullRoles && !reelm.isDefault && (
+                <div className="rs-danger-box">
+                  <div className="rs-danger-header">
+                    <div className="rs-danger-info">
+                      <span className="rs-danger-title">🛑 Danger Zone — Close Reelm</span>
+                      <p className="rs-danger-desc">
+                        Closing this Reelm will permanently remove it from all members, disable its invite links, and delete all channel history. This action cannot be undone.
+                      </p>
+                    </div>
                     <button
-                      className="rs-field-save-btn"
-                      disabled={reelmNameSaving || !reelmNameInput.trim() || reelmNameInput.trim() === reelm.name}
-                      onClick={async () => {
-                        const next = reelmNameInput.trim()
-                        if (!next || next === reelm.name) return
-                        setReelmNameSaving(true)
-                        setReelmNameStatus('')
-                        try {
-                          await onUpdate({ ...reelm, roles, members, name: next })
-                          setReelmNameStatus('saved')
-                        } catch { setReelmNameStatus('error') }
-                        setReelmNameSaving(false)
+                      type="button"
+                      className="rs-danger-btn"
+                      onClick={() => {
+                        const typed = window.prompt(`Type "${reelm.name}" to permanently close this Reelm.`)
+                        if (typed === reelm.name) onCloseReelm?.(reelm.id, typed)
                       }}
                     >
-                      {reelmNameSaving ? '...' : reelmNameStatus === 'saved' ? '✓' : 'Kaydet'}
+                      Close Reelm
                     </button>
                   </div>
-                  {reelmNameStatus === 'error' && <p className="rs-field-error">Kaydedilemedi, tekrar dene.</p>}
-                </div>
-              )}
-              {canManageFullRoles && !reelm.isDefault && (
-                <div className="rs-danger-zone">
-                  <span className="rs-section-title">Danger zone</span>
-                  <p className="rs-section-hint">Closing a server removes it from members and disables its invite code. Type the exact server name to confirm.</p>
-                  <button
-                    type="button"
-                    className="rs-member-remove rs-danger-close"
-                    onClick={() => {
-                      const typed = window.prompt(`Type ${reelm.name} to close this server.`)
-                      if (typed === reelm.name) onCloseReelm?.(reelm.id, typed)
-                    }}
-                  >
-                    Close server
-                  </button>
                 </div>
               )}
             </div>
@@ -6535,28 +6971,19 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
               </div>
 
               {canSetAgeRating && (
-                <div style={{ marginTop: '28px' }}>
-                  <span className="cust-toggle-label">Content age restriction</span>
-                  <p className="accs-note" style={{ marginBottom: '12px' }}>Determines the content moderation profile applied to posts within this reelm.</p>
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    {[
-                      { id: 'under18', label: '14–17', note: 'All categories' },
-                      { id: 'adults',  label: '18+',   note: 'Nefret/taciz/zarar engelli' },
-                    ].map(opt => (
-                      <button
-                        key={opt.id}
-                        className={`cust-textcolor-btn${ageRating === opt.id ? ' active' : ''}`}
-                        style={{ flexDirection: 'column', alignItems: 'flex-start', padding: '8px 12px', gap: '2px' }}
-                        onClick={() => {
-                          setAgeRating(opt.id)
-                          onUpdate({ ...reelm, roles, members, ageRating: opt.id })
-                        }}
-                      >
-                        <span style={{ fontWeight: 600 }}>{opt.label}</span>
-                        <span style={{ fontSize: '10px', opacity: 0.7 }}>{opt.note}</span>
-                      </button>
-                    ))}
+                <div className="cust-toggle-row" style={{ marginTop: '18px' }}>
+                  <div>
+                    <span className="cust-toggle-label">18+ (Age restricted)</span>
+                    <p className="accs-note">Requires members to be 18 or older to join and view content in this reelm.</p>
                   </div>
+                  <button
+                    className={`cust-toggle${ageRating === 'adults' ? ' cust-toggle-on' : ''}`}
+                    onClick={() => {
+                      const next = ageRating === 'adults' ? 'under18' : 'adults'
+                      setAgeRating(next)
+                      onUpdate({ ...reelm, roles, members, showInDiscover, autoJoinOnInvite, memberInvitesEnabled, memberInviteMode, joinMode, ageRating: next })
+                    }}
+                  ><span className="cust-toggle-knob" /></button>
                 </div>
               )}
             </div>
@@ -6592,196 +7019,505 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
           )}
 
           {activeTab === 'roles' && (canManageRoles || canManageMembers || canManageInvites) && (
-            <div className="rs-section">
-              <div className="rs-section-header">
-                <span className="rs-section-title">Roles</span>
-                <span className="rs-section-hint">{roles.length}/12</span>
-                {roleMemberStatus && <span className={`rs-save-state${roleMemberDirty ? ' rs-save-state-dirty' : ''}`}>{roleMemberStatus}</span>}
-                {(canManageRoles || canManageMembers) && (
-                  <button className="rs-save-btn rs-save-all-btn" disabled={!roleMemberDirty || roleMemberSaving} onClick={commitRoleMemberChanges}>{roleMemberSaving ? 'Saving…' : 'Save changes'}</button>
-                )}
-                {canManageRoles && roles.length < 12 && !addingRole && (
-                  <button className="rs-add-btn" onClick={() => setAddingRole(true)}>+ New role</button>
-                )}
-              </div>
-              <p className="rs-section-hint">Edit role names, colors, order and permissions locally, then press Save changes once. Full admin roles stay protected from helpers, but the main admin can rename and recolor them without creating duplicate roles.</p>
+            <div className="rm-container">
+              {/* Top Navigation & Actions Bar */}
+              <div className="rm-top-header">
+                <div className="rm-subnav-pills">
+                  <button
+                    type="button"
+                    className={`rm-subnav-pill${rolesSubTab === 'roles' ? ' active' : ''}`}
+                    onClick={() => setRolesSubTab('roles')}
+                  >
+                    <span>🛡️ Roles</span>
+                    <span className="rm-subnav-badge">{roles.length}</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`rm-subnav-pill${rolesSubTab === 'members' ? ' active' : ''}`}
+                    onClick={() => setRolesSubTab('members')}
+                  >
+                    <span>👥 Members</span>
+                    <span className="rm-subnav-badge">{members.length}</span>
+                  </button>
+                </div>
 
-              {addingRole && (
-                <div className="rs-role-editor">
-                  <div className="rs-color-row">
-                    {ROLE_PALETTE.map(c => (
-                      <button
-                        key={c}
-                        className={`rs-color-dot${newRoleColor === c ? ' rs-color-dot-active' : ''}`}
-                        style={{ background: c }}
-                        onClick={() => setNewRoleColor(c)}
+                <div className="rm-actions-row">
+                  {roleMemberStatus && (
+                    <span className={`rm-save-state${roleMemberDirty ? ' dirty' : ''}`}>
+                      {roleMemberStatus}
+                    </span>
+                  )}
+                  {(canManageRoles || canManageMembers) && (
+                    <button
+                      type="button"
+                      className="rm-save-btn"
+                      disabled={!roleMemberDirty || roleMemberSaving}
+                      onClick={commitRoleMemberChanges}
+                    >
+                      {roleMemberSaving ? 'Saving…' : 'Save changes'}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* ROLES SUB-TAB */}
+              {rolesSubTab === 'roles' && (
+                <div className="rm-split-layout">
+                  {/* Left Pane: Role List */}
+                  <div className="rm-roles-pane">
+                    <div className="rm-roles-pane-header">
+                      <span className="rm-roles-pane-title">Roles ({roles.length}/12)</span>
+                      {canManageRoles && roles.length < 12 && (
+                        <button
+                          type="button"
+                          className="rm-add-role-btn"
+                          onClick={handleCreateNewRole}
+                        >
+                          + New role
+                        </button>
+                      )}
+                    </div>
+
+                    {roles.length > 4 && (
+                      <input
+                        className="rm-text-input"
+                        style={{ padding: '6px 10px', fontSize: '0.78rem' }}
+                        placeholder="Search roles…"
+                        value={roleSearchQuery}
+                        onChange={e => setRoleSearchQuery(e.target.value)}
                       />
-                    ))}
+                    )}
+
+                    <div className="rm-role-list">
+                      {filteredRoles.map((role, roleIndex) => {
+                        const isSelected = selectedRole?.id === role.id
+                        const isProtected = isManagerRoleClient(role)
+                        const roleMemberCount = members.filter(m => (m.roleIds || []).includes(role.id)).length
+                        return (
+                          <div
+                            key={role.id}
+                            className={`rm-role-item${isSelected ? ' active' : ''}`}
+                            onClick={() => setSelectedRoleId(role.id)}
+                            draggable={canEditRole(role)}
+                            onDragStart={e => { e.dataTransfer.setData('application/x-reelm-role-index', String(roleIndex)); e.dataTransfer.effectAllowed = 'move' }}
+                            onDragOver={e => { if (canEditRole(role)) e.preventDefault() }}
+                            onDrop={e => { const from = Number(e.dataTransfer.getData('application/x-reelm-role-index')); if (Number.isFinite(from)) moveRole(from, roleIndex) }}
+                          >
+                            <div className="rm-role-item-left">
+                              <span className="rm-role-color-dot" style={{ background: role.color || '#60a5fa' }} />
+                              <span className="rm-role-item-name">{role.name}</span>
+                            </div>
+
+                            <div className="rm-role-item-right">
+                              {isProtected ? (
+                                <span className="rs-role-protected">Admin</span>
+                              ) : (
+                                <span className="rm-role-item-count">{roleMemberCount}</span>
+                              )}
+                              {canEditRole(role) && (
+                                <div className="rm-role-order-actions" onClick={e => e.stopPropagation()}>
+                                  <button
+                                    type="button"
+                                    className="rm-role-order-btn"
+                                    disabled={roleIndex === 0}
+                                    onClick={() => moveRole(roleIndex, roleIndex - 1)}
+                                    title="Move Up"
+                                  >↑</button>
+                                  <button
+                                    type="button"
+                                    className="rm-role-order-btn"
+                                    disabled={roleIndex === roles.length - 1}
+                                    onClick={() => moveRole(roleIndex, roleIndex + 1)}
+                                    title="Move Down"
+                                  >↓</button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )
+                      })}
+
+                      {filteredRoles.length === 0 && (
+                        <p className="rs-empty">No roles found.</p>
+                      )}
+                    </div>
                   </div>
-                  <div className="rs-name-row">
-                    <span className="rs-color-preview" style={{ background: newRoleColor }} />
-                    <input
-                      className="rs-name-input"
-                      placeholder="Role name…"
-                      value={newRoleName}
-                      onChange={e => setNewRoleName(e.target.value)}
-                      onKeyDown={e => { if (e.key === 'Enter') addRole(); if (e.key === 'Escape') setAddingRole(false) }}
-                      autoFocus
-                    />
-                    <button className="rs-save-btn" onClick={addRole}>Create</button>
-                    <button className="rs-cancel-btn" onClick={() => setAddingRole(false)}>Cancel</button>
-                  </div>
+
+                  {/* Right Pane: Selected Role Inspector */}
+                  {selectedRole ? (
+                    <div className="rm-role-editor-pane">
+                      <div className="rm-editor-header">
+                        <div className="rm-editor-title-wrap">
+                          <span className="rm-editor-color-badge" style={{ background: selectedRole.color || '#60a5fa' }} />
+                          <span className="rm-editor-role-name">{selectedRole.name}</span>
+                          {isManagerRoleClient(selectedRole) && (
+                            <span className="rs-role-protected">Protected Admin</span>
+                          )}
+                        </div>
+
+                        {canDeleteRole(selectedRole) && (
+                          <button
+                            type="button"
+                            className="rm-editor-delete-btn"
+                            onClick={() => deleteRole(selectedRole.id)}
+                          >
+                            Delete Role
+                          </button>
+                        )}
+                      </div>
+
+                      {/* Role Editor Sub-Tabs */}
+                      <div className="rm-editor-tabs">
+                        <button
+                          type="button"
+                          className={`rm-editor-tab-btn${roleEditorTab === 'display' ? ' active' : ''}`}
+                          onClick={() => setRoleEditorTab('display')}
+                        >
+                          Display
+                        </button>
+                        <button
+                          type="button"
+                          className={`rm-editor-tab-btn${roleEditorTab === 'permissions' ? ' active' : ''}`}
+                          onClick={() => setRoleEditorTab('permissions')}
+                        >
+                          Permissions
+                        </button>
+                        <button
+                          type="button"
+                          className={`rm-editor-tab-btn${roleEditorTab === 'members' ? ' active' : ''}`}
+                          onClick={() => setRoleEditorTab('members')}
+                        >
+                          Manage Members ({members.filter(m => (m.roleIds || []).includes(selectedRole.id)).length})
+                        </button>
+                      </div>
+
+                      {/* DISPLAY TAB */}
+                      {roleEditorTab === 'display' && (
+                        <div className="rm-display-section">
+                          <div className="rm-field-group">
+                            <label className="rm-field-label">Role Name</label>
+                            <input
+                              className="rm-text-input"
+                              value={selectedRole.name}
+                              disabled={!canEditRole(selectedRole)}
+                              onChange={e => handleSelectedRoleNameChange(e.target.value)}
+                              placeholder="e.g. Moderator, VIP..."
+                              maxLength={32}
+                            />
+                          </div>
+
+                          <div className="rm-field-group">
+                            <label className="rm-field-label">Role Color</label>
+                            <div className="rm-palette-row">
+                              {ROLE_PALETTE.map(color => (
+                                <button
+                                  key={color}
+                                  type="button"
+                                  className={`rm-palette-dot${(selectedRole.color || '').toLowerCase() === color.toLowerCase() ? ' active' : ''}`}
+                                  style={{ background: color }}
+                                  disabled={!canEditRole(selectedRole)}
+                                  onClick={() => handleSelectedRoleColorChange(color)}
+                                />
+                              ))}
+                            </div>
+                          </div>
+
+                          <div className="rm-field-group">
+                            <label className="rm-field-label">Badge Preview</label>
+                            <div className="rm-role-preview-card">
+                              <span
+                                className="rm-role-badge-preview"
+                                style={{
+                                  background: (selectedRole.color || '#60a5fa') + '22',
+                                  borderColor: selectedRole.color || '#60a5fa',
+                                  color: selectedRole.color || '#60a5fa'
+                                }}
+                              >
+                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: selectedRole.color || '#60a5fa' }} />
+                                {selectedRole.name || 'Role'}
+                              </span>
+                              <span style={{ fontSize: '0.84rem', color: 'rgba(var(--ta-rgb), 0.65)' }}>
+                                How this role will appear next to member names and in server member lists.
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* PERMISSIONS TAB */}
+                      {roleEditorTab === 'permissions' && (
+                        <div className="rm-perms-container">
+                          {isManagerRoleClient(selectedRole) && (
+                            <div style={{ padding: '10px 14px', borderRadius: 10, background: 'rgba(245, 158, 11, 0.1)', border: '1px solid rgba(245, 158, 11, 0.25)', color: '#fbbf24', fontSize: '0.8rem' }}>
+                              ⚡ This role has Full Administrator privileges. All permissions are permanently active and bypass channel rules.
+                            </div>
+                          )}
+
+                          {DISCORD_ROLE_PERMISSION_SECTIONS.map((sec, sIdx) => (
+                            <div key={sIdx} className="rm-perm-section">
+                              <div className="rm-perm-section-head">
+                                <span className="rm-perm-section-icon">{sec.icon}</span>
+                                <span className="rm-perm-section-title">{sec.title}</span>
+                              </div>
+
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                                {sec.permissions.map(perm => {
+                                  const isEnabled = roleHasPermissionClient(selectedRole, perm.key)
+                                  const isLocked = !canEditRole(selectedRole) || (perm.key === 'manageReelm' && !canManageFullRoles)
+                                  return (
+                                    <div key={perm.key} className={`rm-perm-row${perm.danger ? ' danger' : ''}`}>
+                                      <div className="rm-perm-info">
+                                        <span className="rm-perm-name" style={perm.danger ? { color: '#f87171' } : {}}>
+                                          {perm.name}
+                                        </span>
+                                        <span className="rm-perm-desc">{perm.description}</span>
+                                      </div>
+
+                                      <button
+                                        type="button"
+                                        className={`cust-toggle${isEnabled ? ' cust-toggle-on' : ''}`}
+                                        disabled={isLocked}
+                                        onClick={() => toggleRolePermission(selectedRole.id, perm.key)}
+                                      >
+                                        <span className="cust-toggle-knob" />
+                                      </button>
+                                    </div>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      {/* ROLE MEMBERS TAB */}
+                      {roleEditorTab === 'members' && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                          <span style={{ fontSize: '0.8rem', color: 'rgba(var(--ta-rgb), 0.65)' }}>
+                            Members with the <strong>{selectedRole.name}</strong> role ({members.filter(m => (m.roleIds || []).includes(selectedRole.id)).length})
+                          </span>
+
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {members.map(m => {
+                              const hasRole = (m.roleIds || []).includes(selectedRole.id)
+                              const canToggle = canToggleRoleForMember(m, selectedRole)
+                              return (
+                                <div key={m.userId} className="rm-member-card" style={{ padding: '8px 12px' }}>
+                                  <div className="rm-member-left">
+                                    <div className="rm-member-avatar-box" style={{ width: 28, height: 28, fontSize: '0.75rem' }}>
+                                      {m.userPhoto ? <img src={m.userPhoto} alt="" /> : (m.userName || '?').charAt(0).toUpperCase()}
+                                    </div>
+                                    <span className="rm-member-displayname" style={{ fontSize: '0.82rem' }}>
+                                      {m.userName}
+                                      {m.userId === currentUser.id && <span className="rs-member-you"> (you)</span>}
+                                    </span>
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    className={`cust-toggle${hasRole ? ' cust-toggle-on' : ''}`}
+                                    disabled={!canToggle}
+                                    onClick={() => toggleMemberRole(m.userId, selectedRole.id)}
+                                  >
+                                    <span className="cust-toggle-knob" />
+                                  </button>
+                                </div>
+                              )
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="rm-role-editor-pane" style={{ alignItems: 'center', justifyContent: 'center', minHeight: 300 }}>
+                      <p className="rs-empty">Select a role on the left to edit its details and permissions.</p>
+                    </div>
+                  )}
                 </div>
               )}
 
-              <div className="rs-roles-list">
-                {roles.map((role, roleIndex) => (
-                  <div
-                    key={role.id}
-                    className="rs-role-row"
-                    draggable={canEditRole(role)}
-                    onDragStart={e => { e.dataTransfer.setData('application/x-reelm-role-index', String(roleIndex)); e.dataTransfer.effectAllowed = 'move' }}
-                    onDragOver={e => { if (canEditRole(role)) e.preventDefault() }}
-                    onDrop={e => { const from = Number(e.dataTransfer.getData('application/x-reelm-role-index')); if (Number.isFinite(from)) moveRole(from, roleIndex) }}
-                  >
-                    {editingRoleId === role.id ? (
-                      <div className="rs-role-editor">
-                        <div className="rs-color-row">
-                          {ROLE_PALETTE.map(c => (
-                            <button
-                              key={c}
-                              className={`rs-color-dot${editingRoleColor === c ? ' rs-color-dot-active' : ''}`}
-                              style={{ background: c }}
-                              onClick={() => setEditingRoleColor(c)}
-                            />
-                          ))}
-                        </div>
-                        <div className="rs-name-row">
-                          <span className="rs-color-preview" style={{ background: editingRoleColor }} />
-                          <input
-                            className="rs-name-input"
-                            value={editingRoleName}
-                            onChange={e => setEditingRoleName(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter') saveEditRole(); if (e.key === 'Escape') setEditingRoleId(null) }}
-                            autoFocus
-                          />
-                          <button className="rs-save-btn" onClick={saveEditRole}>Apply</button>
-                          <button className="rs-cancel-btn" onClick={() => setEditingRoleId(null)}>Cancel</button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="rs-role-main">
-                        <div className="rs-role-head">
-                          {canEditRole(role) && (
-                            <span className="rs-role-order-controls">
-                              <button type="button" className="rs-role-order-btn" disabled={roleIndex === 0} onClick={() => moveRole(roleIndex, roleIndex - 1)}>↑</button>
-                              <button type="button" className="rs-role-order-btn" disabled={roleIndex === roles.length - 1} onClick={() => moveRole(roleIndex, roleIndex + 1)}>↓</button>
-                            </span>
+              {/* MEMBERS SUB-TAB */}
+              {rolesSubTab === 'members' && (
+                <div className="rm-members-view">
+                  <div className="rm-members-toolbar">
+                    <div className="rm-search-input-wrap">
+                      <svg className="rm-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        <circle cx="11" cy="11" r="8"/>
+                        <path d="m21 21-4.3-4.3"/>
+                      </svg>
+                      <input
+                        className="rm-search-input"
+                        placeholder="Search members by name…"
+                        value={memberSearch}
+                        onChange={e => setMemberSearch(e.target.value)}
+                      />
+                    </div>
+
+                    <select
+                      className="rm-role-filter-select"
+                      value={memberRoleFilter}
+                      onChange={e => setMemberRoleFilter(e.target.value)}
+                    >
+                      <option value="all">All Roles ({members.length})</option>
+                      {roles.map(r => (
+                        <option key={r.id} value={r.id}>{r.name} ({members.filter(m => (m.roleIds || []).includes(r.id)).length})</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div className="rm-members-grid">
+                    {filteredMembers.map(m => {
+                      const isOwnerMember = String(reelm.ownerId || '') === String(m.userId || '')
+                      const isTimedOut = timedOutIds.has(String(m.userId))
+                      return (
+                        <div key={m.userId} className="rm-member-card">
+                          <div className="rm-member-left">
+                            <div className="rm-member-avatar-box">
+                              {m.userPhoto
+                                ? <img src={m.userPhoto} alt="" />
+                                : (m.userName || '?').charAt(0).toUpperCase()}
+                            </div>
+
+                            <div className="rm-member-meta">
+                              <div className="rm-member-name-line">
+                                <span className="rm-member-displayname">{m.userName}</span>
+                                {m.userId === currentUser.id && <span className="rm-badge-pill">You</span>}
+                                {isOwnerMember && <span className="rm-badge-pill owner">Owner</span>}
+                                {isTimedOut && <span className="rm-badge-pill timeout">Timed out</span>}
+                              </div>
+
+                              <div className="rm-member-roles-row">
+                                {(m.roleIds || []).map(rId => {
+                                  const rObj = roles.find(r => r.id === rId)
+                                  if (!rObj) return null
+                                  const canToggle = canToggleRoleForMember(m, rObj)
+                                  return (
+                                    <span
+                                      key={rObj.id}
+                                      className="rm-member-role-chip"
+                                      style={{
+                                        background: (rObj.color || '#60a5fa') + '22',
+                                        borderColor: rObj.color || '#60a5fa',
+                                        color: rObj.color || '#60a5fa'
+                                      }}
+                                      onClick={() => canToggle && toggleMemberRole(m.userId, rObj.id)}
+                                      title={canToggle ? 'Click to remove role' : ''}
+                                    >
+                                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: rObj.color || '#60a5fa' }} />
+                                      {rObj.name}
+                                      {canToggle && <span className="rm-member-role-remove">✕</span>}
+                                    </span>
+                                  )
+                                })}
+
+                                {canManageRoles && (
+                                  <div className="rm-role-popover-wrap">
+                                    <button
+                                      type="button"
+                                      className="rm-add-role-chip-btn"
+                                      onClick={() => setActiveRolePopoverUid(activeRolePopoverUid === m.userId ? null : m.userId)}
+                                    >
+                                      + Add role
+                                    </button>
+
+                                    {activeRolePopoverUid === m.userId && (
+                                      <div className="rm-role-popover">
+                                        {roles.map(r => {
+                                          const hasThisRole = (m.roleIds || []).includes(r.id)
+                                          const canToggle = canToggleRoleForMember(m, r)
+                                          return (
+                                            <button
+                                              key={r.id}
+                                              type="button"
+                                              className={`rm-role-popover-item${hasThisRole ? ' checked' : ''}`}
+                                              disabled={!canToggle}
+                                              onClick={() => toggleMemberRole(m.userId, r.id)}
+                                            >
+                                              <span style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                                                <span style={{ width: 8, height: 8, borderRadius: '50%', background: r.color || '#60a5fa' }} />
+                                                {r.name}
+                                              </span>
+                                              {hasThisRole && <span>✓</span>}
+                                            </button>
+                                          )
+                                        })}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {m.userId !== currentUser.id && (canManageModeration || canManageMembers) && (
+                            <div className="rm-member-actions">
+                              {canManageModeration && (
+                                <button
+                                  type="button"
+                                  className="rm-action-btn"
+                                  disabled={!canActOnMember(m)}
+                                  onClick={() => onTimeoutMember?.(reelm.id, m.userId)}
+                                >
+                                  Timeout
+                                </button>
+                              )}
+                              {canManageMembers && (
+                                <button
+                                  type="button"
+                                  className="rm-action-btn danger"
+                                  disabled={!canActOnMember(m)}
+                                  onClick={() => removeMember(m.userId)}
+                                >
+                                  Remove
+                                </button>
+                              )}
+                              {canManageModeration && (
+                                <button
+                                  type="button"
+                                  className="rm-action-btn danger"
+                                  disabled={!canActOnMember(m)}
+                                  onClick={() => onBanMember?.(reelm.id, m.userId)}
+                                >
+                                  Ban
+                                </button>
+                              )}
+                            </div>
                           )}
-                          <span className="rs-role-dot" style={{ background: role.color }} />
-                          <span className="rs-role-name">{role.name}</span>
-                          {isManagerRoleClient(role) && <span className="rs-role-protected">protected</span>}
-                          <span className="rs-role-count">{members.filter(m => (m.roleIds || []).includes(role.id)).length} members</span>
-                          {canEditRole(role) && <button className="rs-role-edit-btn" onClick={() => startEditRole(role)}>Edit</button>}
-                          {canDeleteRole(role) && <button className="rs-role-delete-btn" onClick={() => deleteRole(role.id)}>✕</button>}
                         </div>
-                        <div className="rs-role-permissions">
-                          {REELM_PERMISSION_OPTIONS.map(opt => {
-                            const active = roleHasPermissionClient(role, opt.key)
-                            const locked = !canEditRole(role) || (opt.key === 'manageReelm' && !canManageFullRoles)
-                            return (
-                              <button
-                                key={opt.key}
-                                className={`rs-perm-chip${active ? ' rs-perm-chip-active' : ''}${locked ? ' rs-perm-chip-locked' : ''}`}
-                                title={opt.note}
-                                disabled={locked}
-                                onClick={() => toggleRolePermission(role.id, opt.key)}
-                              >{opt.label}</button>
-                            )
-                          })}
-                        </div>
-                      </div>
+                      )
+                    })}
+
+                    {filteredMembers.length === 0 && (
+                      <p className="rs-empty">No members match the search criteria.</p>
                     )}
                   </div>
-                ))}
-                {roles.length === 0 && <p className="rs-empty">No roles yet. Create one above.</p>}
-              </div>
-            </div>
-          )}
 
-          {activeTab === 'roles' && (canManageRoles || canManageMembers || canManageInvites) && (
-            <div className="rs-section">
-              <div className="rs-section-header">
-                <span className="rs-section-title">Members</span>
-                <span className="rs-section-hint">{members.length}</span>
-              </div>
-
-              <div className="rs-members-list">
-                {members.map(m => (
-                  <div key={m.userId} className="rs-member-row">
-                    <div className="rs-member-avatar">
-                      {m.userPhoto
-                        ? <img src={m.userPhoto} alt={m.userName} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-                        : (m.userName || '?').charAt(0).toUpperCase()
-                      }
-                    </div>
-                    <div className="rs-member-info">
-                      <span className="rs-member-name">
-                        {m.userName}
-                        {m.userId === currentUser.id && <span className="rs-member-you"> (you)</span>}
-                        {timedOutIds.has(String(m.userId)) && <span className="rs-member-you"> · timed out</span>}
-                      </span>
-                      <div className="rs-member-roles">
-                        {roles.map(role => {
-                          const canToggle = canToggleRoleForMember(m, role)
-                          return (
+                  {(canManageInvites || canManageMembers) && nonMembers.length > 0 && (
+                    <div className="rs-add-member-section" style={{ marginTop: 20 }}>
+                      <div className="rs-section-header">
+                        <span className="rs-section-title">Invite friends to this server</span>
+                      </div>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                        {filteredNonMembers.map(f => (
+                          <div key={f.id} className="rm-member-card" style={{ padding: '8px 12px' }}>
+                            <div className="rm-member-left">
+                              <div className="rm-member-avatar-box" style={{ width: 30, height: 30, fontSize: '0.75rem' }}>
+                                {f.photo ? <img src={f.photo} alt="" /> : (f.name || '?').charAt(0).toUpperCase()}
+                              </div>
+                              <span className="rm-member-displayname" style={{ fontSize: '0.84rem' }}>{f.name}</span>
+                            </div>
                             <button
-                              key={role.id}
-                              className={`rs-role-tag${(m.roleIds || []).includes(role.id) ? ' rs-role-tag-active' : ''}${!canToggle ? ' rs-role-tag-locked' : ''}`}
-                              style={(m.roleIds || []).includes(role.id) ? { background: role.color + '33', borderColor: role.color, color: role.color } : {}}
-                              disabled={!canToggle}
-                              onClick={() => toggleMemberRole(m.userId, role.id)}
-                            >{role.name}</button>
-                          )
-                        })}
+                              type="button"
+                              className="rs-add-btn"
+                              onClick={() => inviteFriendToReelm(f)}
+                            >
+                              Invite
+                            </button>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                    {m.userId !== currentUser.id && (canManageModeration || canManageMembers) && (
-                      <div style={{ display: 'flex', gap: 6 }}>
-                        {canManageModeration && <button className="rs-member-remove" disabled={!canActOnMember(m)} onClick={() => onTimeoutMember?.(reelm.id, m.userId)}>Timeout</button>}
-                        {canManageMembers && <button className="rs-member-remove" disabled={!canActOnMember(m)} onClick={() => removeMember(m.userId)}>Remove</button>}
-                        {canManageModeration && <button className="rs-member-remove" disabled={!canActOnMember(m)} onClick={() => onBanMember?.(reelm.id, m.userId)}>Ban</button>}
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {(canManageInvites || canManageMembers) && nonMembers.length > 0 && (
-                <div className="rs-add-member-section">
-                  <div className="rs-section-header" style={{ marginTop: 24 }}>
-                    <span className="rs-section-title">Invite friends</span>
-                  </div>
-                  <input
-                    className="rs-search-input"
-                    placeholder="Search friends to invite…"
-                    value={memberSearch}
-                    onChange={e => setMemberSearch(e.target.value)}
-                  />
-                  {filteredNonMembers.map(f => (
-                    <div key={f.id} className="rs-member-row">
-                      <div className="rs-member-avatar">
-                        {f.photo
-                          ? <img src={f.photo} alt={f.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-                          : (f.name || '?').charAt(0).toUpperCase()
-                        }
-                      </div>
-                      <div className="rs-member-info">
-                        <span className="rs-member-name">{f.name}</span>
-                      </div>
-                      <button className="rs-add-btn" onClick={() => inviteFriendToReelm(f)}>Invite</button>
-                    </div>
-                  ))}
+                  )}
                 </div>
               )}
             </div>
@@ -6856,44 +7592,344 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
             </div>
           )}
 
-          {activeTab === 'channels' && canManageChannels && (() => {
-            const beginningCat = reelm.categories?.find(c => c.type === 'announcement')
-            const beginningChannels = beginningCat?.channels || []
-            const currentAnnId = reelm.announcementChannelId || beginningChannels[0]?.id || ''
-            return (
-              <>
-              <div className="rs-section">
-                <div className="rs-section-header">
-                  <span className="rs-section-title">Announcements Channel</span>
+          {activeTab === 'channels' && canManageChannels && (
+            <div className="cm-container">
+              {/* Header */}
+              <div className="cm-header">
+                <div>
+                  <span className="cm-header-title">Channels & Categories</span>
+                  <p style={{ margin: '3px 0 0', fontSize: '0.74rem', color: 'rgba(var(--ta-rgb), 0.5)' }}>
+                    Create, reorder, and configure text, voice, and announcement channels.
+                  </p>
                 </div>
-                <p className="rs-section-hint" style={{ marginBottom: 14 }}>
-                  System events like member joins will be posted to this channel.
-                </p>
-                <div className="rs-channel-select-row">
-                  <span className="rs-channel-select-label"># Announcements channel</span>
-                  <select
-                    className="rs-channel-select"
-                    value={currentAnnId}
-                    onChange={e => onUpdate({ ...reelm, announcementChannelId: e.target.value })}
+
+                <div className="cm-header-actions">
+                  <button
+                    type="button"
+                    className="cm-btn"
+                    onClick={() => setCreatingCat(true)}
                   >
-                    {beginningChannels.map(ch => (
-                      <option key={ch.id} value={ch.id}>{ch.name}</option>
-                    ))}
-                  </select>
+                    + Create Category
+                  </button>
                 </div>
               </div>
-              <div className="rs-section" style={{ marginTop: 20 }}>
+
+              {/* Create Category Modal / Inline Box */}
+              {creatingCat && (
+                <div className="cm-inline-editor">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontSize: '0.84rem', fontWeight: 800, color: 'var(--ta)' }}>Create New Category</span>
+                    <button type="button" className="cm-icon-btn" onClick={() => setCreatingCat(false)}>✕</button>
+                  </div>
+                  <div className="cm-inline-editor-grid">
+                    <div className="rm-field-group">
+                      <label className="rm-field-label">Category Name</label>
+                      <input
+                        className="rm-text-input"
+                        placeholder="e.g. TEXT CHANNELS, COMMUNITY..."
+                        value={newCatName}
+                        onChange={e => setNewCatName(e.target.value)}
+                        autoFocus
+                        onKeyDown={e => { if (e.key === 'Enter') handleCreateCategory(); if (e.key === 'Escape') setCreatingCat(false) }}
+                      />
+                    </div>
+                    <div className="rm-field-group">
+                      <label className="rm-field-label">Category Type</label>
+                      <select
+                        className="rm-role-filter-select"
+                        value={newCatType}
+                        onChange={e => setNewCatType(e.target.value)}
+                      >
+                        <option value="text">💬 Text Channels</option>
+                        <option value="voice">🔊 Voice Channels</option>
+                        <option value="announcement">📢 Announcement</option>
+                        <option value="live">⚡ Live Space</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+                    <button type="button" className="cm-btn" onClick={() => setCreatingCat(false)}>Cancel</button>
+                    <button type="button" className="cm-btn cm-btn-primary" onClick={handleCreateCategory}>Create Category</button>
+                  </div>
+                </div>
+              )}
+
+              {/* Categories & Channels Tree */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+                {(reelm.categories || []).map((cat, catIndex) => (
+                  <div key={cat.id} className="cm-category-card">
+                    {/* Category Header */}
+                    <div className="cm-category-head">
+                      <div className="cm-category-left">
+                        <span className="cm-category-tag">{cat.type}</span>
+                        <span className="cm-category-title">{cat.name}</span>
+                        <span style={{ fontSize: '0.7rem', color: 'rgba(var(--ta-rgb), 0.45)' }}>({(cat.channels || []).length})</span>
+                      </div>
+
+                      <div className="cm-category-actions">
+                        <button
+                          type="button"
+                          className="cm-icon-btn"
+                          disabled={catIndex === 0}
+                          onClick={() => handleMoveCategory(catIndex, catIndex - 1)}
+                          title="Move Category Up"
+                        >↑</button>
+                        <button
+                          type="button"
+                          className="cm-icon-btn"
+                          disabled={catIndex === (reelm.categories || []).length - 1}
+                          onClick={() => handleMoveCategory(catIndex, catIndex + 1)}
+                          title="Move Category Down"
+                        >↓</button>
+                        <button
+                          type="button"
+                          className="cm-icon-btn"
+                          onClick={() => setPermModalTarget({ catId: cat.id, isCategory: true, targetName: cat.name })}
+                          title="Category Permissions"
+                        >🛡️</button>
+                        <button
+                          type="button"
+                          className="cm-icon-btn"
+                          onClick={() => { setCreatingChInCatId(cat.id); setNewChType(cat.type || 'text'); setNewChName('') }}
+                          title="Add Channel to this Category"
+                        >+ Channel</button>
+                        {(reelm.categories || []).length > 1 && (
+                          <button
+                            type="button"
+                            className="cm-icon-btn danger"
+                            onClick={() => handleDeleteCategory(cat.id)}
+                            title="Delete Category"
+                          >🗑️</button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Inline Create Channel in this Category */}
+                    {creatingChInCatId === cat.id && (
+                      <div className="cm-inline-editor">
+                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                          <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--ta)' }}>Add Channel to {cat.name}</span>
+                          <button type="button" className="cm-icon-btn" onClick={() => setCreatingChInCatId(null)}>✕</button>
+                        </div>
+                        <div className="cm-inline-editor-grid">
+                          <div className="rm-field-group">
+                            <label className="rm-field-label">Channel Name</label>
+                            <input
+                              className="rm-text-input"
+                              placeholder="e.g. general, announcements, voice-chat..."
+                              value={newChName}
+                              onChange={e => setNewChName(e.target.value)}
+                              autoFocus
+                              onKeyDown={e => { if (e.key === 'Enter') handleCreateChannel(cat.id); if (e.key === 'Escape') setCreatingChInCatId(null) }}
+                            />
+                          </div>
+                          <div className="rm-field-group">
+                            <label className="rm-field-label">Channel Type</label>
+                            <select
+                              className="rm-role-filter-select"
+                              value={newChType}
+                              onChange={e => setNewChType(e.target.value)}
+                            >
+                              <option value="text">💬 Text Channel</option>
+                              <option value="voice">🔊 Voice Channel</option>
+                              <option value="announcement">📢 Announcement</option>
+                              <option value="live">⚡ Live Space</option>
+                            </select>
+                          </div>
+                        </div>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+                          <button type="button" className="cm-btn" onClick={() => setCreatingChInCatId(null)}>Cancel</button>
+                          <button type="button" className="cm-btn cm-btn-primary" onClick={() => handleCreateChannel(cat.id)}>Create Channel</button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Channels List */}
+                    <div className="cm-channel-list">
+                      {(cat.channels || []).map((ch, chIndex) => {
+                        const isSystemChannel = reelm.announcementChannelId === ch.id
+                        const isEditingThis = editingChObj?.chId === ch.id
+                        return (
+                          <React.Fragment key={ch.id}>
+                            <div className="cm-channel-row">
+                              <div className="cm-channel-left">
+                                <span className="cm-channel-icon">
+                                  {ch.type === 'voice' ? '🔊' : ch.type === 'announcement' ? '📢' : ch.type === 'live' ? '⚡' : '#'}
+                                </span>
+                                <span className="cm-channel-name">{ch.name}</span>
+                                <div className="cm-channel-badges">
+                                  {isSystemChannel && <span className="cm-badge announcement">System</span>}
+                                  {ch.isNsfw && <span className="cm-badge nsfw">18+</span>}
+                                  {ch.slowmode > 0 && <span className="cm-badge slowmode">{ch.slowmode}s slowmode</span>}
+                                  {ch.type === 'voice' && <span className="cm-badge">Limit: {ch.capacity || '∞'}</span>}
+                                </div>
+                              </div>
+
+                              <div className="cm-channel-actions">
+                                <button
+                                  type="button"
+                                  className="cm-icon-btn"
+                                  disabled={chIndex === 0}
+                                  onClick={() => handleMoveChannel(cat.id, chIndex, chIndex - 1)}
+                                  title="Move Channel Up"
+                                >↑</button>
+                                <button
+                                  type="button"
+                                  className="cm-icon-btn"
+                                  disabled={chIndex === (cat.channels || []).length - 1}
+                                  onClick={() => handleMoveChannel(cat.id, chIndex, chIndex + 1)}
+                                  title="Move Channel Down"
+                                >↓</button>
+                                <button
+                                  type="button"
+                                  className="cm-icon-btn"
+                                  onClick={() => setEditingChObj(isEditingThis ? null : {
+                                    catId: cat.id,
+                                    chId: ch.id,
+                                    name: ch.name,
+                                    topic: ch.topic || '',
+                                    slowmode: ch.slowmode || 0,
+                                    isNsfw: Boolean(ch.isNsfw),
+                                    capacity: ch.capacity || 8
+                                  })}
+                                  title="Channel Settings"
+                                >⚙️</button>
+                                <button
+                                  type="button"
+                                  className="cm-icon-btn"
+                                  onClick={() => setPermModalTarget({ catId: cat.id, chId: ch.id, isCategory: false, targetName: ch.name })}
+                                  title="Channel Permissions"
+                                >🛡️</button>
+                                {(cat.channels || []).length > 1 && (
+                                  <button
+                                    type="button"
+                                    className="cm-icon-btn danger"
+                                    onClick={() => handleDeleteChannel(cat.id, ch.id)}
+                                    title="Delete Channel"
+                                  >🗑️</button>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Channel Settings Inspector */}
+                            {isEditingThis && (
+                              <div className="cm-inline-editor">
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <span style={{ fontSize: '0.82rem', fontWeight: 800, color: 'var(--ta)' }}>
+                                    Settings: #{ch.name}
+                                  </span>
+                                  <button type="button" className="cm-icon-btn" onClick={() => setEditingChObj(null)}>✕</button>
+                                </div>
+
+                                <div className="cm-inline-editor-grid">
+                                  <div className="rm-field-group">
+                                    <label className="rm-field-label">Channel Name</label>
+                                    <input
+                                      className="rm-text-input"
+                                      value={editingChObj.name}
+                                      onChange={e => setEditingChObj({ ...editingChObj, name: e.target.value })}
+                                      placeholder="channel-name"
+                                    />
+                                  </div>
+
+                                  <div className="rm-field-group">
+                                    <label className="rm-field-label">Channel Topic</label>
+                                    <input
+                                      className="rm-text-input"
+                                      value={editingChObj.topic}
+                                      onChange={e => setEditingChObj({ ...editingChObj, topic: e.target.value })}
+                                      placeholder="Let members know what this channel is for"
+                                    />
+                                  </div>
+
+                                  {ch.type === 'text' && (
+                                    <div className="rm-field-group">
+                                      <label className="rm-field-label">Slowmode (Cooldown)</label>
+                                      <select
+                                        className="rm-role-filter-select"
+                                        value={String(editingChObj.slowmode || 0)}
+                                        onChange={e => setEditingChObj({ ...editingChObj, slowmode: Number(e.target.value) })}
+                                      >
+                                        <option value="0">Off (No cooldown)</option>
+                                        <option value="5">5 seconds</option>
+                                        <option value="10">10 seconds</option>
+                                        <option value="30">30 seconds</option>
+                                        <option value="60">1 minute</option>
+                                        <option value="300">5 minutes</option>
+                                        <option value="900">15 minutes</option>
+                                        <option value="3600">1 hour</option>
+                                      </select>
+                                    </div>
+                                  )}
+
+                                  {ch.type === 'voice' && (
+                                    <div className="rm-field-group">
+                                      <label className="rm-field-label">User Limit (Capacity)</label>
+                                      <select
+                                        className="rm-role-filter-select"
+                                        value={String(editingChObj.capacity || 8)}
+                                        onChange={e => setEditingChObj({ ...editingChObj, capacity: Number(e.target.value) })}
+                                      >
+                                        <option value="0">No Limit (∞)</option>
+                                        <option value="4">4 Users</option>
+                                        <option value="8">8 Users</option>
+                                        <option value="12">12 Users</option>
+                                        <option value="16">16 Users</option>
+                                        <option value="25">25 Users</option>
+                                        <option value="50">50 Users</option>
+                                      </select>
+                                    </div>
+                                  )}
+
+                                  <div className="rm-field-group" style={{ justifyContent: 'center' }}>
+                                    <label className="rm-field-label">Age Restriction</label>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                                      <button
+                                        type="button"
+                                        className={`cust-toggle${editingChObj.isNsfw ? ' cust-toggle-on' : ''}`}
+                                        onClick={() => setEditingChObj({ ...editingChObj, isNsfw: !editingChObj.isNsfw })}
+                                      >
+                                        <span className="cust-toggle-knob" />
+                                      </button>
+                                      <span style={{ fontSize: '0.78rem', color: 'rgba(var(--ta-rgb), 0.7)' }}>
+                                        18+ Age Restricted Channel
+                                      </span>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 4 }}>
+                                  <button type="button" className="cm-btn" onClick={() => setEditingChObj(null)}>Cancel</button>
+                                  <button type="button" className="cm-btn cm-btn-primary" onClick={handleSaveChannelDetails}>Save Channel</button>
+                                </div>
+                              </div>
+                            )}
+                          </React.Fragment>
+                        )
+                      })}
+
+                      {(cat.channels || []).length === 0 && (
+                        <p className="rs-empty" style={{ margin: '6px 8px' }}>No channels in this category yet.</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Global Voice Settings */}
+              <div className="rs-section" style={{ marginTop: 10 }}>
                 <div className="rs-section-header">
-                  <span className="rs-section-title">Voice Channels</span>
+                  <span className="rs-section-title">Voice Channels Behavior</span>
                 </div>
                 <div className="rs-channel-select-row">
                   <div>
                     <span className="rs-channel-select-label">Auto-join on click</span>
-                    <p style={{ margin: '3px 0 0', fontSize: '0.74rem', color: 'rgba(var(--ta-rgb), 0.4)' }}>
-                      Members join a voice channel instantly when clicked.
+                    <p style={{ margin: '3px 0 0', fontSize: '0.74rem', color: 'rgba(var(--ta-rgb), 0.45)' }}>
+                      Members join a voice channel instantly when clicked in the channel list.
                     </p>
                   </div>
                   <button
+                    type="button"
                     className={`cust-toggle${reelm.autoJoinVoice !== false ? ' cust-toggle-on' : ''}`}
                     onClick={() => onUpdate({ ...reelm, autoJoinVoice: reelm.autoJoinVoice === false ? true : false })}
                   >
@@ -6901,21 +7937,23 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
                   </button>
                 </div>
               </div>
-            </>
-            )
-          })()}
+
+              {/* Permission Modal if open */}
+              {permModalTarget && (
+                <ChannelPermissionsModal
+                  reelm={reelm}
+                  target={permModalTarget}
+                  onClose={() => setPermModalTarget(null)}
+                  onSave={next => onUpdate(next)}
+                />
+              )}
+            </div>
+          )}
 
           {activeTab === 'integrations' && (
             <IntegrationsTab
               reelm={reelm}
               channels={(reelm.categories || []).flatMap(c => c.channels || [])}
-            />
-          )}
-
-          {activeTab === 'insights' && canViewInsights && (
-            <ReelmsInsights
-              reelm={reelm}
-              onClose={() => setActiveTab('general')}
             />
           )}
 
@@ -9507,9 +10545,39 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     return () => { cancelled = true }
   }, [customization.bgImage])
 
+  const [isOnline, setIsOnline] = useState(() => isAppOnline())
+
   useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true)
+      triggerTopTicker({ sender: 'Bağlantı', text: 'Yeniden çevrimiçi oldunuz. Bekleyen mesajlar gönderiliyor...' })
+      flushOutbox(messageSend, (msgKey, sentMsgId) => {
+        setMessages(prev => {
+          const updated = (prev[msgKey] || []).map(m => (String(m.id) === String(sentMsgId) ? { ...m, isQueued: false } : m))
+          saveCachedMessages(msgKey, updated)
+          return { ...prev, [msgKey]: updated }
+        })
+      }).catch(() => {})
+    }
+    const handleOffline = () => {
+      setIsOnline(false)
+      triggerTopTicker({ sender: 'Çevrimdışı', text: 'İnternet bağlantısı kesildi. Çevrimdışı moddasınız.' })
+    }
+    window.addEventListener('online', handleOnline)
+    window.addEventListener('offline', handleOffline)
+    return () => {
+      window.removeEventListener('online', handleOnline)
+      window.removeEventListener('offline', handleOffline)
+    }
+  }, [])
+
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) return
     touchUserSession().catch(() => {})
-    const interval = setInterval(() => touchUserSession().catch(() => {}), 5 * 60 * 1000)
+    const interval = setInterval(() => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return
+      touchUserSession().catch(() => {})
+    }, 5 * 60 * 1000)
     return () => clearInterval(interval)
   }, [uid])
 
@@ -11000,6 +12068,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   useEffect(() => {
     if (!spotifyConnected) { setSpotifyNowPlaying(null); return }
     const poll = async () => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return
       try {
         const token = await getIdToken().catch(() => null)
         if (!token) return
@@ -11031,6 +12100,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
     let cancelled = false
     const poll = async () => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return
       try {
         const results = await Promise.allSettled(friendIds.map(async (targetUid) => {
           const token = await getIdToken().catch(() => null)
@@ -11353,11 +12423,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const deleteConversation = async (chatId) => {
     const id = String(chatId || selectedChat?.id || '')
     if (!id) return
-    const chat = chatsRef.current.find(c => String(c.id || c.convId || '') === id) || selectedChatRef.current
-    if (isReelmsSystemChat(chat) || id.split('_').some(isReelmsSystemUid)) {
-      addNotification('Reelms System inbox is locked and cannot be deleted.', { type: 'system_locked' })
-      return
-    }
     if (typeof window !== 'undefined' && !window.confirm('Delete this conversation and clear its messages?')) return
     try { await messageDeleteConversation(id) } catch { /* keep local deletion even if remote clear fails */ }
     setMessages(prev => {
@@ -11821,7 +12886,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const msgTouchStartPosRef = useRef({ x: 0, y: 0 })
 
   const handleMsgTouchStart = (e, msg, chatKey, canDelete, isOwn, canPin, isPinned) => {
-    if (isReelmsSystemChat(selectedChat)) return
     const touch = e.touches?.[0]
     if (!touch) return
     msgTouchStartPosRef.current = { x: touch.clientX, y: touch.clientY }
@@ -11940,6 +13004,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       ? selectedChat.id
       : composeReelmMsgKey(selectedReelm, selectedChannel)
     if (!msgKey) return
+
+    // Immediately load from offline cache so messages are visible instantly
+    const localCached = getCachedMessages(msgKey)
+    if (localCached.length > 0) {
+      setMessages(prev => (prev[msgKey]?.length ? prev : { ...prev, [msgKey]: localCached }))
+    }
+
     const vanishExpired = (m, now) => {
       const v = m.vanishAt
       if (v == null) return false
@@ -11981,6 +13052,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         }))
       }
       const filtered = dedupeMessagesForRender(processed.filter(m => !vanishExpired(m, now)))
+      saveCachedMessages(msgKey, filtered)
       setMessages(prev => {
         const current = prev[msgKey] || []
         return sameMessageList(current, filtered) ? prev : { ...prev, [msgKey]: filtered }
@@ -14017,7 +15089,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }
 
   const modDeleteMessage = (msgKey, msgId) => {
-    if (String(msgKey || '').startsWith('dm_') && String(msgKey || '').slice(3).split('_').some(isReelmsSystemUid)) return
     let snapshot = null
     setMessages(prev => {
       snapshot = prev[msgKey] || []
@@ -14538,16 +15609,40 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         outgoingText = '💡 **Commands:** `/shrug`, `/tableflip`, `/unflip`, `/poll <q>`, `/roll <NdM>`, `/flip`, `/clear`, `/tts <text>`, `/me <action>`'
       }
 
+      const isOnlineNow = isAppOnline()
       const textId = attach ? `${baseMessageId}_text` : baseMessageId
       const msg = {
         id: textId, text: outgoingText,
         ...(richText ? { richText } : {}),
         sender: { id: currentUser.id, name: currentUser.name, photo: getPersonPhoto(currentUser) || null },
         time: now,
+        isQueued: !isOnlineNow,
         ...(replySnap ? { replyTo: { id: replySnap.id, text: replySnap.text, senderName: replySnap.senderName, senderId: replySnap.senderId } } : {})
       }
-      setMessages(prev => appendUniqueMessage(prev, msgKey, msg))
-      messageSend(msgKey, msg).catch(err => handleRemoteMessageError(err, msgKey, msg.id))
+      setMessages(prev => {
+        const next = appendUniqueMessage(prev, msgKey, msg)
+        saveCachedMessages(msgKey, next[msgKey] || [])
+        return next
+      })
+
+      if (!isOnlineNow) {
+        enqueueOutboxMessage(msgKey, msg)
+        triggerTopTicker({ sender: 'Kuyruk', text: 'Çevrimdışısınız. Mesaj kuyruğa alındı, bağlantı gelince gönderilecek.' })
+      } else {
+        messageSend(msgKey, msg).catch(err => {
+          if (err?.code === 'offline' || !isAppOnline()) {
+            enqueueOutboxMessage(msgKey, { ...msg, isQueued: true })
+            setMessages(prev => {
+              const updated = (prev[msgKey] || []).map(m => (m.id === msg.id ? { ...m, isQueued: true } : m))
+              saveCachedMessages(msgKey, updated)
+              return { ...prev, [msgKey]: updated }
+            })
+            triggerTopTicker({ sender: 'Kuyruk', text: 'Bağlantı kesildi. Mesaj kuyruğa eklendi.' })
+          } else {
+            handleRemoteMessageError(err, msgKey, msg.id)
+          }
+        })
+      }
       if (isPollCommand) {
         setTimeout(() => {
           toggleReaction(msgKey, textId, '👍')
@@ -14791,9 +15886,28 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         onUnblock={unblockUserFn}
         onAddFriend={sendFriendRequest}
         onNudge={sendNudge}
+        onMention={(nameOrUser) => {
+          const handle = '@' + String(nameOrUser || '').replace(/^@/, '') + ' '
+          if (editorRef.current) {
+            editorRef.current.focus()
+            document.execCommand('insertText', false, handle)
+            setMessageInput(editorRef.current.innerText)
+          }
+        }}
         isFriend={friends.some(fr => String(fr.id) === String(f.id))}
         isBlocked={blocked.some(b => String(b.id) === String(f.id))}
         isPending={friendRequestsOut.map(String).includes(String(f.id))}
+        isMutedUser={mutedChatIds.map(String).includes(String(f.id))}
+        onToggleMuteUser={(targetId) => {
+          const tid = String(targetId || '')
+          if (!tid) return
+          setMutedChatIds(prev => {
+            const next = prev.includes(tid) ? prev.filter(x => x !== tid) : [...prev, tid]
+            scheduleUserPersist('muted_chats', next)
+            userPutDoc('muted_chats', next).catch(() => {})
+            return next
+          })
+        }}
         nickname={nicknames[f.id] || ''}
         onNicknameChange={(nick) => saveNickname(f.id, nick)}
         canShare={canShare}
@@ -17127,7 +18241,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           <div className="dm-blocked-banner">
                             <div>
                               <strong>Reelms System</strong>
-                              <span>This inbox is locked for server notifications. You cannot block, delete, reply, or react here.</span>
+                              <span>Official Reelms System notifications and announcements inbox.</span>
                             </div>
                           </div>
                         )}
@@ -17163,9 +18277,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               {!isReelmsSystemChat(selectedChat) && !dmIsSelf && !dmIsBlocked && fp && (
                                 <button type="button" className="dm-profile-inline-action dm-profile-inline-action--danger" onClick={(e) => { e.stopPropagation(); blockUserFn(fp) }}>{t('block')}</button>
                               )}
-                              {!isReelmsSystemChat(selectedChat) && (
-                                <button type="button" className="dm-profile-inline-action dm-profile-inline-action--danger" onClick={(e) => { e.stopPropagation(); deleteConversation(selectedChat.id) }}>Delete conversation</button>
-                              )}
+                              <button type="button" className="dm-profile-inline-action dm-profile-inline-action--danger" onClick={(e) => { e.stopPropagation(); deleteConversation(selectedChat.id) }}>Delete conversation</button>
                             </div>
                             {fp?.activity?.name && <ActivityBadge activity={fp.activity} />}
                             {fp?.bio && <p className="dm-profile-bio">{fp.bio}</p>}

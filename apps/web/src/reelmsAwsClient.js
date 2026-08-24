@@ -2,6 +2,7 @@ import { io } from 'socket.io-client'
 import { isElectron, getElectronToken, getElectronClientId } from './electronAuth'
 import { getWebToken, getWebClientId, claimWebClient } from './webAuth'
 import { getApiBaseUrl } from './config/api'
+import { getCachedMessages, saveCachedMessages, isAppOnline } from './features/offline/offlineQueue.js'
 
 const BASE = getApiBaseUrl()
 
@@ -119,6 +120,16 @@ async function api(path, opts = {}) {
     const cached = responseCache.get(cacheKey)
     if (cached && now - cached.at < ttl) return cached.value
     if (inflightRequests.has(cacheKey)) return inflightRequests.get(cacheKey)
+  }
+
+  if (!isAppOnline()) {
+    if (ttl > 0 && responseCache.has(cacheKey)) {
+      return responseCache.get(cacheKey).value
+    }
+    if (opts.allowNotFound) return null
+    const offErr = new Error('offline')
+    offErr.code = 'offline'
+    throw offErr
   }
 
   const run = (async () => {
@@ -746,8 +757,22 @@ export async function discoverySearch(query = '', opts = {}) {
 // ── Messages ──────────────────────────────────────────────────────────────────
 
 export async function messagesGet(msgKey) {
-  const j = await api(`/api/v1/messages/${encodeURIComponent(msgKey)}`)
-  return j.data || []
+  if (!isAppOnline()) {
+    return getCachedMessages(msgKey)
+  }
+  try {
+    const j = await api(`/api/v1/messages/${encodeURIComponent(msgKey)}`)
+    const list = Array.isArray(j?.data) ? j.data : []
+    saveCachedMessages(msgKey, list)
+    return list
+  } catch (err) {
+    if (err?.code === 'offline' || !isAppOnline()) {
+      return getCachedMessages(msgKey)
+    }
+    const cached = getCachedMessages(msgKey)
+    if (cached.length > 0) return cached
+    throw err
+  }
 }
 
 export async function messageSend(msgKey, message) {
