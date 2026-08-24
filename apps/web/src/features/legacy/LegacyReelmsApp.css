@@ -566,8 +566,9 @@ h6 {
   border: 1px solid rgba(var(--ta-rgb), 0.25);
   background: rgba(255, 255, 255, 0.06);
   color: var(--ta);
-  font-family: var(--body-font);
+  font-family: 'Karla', sans-serif !important;
   font-size: 0.95rem;
+  font-weight: 500;
   outline: none;
   line-height: 1;
   vertical-align: middle;
@@ -577,6 +578,8 @@ h6 {
 
 .pill-input::placeholder {
   color: rgba(var(--ta-rgb), 0.5);
+  font-family: 'Karla', sans-serif !important;
+  font-weight: 400;
 }
 
 .pill-input:focus {
@@ -596,7 +599,9 @@ h6 {
 
 .forgot-link {
   white-space: nowrap;
+  font-family: 'Karla', sans-serif !important;
   font-size: 0.82rem;
+  font-weight: 600;
   color: rgba(var(--ta-rgb), 0.65);
   cursor: pointer;
   margin-right: 1px;
@@ -613,9 +618,9 @@ h6 {
   border: none;
   background: var(--ta);
   color: #1a1428;
-  font-family: var(--body-font);
+  font-family: 'Karla', sans-serif !important;
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: 800 !important;
   cursor: pointer;
 }
 
@@ -689,9 +694,9 @@ h6 {
   background: none;
   border: none;
   color: var(--ta);
-  font-family: var(--body-font);
+  font-family: 'Karla', sans-serif !important;
   font-size: 0.95rem;
-  font-weight: 600;
+  font-weight: 800 !important;
   cursor: pointer;
   padding: 16px 0 0;
   text-align: center;
@@ -720,9 +725,9 @@ h6 {
   border: 1px solid rgba(var(--ta-rgb), 0.2);
   background: rgba(255, 255, 255, 0.04);
   color: var(--ta);
-  font-family: var(--body-font);
+  font-family: 'Karla', sans-serif !important;
   font-size: 0.9rem;
-  font-weight: 500;
+  font-weight: 700;
   cursor: pointer;
   backdrop-filter: blur(10px) brightness(0.9);
   -webkit-backdrop-filter: blur(10px) brightness(0.9);
@@ -737,12 +742,15 @@ h6 {
 .signup-link {
   margin-top: 20px;
   text-align: center;
+  font-family: 'Karla', sans-serif !important;
   font-size: 0.85rem;
+  font-weight: 500;
   color: rgba(var(--ta-rgb), 0.55);
 }
 
 .signup-link span {
   color: var(--ta);
+  font-weight: 700;
   cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -750,6 +758,102 @@ h6 {
 
 .signup-link span:hover {
   color: #c9a898;
+}
+
+/* ── Auth Language Picker (Centered Bottom Sliding Pill) ── */
+.auth-lang-container {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.auth-lang-picker {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(24, 22, 24, 0.72);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(var(--ta-rgb), 0.16);
+  border-radius: 999px;
+  padding: 3px;
+  transition: all 0.3s cubic-bezier(0.22, 1, 0.36, 1);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.3);
+}
+
+.auth-lang-picker--open {
+  padding: 4px 8px;
+  background: rgba(24, 22, 24, 0.92);
+  border-color: rgba(var(--ta-rgb), 0.28);
+}
+
+.auth-lang-slider {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  animation: authLangSlideIn 0.25s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes authLangSlideIn {
+  from {
+    transform: scaleX(0.7);
+    opacity: 0;
+  }
+  to {
+    transform: scaleX(1);
+    opacity: 1;
+  }
+}
+
+.auth-lang-btn {
+  font-family: 'Karla', sans-serif !important;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: rgba(var(--ta-rgb), 0.55);
+  background: none;
+  border: none;
+  padding: 5px 11px;
+  border-radius: 999px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.auth-lang-btn:hover {
+  color: var(--ta);
+  background: rgba(var(--ta-rgb), 0.12);
+}
+
+.auth-lang-btn--current {
+  color: rgba(var(--ta-rgb), 0.85);
+  padding: 5px 14px;
+}
+
+.auth-lang-btn--active {
+  background: rgba(var(--ta-rgb), 0.18);
+  color: var(--ta);
+}
+
+.auth-lang-close {
+  font-family: 'Karla', sans-serif !important;
+  font-size: 0.7rem;
+  color: rgba(var(--ta-rgb), 0.4);
+  background: none;
+  border: none;
+  padding: 4px 7px;
+  border-radius: 999px;
+  cursor: pointer;
+  margin-left: 2px;
+  transition: all 0.15s ease;
+}
+
+.auth-lang-close:hover {
+  color: var(--ta);
+  background: rgba(var(--ta-rgb), 0.12);
 }
 
 
@@ -15468,7 +15572,7 @@ button, input, select, textarea,
 .legacy-auth-download-cta__text {
   max-width: 230px;
   color: rgba(var(--ta-rgb), 0.5);
-  font-family: var(--body-font);
+  font-family: 'Karla', sans-serif !important;
   font-size: 0.76rem;
   line-height: 1.45;
 }
@@ -15477,7 +15581,7 @@ button, input, select, textarea,
   min-height: 36px;
   padding: 0 14px;
   color: var(--ta);
-  font-family: var(--body-font);
+  font-family: 'Karla', sans-serif !important;
   font-size: 0.78rem;
   font-weight: 700;
   letter-spacing: 0;

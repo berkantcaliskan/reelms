@@ -537,11 +537,67 @@ function GoogleIcon() {
 }
 
 
+function AuthLanguagePicker({ language, onLanguageChange }) {
+  const [open, setOpen] = useState(false)
+  const currentLang = (language || 'en').toUpperCase()
+
+  const list = [
+    { code: 'en', label: 'EN' },
+    { code: 'tr', label: 'TR' },
+    { code: 'de', label: 'DE' },
+    { code: 'es', label: 'ES' },
+    { code: 'fr', label: 'FR' },
+    { code: 'pt', label: 'PT' },
+  ]
+
+  return (
+    <div className="auth-lang-container">
+      <div className={`auth-lang-picker${open ? ' auth-lang-picker--open' : ''}`}>
+        {!open ? (
+          <button
+            type="button"
+            className="auth-lang-btn auth-lang-btn--current"
+            onClick={() => setOpen(true)}
+            title="Change language"
+          >
+            {currentLang}
+          </button>
+        ) : (
+          <div className="auth-lang-slider">
+            {list.map(l => (
+              <button
+                key={l.code}
+                type="button"
+                className={`auth-lang-btn${language === l.code ? ' auth-lang-btn--active' : ''}`}
+                onClick={() => {
+                  onLanguageChange(l.code)
+                  setOpen(false)
+                }}
+              >
+                {l.label}
+              </button>
+            ))}
+            <button
+              type="button"
+              className="auth-lang-close"
+              onClick={() => setOpen(false)}
+              title="Close"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function LegacyAuthDownloadCta({ compact = false }) {
+  const t = useT()
   return (
     <div className={`legacy-auth-download-cta${compact ? ' legacy-auth-download-cta--compact' : ''} su-drop su-drop-5`}>
-      <span className="legacy-auth-download-cta__text">Windows uygulaması da hazır olduğunda aynı hesapla devam et.</span>
-      <DesktopDownloadButton variant="auth" size="sm">Windows uygulamasını indir</DesktopDownloadButton>
+      <span className="legacy-auth-download-cta__text">{t('auth_download_cta_text') || 'Continue with the same account across all your devices.'}</span>
+      <DesktopDownloadButton variant="auth" size="sm">{t('download_app') || 'Download Reelms'}</DesktopDownloadButton>
     </div>
   )
 }
@@ -20735,7 +20791,6 @@ function App() {
               <header className="app-header">
                 <div className="logo-area">
                   <img src={reelmsLogo} alt="Reelms Logo" className="logo" />
-                  <span className="app-name">Reelms</span>
                 </div>
               </header>
               <main className="app-main">
@@ -20743,6 +20798,7 @@ function App() {
                   <SignInScreen onGoSignUp={() => navigateTo('/signup')} onSignInSuccess={handleSignInSuccess} />
                 </div>
               </main>
+              <AuthLanguagePicker language={language} onLanguageChange={updateLanguage} />
               <div style={{ position: 'absolute', bottom: '30px', right: '30px', opacity: 0.5, fontSize: '12px', pointerEvents: 'none' }}>
                 Sun Intelligence
               </div>
@@ -20764,7 +20820,6 @@ function App() {
               <header className="app-header">
                 <div className="logo-area">
                   <img src={reelmsLogo} alt="Reelms Logo" className="logo" />
-                  <span className="app-name">Reelms</span>
                 </div>
               </header>
               <main className="app-main">
@@ -20772,6 +20827,7 @@ function App() {
                   <SignUpScreen onSignUpComplete={handleSignUpComplete} onGoBack={() => navigateTo('/signin')} />
                 </div>
               </main>
+              <AuthLanguagePicker language={language} onLanguageChange={updateLanguage} />
               <div style={{ position: 'absolute', bottom: '30px', right: '30px', opacity: 0.5, fontSize: '12px', pointerEvents: 'none' }}>
                 Sun Intelligence
               </div>
