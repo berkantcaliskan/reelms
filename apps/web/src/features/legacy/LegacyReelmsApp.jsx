@@ -54,6 +54,9 @@ import { RichMessageComposerToolbar } from '../rich-message/RichMessageComposer'
 import { SEMANTIC_COLORS, SUPPORTED_LANGUAGES } from '../rich-message/richMessageTokens'
 import '../rich-message/richMessage.css'
 import { fetchVoiceToken, createLivekitSession } from '../voice/livekitManager.js'
+import { DiscordEmbedCard } from '../chat/DiscordEmbedCard.jsx'
+import { QuickSwitcherModal } from '../quick-switcher/QuickSwitcherModal.jsx'
+import { ReelmsInsights } from '../insights/ReelmsInsights.jsx'
 
 // Audit Log components
 function AuditLogView({ reelmId }) {
@@ -1088,6 +1091,88 @@ function makeIconFilter(baseHex) {
     return `hue-rotate(${rotation.toFixed(1)}deg) saturate(${satScale.toFixed(2)}) brightness(${briScale.toFixed(2)})`
   }
 }
+function MaskIcon({ src, className = '', style = {}, alt = '', ...props }) {
+  return (
+    <span
+      role="img"
+      aria-label={alt}
+      className={`mask-icon ${className}`.trim()}
+      style={{
+        display: 'inline-block',
+        backgroundColor: 'var(--ta)',
+        WebkitMaskImage: `url("${src}")`,
+        maskImage: `url("${src}")`,
+        WebkitMaskSize: 'contain',
+        maskSize: 'contain',
+        WebkitMaskRepeat: 'no-repeat',
+        maskRepeat: 'no-repeat',
+        WebkitMaskPosition: 'center',
+        maskPosition: 'center',
+        ...style
+      }}
+      {...props}
+    />
+  )
+}
+
+function ReelmsCustomSelect({ value, options = [], placeholder = '— Off —', onChange, className = '', buttonStyle, dropdownStyle }) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    if (!open) return
+    const handleClick = (e) => {
+      if (ref.current && !ref.current.contains(e.target)) {
+        setOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [open])
+
+  const selectedOpt = options.find(o => String(o.value) === String(value))
+  const displayLabel = selectedOpt ? selectedOpt.label : (placeholder || (options[0]?.label || ''))
+
+  return (
+    <div className={`reelms-select-container ${className}`.trim()} ref={ref}>
+      <button
+        type="button"
+        className={`reelms-select-btn${open ? ' reelms-select-btn--open' : ''}`}
+        onClick={() => setOpen(v => !v)}
+        style={buttonStyle}
+      >
+        <span className="reelms-select-value">{displayLabel}</span>
+        <svg className={`reelms-select-arrow${open ? ' reelms-select-arrow--open' : ''}`} width="10" height="6" viewBox="0 0 10 6" fill="none">
+          <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      </button>
+      {open && (
+        <div className="reelms-select-dropdown" style={dropdownStyle}>
+          {placeholder ? (
+            <button
+              type="button"
+              className={`reelms-select-option${!value ? ' reelms-select-option--active' : ''}`}
+              onClick={() => { onChange?.(''); setOpen(false) }}
+            >
+              {placeholder}
+            </button>
+          ) : null}
+          {options.map(opt => (
+            <button
+              key={opt.value}
+              type="button"
+              className={`reelms-select-option${String(value) === String(opt.value) ? ' reelms-select-option--active' : ''}`}
+              onClick={() => { onChange?.(opt.value); setOpen(false) }}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 const iconThemeFilter       = makeIconFilter('#b99887')
 const categoryIconFilter    = iconThemeFilter
 const headerIconThemeFilter = iconThemeFilter
@@ -1114,12 +1199,32 @@ function PillSelect({ value, onChange, options }) {
   )
 }
 
+const MIDNIGHT_ACCENTS = [
+  { id: 'purple_nightlight', name: 'Purple Nightlight', color: '#9070c0' },
+  { id: 'rose',              name: 'Rose',              color: '#e8a4b8' },
+  { id: 'pink_in_red',       name: 'Pink in Red',       color: '#d46e82' },
+  { id: 'green_light',       name: 'Green Light',       color: '#68c586' },
+  { id: 'earth_sky',         name: 'Earth Sky',         color: '#7fc8e8' },
+  { id: 'ocean',             name: 'Ocean',             color: '#4a96be' },
+  { id: 'sunbathe',          name: 'Sunbathe',          color: '#F3B38B' },
+]
+
+const SUNLIGHT_ACCENTS = [
+  { id: 'amber',     name: 'Amber',     color: '#d97706' },
+  { id: 'tangerine', name: 'Tangerine', color: '#ea580c' },
+  { id: 'gold',      name: 'Sun Gold',  color: '#ca8a04' },
+  { id: 'emerald',   name: 'Green Sun', color: '#059669' },
+  { id: 'sky',       name: 'Sky Blue',  color: '#0284c7' },
+  { id: 'rose',      name: 'Sun Rose',  color: '#e11d48' },
+  { id: 'violet',    name: 'Violet',    color: '#7c3aed' },
+]
+
 const THEMES = [
   {
     id: 'default',
     name: 'Warm, Default',
-    accent: '#fdfcfb',
-    accentRgb: '253,252,251',
+    accent: '#e8d8cc',
+    accentRgb: '232,216,204',
     base: '#2c2522',
     baseRgb: '44,37,34',
     surfacePrimary: '#362e2a',
@@ -1129,20 +1234,101 @@ const THEMES = [
     borderStrong: 'rgba(255,255,255,0.14)',
     noAccentGlow: true,
     noGradient: true,
+    isLight: false,
   },
-  { id: 'gece',     name: 'Night',           accent: '#b99887', accentRgb: '185,152,135', base: '#1e1c1a', baseRgb: '30,28,26', grainOpacity: 0.12, noAccentGlow: true },
-  { id: 'charcoal', name: 'Charcoal',        accent: '#b99887', accentRgb: '185,152,135', base: '#121315', baseRgb: '18,19,21', surfacePrimary: '#181A1D', surfaceElevated: '#1E2024', surfaceHover: '#24262B', borderSubtle: 'rgba(255,255,255,0.06)', borderStrong: 'rgba(255,255,255,0.10)', noAccentGlow: true, noGradient: true },
-  { id: 'stone',    name: 'Soft Light',      accent: '#c8bfa8', accentRgb: '200,191,168', base: '#383835', baseRgb: '56,56,53', noGradient: true },
-  { id: 'classic',  name: 'Midnight Purple', accent: '#b99887', accentRgb: '185,152,135', base: '#0c0c20', baseRgb: '12,12,32' },
-  { id: 'lavender', name: 'Purple Sunlight', accent: '#c0a8e0', accentRgb: '192,168,224', base: '#120d1a', baseRgb: '18,13,26' },
-  { id: 'dusk',     name: 'Purple Nightlight', accent: '#9070c0', accentRgb: '144,112,192', base: '#0d0a18', baseRgb: '13,10,24' },
-  { id: 'rose',     name: 'Rose',            accent: '#e8a4b8', accentRgb: '232,164,184', base: '#1a0d12', baseRgb: '26,13,18' },
-  { id: 'crimson',  name: 'Pink in Red',     accent: '#d46e82', accentRgb: '212,110,130', base: '#18080d', baseRgb: '24,8,13' },
-  { id: 'sage',     name: 'Sage',            accent: '#68c586', accentRgb: '104,197,134', base: '#0d1d14', baseRgb: '13,29,20' },
-  { id: 'sky',      name: 'Earth Sky',       accent: '#7fc8e8', accentRgb: '127,200,232', base: '#0a1520', baseRgb: '10,21,32' },
-  { id: 'ocean',    name: 'Ocean',           accent: '#4a96be', accentRgb: '74,150,190',  base: '#080f1a', baseRgb: '8,15,26' },
-  { id: 'peach',    name: 'Sunbathe',        accent: '#f0a06a', accentRgb: '240,160,106', base: '#1a0e08', baseRgb: '26,14,8' },
-  { id: 'lemon',    name: 'Lemonade',        accent: '#F3B38B', accentRgb: '243,179,139', base: '#161400', baseRgb: '22,20,0' },
+  {
+    id: 'daylight',
+    name: 'Daylight',
+    accent: '#2c2522',
+    accentRgb: '44,37,34',
+    base: '#f4ede6',
+    baseRgb: '244,237,230',
+    surfacePrimary: '#ece3db',
+    surfaceElevated: '#e2d7ce',
+    surfaceHover: '#d8ccc2',
+    borderSubtle: 'rgba(0,0,0,0.08)',
+    borderStrong: 'rgba(0,0,0,0.16)',
+    noAccentGlow: true,
+    noGradient: true,
+    isLight: true,
+  },
+  {
+    id: 'gece',
+    name: 'Night',
+    accent: '#e8d8cc',
+    accentRgb: '232,216,204',
+    base: '#1e1c1a',
+    baseRgb: '30,28,26',
+    surfacePrimary: '#262421',
+    surfaceElevated: '#302d29',
+    surfaceHover: '#3b3732',
+    borderSubtle: 'rgba(255,255,255,0.08)',
+    borderStrong: 'rgba(255,255,255,0.14)',
+    grainOpacity: 0.12,
+    noAccentGlow: true,
+    isLight: false,
+  },
+  {
+    id: 'charcoal',
+    name: 'Very Dark',
+    accent: '#e4d6cb',
+    accentRgb: '228,214,203',
+    base: '#121315',
+    baseRgb: '18,19,21',
+    surfacePrimary: '#181A1D',
+    surfaceElevated: '#1E2024',
+    surfaceHover: '#24262B',
+    borderSubtle: 'rgba(255,255,255,0.06)',
+    borderStrong: 'rgba(255,255,255,0.10)',
+    noAccentGlow: true,
+    noGradient: true,
+    isLight: false,
+  },
+  {
+    id: 'sunlight',
+    name: 'Sunlight',
+    accent: '#d97706',
+    accentRgb: '217,119,6',
+    base: '#fdfbf7',
+    baseRgb: '253,251,247',
+    surfacePrimary: '#f6ede0',
+    surfaceElevated: '#ede0ce',
+    surfaceHover: '#e3d3bd',
+    borderSubtle: 'rgba(0,0,0,0.08)',
+    borderStrong: 'rgba(0,0,0,0.14)',
+    noGradient: true,
+    isLight: true,
+    hasSubAccents: true,
+  },
+  {
+    id: 'midnight',
+    name: 'Midnight',
+    accent: '#9070c0',
+    accentRgb: '144,112,192',
+    base: '#0c0c20',
+    baseRgb: '12,12,32',
+    surfacePrimary: '#141430',
+    surfaceElevated: '#1b1b3e',
+    surfaceHover: '#23234d',
+    borderSubtle: 'rgba(255,255,255,0.08)',
+    borderStrong: 'rgba(255,255,255,0.14)',
+    isLight: false,
+    hasSubAccents: true,
+  },
+  {
+    id: 'classic',
+    name: 'Midnight Purple',
+    accent: '#c084fc',
+    accentRgb: '192,132,252',
+    base: '#0f0a1c',
+    baseRgb: '15,10,28',
+    surfacePrimary: '#1a1130',
+    surfaceElevated: '#241842',
+    surfaceHover: '#2e1f54',
+    borderSubtle: 'rgba(255,255,255,0.08)',
+    borderStrong: 'rgba(255,255,255,0.14)',
+    isLight: false,
+  },
 ]
 
 function rgbArrayFrom(value, fallback = null) {
@@ -1170,7 +1356,7 @@ function rgbArrayFrom(value, fallback = null) {
   return fallback
 }
 
-function rgbCssValue(value, fallback = '185,152,135') {
+function rgbCssValue(value, fallback = '253,252,251') {
   const arr = rgbArrayFrom(value, null)
   return arr ? arr.join(',') : fallback
 }
@@ -1213,9 +1399,33 @@ function EnvToggle({ k, def = false, v, set }) {
   )
 }
 
-function EnvSelect({ k, def, options, v, set }) {
+function EnvSelect({ k, def, options, v, set, width = 180 }) {
   return (
-    <PillSelect value={v(k, def)} onChange={(val) => set(k, val)} options={options} />
+    <div style={{ width: width, minWidth: 150, flexShrink: 0 }}>
+      <ReelmsCustomSelect
+        value={v(k, def)}
+        placeholder=""
+        options={options}
+        onChange={(val) => set(k, val)}
+      />
+    </div>
+  )
+}
+
+function EnvInlineSlider({ k, def, min = 0, max = 100, step = 1, disabled = false, v, set }) {
+  const currentVal = v(k, def)
+  return (
+    <div className="env-inline-slider-wrapper">
+      <input
+        type="range"
+        className="env-slider env-slider--inline"
+        min={min} max={max} step={step}
+        value={currentVal}
+        disabled={disabled}
+        onChange={e => set(k, Number(e.target.value))}
+      />
+      <span className="env-slider-inline-value">{currentVal}%</span>
+    </div>
   )
 }
 
@@ -1257,6 +1467,7 @@ function EnvironmentPanel({ uid }) {
   }
 
   const v = (key, def) => env[key] ?? def
+  const isSpatialAudio = !!v('spatialAudio', false)
 
   return (
     <div className="accs-panel">
@@ -1276,7 +1487,7 @@ function EnvironmentPanel({ uid }) {
           ]} v={v} set={set} />
         </div>
 
-        <div className="accs-visibility-row" style={{ marginTop: 12 }}>
+        <div className="accs-visibility-row" style={{ marginTop: 14 }}>
           <div>
             <span className="cust-toggle-label">{t('speaker_label')}</span>
             <p className="accs-note">{t('speaker_desc')}</p>
@@ -1287,20 +1498,18 @@ function EnvironmentPanel({ uid }) {
           ]} v={v} set={set} />
         </div>
 
-        <div className="env-slider-row" style={{ marginTop: 16 }}>
-          <div className="env-slider-label-row">
+        <div className="accs-visibility-row" style={{ marginTop: 16 }}>
+          <div>
             <span className="cust-toggle-label">{t('input_volume_label')}</span>
-            <span className="env-slider-value">{v('inputVolume', 80)}%</span>
           </div>
-          <EnvSlider k="inputVolume" def={80} min={0} max={100} v={v} set={set} />
+          <EnvInlineSlider k="inputVolume" def={80} min={0} max={100} v={v} set={set} />
         </div>
 
-        <div className="env-slider-row" style={{ marginTop: 12 }}>
-          <div className="env-slider-label-row">
+        <div className="accs-visibility-row" style={{ marginTop: 14 }}>
+          <div>
             <span className="cust-toggle-label">{t('output_volume_label')}</span>
-            <span className="env-slider-value">{v('outputVolume', 100)}%</span>
           </div>
-          <EnvSlider k="outputVolume" def={100} min={0} max={100} v={v} set={set} />
+          <EnvInlineSlider k="outputVolume" def={100} min={0} max={100} v={v} set={set} />
         </div>
 
         <div className="cust-toggle-row" style={{ marginTop: 16 }}>
@@ -1318,26 +1527,22 @@ function EnvironmentPanel({ uid }) {
           </div>
           <EnvToggle k="echoCancellation" def={true} v={v} set={set} />
         </div>
-      </div>
 
-      {/* ── Spatial Audio ── */}
-      <div className="accs-section">
-        <div className="accs-section-title">{t('spatial_audio')}</div>
-
-        <div className="cust-toggle-row">
+        <div className="cust-toggle-row" style={{ marginTop: 16 }}>
           <div>
-            <span className="cust-toggle-label">{t('enable_spatial_audio')}</span>
+            <span className="cust-toggle-label">{t('spatial_audio')}</span>
             <p className="accs-note">{t('spatial_audio_desc')}</p>
           </div>
           <EnvToggle k="spatialAudio" def={false} v={v} set={set} />
         </div>
 
-        <div className="env-slider-row" style={{ marginTop: 16 }}>
-          <div className="env-slider-label-row">
-            <span className="cust-toggle-label" style={{ opacity: v('spatialAudio', false) ? 1 : 0.4 }}>{t('spatial_depth_label')}</span>
-            <span className="env-slider-value" style={{ opacity: v('spatialAudio', false) ? 1 : 0.4 }}>{v('spatialDepth', 50)}%</span>
+        <div className={`env-expandable-row${isSpatialAudio ? ' env-expandable-row--open' : ''}`}>
+          <div className="accs-visibility-row" style={{ paddingTop: 10 }}>
+            <div>
+              <span className="cust-toggle-label">{t('spatial_depth_label')}</span>
+            </div>
+            <EnvInlineSlider k="spatialDepth" def={50} min={0} max={100} disabled={!isSpatialAudio} v={v} set={set} />
           </div>
-          <EnvSlider k="spatialDepth" def={50} min={0} max={100} disabled={!v('spatialAudio', false)} v={v} set={set} />
         </div>
       </div>
 
@@ -1356,7 +1561,7 @@ function EnvironmentPanel({ uid }) {
           ]} v={v} set={set} />
         </div>
 
-        <div className="accs-visibility-row" style={{ marginTop: 12 }}>
+        <div className="accs-visibility-row" style={{ marginTop: 14 }}>
           <div>
             <span className="cust-toggle-label">{t('video_quality_label')}</span>
             <p className="accs-note">{t('video_quality_desc')}</p>
@@ -1394,7 +1599,7 @@ function EnvironmentPanel({ uid }) {
           ]} v={v} set={set} />
         </div>
 
-        <div className="accs-visibility-row" style={{ marginTop: 12 }}>
+        <div className="accs-visibility-row" style={{ marginTop: 14 }}>
           <div>
             <span className="cust-toggle-label">{t('resolution_label')}</span>
             <p className="accs-note">{t('resolution_desc')}</p>
@@ -1432,6 +1637,7 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
   const bgInputRef = useRef(null)
   const currentTheme = THEMES.find(th => th.id === customization.themeId) || THEMES[0]
   const [openSpectrum, setOpenSpectrum] = useState(null)
+  const [fontsExpanded, setFontsExpanded] = useState(false)
 
   const pickSpectrum = (e, key) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -1445,7 +1651,6 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
   }
 
   const compressImageToDataUrl = async (file) => {
-    // Keep story background images small (payload size).
     const dataUrl = await new Promise((resolve, reject) => {
       const reader = new FileReader()
       reader.onload = () => resolve(reader.result)
@@ -1472,20 +1677,55 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
     if (!ctx) return dataUrl
     ctx.drawImage(img, 0, 0, w, h)
 
-    // Prefer webp where available, fallback to jpeg.
     const webp = canvas.toDataURL('image/webp', 0.82)
     if (webp && webp.startsWith('data:image/webp')) return webp
     return canvas.toDataURL('image/jpeg', 0.84)
   }
 
+  const activeFontObj = (BODY_FONTS || []).find(f => f.id === bodyFont) || BODY_FONTS?.[0] || { label: 'Karla', family: "'Karla', sans-serif" }
+
   return (
     <div className="accs-panel">
+      {/* ── Background ── */}
       <div className="accs-section">
         <div className="accs-section-title">{t('background')}</div>
         <div className="cust-bg-area">
           {customization.bgImage ? (
-            <div className="cust-bg-preview" style={{ backgroundImage: `url("${normalizeMediaUrl(customization.bgImage) || customization.bgImage}")` }}>
-              <button className="cust-bg-remove" onClick={() => onChange({ bgImage: null })}>{t('remove')}</button>
+            <div className="cust-bg-box">
+              <div
+                className="cust-bg-preview"
+                style={{ backgroundImage: `url("${normalizeMediaUrl(customization.bgImage) || customization.bgImage}")` }}
+              />
+              <div className="cust-bg-controls-row">
+                <button type="button" className="cust-bg-btn" onClick={() => bgInputRef.current?.click()}>
+                  {t('change') || 'Change'}
+                </button>
+                <button type="button" className="cust-bg-btn cust-bg-btn--danger" onClick={() => onChange({ bgImage: null })}>
+                  {t('remove') || 'Remove'}
+                </button>
+                <div className="cust-bg-slider-item">
+                  <span className="cust-bg-slider-label">Blur: {customization.bgBlur ?? 16}px</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="40"
+                    value={customization.bgBlur ?? 16}
+                    onChange={e => onChange({ bgBlur: Number(e.target.value) })}
+                    className="cust-bg-slider"
+                  />
+                </div>
+                <div className="cust-bg-slider-item">
+                  <span className="cust-bg-slider-label">Dim: {customization.bgDim ?? 30}%</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="80"
+                    value={customization.bgDim ?? 30}
+                    onChange={e => onChange({ bgDim: Number(e.target.value) })}
+                    className="cust-bg-slider"
+                  />
+                </div>
+              </div>
             </div>
           ) : (
             <button className="cust-btn-upload" onClick={() => bgInputRef.current?.click()}>
@@ -1517,41 +1757,74 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
             }}
           />
         </div>
-        {customization.bgImage && (
-          <div className="cust-toggle-row" style={{ marginTop: '14px' }}>
-            <div>
-              <span className="cust-toggle-label">{t('reduce_blur')}</span>
-              <p className="accs-note">{t('reduce_blur_desc')}</p>
+      </div>
+
+      {/* ── Theme ── */}
+      <div className="accs-section">
+        <div className="accs-section-title">{t('theme_section') || 'Theme'}</div>
+        <div className="cust-theme-grid">
+          {THEMES.map(th => {
+            const isSelected = customization.themeId === th.id
+            return (
+              <button
+                key={th.id}
+                type="button"
+                className={`cust-theme-swatch${isSelected ? ' cust-theme-swatch-active' : ''}${th.isLight ? ' cust-theme-swatch--light' : ''}`}
+                onClick={() => onChange({ themeId: th.id, customAccent: null })}
+                title={th.name}
+                style={{ background: th.base }}
+              >
+                <span className="cust-theme-swatch-dot" style={{ background: isSelected && customization.customAccent ? customization.customAccent : th.accent }} />
+              </button>
+            )
+          })}
+        </div>
+
+        {/* Midnight / Sunlight Selectable Accent Presets */}
+        {(customization.themeId === 'midnight' || customization.themeId === 'sunlight' || currentTheme.hasSubAccents) && (
+          <div className="cust-midnight-accents" style={{ marginTop: 14 }}>
+            <div style={{ fontSize: '0.76rem', color: 'rgba(var(--ta-rgb), 0.8)', marginBottom: 8, fontWeight: 600 }}>
+              {t('accent_color')}
             </div>
-            <button
-              className={`cust-toggle${customization.reduceBlur ? ' cust-toggle-on' : ''}`}
-              onClick={() => onChange({ reduceBlur: !customization.reduceBlur })}
-            ><span className="cust-toggle-knob" /></button>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+              {(customization.themeId === 'sunlight' ? SUNLIGHT_ACCENTS : MIDNIGHT_ACCENTS).map(acc => {
+                const isSelected = (customization.customAccent || currentTheme.accent).toLowerCase() === acc.color.toLowerCase()
+                return (
+                  <button
+                    key={acc.id}
+                    type="button"
+                    onClick={() => onChange({ customAccent: acc.color })}
+                    className={`cust-midnight-acc-btn${isSelected ? ' active' : ''}`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '5px 12px',
+                      borderRadius: 999,
+                      background: isSelected ? 'rgba(var(--ta-rgb), 0.16)' : 'rgba(var(--ta-rgb), 0.06)',
+                      border: `1.5px solid ${isSelected ? 'var(--ta)' : 'rgba(var(--ta-rgb), 0.2)'}`,
+                      color: isSelected ? 'var(--ta)' : 'rgba(var(--ta-rgb), 0.85)',
+                      fontWeight: isSelected ? 600 : 500,
+                      fontSize: '0.75rem',
+                      cursor: 'pointer',
+                      transition: 'all 0.15s ease',
+                    }}
+                  >
+                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: acc.color, flexShrink: 0, boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+                    <span>{acc.name}</span>
+                  </button>
+                )
+              })}
+            </div>
           </div>
         )}
       </div>
 
+      {/* ── Accent Color (replacing Spectrum) ── */}
       <div className="accs-section">
-        <div className="accs-section-title">{t('theme_section')}</div>
-        <div className="cust-theme-grid">
-          {THEMES.map(th => (
-            <button
-              key={th.id}
-              className={`cust-theme-swatch${customization.themeId === th.id ? ' cust-theme-swatch-active' : ''}`}
-              onClick={() => onChange({ themeId: th.id })}
-              title={th.name}
-              style={{ background: th.base }}
-            >
-              <span className="cust-theme-swatch-dot" style={{ background: th.accent }} />
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="accs-section">
-        <div className="accs-section-title">{t('spectrum')}</div>
+        <div className="accs-section-title">{t('accent_color') || 'Accent color'}</div>
         <p className="accs-note" style={{ marginTop: 0, marginBottom: 12 }}>
-          <strong>{t('spectrum_accent')}</strong> is for icons, indicators, and headings — channel/feed text is configured separately below.
+          {t('accent_color_desc') || 'Accent color for icons, highlights, indicators and active elements.'}
         </p>
         <div className="cust-tayf-row">
           <div className="cust-tayf-picker">
@@ -1565,7 +1838,7 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
                   <button type="button" className="cust-tayf-reset" onClick={e => { e.stopPropagation(); onChange({ customAccent: null }); if (openSpectrum === 'customAccent') setOpenSpectrum(null) }}>×</button>
                 )}
               </div>
-              <span className="cust-tayf-label">{t('spectrum_accent')}</span>
+              <span className="cust-tayf-label">{t('accent_color') || 'Accent'}</span>
             </div>
             <div
               className={`cust-tayf-strip${openSpectrum === 'customAccent' ? ' open' : ''}`}
@@ -1574,80 +1847,111 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
             />
           </div>
         </div>
-        <div className="cust-tayf-text-row">
+
+        {/* ── Text Color (3 options ONLY: match_theme, white, black) ── */}
+        <div className="cust-tayf-text-row" style={{ marginTop: 18 }}>
           <div>
-            <span className="cust-toggle-label">{t('channel_text_color')}</span>
-            <p className="accs-note" style={{ margin: '4px 0 0' }}>{t('channel_text_desc')}</p>
+            <span className="cust-toggle-label">{t('text_color') || 'Text color'}</span>
+            <p className="accs-note" style={{ margin: '4px 0 0' }}>{t('text_color_desc') || 'Choose text appearance across channels and feed.'}</p>
           </div>
           <div className="cust-textcolor-opts">
             {[
-              { id: 'theme', label: t('match_theme') },
-              { id: 'white', label: t('white_ecru') },
-              { id: 'black', label: t('black') },
-            ].map(({ id, label }) => (
-              <button
-                key={id}
-                type="button"
-                className={`cust-textcolor-btn${(customization.customTextColor || 'white') === id ? ' active' : ''}`}
-                onClick={() => onChange({ customTextColor: id })}
-              >{label}</button>
-            ))}
+              { id: 'match_theme', label: t('match_theme') || 'Match theme' },
+              { id: 'white', label: t('white') || 'White' },
+              { id: 'black', label: t('black') || 'Black' },
+            ].map(({ id, label }) => {
+              const active = (customization.customTextColor || 'match_theme') === id || (id === 'match_theme' && customization.customTextColor === 'theme')
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  className={`cust-textcolor-btn${active ? ' active' : ''}`}
+                  onClick={() => onChange({ customTextColor: id })}
+                >{label}</button>
+              )
+            })}
           </div>
         </div>
       </div>
 
+      {/* ── Typography (Expandable Accordion) ── */}
       <div className="accs-section">
         <div className="accs-section-title">{t('typography')}</div>
         <p style={{ margin: '0 0 14px', fontSize: '0.78rem', color: 'rgba(var(--ta-rgb), 0.45)', lineHeight: 1.5 }}>
           {t('typography_desc')}
         </p>
-        <div style={{ fontSize: '0.72rem', color: 'rgba(var(--ta-rgb), 0.4)', marginBottom: 10, letterSpacing: '0.06em', textTransform: 'uppercase' }}>{t('body_label')}</div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 }}>
-          {(BODY_FONTS || []).map(font => (
-            <button
-              key={font.id}
-              onClick={() => onFontChange && onFontChange(font.id)}
-              style={{
-                padding: '7px 14px',
-                borderRadius: 20,
-                border: `1.5px solid ${bodyFont === font.id ? 'rgba(var(--ta-rgb), 0.7)' : 'rgba(var(--ta-rgb), 0.18)'}`,
-                background: bodyFont === font.id ? 'rgba(var(--ta-rgb), 0.12)' : 'none',
-                color: bodyFont === font.id ? 'rgba(var(--ta-rgb), 0.95)' : 'rgba(var(--ta-rgb), 0.45)',
-                fontFamily: font.family,
-                fontSize: '0.8rem',
-                cursor: 'pointer',
-                transition: 'all 0.15s',
-                textAlign: 'center',
-                whiteSpace: 'nowrap',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-              }}
-            >{font.label}</button>
-          ))}
-        </div>
-      </div>
 
-      <div className="accs-section">
-        <div className="accs-section-title">{t('interface_section')}</div>
-        <div className="cust-options-col">
-          {[
-            { key: 'showCategoryIcons', label: t('category_icons'), note: t('category_icons_desc') },
-            { key: 'showTimestamps',    label: t('msg_timestamps'), note: t('msg_timestamps_desc') },
-          ].map(({ key, label, note }) => (
-            <div key={key} className="cust-toggle-row">
-              <div>
-                <span className="cust-toggle-label">{label}</span>
-                <p className="accs-note">{note}</p>
-              </div>
-              <button
-                className={`cust-toggle${customization[key] ? ' cust-toggle-on' : ''}`}
-                onClick={() => onChange({ [key]: !customization[key] })}
-              ><span className="cust-toggle-knob" /></button>
+        <div className="cust-font-accordion">
+          <div
+            className="cust-font-header"
+            onClick={() => setFontsExpanded(!fontsExpanded)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '10px 14px',
+              borderRadius: 14,
+              background: 'rgba(var(--ta-rgb), 0.08)',
+              border: '1px solid rgba(var(--ta-rgb), 0.18)',
+              cursor: 'pointer',
+              userSelect: 'none',
+            }}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: '0.86rem', fontWeight: 600, color: 'rgba(var(--ta-rgb), 0.95)', fontFamily: activeFontObj.family }}>
+                {activeFontObj.label}
+              </span>
+              <span style={{ fontSize: '0.74rem', color: 'rgba(var(--ta-rgb), 0.45)' }}>
+                (Aa Bb Gg 123)
+              </span>
             </div>
-          ))}
+            <span style={{ fontSize: '0.74rem', color: 'rgba(var(--ta-rgb), 0.6)', transform: fontsExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}>
+              ▼
+            </span>
+          </div>
+
+          <div
+            className="cust-font-grid"
+            style={{
+              display: fontsExpanded ? 'grid' : 'none',
+              gridTemplateColumns: 'repeat(2, 1fr)',
+              gap: 8,
+              marginTop: 10,
+              animation: 'nameMenuFadeIn 0.15s ease both',
+            }}
+          >
+            {(BODY_FONTS || []).map(font => (
+              <button
+                key={font.id}
+                type="button"
+                onClick={() => {
+                  if (onFontChange) onFontChange(font.id)
+                }}
+                style={{
+                  padding: '9px 14px',
+                  borderRadius: 14,
+                  border: `1.5px solid ${bodyFont === font.id ? 'rgba(var(--ta-rgb), 0.7)' : 'rgba(var(--ta-rgb), 0.18)'}`,
+                  background: bodyFont === font.id ? 'rgba(var(--ta-rgb), 0.14)' : 'rgba(var(--ta-rgb), 0.04)',
+                  color: bodyFont === font.id ? 'rgba(var(--ta-rgb), 0.98)' : 'rgba(var(--ta-rgb), 0.55)',
+                  fontFamily: font.family,
+                  fontSize: '0.84rem',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                  textAlign: 'left',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <span>{font.label}</span>
+                {bodyFont === font.id && <span style={{ fontSize: '0.75rem', color: 'var(--ta)' }}>✓</span>}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 
+      {/* ── Custom Greeting ── */}
       <div className="accs-section">
         <div className="accs-section-title">Custom Greeting</div>
         <div className="cust-greeting-sublabel">Classic Greetings</div>
@@ -1697,8 +2001,19 @@ function AccessibilityPanel({ uid }) {
     const el = document.documentElement
     if (a11y.reducedMotion) el.classList.add('a11y-reduced-motion')
     else el.classList.remove('a11y-reduced-motion')
+
     if (a11y.messageSpacing) el.classList.add('a11y-msg-spacing')
     else el.classList.remove('a11y-msg-spacing')
+
+    if (a11y.highContrast) el.classList.add('a11y-high-contrast')
+    else el.classList.remove('a11y-high-contrast')
+
+    if (a11y.reduceTransparency) el.classList.add('a11y-reduce-transparency')
+    else el.classList.remove('a11y-reduce-transparency')
+
+    if (a11y.underlineLinks) el.classList.add('a11y-underline-links')
+    else el.classList.remove('a11y-underline-links')
+
     const scale = a11y.fontScale || 1
     el.style.fontSize = scale === 1 ? '' : (16 * scale) + 'px'
   }, [a11y])
@@ -1708,55 +2023,134 @@ function AccessibilityPanel({ uid }) {
     scheduleUserPersist('accessibility', next)
   }
 
-  const FONT_OPTS = [
-    { val: 0.85, key: 'a11y_font_small' },
-    { val: 1,    key: 'a11y_font_normal' },
-    { val: 1.15, key: 'a11y_font_large' },
-    { val: 1.3,  key: 'a11y_font_xlarge' },
+  const FONT_OPTIONS = [
+    { value: '0.85', label: t('a11y_font_small') || 'Small' },
+    { value: '1',    label: t('a11y_font_normal') || 'Normal' },
+    { value: '1.15', label: t('a11y_font_large') || 'Large' },
+    { value: '1.3',  label: t('a11y_font_xlarge') || 'X-Large' },
   ]
-  // label overrides — use direct strings instead of locale keys for these
-  const FONT_LABELS = ['Small', 'Default', 'Big', 'Bigger']
 
   return (
     <div className="accs-panel">
+      {/* 1. Text size */}
       <div className="accs-section">
-        <div className="accs-section-title">{t('a11y_motion')}</div>
+        <div className="cust-toggle-row" style={{ alignItems: 'center' }}>
+          <div>
+            <span className="cust-toggle-label">{t('a11y_font_size') || 'Text size'}</span>
+            <p className="accs-note">{t('a11y_font_size_desc') || 'Adjust the text scale across the interface.'}</p>
+          </div>
+          <div style={{ width: 140, flexShrink: 0 }}>
+            <ReelmsCustomSelect
+              value={String(a11y.fontScale || 1)}
+              options={FONT_OPTIONS}
+              onChange={val => update({ ...a11y, fontScale: parseFloat(val) })}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* 2. High contrast */}
+      <div className="accs-section">
+        <div className="cust-toggle-row">
+          <div>
+            <span className="cust-toggle-label">{t('a11y_high_contrast') || 'High contrast'}</span>
+            <p className="accs-note">{t('a11y_high_contrast_desc') || 'Increases border visibility and contrast for clearer separation.'}</p>
+          </div>
+          <button
+            type="button"
+            className={`cust-toggle${a11y.highContrast ? ' cust-toggle-on' : ''}`}
+            onClick={() => update({ ...a11y, highContrast: !a11y.highContrast })}
+          ><span className="cust-toggle-knob" /></button>
+        </div>
+      </div>
+
+      {/* 3. Reduce motion */}
+      <div className="accs-section">
         <div className="cust-toggle-row">
           <div>
             <span className="cust-toggle-label">{t('a11y_motion')}</span>
             <p className="accs-note">{t('a11y_motion_desc')}</p>
           </div>
           <button
+            type="button"
             className={`cust-toggle${a11y.reducedMotion ? ' cust-toggle-on' : ''}`}
             onClick={() => update({ ...a11y, reducedMotion: !a11y.reducedMotion })}
           ><span className="cust-toggle-knob" /></button>
         </div>
       </div>
 
+      {/* 4. Reduce transparency */}
       <div className="accs-section">
-        <div className="accs-section-title">{t('a11y_font_size')}</div>
-        <div className="a11y-scale-row">
-          {FONT_OPTS.map((opt, i) => (
-            <button
-              key={opt.val}
-              className={`a11y-scale-btn${(a11y.fontScale || 1) === opt.val ? ' a11y-scale-btn--active' : ''}`}
-              onClick={() => update({ ...a11y, fontScale: opt.val })}
-            >{FONT_LABELS[i]}</button>
-          ))}
+        <div className="cust-toggle-row">
+          <div>
+            <span className="cust-toggle-label">{t('a11y_reduce_transparency') || 'Reduce transparency'}</span>
+            <p className="accs-note">{t('a11y_reduce_transparency_desc') || 'Replaces translucent glass effects with solid backgrounds for enhanced legibility.'}</p>
+          </div>
+          <button
+            type="button"
+            className={`cust-toggle${a11y.reduceTransparency ? ' cust-toggle-on' : ''}`}
+            onClick={() => update({ ...a11y, reduceTransparency: !a11y.reduceTransparency })}
+          ><span className="cust-toggle-knob" /></button>
         </div>
       </div>
 
+      {/* 5. Extra message spacing */}
       <div className="accs-section">
-        <div className="accs-section-title">{t('a11y_msg_spacing')}</div>
         <div className="cust-toggle-row">
           <div>
             <span className="cust-toggle-label">{t('a11y_msg_spacing')}</span>
             <p className="accs-note">{t('a11y_msg_spacing_desc')}</p>
           </div>
           <button
+            type="button"
             className={`cust-toggle${a11y.messageSpacing ? ' cust-toggle-on' : ''}`}
             onClick={() => update({ ...a11y, messageSpacing: !a11y.messageSpacing })}
           ><span className="cust-toggle-knob" /></button>
+        </div>
+      </div>
+
+      {/* 6. Underline links */}
+      <div className="accs-section">
+        <div className="cust-toggle-row">
+          <div>
+            <span className="cust-toggle-label">{t('a11y_underline_links') || 'Underline links'}</span>
+            <p className="accs-note">{t('a11y_underline_links_desc') || 'Always underlines links, channels, and mentions.'}</p>
+          </div>
+          <button
+            type="button"
+            className={`cust-toggle${a11y.underlineLinks ? ' cust-toggle-on' : ''}`}
+            onClick={() => update({ ...a11y, underlineLinks: !a11y.underlineLinks })}
+          ><span className="cust-toggle-knob" /></button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function AuthorizedAppsPanel({ user, spotifyConnected, onSpotifyConnect, onSpotifyDisconnect }) {
+  const t = useT()
+  return (
+    <div className="accs-panel">
+      <div className="accs-section">
+        <div className="accs-section-title">{t('authorized_apps') || 'Authorized Apps'}</div>
+        <p className="accs-note" style={{ marginBottom: 16 }}>
+          Manage authorized third-party applications, OAuth connections, and music integrations linked with your Reelms profile.
+        </p>
+
+        <div className="accs-connected-item">
+          <div className="accs-connected-info">
+            <span className="accs-connected-icon" style={{ color: '#1DB954' }}><SpotifyIcon size={22} /></span>
+            <div>
+              <span className="accs-connected-name">Spotify</span>
+              <p className="accs-note" style={{ margin: 0 }}>
+                {spotifyConnected ? t('spotify_connected') : t('spotify_connect_desc')}
+              </p>
+            </div>
+          </div>
+          {spotifyConnected
+            ? <button className="accs-btn accs-btn-ghost accs-btn-spotify-disconnect" onClick={onSpotifyDisconnect}>{t('disconnect')}</button>
+            : <button className="accs-btn accs-btn-ghost accs-btn-spotify" onClick={onSpotifyConnect}>{t('connect')}</button>
+          }
         </div>
       </div>
     </div>
@@ -1766,6 +2160,40 @@ function AccessibilityPanel({ uid }) {
 function PrivacySafetyPanel({ user, onUpdate, onUnblock, blockedList, sessionsList, onSessionsUpdate, showHiddenBarItems, onShowHiddenBarItemsChange, friends, lastSeenAllowList, onLastSeenAllowListChange }) {
   const t = useT()
   const [friendSearch, setFriendSearch] = React.useState('')
+  const [newPw, setNewPw] = useState('')
+  const [confirmPw, setConfirmPw] = useState('')
+  const [currentPw, setCurrentPw] = useState('')
+  const [pwPhase, setPwPhase] = useState('new') // 'new' | 'confirm'
+  const [pwSaving, setPwSaving] = useState(false)
+  const [pwError, setPwError] = useState('')
+  const [pwSuccess, setPwSuccess] = useState(false)
+
+  const handlePasswordUpdate = async () => {
+    setPwError('')
+    if (newPw.length < 8) { setPwError(t('password_too_short') || 'Password too short'); return }
+    if (newPw !== confirmPw) { setPwError(t('passwords_no_match') || 'Passwords do not match'); return }
+    const hasPassword = Boolean(user?.hasPassword)
+    if (hasPassword && pwPhase === 'new') {
+      setPwPhase('confirm')
+      return
+    }
+    setPwSaving(true)
+    try {
+      await authChangePassword({ newPassword: newPw, currentPassword: hasPassword ? currentPw : undefined })
+      onUpdate({ hasPassword: true })
+      setNewPw(''); setConfirmPw(''); setCurrentPw('')
+      setPwPhase('new')
+      setPwSuccess(true)
+      setTimeout(() => setPwSuccess(false), 3000)
+    } catch (err) {
+      const code = err?.code || ''
+      if (code === 'auth/wrong-password') setPwError(t('wrong_current_password') || 'Wrong current password')
+      else if (code === 'auth/weak-password') setPwError(t('password_too_short') || 'Password too short')
+      else setPwError(err?.message || t('password_update_failed') || 'Failed to update password')
+    } finally {
+      setPwSaving(false)
+    }
+  }
 
   if (!user) {
     return (
@@ -1787,6 +2215,28 @@ function PrivacySafetyPanel({ user, onUpdate, onUnblock, blockedList, sessionsLi
 
   return (
     <div className="accs-panel">
+
+      <div className="accs-section">
+        <div className="accs-section-title">{t('change_password')}</div>
+        <div className="accs-field-col">
+          {pwPhase === 'new' ? (
+            <>
+              <input className="accs-input" type="password" value={newPw} onChange={e => { setNewPw(e.target.value); setPwError(''); setPwSuccess(false) }} placeholder={t('new_password')} autoComplete="new-password" />
+              <input className="accs-input" type="password" value={confirmPw} onChange={e => { setConfirmPw(e.target.value); setPwError(''); setPwSuccess(false) }} placeholder={t('confirm_password')} autoComplete="new-password" />
+            </>
+          ) : (
+            <>
+              <input className="accs-input" type="password" value={currentPw} onChange={e => { setCurrentPw(e.target.value); setPwError('') }} placeholder={t('current_password')} autoComplete="current-password" autoFocus />
+              <button type="button" className="accs-link-btn" onClick={() => { setPwPhase('new'); setCurrentPw(''); setPwError('') }}>{t('back')}</button>
+            </>
+          )}
+          {pwError && <p className="accs-error">{pwError}</p>}
+          {pwSuccess && <p className="accs-success">{t('password_updated')}</p>}
+          <button className="accs-btn" style={{ alignSelf: 'flex-end' }} onClick={handlePasswordUpdate} disabled={pwSaving}>
+            {pwSaving ? '…' : pwPhase === 'confirm' ? t('confirm') : t('update_password')}
+          </button>
+        </div>
+      </div>
 
       <div className="accs-section">
         <div className="accs-section-title">{t('security')}</div>
@@ -2073,16 +2523,16 @@ const REELM_RADIO_BOT = {
   id: 'reelm-radio',
   name: 'Reelm Radio',
   username: 'reelmradio',
-  description: 'Reelm kanallarında müzik çal. /play, /skip, /queue ve /stop komutlarıyla veya @reelm-radio mention\'ıyla kontrol et.',
-  tags: ['Müzik', 'YouTube', 'Ücretsiz'],
+  description: 'Play music seamlessly in Reelm channels. Control playback with /play, /skip, /queue, and /stop commands or by mentioning @reelmradio.',
+  tags: ['Music', 'YouTube', 'Free'],
 }
 
 const REELMS_INTELLIGENCE_BOT = {
   id: 'reelms-intelligence',
   name: 'Reelms AI',
   username: 'reelmsai',
-  description: 'Kanallarında AI asistanı. Soru sor, mesajları özetle, günlük digest al.',
-  tags: ['AI', 'Özet', 'Sohbet'],
+  description: 'Your channel AI companion. Ask questions, summarize discussions, and receive daily digests.',
+  tags: ['AI', 'Summarizer', 'Assistant'],
 }
 
 function CompanionsPanel({ reelms = [] }) {
@@ -2091,6 +2541,11 @@ function CompanionsPanel({ reelms = [] }) {
   const [aiBotStatus, setAiBotStatus] = useState({})
   const [aiLoading, setAiLoading] = useState({})
   const [authToken, setAuthToken] = useState(null)
+  const [openReelms, setOpenReelms] = useState({})
+
+  const toggleReelms = (botId) => {
+    setOpenReelms(prev => ({ ...prev, [botId]: !prev[botId] }))
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -2173,8 +2628,9 @@ function CompanionsPanel({ reelms = [] }) {
 
   return (
     <div className="companions-panel">
-      <div className="companions-section-label">Reelms&apos;ten Eşlikçiler</div>
+      <div className="companions-section-label">Companions from Reelms</div>
 
+      {/* Reelm Radio */}
       <div className="companion-card">
         <div className="companion-card-header">
           <div className="companion-avatar">
@@ -2185,7 +2641,10 @@ function CompanionsPanel({ reelms = [] }) {
             </svg>
           </div>
           <div className="companion-info">
-            <div className="companion-name">{REELM_RADIO_BOT.name}</div>
+            <div className="companion-name-row">
+              <span className="companion-name">{REELM_RADIO_BOT.name}</span>
+              <span className="companion-coming-soon-badge">Coming soon</span>
+            </div>
             <div className="companion-username">@{REELM_RADIO_BOT.username}</div>
           </div>
           <div className="companion-tags">
@@ -2196,40 +2655,57 @@ function CompanionsPanel({ reelms = [] }) {
         </div>
         <p className="companion-desc">{REELM_RADIO_BOT.description}</p>
         <div className="companion-commands">
-          {['/play', '/skip', '/queue', '/stop'].map(cmd => (
+          {['/play', '/skip', '/queue', '/stop', '@reelmradio'].map(cmd => (
             <code key={cmd} className="companion-cmd">{cmd}</code>
           ))}
-          <code className="companion-cmd">@reelm-radio</code>
         </div>
 
         {reelms.length > 0 && (
-          <div className="companion-reelms">
-            <div className="companion-reelms-label">Reelm&apos;lerine ekle</div>
-            <div className="companion-reelm-list">
-              {reelms.map(r => (
-                <div key={r.id} className="companion-reelm-row">
-                  <div className="companion-reelm-avatar" style={r.image ? { backgroundImage: `url(${r.image})`, backgroundSize: 'cover' } : {}}>
-                    {!r.image && (r.name || '?').charAt(0).toUpperCase()}
+          <div className="companion-reelms-section">
+            <div className="companion-reelms-trigger-row">
+              <button
+                type="button"
+                className="companion-reelms-trigger"
+                onClick={() => toggleReelms('radio')}
+              >
+                <span>Add to your Reelms</span>
+                <svg
+                  className={`companion-chevron${openReelms['radio'] ? ' companion-chevron--open' : ''}`}
+                  width="13" height="13" viewBox="0 0 24 24" fill="none"
+                >
+                  <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            </div>
+            <div className={`companion-reelm-dropdown${openReelms['radio'] ? ' companion-reelm-dropdown--open' : ''}`}>
+              <div className="companion-reelm-list">
+                {reelms.map(r => (
+                  <div key={r.id} className="companion-reelm-row">
+                    <div className="companion-reelm-avatar" style={r.image ? { backgroundImage: `url(${r.image})`, backgroundSize: 'cover' } : {}}>
+                      {!r.image && (r.name || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <span className="companion-reelm-name">{r.name}</span>
+                    {botStatus[r.id] ? (
+                      <span className="companion-reelm-added">Added ✓</span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="companion-add-btn"
+                        disabled={!!loading[r.id]}
+                        onClick={() => addBot(r.id)}
+                      >
+                        {loading[r.id] ? '...' : 'Add'}
+                      </button>
+                    )}
                   </div>
-                  <span className="companion-reelm-name">{r.name}</span>
-                  {botStatus[r.id] ? (
-                    <span className="companion-reelm-added">Eklendi ✓</span>
-                  ) : (
-                    <button
-                      className="companion-add-btn"
-                      disabled={!!loading[r.id]}
-                      onClick={() => addBot(r.id)}
-                    >
-                      {loading[r.id] ? '...' : 'Ekle'}
-                    </button>
-                  )}
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         )}
       </div>
 
+      {/* Reelms AI */}
       <div className="companion-card">
         <div className="companion-card-header">
           <div className="companion-avatar">
@@ -2239,7 +2715,10 @@ function CompanionsPanel({ reelms = [] }) {
             </svg>
           </div>
           <div className="companion-info">
-            <div className="companion-name">{REELMS_INTELLIGENCE_BOT.name}</div>
+            <div className="companion-name-row">
+              <span className="companion-name">{REELMS_INTELLIGENCE_BOT.name}</span>
+              <span className="companion-coming-soon-badge">Coming soon</span>
+            </div>
             <div className="companion-username">@{REELMS_INTELLIGENCE_BOT.username}</div>
           </div>
           <div className="companion-tags">
@@ -2250,38 +2729,167 @@ function CompanionsPanel({ reelms = [] }) {
         </div>
         <p className="companion-desc">{REELMS_INTELLIGENCE_BOT.description}</p>
         <div className="companion-commands">
-          {['/ai', '/summarize', '/digest', '/ai-reset'].map(cmd => (
+          {['/ai', '/summarize', '/digest', '/ai-reset', '@reelmsai'].map(cmd => (
             <code key={cmd} className="companion-cmd">{cmd}</code>
           ))}
-          <code className="companion-cmd">@reelmsai</code>
         </div>
 
         {reelms.length > 0 && (
-          <div className="companion-reelms">
-            <div className="companion-reelms-label">Reelm&apos;lerine ekle</div>
-            <div className="companion-reelm-list">
-              {reelms.map(r => (
-                <div key={r.id} className="companion-reelm-row">
-                  <div className="companion-reelm-avatar" style={r.image ? { backgroundImage: `url(${r.image})`, backgroundSize: 'cover' } : {}}>
-                    {!r.image && (r.name || '?').charAt(0).toUpperCase()}
+          <div className="companion-reelms-section">
+            <div className="companion-reelms-trigger-row">
+              <button
+                type="button"
+                className="companion-reelms-trigger"
+                onClick={() => toggleReelms('ai')}
+              >
+                <span>Add to your Reelms</span>
+                <svg
+                  className={`companion-chevron${openReelms['ai'] ? ' companion-chevron--open' : ''}`}
+                  width="13" height="13" viewBox="0 0 24 24" fill="none"
+                >
+                  <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+            </div>
+            <div className={`companion-reelm-dropdown${openReelms['ai'] ? ' companion-reelm-dropdown--open' : ''}`}>
+              <div className="companion-reelm-list">
+                {reelms.map(r => (
+                  <div key={r.id} className="companion-reelm-row">
+                    <div className="companion-reelm-avatar" style={r.image ? { backgroundImage: `url(${r.image})`, backgroundSize: 'cover' } : {}}>
+                      {!r.image && (r.name || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <span className="companion-reelm-name">{r.name}</span>
+                    {aiBotStatus[r.id] ? (
+                      <span className="companion-reelm-added">Added ✓</span>
+                    ) : (
+                      <button
+                        type="button"
+                        className="companion-add-btn"
+                        disabled={!!aiLoading[r.id]}
+                        onClick={() => addAIBot(r.id)}
+                      >
+                        {aiLoading[r.id] ? '...' : 'Add'}
+                      </button>
+                    )}
                   </div>
-                  <span className="companion-reelm-name">{r.name}</span>
-                  {aiBotStatus[r.id] ? (
-                    <span className="companion-reelm-added">Eklendi ✓</span>
-                  ) : (
-                    <button
-                      className="companion-add-btn"
-                      disabled={!!aiLoading[r.id]}
-                      onClick={() => addAIBot(r.id)}
-                    >
-                      {aiLoading[r.id] ? '...' : 'Ekle'}
-                    </button>
-                  )}
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </div>
         )}
+      </div>
+    </div>
+  )
+}
+
+function HelpCenterPanel({ currentUser, language, helpForm, setHelpForm, helpStatus, setHelpStatus, feedbackSend }) {
+  const isTr = language === 'tr'
+
+  return (
+    <div className="accs-panel help-center-panel">
+      <div className="accs-section">
+        <div className="accs-section-title">{getT(language)('help_center') || 'Help Center'}</div>
+        <p className="accs-note" style={{ margin: '0 0 16px' }}>
+          {isTr ? 'Geri bildirim gönderin, soru sorun veya sorun bildirin. En kısa sürede size geri dönüş yapacağız.' : 'Send us your feedback, questions, or bug reports. We will get back to you as soon as possible.'}
+        </p>
+
+        {helpStatus === 'sent' ? (
+          <div className="hc-sent" style={{ padding: '32px 16px', textAlign: 'center' }}>
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" style={{ color: 'var(--accent, #a78bfa)' }}>
+              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.6"/>
+              <path d="M7.5 12l3 3 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+            <p style={{ marginTop: 12, fontSize: '0.92rem', fontWeight: 600, color: 'var(--ta)' }}>{getT(language)('feedback_sent') || 'Your message has been sent successfully!'}</p>
+            <button
+              type="button"
+              className="hc-submit"
+              style={{ marginTop: 16, width: 'auto', padding: '6px 20px' }}
+              onClick={() => {
+                setHelpForm({ name: currentUser?.displayName || '', email: currentUser?.email || '', message: '' })
+                setHelpStatus('idle')
+              }}
+            >
+              {isTr ? 'Yeni mesaj gönder' : 'Send another message'}
+            </button>
+          </div>
+        ) : (
+          <form className="hc-form" onSubmit={async e => {
+            e.preventDefault()
+            if (!helpForm.message.trim()) return
+            setHelpStatus('sending')
+            try {
+              await feedbackSend(helpForm.name, helpForm.email, helpForm.message)
+              setHelpStatus('sent')
+            } catch {
+              setHelpStatus('error')
+            }
+          }}>
+            <div className="hc-row">
+              <label className="hc-label">{getT(language)('display_name')}</label>
+              <input
+                className="hc-input"
+                type="text"
+                value={helpForm.name}
+                onChange={e => setHelpForm(f => ({ ...f, name: e.target.value }))}
+                placeholder={getT(language)('your_name_ph')}
+              />
+            </div>
+            <div className="hc-row">
+              <label className="hc-label">{getT(language)('email')}</label>
+              <input
+                className="hc-input"
+                type="email"
+                value={helpForm.email}
+                onChange={e => setHelpForm(f => ({ ...f, email: e.target.value }))}
+                placeholder={getT(language)('email_placeholder')}
+              />
+            </div>
+            <div className="hc-row">
+              <label className="hc-label">{getT(language)('feedback_message')}</label>
+              <textarea
+                className="hc-textarea"
+                value={helpForm.message}
+                onChange={e => setHelpForm(f => ({ ...f, message: e.target.value }))}
+                placeholder={getT(language)('feedback_placeholder')}
+                rows={5}
+              />
+            </div>
+            {helpStatus === 'error' && (
+              <p className="hc-error">{getT(language)('feedback_error')}</p>
+            )}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+              <button
+                type="submit"
+                className="hc-submit"
+                disabled={helpStatus === 'sending' || !helpForm.message.trim()}
+              >
+                {helpStatus === 'sending' ? getT(language)('loading') : getT(language)('send')}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+
+      {/* Alternative Contact Notice Card */}
+      <div className="accs-section help-center-channels-card">
+        <div className="hc-notice-box">
+          <div className="hc-notice-icon">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </div>
+          <div className="hc-notice-text">
+            <span className="hc-notice-title">
+              {isTr ? 'Diğer iletişim yolları' : 'Direct contact channels'}
+            </span>
+            <p className="hc-notice-desc">
+              {isTr
+                ? <>Uygulama içindeki <strong>Reelms Community</strong> üzerinden veya <a href="mailto:team@reelms.io" className="hc-notice-link">team@reelms.io</a> e-posta adresinden ekibimize doğrudan ulaşabilirsiniz.</>
+                : <>You can also reach our team directly in the <strong>Reelms Community</strong> within the app or via email at <a href="mailto:team@reelms.io" className="hc-notice-link">team@reelms.io</a>.</>
+              }
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -2300,13 +2908,6 @@ function AccountSettingsPanel({ user, onUpdate, onLogOut, profileBio, onBioChang
   const [usernameSaved, setUsernameSaved] = useState(false)
   const [bioInput, setBioInput] = useState(profileBio || user.bio || '')
   const [contactInput, setContactInput] = useState(user.contact || '')
-  const [newPw, setNewPw] = useState('')
-  const [confirmPw, setConfirmPw] = useState('')
-  const [currentPw, setCurrentPw] = useState('')
-  const [pwPhase, setPwPhase] = useState('new') // 'new' | 'confirm'
-  const [pwSaving, setPwSaving] = useState(false)
-  const [pwError, setPwError] = useState('')
-  const [pwSuccess, setPwSuccess] = useState(false)
   const [nameSaved, setNameSaved] = useState(false)
   const [bioSaved, setBioSaved] = useState(false)
   const [contactSaved, setContactSaved] = useState(false)
@@ -2458,33 +3059,6 @@ function AccountSettingsPanel({ user, onUpdate, onLogOut, profileBio, onBioChang
     setTimeout(() => setContactSaved(false), 2000)
   }
 
-  const handlePasswordUpdate = async () => {
-    setPwError('')
-    if (newPw.length < 8) { setPwError(t('password_too_short')); return }
-    if (newPw !== confirmPw) { setPwError(t('passwords_no_match')); return }
-    const hasPassword = Boolean(user.hasPassword)
-    if (hasPassword && pwPhase === 'new') {
-      setPwPhase('confirm')
-      return
-    }
-    setPwSaving(true)
-    try {
-      await authChangePassword({ newPassword: newPw, currentPassword: hasPassword ? currentPw : undefined })
-      onUpdate({ hasPassword: true })
-      setNewPw(''); setConfirmPw(''); setCurrentPw('')
-      setPwPhase('new')
-      setPwSuccess(true)
-      setTimeout(() => setPwSuccess(false), 3000)
-    } catch (err) {
-      const code = err?.code || ''
-      if (code === 'auth/wrong-password') setPwError(t('wrong_current_password'))
-      else if (code === 'auth/weak-password') setPwError(t('password_too_short'))
-      else setPwError(err?.message || t('password_update_failed'))
-    } finally {
-      setPwSaving(false)
-    }
-  }
-
   const downloadUserData = async (format) => {
     const uid = user.id
     let friends = []
@@ -2559,7 +3133,7 @@ ${posts.length ? `<ul>${posts.map(p => { const raw = (p.text || p.content || '')
       window.alert('This is a permanent system account and cannot be frozen.')
       return
     }
-    if (!window.confirm('Freeze your account? You can reactivate it by signing in again.')) return
+    if (!window.confirm('Brrr... Entering cryogenic sleep? ❄️ You can thaw your account anytime just by signing back in.')) return
     onUpdate({ frozen: true })
     onLogOut()
   }
@@ -2569,13 +3143,18 @@ ${posts.length ? `<ul>${posts.map(p => { const raw = (p.text || p.content || '')
       window.alert('This is a permanent system account and cannot be deleted.')
       return
     }
-    if (!window.confirm('Permanently close your account? This cannot be undone.')) return
+    if (!window.confirm('Permanent game over? 💀 There are no respawn points in the digital void. Are you absolutely sure you want to delete your entire account?')) return
     await userProfileDelete().catch(() => {})
     onLogOut()
   }
 
+  const memberSinceFormatted = user.createdAt
+    ? new Date(user.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
+    : 'Recently Joined'
+
   return (
     <div className="accs-panel">
+      {/* 1. Username */}
       <div className="accs-section">
         <div className="accs-section-title">{t('username')}</div>
         <div className="accs-field-row">
@@ -2599,6 +3178,7 @@ ${posts.length ? `<ul>${posts.map(p => { const raw = (p.text || p.content || '')
         </div>
       )}
 
+      {/* 2. Email */}
       <div className="accs-section">
         <div className="accs-section-title">{t('email')}</div>
         <div className="accs-field-row">
@@ -2609,47 +3189,35 @@ ${posts.length ? `<ul>${posts.map(p => { const raw = (p.text || p.content || '')
         <p className="accs-note">{t('email_signin_note')}</p>
       </div>
 
+      {/* 3. Member Since */}
       <div className="accs-section">
-        <div className="accs-section-title">{t('change_password')}</div>
-        <div className="accs-field-col">
-          {pwPhase === 'new' ? (
-            <>
-              <input className="accs-input" type="password" value={newPw} onChange={e => { setNewPw(e.target.value); setPwError(''); setPwSuccess(false) }} placeholder={t('new_password')} autoComplete="new-password" />
-              <input className="accs-input" type="password" value={confirmPw} onChange={e => { setConfirmPw(e.target.value); setPwError(''); setPwSuccess(false) }} placeholder={t('confirm_password')} autoComplete="new-password" />
-            </>
-          ) : (
-            <>
-              <input className="accs-input" type="password" value={currentPw} onChange={e => { setCurrentPw(e.target.value); setPwError('') }} placeholder={t('current_password')} autoComplete="current-password" autoFocus />
-              <button type="button" className="accs-link-btn" onClick={() => { setPwPhase('new'); setCurrentPw(''); setPwError('') }}>{t('back')}</button>
-            </>
-          )}
-          {pwError && <p className="accs-error">{pwError}</p>}
-          {pwSuccess && <p className="accs-success">{t('password_updated')}</p>}
-          <button className="accs-btn" style={{ alignSelf: 'flex-end' }} onClick={handlePasswordUpdate} disabled={pwSaving}>
-            {pwSaving ? '…' : pwPhase === 'confirm' ? t('confirm') : t('update_password')}
-          </button>
+        <div className="accs-section-title">{t('member_since') || 'Member Since'}</div>
+        <div className="accs-info-box">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="accs-info-icon">
+            <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2"/>
+            <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" strokeWidth="2"/>
+            <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" strokeWidth="2"/>
+            <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" strokeWidth="2"/>
+          </svg>
+          <span className="accs-info-val">{memberSinceFormatted}</span>
         </div>
       </div>
 
+      {/* 4. Account Status */}
       <div className="accs-section">
-        <div className="accs-section-title">{t('connected_accounts')}</div>
-        <div className="accs-connected-item">
-          <div className="accs-connected-info">
-            <span className="accs-connected-icon" style={{ color: '#1DB954' }}><SpotifyIcon size={22} /></span>
-            <div>
-              <span className="accs-connected-name">Spotify</span>
-              <p className="accs-note" style={{ margin: 0 }}>
-                {spotifyConnected ? t('spotify_connected') : t('spotify_connect_desc')}
-              </p>
-            </div>
+        <div className="accs-section-title">{t('account_status') || 'Account Status'}</div>
+        <div className="accs-status-card">
+          <div className="accs-status-header">
+            <span className="accs-status-dot accs-status-dot--active" />
+            <span className="accs-status-title">Active & In Good Standing</span>
           </div>
-          {spotifyConnected
-            ? <button className="accs-btn accs-btn-ghost accs-btn-spotify-disconnect" onClick={onSpotifyDisconnect}>{t('disconnect')}</button>
-            : <button className="accs-btn accs-btn-ghost accs-btn-spotify" onClick={onSpotifyConnect}>{t('connect')}</button>
-          }
+          <p className="accs-note" style={{ margin: '4px 0 0 0' }}>
+            All Reelms capabilities, synchronized channels, cloud backups, and voice rooms are fully active.
+          </p>
         </div>
       </div>
 
+      {/* 5. Your Data */}
       <div className="accs-section">
         <div className="accs-section-title">{t('your_data')}</div>
         <p className="accs-note" style={{marginBottom: '14px'}}>{t('data_download_desc')}</p>
@@ -2659,6 +3227,7 @@ ${posts.length ? `<ul>${posts.map(p => { const raw = (p.text || p.content || '')
         </div>
       </div>
 
+      {/* 6. Account Actions */}
       {!user.isSystem && (
       <div className="accs-section accs-section-danger">
         <div className="accs-section-title accs-danger-title">{t('account_actions')}</div>
@@ -2666,14 +3235,18 @@ ${posts.length ? `<ul>${posts.map(p => { const raw = (p.text || p.content || '')
           <div className="accs-danger-item">
             <div>
               <span className="accs-danger-label">{t('account_freeze')}</span>
-              <p className="accs-note">{t('freeze_desc')}</p>
+              <p className="accs-note">
+                Are you sure? It gets pretty chilly out there in cryo-sleep. 🥶 You can thaw your account and jump back in whenever you log in.
+              </p>
             </div>
             <button className="accs-btn accs-btn-danger" onClick={freezeAccount}>{t('freeze')}</button>
           </div>
           <div className="accs-danger-item">
             <div>
               <span className="accs-danger-label">{t('close_account_label')}</span>
-              <p className="accs-note">{t('close_account_desc')}</p>
+              <p className="accs-note">
+                Ready to pull the plug? Once you jump into the digital void, you vanish forever. No respawns, no extra lives, no backup saves. 🕳️💀
+              </p>
             </div>
             <button className="accs-btn accs-btn-danger" onClick={closeAccount}>{t('close')}</button>
           </div>
@@ -2833,9 +3406,6 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
     <>
     <div className="profile-popup" style={{ width }} ref={popupRef}>
       <CachedProfileCover src={cover} className="pp-cover" style={{ backgroundSize: 'cover', backgroundPosition: 'center' }}>
-        <button className="pp-cover-edit-btn" onClick={() => setHeaderEditOpen(v => !v)}>
-          <PencilIcon />
-        </button>
         <input
           type="file"
           accept="image/*"
@@ -2882,13 +3452,6 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
         />
       </CachedProfileCover>
       {mediaSaving && <div className="pp-media-saving">Uploading {mediaSaving}…</div>}
-      {headerEditOpen && (
-        <div className="pp-cover-menu">
-          <button className="pp-cover-menu-item" onClick={() => { ppPhotoInputRef.current?.click(); setHeaderEditOpen(false) }}>Change photo</button>
-          <button className="pp-cover-menu-item" onClick={() => { ppCoverInputRef.current?.click(); setHeaderEditOpen(false) }}>Edit cover</button>
-          <button className="pp-cover-menu-item" onClick={() => setHeaderEditOpen(false)}>Edit profile</button>
-        </div>
-      )}
 
       <div className="pp-identity">
         <CachedProfileImage
@@ -3145,7 +3708,11 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
           </button>
         </div>
         {onViewFullProfile && (
-          <button className="profile-view-full-btn" onClick={e => { e.stopPropagation(); onClose(); onViewFullProfile() }}>
+          <button
+            type="button"
+            className="profile-view-full-btn"
+            onClick={e => { e.stopPropagation(); onClose(); onViewFullProfile() }}
+          >
             {t('see_full_profile')}
           </button>
         )}
@@ -3474,6 +4041,50 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
           {safeFriend.activity?.name && <ActivityBadge activity={safeFriend.activity} />}
         </div>
       </div>
+      {!isSelf && (
+        <div className="fpp-quick-actions">
+          <button
+            type="button"
+            className="fpp-quick-btn"
+            onClick={() => {
+              onMessage?.()
+              onClose?.()
+            }}
+            title="Direct Message"
+          >
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            <span>{t('send_message_btn', 'Message')}</span>
+          </button>
+          {voiceContext && (
+            <button
+              type="button"
+              className={`fpp-quick-btn${voiceContext.isMuted ? ' fpp-quick-btn--active' : ''}`}
+              onClick={() => voiceContext.onToggleMute?.()}
+              title={voiceContext.isMuted ? 'Unmute User' : 'Mute User'}
+            >
+              {voiceContext.isMuted ? (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="1" y1="1" x2="23" y2="23"/>
+                  <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/>
+                  <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>
+                  <line x1="12" y1="19" x2="12" y2="23"/>
+                  <line x1="8" y1="23" x2="16" y2="23"/>
+                </svg>
+              ) : (
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                  <line x1="12" y1="19" x2="12" y2="23"/>
+                  <line x1="8" y1="23" x2="16" y2="23"/>
+                </svg>
+              )}
+              <span>{voiceContext.isMuted ? 'Unmute' : 'Mute'}</span>
+            </button>
+          )}
+        </div>
+      )}
       {(safeFriend.isBot ? t(BOT_BIO_KEY[safeFriend.username] || 'bot_radio_bio') : safeFriend.bio) && (
         <p className="fpp-bio">{safeFriend.isBot ? t(BOT_BIO_KEY[safeFriend.username] || 'bot_radio_bio') : safeFriend.bio}</p>
       )}
@@ -3496,19 +4107,49 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
           ) : null}
         </div>
       )}
-      {roleContext?.roles?.length > 0 && (
+      {roleContext && (
         <div className="fpp-roles-section">
-          <span className="fpp-section-label">SERVER ROLES</span>
-          <div className="fpp-role-badges">
-            {roleContext.roles.slice(0, roleContext.expanded ? 12 : 3).map(role => (
-              <span key={role.id} className="rp-role-badge" style={{ color: role.color, borderColor: role.color + '55', background: role.color + '18' }}>{role.name}</span>
-            ))}
-            {roleContext.roles.length > 3 && (
-              <button type="button" className="fpp-mini-link" onClick={roleContext.onToggleExpanded}>
-                {roleContext.expanded ? 'Show less' : `+${roleContext.roles.length - 3} more`}
-              </button>
+          <div className="fpp-roles-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+            <span className="fpp-section-label">SERVER ROLES</span>
+            {roleContext.canManageRoles && (
+              <span style={{ fontSize: '0.66rem', color: 'rgba(var(--ta-rgb), 0.4)' }}>Click to assign</span>
             )}
           </div>
+          {roleContext.canManageRoles && roleContext.allRoles?.length > 0 ? (
+            <div className="fpp-role-badges fpp-role-badges--interactive" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+              {roleContext.allRoles.map(role => {
+                const hasRole = (roleContext.memberRoleIds || []).map(String).includes(String(role.id))
+                return (
+                  <button
+                    key={role.id}
+                    type="button"
+                    className={`fpp-role-chip${hasRole ? ' fpp-role-chip--assigned' : ''}`}
+                    style={{
+                      '--chip-color': role.color || '#94a3b8',
+                    }}
+                    onClick={() => roleContext.onToggleRole?.(role.id)}
+                    title={hasRole ? `Remove ${role.name}` : `Assign ${role.name}`}
+                  >
+                    <span className="fpp-role-chip-indicator">{hasRole ? '✓' : '+'}</span>
+                    <span className="fpp-role-chip-name">{role.name}</span>
+                  </button>
+                )
+              })}
+            </div>
+          ) : roleContext.roles?.length > 0 ? (
+            <div className="fpp-role-badges">
+              {roleContext.roles.slice(0, roleContext.expanded ? 12 : 3).map(role => (
+                <span key={role.id} className="rp-role-badge" style={{ color: role.color, borderColor: role.color + '55', background: role.color + '18' }}>{role.name}</span>
+              ))}
+              {roleContext.roles.length > 3 && (
+                <button type="button" className="fpp-mini-link" onClick={roleContext.onToggleExpanded}>
+                  {roleContext.expanded ? 'Show less' : `+${roleContext.roles.length - 3} more`}
+                </button>
+              )}
+            </div>
+          ) : (
+            <p style={{ fontSize: '0.74rem', color: 'rgba(var(--ta-rgb), 0.4)', margin: '4px 0 0' }}>No roles assigned</p>
+          )}
         </div>
       )}
       {moderationContext?.canShow && !isSelf && (
@@ -3638,7 +4279,17 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
   const fpPhotoRef = useRef(null)
   const fpCoverRef = useRef(null)
 
-  useEffect(() => { const t = setTimeout(() => setVisible(true), 10); return () => clearTimeout(t) }, [])
+  useEffect(() => {
+    const t = setTimeout(() => setVisible(true), 10)
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') handleClose()
+    }
+    window.addEventListener('keydown', handleKeyDown)
+    return () => {
+      clearTimeout(t)
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [])
 
   const norm = normalizeFriendProfileTarget(user || {})
   const cover = getPersonCover(user)
@@ -3665,7 +4316,21 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
   }
 
   return (
-    <div className={`fp-overlay${visible ? ' fp-overlay--in' : ''}`} onClick={e => { if (e.target === e.currentTarget) handleClose() }}>
+    <div
+      className={`fp-overlay${visible ? ' fp-overlay--in' : ''}`}
+      onClick={e => {
+        if (
+          !e.target.closest('.fp-main') &&
+          !e.target.closest('.fp-sidebar') &&
+          !e.target.closest('.fp-back-btn') &&
+          !e.target.closest('.pp-panel') &&
+          !e.target.closest('.modal') &&
+          !e.target.closest('.fmt-menu')
+        ) {
+          handleClose()
+        }
+      }}
+    >
       <div className={`fp-page${visible ? ' fp-page--in' : ''}`}>
         <button className="fp-back-btn" onClick={handleClose}>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
@@ -4079,8 +4744,8 @@ function renderRichMessage(content, uid, members, roles, isRich) {
   return parseRichText(content, { uid, members, roles, keyPrefix: 'r' })
 }
 
-// ── Voice message player (WhatsApp-style: play/pause · waveform · speed) ────────
-const VOICE_SPEEDS = [1, 1.25, 1.5, 2]
+// ── Voice message player (waveform · 1x / 1.5x / 2x speed) ────────
+const VOICE_SPEEDS = [1, 1.5, 2]
 const VOICE_WAVE_BARS = 38
 let _voiceAudioCtx = null
 function getVoiceAudioCtx() {
@@ -4408,6 +5073,9 @@ function VirtualMessageList({
                       <div className="msg-doc-info"><span className="msg-doc-name">{msg.fileName}</span><span className="msg-doc-size">{msg.fileSize ? (msg.fileSize/1024<1024 ? (msg.fileSize/1024).toFixed(1)+' KB' : (msg.fileSize/1048576).toFixed(1)+' MB') : ''}</span></div>
                     </a>
                   )}
+                  {Array.isArray(msg.embeds) && msg.embeds.map((emb, embIdx) => (
+                    <DiscordEmbedCard key={embIdx} embed={emb} />
+                  ))}
                   {Object.keys(msgReactions[msgKey2]?.[String(msg.id)] || {}).length > 0 && (
                     <div className="msg-reactions">
                       {Object.entries(msgReactions[msgKey2]?.[String(msg.id)] || {}).map(([emoji, users]) => (
@@ -4729,12 +5397,16 @@ function normalizeRoleForClient(role, fallbackId = '', allowManageReelm = true) 
   const name = String(role?.name || 'Role').trim().replace(/\s+/g, ' ').slice(0, 32) || 'Role'
   const color = /^#[0-9a-fA-F]{6}$/.test(String(role?.color || '')) ? String(role.color) : '#60a5fa'
   const position = Number.isFinite(Number(role?.position ?? role?.order)) ? Number(role.position ?? role.order) : 0
+  const hoist = role?.hoist === true
+  const mentionable = role?.mentionable === true
   return {
     ...role,
     id,
     name,
     color,
     position,
+    hoist,
+    mentionable,
     permissions: normalizeRolePermissionsClient(role, allowManageReelm)
   }
 }
@@ -4861,6 +5533,431 @@ function getReelmTemplates(t) {
   ]
 }
 
+const CHANNEL_OVERRIDE_PERMISSIONS = [
+  { key: 'viewChannel', label: 'View Channel', note: 'Allows members to view this channel.' },
+  { key: 'sendMessages', label: 'Send Messages', note: 'Allows members to post messages in this channel.' },
+  { key: 'attachFiles', label: 'Attach Files', note: 'Allows uploading photos, audio and attachments.' },
+  { key: 'embedLinks', label: 'Embed Links', note: 'Allows links to display rich previews.' },
+  { key: 'addReactions', label: 'Add Reactions', note: 'Allows adding emoji reactions.' },
+  { key: 'mentionEveryone', label: 'Mention @everyone', note: 'Allows mentioning @everyone and all roles in this channel.' },
+  { key: 'manageMessages', label: 'Manage Messages', note: 'Allows deleting and pinning other members\' messages.' },
+  { key: 'connect', label: 'Connect to Voice', note: 'Allows joining voice in this channel.' },
+  { key: 'speak', label: 'Speak in Voice', note: 'Allows speaking in voice.' },
+]
+
+function IntegrationsTab({ reelm, channels = [] }) {
+  const t = useT()
+  const [webhooks, setWebhooks] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [creating, setCreating] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [selectedChannelId, setSelectedChannelId] = useState(channels[0]?.id || '')
+  const [newAvatar, setNewAvatar] = useState('')
+  const [copiedId, setCopiedId] = useState(null)
+  const [testStatus, setTestStatus] = useState({})
+
+  const loadWebhooks = useCallback(async () => {
+    try {
+      setLoading(true)
+      const token = getToken()
+      const res = await fetch(`/api/reelms/${reelm.id}/webhooks`, {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      })
+      const data = await res.json()
+      if (data.webhooks) setWebhooks(data.webhooks)
+    } catch {
+      // ignore
+    } finally {
+      setLoading(false)
+    }
+  }, [reelm.id])
+
+  useEffect(() => {
+    loadWebhooks()
+  }, [loadWebhooks])
+
+  const handleCreate = async () => {
+    if (!newName.trim() || !selectedChannelId) return
+    try {
+      const token = getToken()
+      const res = await fetch(`/api/reelms/${reelm.id}/channels/${selectedChannelId}/webhooks`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          name: newName.trim(),
+          avatar: newAvatar.trim() || null
+        })
+      })
+      const data = await res.json()
+      if (data.webhook) {
+        setWebhooks(prev => [data.webhook, ...prev])
+        setCreating(false)
+        setNewName('')
+        setNewAvatar('')
+      }
+    } catch {
+      alert('Failed to create webhook')
+    }
+  }
+
+  const handleDelete = async (webhookId) => {
+    if (!confirm('Are you sure you want to delete this webhook?')) return
+    try {
+      const token = getToken()
+      await fetch(`/api/reelms/${reelm.id}/webhooks/${webhookId}`, {
+        method: 'DELETE',
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      })
+      setWebhooks(prev => prev.filter(w => w.id !== webhookId))
+    } catch {}
+  }
+
+  const handleCopyUrl = (webhook) => {
+    const url = `${window.location.origin}/api/webhooks/${webhook.id}/${webhook.token}`
+    navigator.clipboard.writeText(url)
+    setCopiedId(webhook.id)
+    setTimeout(() => setCopiedId(null), 2000)
+  }
+
+  const handleTest = async (webhook) => {
+    setTestStatus(prev => ({ ...prev, [webhook.id]: 'Sending...' }))
+    try {
+      const res = await fetch(`/api/webhooks/${webhook.id}/${webhook.token}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          content: '🚀 Hello from Reelms Webhook! Integration test successful.',
+          username: webhook.name,
+          avatar_url: webhook.avatar || undefined
+        })
+      })
+      if (res.ok) {
+        setTestStatus(prev => ({ ...prev, [webhook.id]: 'Success! ✓' }))
+      } else {
+        setTestStatus(prev => ({ ...prev, [webhook.id]: 'Error ✕' }))
+      }
+    } catch {
+      setTestStatus(prev => ({ ...prev, [webhook.id]: 'Error ✕' }))
+    }
+    setTimeout(() => setTestStatus(prev => ({ ...prev, [webhook.id]: null })), 3000)
+  }
+
+  return (
+    <div className="rs-section">
+      <div className="rs-section-header">
+        <span className="rs-section-title">Webhooks & Bot Integrations</span>
+        <button className="rs-add-btn" onClick={() => setCreating(true)}>+ New Webhook</button>
+      </div>
+      <p className="rs-section-hint">
+        Create webhook endpoints compatible with Discord bots and GitHub events. Any tool (Zapier, IFTTT, GitHub, custom Discord bots) can post directly to your Reelms channels without modifying their code.
+      </p>
+
+      {creating && (
+        <div className="rs-webhook-create-card">
+          <span className="rs-webhook-card-title">New Webhook</span>
+          <div className="rs-webhook-form">
+            <div className="rs-webhook-field">
+              <label>Bot Name</label>
+              <input
+                className="rs-name-input"
+                placeholder="e.g. GitHub Commits, Music Bot"
+                value={newName}
+                onChange={e => setNewName(e.target.value)}
+              />
+            </div>
+            <div className="rs-webhook-field">
+              <label>Target Channel</label>
+              <select
+                className="rs-webhook-select"
+                value={selectedChannelId}
+                onChange={e => setSelectedChannelId(e.target.value)}
+              >
+                {channels.map(ch => (
+                  <option key={ch.id} value={ch.id}>#{ch.name}</option>
+                ))}
+              </select>
+            </div>
+            <div className="rs-webhook-field">
+              <label>Avatar URL (Optional)</label>
+              <input
+                className="rs-name-input"
+                placeholder="https://..."
+                value={newAvatar}
+                onChange={e => setNewAvatar(e.target.value)}
+              />
+            </div>
+            <div className="rs-webhook-buttons">
+              <button className="rs-save-btn" onClick={handleCreate} disabled={!newName.trim()}>Create Webhook</button>
+              <button className="rs-cancel-btn" onClick={() => setCreating(false)}>Cancel</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loading && <p className="rs-empty">Loading integrations…</p>}
+      {!loading && webhooks.length === 0 && !creating && (
+        <div className="rs-empty">
+          <p>No webhooks configured yet.</p>
+          <p style={{ fontSize: '0.74rem', opacity: 0.65 }}>Create a webhook to connect GitHub, Discord bots, or notification scripts.</p>
+        </div>
+      )}
+
+      <div className="rs-webhooks-list">
+        {webhooks.map(wh => {
+          const ch = channels.find(c => String(c.id) === String(wh.channelId))
+          return (
+            <div key={wh.id} className="rs-webhook-card">
+              <div className="rs-webhook-avatar">
+                {wh.avatar ? <img src={wh.avatar} alt="" /> : (wh.name || 'W')[0].toUpperCase()}
+              </div>
+              <div className="rs-webhook-info">
+                <div className="rs-webhook-name-row">
+                  <span className="rs-webhook-name">{wh.name}</span>
+                  <span className="rs-webhook-channel-badge">#{ch?.name || 'channel'}</span>
+                </div>
+                <div className="rs-webhook-url-row">
+                  <code className="rs-webhook-url">{`${window.location.origin}/api/webhooks/${wh.id}/${wh.token.slice(0, 8)}••••••••`}</code>
+                </div>
+              </div>
+              <div className="rs-webhook-actions">
+                <button
+                  type="button"
+                  className="rs-webhook-copy-btn"
+                  onClick={() => handleCopyUrl(wh)}
+                >
+                  {copiedId === wh.id ? 'Copied! ✓' : 'Copy URL'}
+                </button>
+                <button
+                  type="button"
+                  className="rs-webhook-test-btn"
+                  onClick={() => handleTest(wh)}
+                >
+                  {testStatus[wh.id] || 'Test'}
+                </button>
+                <button
+                  type="button"
+                  className="rs-role-delete-btn"
+                  onClick={() => handleDelete(wh.id)}
+                  title="Delete Webhook"
+                >
+                  ✕
+                </button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function ChannelPermissionsModal({ reelm, target, onClose, onSave }) {
+  const { catId, chId, isCategory, targetName } = target
+  const cat = reelm.categories?.find(c => c.id === catId)
+  const ch = !isCategory ? cat?.channels?.find(c => c.id === chId) : null
+  const currentObj = isCategory ? cat : ch
+
+  const [syncWithCat, setSyncWithCat] = useState(ch?.syncWithCategory ?? true)
+  const [overwrites, setOverwrites] = useState(() => Array.isArray(currentObj?.permissionOverrides) ? currentObj.permissionOverrides : [])
+  const [selectedTargetId, setSelectedTargetId] = useState('@everyone')
+  const [addingTarget, setAddingTarget] = useState(false)
+
+  const roles = Array.isArray(reelm.roles) ? reelm.roles : []
+  const members = Array.isArray(reelm.members) ? reelm.members : []
+
+  const activeOverwrite = overwrites.find(o => o.id === selectedTargetId) || { id: selectedTargetId, type: 'role', allow: [], deny: [] }
+
+  const setPermState = (permKey, state) => {
+    setOverwrites(prev => {
+      const existingIdx = prev.findIndex(o => o.id === selectedTargetId)
+      const targetObj = existingIdx >= 0 ? { ...prev[existingIdx] } : { id: selectedTargetId, type: roles.some(r => r.id === selectedTargetId) || selectedTargetId === '@everyone' ? 'role' : 'member', allow: [], deny: [] }
+      const allowSet = new Set(targetObj.allow || [])
+      const denySet = new Set(targetObj.deny || [])
+
+      allowSet.delete(permKey)
+      denySet.delete(permKey)
+
+      if (state === 'allow') allowSet.add(permKey)
+      if (state === 'deny') denySet.add(permKey)
+
+      targetObj.allow = Array.from(allowSet)
+      targetObj.deny = Array.from(denySet)
+
+      const next = [...prev]
+      if (existingIdx >= 0) {
+        next[existingIdx] = targetObj
+      } else {
+        next.push(targetObj)
+      }
+      return next
+    })
+  }
+
+  const handleSave = () => {
+    const updatedCategories = (reelm.categories || []).map(c => {
+      if (c.id !== catId) return c
+      if (isCategory) {
+        return { ...c, permissionOverrides: overwrites }
+      }
+      const updatedChannels = (c.channels || []).map(channel => {
+        if (channel.id !== chId) return channel
+        return { ...channel, syncWithCategory: syncWithCat, permissionOverrides: overwrites }
+      })
+      return { ...c, channels: updatedChannels }
+    })
+    onSave({ ...reelm, categories: updatedCategories })
+    onClose()
+  }
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="reelm-channel-perm-modal" onClick={e => e.stopPropagation()}>
+        <div className="rcp-header">
+          <div>
+            <span className="rcp-title">{isCategory ? `Category Permissions: ${cat?.name}` : `Channel Permissions: #${targetName}`}</span>
+            <span className="rcp-subtitle">Configure who can view, send messages, and connect to this channel.</span>
+          </div>
+          <button type="button" className="rcp-close-btn" onClick={onClose}>×</button>
+        </div>
+
+        {!isCategory && (
+          <div className="rcp-sync-row">
+            <div>
+              <span className="rcp-sync-label">Sync permissions with category</span>
+              <p className="rcp-sync-desc">When enabled, channel automatically matches category permissions.</p>
+            </div>
+            <button
+              className={`cust-toggle${syncWithCat ? ' cust-toggle-on' : ''}`}
+              onClick={() => setSyncWithCat(!syncWithCat)}
+            >
+              <span className="cust-toggle-knob" />
+            </button>
+          </div>
+        )}
+
+        <div className="rcp-body">
+          <div className="rcp-targets-sidebar">
+            <div className="rcp-sidebar-header">
+              <span>ROLES / MEMBERS</span>
+              <button type="button" className="rcp-add-target-btn" onClick={() => setAddingTarget(!addingTarget)}>+</button>
+            </div>
+
+            {addingTarget && (
+              <div className="rcp-add-target-dropdown">
+                <span className="rcp-dropdown-header">Add Role</span>
+                {roles.filter(r => !overwrites.some(o => o.id === r.id)).map(r => (
+                  <button
+                    key={r.id}
+                    type="button"
+                    className="rcp-target-option"
+                    onClick={() => {
+                      setOverwrites(prev => [...prev, { id: r.id, type: 'role', allow: [], deny: [] }])
+                      setSelectedTargetId(r.id)
+                      setAddingTarget(false)
+                    }}
+                  >
+                    <span className="rcp-target-dot" style={{ background: r.color }} />
+                    <span>{r.name}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <div className="rcp-targets-list">
+              <button
+                type="button"
+                className={`rcp-target-item${selectedTargetId === '@everyone' ? ' rcp-target-item--active' : ''}`}
+                onClick={() => setSelectedTargetId('@everyone')}
+              >
+                <span>@everyone</span>
+              </button>
+              {overwrites.filter(o => o.id !== '@everyone').map(o => {
+                const role = roles.find(r => r.id === o.id)
+                const member = members.find(m => String(m.userId) === String(o.id))
+                const name = role?.name || member?.userName || o.id
+                return (
+                  <button
+                    key={o.id}
+                    type="button"
+                    className={`rcp-target-item${selectedTargetId === o.id ? ' rcp-target-item--active' : ''}`}
+                    onClick={() => setSelectedTargetId(o.id)}
+                  >
+                    {role && <span className="rcp-target-dot" style={{ background: role.color }} />}
+                    <span>{name}</span>
+                    <span
+                      className="rcp-target-remove"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        setOverwrites(prev => prev.filter(item => item.id !== o.id))
+                        if (selectedTargetId === o.id) setSelectedTargetId('@everyone')
+                      }}
+                    >
+                      ✕
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          <div className="rcp-perms-content">
+            <div className="rcp-perms-list">
+              {CHANNEL_OVERRIDE_PERMISSIONS.map(p => {
+                const isAllow = (activeOverwrite.allow || []).includes(p.key)
+                const isDeny = (activeOverwrite.deny || []).includes(p.key)
+                const isNeutral = !isAllow && !isDeny
+
+                return (
+                  <div key={p.key} className="rcp-perm-row">
+                    <div className="rcp-perm-info">
+                      <span className="rcp-perm-name">{p.label}</span>
+                      <span className="rcp-perm-note">{p.note}</span>
+                    </div>
+                    <div className="rcp-tri-state">
+                      <button
+                        type="button"
+                        className={`rcp-tri-btn rcp-tri-deny${isDeny ? ' rcp-tri-btn--active' : ''}`}
+                        onClick={() => setPermState(p.key, 'deny')}
+                        title="Deny"
+                      >
+                        ✕
+                      </button>
+                      <button
+                        type="button"
+                        className={`rcp-tri-btn rcp-tri-neutral${isNeutral ? ' rcp-tri-btn--active' : ''}`}
+                        onClick={() => setPermState(p.key, 'neutral')}
+                        title="Inherit / Neutral"
+                      >
+                        /
+                      </button>
+                      <button
+                        type="button"
+                        className={`rcp-tri-btn rcp-tri-allow${isAllow ? ' rcp-tri-btn--active' : ''}`}
+                        onClick={() => setPermState(p.key, 'allow')}
+                        title="Allow"
+                      >
+                        ✓
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="rcp-footer">
+          <button type="button" className="rs-cancel-btn" onClick={onClose}>Cancel</button>
+          <button type="button" className="rs-save-btn" onClick={handleSave}>Save Permissions</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onCloseReelm, onAnnouncement, onApproveJoin, onRejectJoin, onInviteFriend, onBanMember, onUnbanMember, onTimeoutMember, onUntimeoutMember }) {
   const [activeTab, setActiveTab] = useState('general')
   const [roles, setRoles] = useState(() => (reelm.roles || []).map((role, i) => normalizeRoleForClient(role, `role-${i}`)))
@@ -4925,15 +6022,18 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
   const canDeleteRole = (role) => canEditRole(role) && !isManagerRoleClient(role)
   const canToggleRoleForMember = (member, role) => canManageRoles && (canManageFullRoles || (!isManagerRoleClient(role) && !isProtectedMember(member)))
   const canActOnMember = (member) => canManageMembers && String(member?.userId || '') !== String(currentUser?.id || '') && (canManageFullRoles || !isProtectedMember(member))
+  const canViewInsights = isFullManager || permissionSet.has('viewInsights') || canManageOverview || isOwner
   const availableTabs = useMemo(() => [
     canViewSettings ? { key: 'general', label: 'General' } : null,
+    canViewInsights ? { key: 'insights', label: 'Community Insights ✦' } : null,
     canManageOverview ? { key: 'visibility', label: 'Visibility' } : null,
     (canManageRoles || canManageMembers || canManageInvites) ? { key: 'roles', label: 'Roles and members' } : null,
     canManageChannels ? { key: 'channels', label: 'Channels' } : null,
+    (canManageChannels || canManageOverview || isOwner) ? { key: 'integrations', label: 'Integrations & Webhooks' } : null,
     canManageJoinRequests ? { key: 'join_requests', label: 'Join requests' } : null,
     canManageModeration ? { key: 'audit_log', label: 'Audit Actions' } : null,
     canManageModeration ? { key: 'timeouts', label: 'Timeouts' } : null,
-  ].filter(Boolean), [canViewSettings, canManageOverview, canManageRoles, canManageMembers, canManageInvites, canManageChannels, canManageJoinRequests, canManageModeration])
+  ].filter(Boolean), [canViewSettings, canViewInsights, canManageOverview, canManageRoles, canManageMembers, canManageInvites, canManageChannels, isOwner, canManageJoinRequests, canManageModeration])
 
   useEffect(() => {
     if (availableTabs.length && !availableTabs.some(tab => tab.key === activeTab)) setActiveTab(availableTabs[0].key)
@@ -5615,6 +6715,20 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
             </>
             )
           })()}
+
+          {activeTab === 'integrations' && (
+            <IntegrationsTab
+              reelm={reelm}
+              channels={(reelm.categories || []).flatMap(c => c.channels || [])}
+            />
+          )}
+
+          {activeTab === 'insights' && canViewInsights && (
+            <ReelmsInsights
+              reelm={reelm}
+              onClose={() => setActiveTab('general')}
+            />
+          )}
 
         </div>
       </div>
@@ -8101,6 +9215,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       const el = document.documentElement
       if (d.reducedMotion) el.classList.add('a11y-reduced-motion')
       if (d.messageSpacing) el.classList.add('a11y-msg-spacing')
+      if (d.highContrast) el.classList.add('a11y-high-contrast')
+      if (d.reduceTransparency) el.classList.add('a11y-reduce-transparency')
+      if (d.underlineLinks) el.classList.add('a11y-underline-links')
       if (d.fontScale && d.fontScale !== 1) el.style.fontSize = (16 * d.fontScale) + 'px'
     }).catch(() => {})
   }, [uid])
@@ -8146,10 +9263,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const effectiveBase      = customization.customBase   || activeTheme.base
   const effectiveBaseRgb   = customization.customBase   ? hexToRgb(customization.customBase)   : activeTheme.baseRgb
   const effectiveTextColor = (() => {
-    const tc = customization.customTextColor || 'white'
-    if (tc === 'black') return 'rgba(20, 14, 30, 0.9)'
-    if (tc === 'theme') return effectiveAccent
-    return 'rgba(226, 215, 204, 0.88)'
+    const tc = customization.customTextColor || 'match_theme'
+    if (tc === 'white') return '#ffffff'
+    if (tc === 'black') return '#000000'
+    if (tc === 'match_theme' || tc === 'theme') {
+      return activeTheme.isLight ? activeTheme.accent : effectiveAccent
+    }
+    return activeTheme.isLight ? '#1c1917' : 'rgba(232, 216, 204, 0.92)'
   })()
 
   useEffect(() => {
@@ -8206,6 +9326,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   useEffect(() => {
     const root = document.documentElement
+    if (activeTheme.isLight) {
+      root.classList.add('theme-light')
+    } else {
+      root.classList.remove('theme-light')
+    }
     root.style.setProperty('--ta', effectiveAccent)
     root.style.setProperty('--ta-rgb', effectiveAccentRgb)
     root.style.setProperty('--tb', effectiveBase)
@@ -8222,6 +9347,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       root.style.removeProperty('--grain-opacity')
     }
     return () => {
+      root.classList.remove('theme-light')
       root.style.removeProperty('--ta')
       root.style.removeProperty('--ta-rgb')
       root.style.removeProperty('--tb')
@@ -8314,6 +9440,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [editingChannelId, setEditingChannelId] = useState(null)
   const [editingChannelName, setEditingChannelName] = useState('')
   const [newVoiceChannelId, setNewVoiceChannelId] = useState(null) // channel id awaiting capacity pick after creation
+  const [channelPermissionsTarget, setChannelPermissionsTarget] = useState(null)
   const [channelCtxMenu, setChannelCtxMenu] = useState(null)
   const [flyingRoomModal, setFlyingRoomModal] = useState(null) // { reelmId, catId }
   const [flyingRoomName, setFlyingRoomName] = useState('')
@@ -8459,6 +9586,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [reelmMemberSearchOpen, setReelmMemberSearchOpen] = useState(false)
   const reelmSearchInputRef = useRef(null)
   const [changelog, setChangelog] = useState([])
+  const [showPrevVersions, setShowPrevVersions] = useState(false)
   const [, setCurrentVersion] = useState(null)
   const [showMenu, setShowMenu] = useState(false)
   const [showFeed, setShowFeed] = useState(false)
@@ -8477,7 +9605,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [showNotificationsPopup, setShowNotificationsPopup] = useState(false)
   const [showFriendsPanel, setShowFriendsPanel] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
-  const [selectedSettingsCategory, setSelectedSettingsCategory] = useState(null)
+  const [selectedSettingsCategory, setSelectedSettingsCategory] = useState('account')
   const [showHelpCenter, setShowHelpCenter] = useState(false)
   const [helpForm, setHelpForm] = useState({ name: '', email: '', message: '' })
   const [helpStatus, setHelpStatus] = useState('idle')
@@ -8490,13 +9618,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const activeTemplate = selectedTemplateId ? reelmTemplates.find(t => t.id === selectedTemplateId) ?? null : null
   const BODY_FONTS = [
     { id: 'karla', label: 'Karla', family: "'Karla', sans-serif" },
-    { id: 'figtree', label: 'Figtree', family: "'Figtree', sans-serif" },
     { id: 'be-vietnam-pro', label: 'Be Vietnam Pro', family: "'Be Vietnam Pro', sans-serif" },
     { id: 'plus-jakarta-sans', label: 'Plus Jakarta Sans', family: "'Plus Jakarta Sans', sans-serif" },
-    { id: 'line-seed-jp', label: 'LINE Seed JP', family: "'LINE Seed JP', sans-serif" },
     { id: 'akt', label: 'Akt', family: "'Akt', sans-serif" },
     { id: 'mona-sans', label: 'Mona Sans', family: "'Mona Sans', sans-serif" },
-    { id: 'pliant', label: 'Pliant', family: "'Pliant', sans-serif" },
     { id: 'inclusive-sans', label: 'Inclusive Sans', family: "'Inclusive Sans', sans-serif" },
     { id: 'inter', label: 'Inter', family: "'Inter', sans-serif" },
     { id: 'sour-gummy', label: 'Sour Gummy', family: "'Sour Gummy', sans-serif" },
@@ -8561,6 +9686,20 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [showCreateEventModal, setShowCreateEventModal] = useState(null)
   const [showAllEventsModal, setShowAllEventsModal] = useState(null)
   const [eventCtxMenu, setEventCtxMenu] = useState(null)
+  const [showQuickSwitcher, setShowQuickSwitcher] = useState(false)
+  const [showInsightsModal, setShowInsightsModal] = useState(null)
+  const [showPinnedDrawer, setShowPinnedDrawer] = useState(false)
+
+  useEffect(() => {
+    const handleGlobalKey = (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault()
+        setShowQuickSwitcher(v => !v)
+      }
+    }
+    window.addEventListener('keydown', handleGlobalKey)
+    return () => window.removeEventListener('keydown', handleGlobalKey)
+  }, [])
   const saveChatFolders = (folders) => {
     const list = Array.isArray(folders) ? folders : []
     chatFoldersRef.current = list
@@ -9498,6 +10637,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setShowSettings(false)
     setShowChatList(false)
     setShowFeed(false)
+    setShowInsightsModal(null)
   }
 
   const toggleMuteReelmById = (reelmId) => {
@@ -12652,6 +13792,21 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const BOT_COMMANDS = [
     {
+      bot: 'General',
+      commands: [
+        { cmd: '/shrug', args: '[message]', desc: 'Append ¯\\_(ツ)_/¯ shrug emoji' },
+        { cmd: '/tableflip', args: '', desc: 'Rage table flip (╯°□°)╯︵ ┻━┻' },
+        { cmd: '/unflip', args: '', desc: 'Put table back ┬─┬ノ( º _ ºノ)' },
+        { cmd: '/poll', args: '<question>', desc: 'Create a quick poll with 👍/👎 reactions' },
+        { cmd: '/roll', args: '<NdM>', desc: 'Roll dice (e.g. /roll 1d20, /roll 2d6)' },
+        { cmd: '/flip', args: '', desc: 'Flip a coin (Heads / Tails)' },
+        { cmd: '/clear', args: '', desc: 'Clear local channel messages' },
+        { cmd: '/tts', args: '<text>', desc: 'Read text aloud via text-to-speech' },
+        { cmd: '/me', args: '<action>', desc: 'Send an italicized action message' },
+        { cmd: '/help', args: '', desc: 'List interactive chat commands' },
+      ]
+    },
+    {
       bot: 'Reelms AI',
       commands: [
         { cmd: '/ai', args: '<message>', desc: t('slash_cmd_ai_desc') },
@@ -13059,9 +14214,56 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
     // Then send text
     if (text) {
+      let outgoingText = text
+      let isPollCommand = false
+
+      if (outgoingText.startsWith('/shrug')) {
+        const rest = outgoingText.slice(6).trim()
+        outgoingText = rest ? `${rest} ¯\\_(ツ)_/¯` : '¯\\_(ツ)_/¯'
+      } else if (outgoingText.startsWith('/tableflip')) {
+        outgoingText = '(╯°□°)╯︵ ┻━┻'
+      } else if (outgoingText.startsWith('/unflip')) {
+        outgoingText = '┬─┬ノ( º _ ºノ)'
+      } else if (outgoingText.startsWith('/flip')) {
+        outgoingText = Math.random() > 0.5 ? '🪙 Coin flip: **Heads** (Yazı)' : '🪙 Coin flip: **Tails** (Tura)'
+      } else if (outgoingText.startsWith('/roll')) {
+        const dice = outgoingText.slice(5).trim() || '1d6'
+        const match = dice.match(/^(\d*)d(\d+)$/i)
+        if (match) {
+          const count = Math.min(20, Math.max(1, parseInt(match[1] || '1', 10)))
+          const sides = Math.min(1000, Math.max(2, parseInt(match[2], 10)))
+          const rolls = Array.from({ length: count }, () => Math.floor(Math.random() * sides) + 1)
+          const sum = rolls.reduce((a, b) => a + b, 0)
+          outgoingText = `🎲 Rolled ${count}d${sides}: **${sum}** ${count > 1 ? `(${rolls.join(', ')})` : ''}`
+        } else {
+          outgoingText = `🎲 Rolled 1d6: **${Math.floor(Math.random() * 6) + 1}**`
+        }
+      } else if (outgoingText.startsWith('/clear')) {
+        setMessages(prev => ({ ...prev, [msgKey]: [] }))
+        return
+      } else if (outgoingText.startsWith('/tts')) {
+        const ttsText = outgoingText.slice(4).trim()
+        if (ttsText && window.speechSynthesis) {
+          const u = new SpeechSynthesisUtterance(ttsText)
+          window.speechSynthesis.speak(u)
+        }
+        outgoingText = `📢 *${ttsText}*`
+      } else if (outgoingText.startsWith('/me')) {
+        const action = outgoingText.slice(3).trim()
+        outgoingText = `*${action}*`
+      } else if (outgoingText.startsWith('/poll')) {
+        const q = outgoingText.slice(5).trim()
+        if (q) {
+          outgoingText = `📊 **Poll:** ${q}`
+          isPollCommand = true
+        }
+      } else if (outgoingText.startsWith('/help')) {
+        outgoingText = '💡 **Commands:** `/shrug`, `/tableflip`, `/unflip`, `/poll <q>`, `/roll <NdM>`, `/flip`, `/clear`, `/tts <text>`, `/me <action>`'
+      }
+
       const textId = attach ? `${baseMessageId}_text` : baseMessageId
       const msg = {
-        id: textId, text,
+        id: textId, text: outgoingText,
         ...(richText ? { richText } : {}),
         sender: { id: currentUser.id, name: currentUser.name, photo: getPersonPhoto(currentUser) || null },
         time: now,
@@ -13069,7 +14271,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       }
       setMessages(prev => appendUniqueMessage(prev, msgKey, msg))
       messageSend(msgKey, msg).catch(err => handleRemoteMessageError(err, msgKey, msg.id))
-      notifyMentions(text)
+      if (isPollCommand) {
+        setTimeout(() => {
+          toggleReaction(msgKey, textId, '👍')
+          setTimeout(() => toggleReaction(msgKey, textId, '👎'), 150)
+        }, 120)
+      }
+      notifyMentions(outgoingText)
       if (replySnap && String(replySnap.senderId) !== String(uid)) {
         _pushNotifTo(replySnap.senderId, `${currentUser.name || 'Someone'} ${t('replied_to_you')}`,
           selectedChat ? { type: 'dm', chatId: selectedChat.id } : { type: 'reelm', reelmId: selectedReelm?.id, channelId: selectedChannel?.id })
@@ -13267,8 +14475,32 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       onRemove: () => openServerMemberAction('remove', profileReelm.id, f),
       onBan: () => openServerMemberAction('ban', profileReelm.id, f),
     } : null
-    const roleContext = profileReelm && memberRoles.length ? {
+    const canManageRoles = profileReelm ? (hasReelmPermissionClient(profileReelm, uid, 'manageRoles') || canManageReelmClient(profileReelm, uid)) : false
+    const memberRoleIds = memberRecord ? getMemberRoleIdsClient(memberRecord).map(String) : []
+    const toggleMemberRole = (roleId) => {
+      if (!profileReelm || !canManageRoles) return
+      const rid = String(roleId)
+      const currentMembers = Array.isArray(profileReelm.members) ? [...profileReelm.members] : []
+      const targetMemberIdx = currentMembers.findIndex(m => String(m.userId) === String(f?.id))
+      if (targetMemberIdx === -1) return
+      const targetMember = { ...currentMembers[targetMemberIdx] }
+      const existingRoleIds = new Set((targetMember.roleIds || []).map(String))
+      if (existingRoleIds.has(rid)) {
+        existingRoleIds.delete(rid)
+      } else {
+        existingRoleIds.add(rid)
+      }
+      targetMember.roleIds = Array.from(existingRoleIds)
+      currentMembers[targetMemberIdx] = targetMember
+      const updatedReelm = { ...profileReelm, members: currentMembers }
+      updateReelm(updatedReelm, { scope: 'roles-members' })
+    }
+    const roleContext = profileReelm ? {
       roles: memberRoles,
+      allRoles: orderedRoles,
+      memberRoleIds,
+      canManageRoles,
+      onToggleRole: toggleMemberRole,
       expanded: String(expandedProfileRolesUserId || '') === String(f?.id || ''),
       onToggleExpanded: () => setExpandedProfileRolesUserId(prev => String(prev || '') === String(f?.id || '') ? null : String(f?.id || ''))
     } : null
@@ -13484,8 +14716,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       ].filter(Boolean).join(' ')}
       style={{
         '--bg-image': customization.bgImage ? `url("${normalizeMediaUrl(customization.bgImage) || customization.bgImage}")` : 'none',
-        // Outside panels: ~60% blur. Panels add extra blur on top (via backdrop-filter).
-        '--bg-blur-outside': customization.reduceBlur ? '12px' : '16px',
+        '--bg-blur-outside': `${customization.bgBlur ?? (customization.reduceBlur ? 8 : 16)}px`,
+        '--bg-dim': `${(customization.bgDim ?? 30) / 100}`,
         '--bg-blur-panel-extra': customization.reduceBlur ? '10px' : '12px',
       }}
     >
@@ -13550,19 +14782,19 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             <div className="header-icons-group">
               {!isMobile && (
                 <button className="header-settings-btn" onClick={toggleFriendsPopup} style={{ opacity: showFriendsPopup ? 0 : 1 }}>
-                  <img src={friendsIcon} alt="Friends" className="header-icon" style={{ filter: iconThemeFilter(effectiveAccent) }} />
+                  <MaskIcon src={friendsIcon} alt="Friends" className="header-icon" />
                 </button>
               )}
               <button className="header-settings-btn" onClick={toggleNotifPopup} style={{ opacity: showNotificationsPopup ? 0 : 1 }}>
                 <span className="notif-icon-wrap">
-                  <img src={notificationIcon} alt="Notifications" className="header-icon" style={{ filter: iconThemeFilter(effectiveAccent) }} />
+                  <MaskIcon src={notificationIcon} alt="Notifications" className="header-icon" />
                   {notifications.length > notifSeenCount && (
                     <span className="notif-badge">{capBadge(notifications.length - notifSeenCount)}</span>
                   )}
                 </span>
               </button>
-              <button className="header-settings-btn" onClick={() => { setShowSettings(v => { if (!v) setSelectedSettingsCategory(null); return !v }); setSelectedReelm(null); setSelectedChat(null); setShowDiscover(false); setShowFriendsPanel(false) }}>
-                <img src={settingsIcon} alt="Settings" className="header-icon header-settings-icon" style={{ filter: iconThemeFilter(effectiveAccent) }} />
+              <button className="header-settings-btn" onClick={() => { setShowInsightsModal(null); setShowSettings(v => { if (!v) setSelectedSettingsCategory(isMobile ? null : 'account'); return !v }); setSelectedReelm(null); setSelectedChat(null); setShowDiscover(false); setShowFriendsPanel(false) }}>
+                <MaskIcon src={settingsIcon} alt="Settings" className="header-icon header-settings-icon" />
               </button>
             </div>
           </div>
@@ -13651,7 +14883,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   onClick={() => setShowMenu(!showMenu)}
                   title="New"
                 >
-                  <img src={newIcon} alt="New" className="header-new-icon" style={{ filter: iconThemeFilter(effectiveAccent) }} />
+                  <MaskIcon src={newIcon} alt="New" className="header-new-icon" />
                 </button>
                 <div className="sidebar-divider" />
                 <div className="chats-list-vertical" ref={barScrollRef}>
@@ -13717,8 +14949,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               const y = fitsBelow
                                 ? Math.round(rect.top)
                                 : Math.round(Math.max(10, rect.bottom - estimatedHeight))
+                              const coverEl = document.querySelector('.reelm-cover-wrap')
+                              const menuX = coverEl && coverEl.getBoundingClientRect().left > 0
+                                ? Math.round(coverEl.getBoundingClientRect().left)
+                                : Math.round(rect.right + 11)
                               setBarCtxMenu({
-                                x: Math.round(rect.right + 8),
+                                x: menuX,
                                 y,
                                 item
                               })
@@ -13867,6 +15103,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             saveChatFolders([...nextFolders, newFolder])
                           }}
                           onClick={() => {
+                            setShowInsightsModal(null)
                             if (item.itemType !== 'reelm') clearUnread(item.id)
                             if (item.itemType === 'reelm') { setSelectedReelm(item); setSelectedChat(null); setShowDiscover(false); setShowFriendsPanel(false); setShowSettings(false); setReelmLoading(true); setTimeout(() => setReelmLoading(false), 350) }
                             else { setSelectedChat(item); setSelectedReelm(null); setSelectedChannel(null); setShowDiscover(false); setShowFriendsPanel(false); setShowSettings(false) }
@@ -13879,8 +15116,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             const y = fitsBelow
                               ? Math.round(rect.top)
                               : Math.round(Math.max(10, rect.bottom - estimatedHeight))
+                            const coverEl = document.querySelector('.reelm-cover-wrap')
+                            const menuX = coverEl && coverEl.getBoundingClientRect().left > 0
+                              ? Math.round(coverEl.getBoundingClientRect().left)
+                              : Math.round(rect.right + 11)
                             setBarCtxMenu({
-                              x: Math.round(rect.right + 8),
+                              x: menuX,
                               y,
                               item
                             })
@@ -13916,6 +15157,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   <button
                     className={`bar-item bar-item-nav${(showChatList || (selectedChat && !selectedReelm)) && !showDiscover && !showSettings && !showFeed && !showFriendsPanel ? ' bar-item-active' : ''}`}
                     onClick={() => {
+                      setShowInsightsModal(null)
                       setSelectedReelm(null)
                       setSelectedChat(null)
                       setShowChatList(true)
@@ -13930,7 +15172,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   >
                     <span className="bar-item-wrap">
                       <div className="bar-item-avatar bar-item-avatar--nav">
-                        <img src={messagesIcon} alt="Messages" className="bar-nav-icon bar-nav-icon--msg" style={{ filter: iconThemeFilter(effectiveAccent) }} />
+                        <MaskIcon src={messagesIcon} alt="Messages" className="bar-nav-icon bar-nav-icon--msg" />
                       </div>
                       {totalUnread > 0 && (
                         <span className="bar-item-badge">{capBadge(totalUnread)}</span>
@@ -13941,6 +15183,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   <button
                     className={`bar-item bar-item-nav${showDiscover ? ' bar-item-active' : ''}`}
                     onClick={() => {
+                      setShowInsightsModal(null)
                       setShowDiscover(true)
                       setSelectedReelm(null)
                       setSelectedChat(null)
@@ -13955,7 +15198,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   >
                     <span className="bar-item-wrap">
                       <div className="bar-item-avatar bar-item-avatar--nav">
-                        <img src={discoverIcon} alt="Discover" className="bar-nav-icon" style={{ filter: iconThemeFilter(effectiveAccent) }} />
+                        <MaskIcon src={discoverIcon} alt="Discover" className="bar-nav-icon" />
                       </div>
                     </span>
                   </button>
@@ -13976,13 +15219,27 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               return null
             }).filter(Boolean)
 
+            const folderEl = document.querySelector(`[data-bar-id="${folder.id}"]`)
+            const rect = folderEl ? folderEl.getBoundingClientRect() : null
+            const estimatedHeight = 50 + folderItems.length * 44
+            const fitsBelow = rect ? rect.top + estimatedHeight <= window.innerHeight - 12 : true
+            const y = rect
+              ? (fitsBelow
+                  ? Math.round(rect.top)
+                  : Math.round(Math.max(12, rect.bottom - estimatedHeight)))
+              : 80
+            const coverEl = document.querySelector('.reelm-cover-wrap')
+            const x = coverEl && coverEl.getBoundingClientRect().left > 0
+              ? Math.round(coverEl.getBoundingClientRect().left)
+              : (rect ? Math.round(rect.right + 11) : 71)
+
             return (
               <div
                 className="bar-folder-drawer"
                 style={{
                   position: 'fixed',
-                  left: 68,
-                  top: Math.max(60, Math.min(window.innerHeight - 320, 100)),
+                  left: x,
+                  top: y,
                   zIndex: 9999
                 }}
               >
@@ -14203,18 +15460,54 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                 </button>
               )}
               {barCtxMenu.item.itemType === 'reelm' && (
-                <button
-                  type="button"
-                  className="bar-ctx-menu-item"
-                  onClick={(e) => {
-                    e.preventDefault(); e.stopPropagation();
-                    const item = barCtxMenu.item
-                    setBarCtxMenu(null)
-                    toggleMuteReelmById(item.id)
-                  }}
-                >
-                  {mutedReelmIds.map(String).includes(String(barCtxMenu.item.id)) ? t('bar_unmute') : t('bar_mute')}
-                </button>
+                <>
+                  {(() => {
+                    const r = reelms.find(re => String(re.id) === String(barCtxMenu.item.id)) || barCtxMenu.item
+                    const mm = r.members?.find(m => m.userId === uid)
+                    const mr = (r.roles || []).filter(role => (mm?.roleIds || []).includes(role.id))
+                    const canView = canManageReelmClient(r, uid) || mr.some(isManagerRoleClient)
+                    if (!canView) return null
+                    return (
+                      <button
+                        type="button"
+                        className="bar-ctx-menu-item bar-ctx-menu-insights"
+                        onClick={(e) => {
+                          e.preventDefault(); e.stopPropagation()
+                          const targetReelm = reelms.find(re => String(re.id) === String(barCtxMenu.item.id)) || barCtxMenu.item
+                          setBarCtxMenu(null)
+                          setShowInsightsModal(targetReelm)
+                        }}
+                      >
+                        <div className="reelm-menu-left-row">
+                          <svg className="reelm-insights-icon" width="13" height="12" viewBox="0 0 12 11" fill="currentColor">
+                            <rect x="0" y="6" width="2.5" height="5" rx="1"/>
+                            <rect x="4.75" y="0" width="2.5" height="11" rx="1"/>
+                            <rect x="9.5" y="3.5" width="2.5" height="7.5" rx="1"/>
+                          </svg>
+                          <span>Insights</span>
+                        </div>
+                        <span className="reelm-intel-pill">
+                          <svg className="reelm-intel-star" width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+                            <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z"/>
+                          </svg>
+                          intelligence
+                        </span>
+                      </button>
+                    )
+                  })()}
+                  <button
+                    type="button"
+                    className="bar-ctx-menu-item"
+                    onClick={(e) => {
+                      e.preventDefault(); e.stopPropagation();
+                      const item = barCtxMenu.item
+                      setBarCtxMenu(null)
+                      toggleMuteReelmById(item.id)
+                    }}
+                  >
+                    {mutedReelmIds.map(String).includes(String(barCtxMenu.item.id)) ? t('bar_unmute') : t('bar_mute')}
+                  </button>
+                </>
               )}
               <button
                 type="button"
@@ -14403,8 +15696,17 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                 onClick={() => { setMobileLeftPanelOpen(false); setMobileRightPanelOpen(false) }}
               />
             )}
-            {reelmLoading && <div className="reelm-loading-overlay" />}
-            {showReelmSettings && selectedReelm ? (
+            {showInsightsModal ? (
+              <ReelmsInsights
+                reelm={showInsightsModal}
+                language={language}
+                onClose={() => setShowInsightsModal(null)}
+                onNavigateChannel={(ch) => {
+                  setSelectedChannel(ch)
+                  setShowInsightsModal(null)
+                }}
+              />
+            ) : showReelmSettings && selectedReelm ? (
               <ReelmSettings
                 reelm={selectedReelm}
                 currentUser={currentUser}
@@ -14428,29 +15730,32 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               />
             ) : showSettings ? (
               <div className={`settings-layout${isMobile ? (!selectedSettingsCategory ? ' settings-layout--mobile-menu' : ' settings-layout--mobile-content') : ''}`}>
+                <button
+                  type="button"
+                  className="settings-floating-close-btn"
+                  onClick={() => setShowSettings(false)}
+                  title={t('close')}
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                </button>
+
                 <div className="settings-sidebar">
                   <div className="settings-sidebar-top-row">
                     <h2 className="settings-title">{t('settings')}</h2>
-                    <div className="settings-sidebar-actions">
-                      <button type="button" className="settings-signout-btn" onClick={onLogOut}>{t('sign_out')}</button>
-                      <button type="button" className="settings-close-btn settings-close-btn--sidebar" onClick={() => setShowSettings(false)}>
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                          <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                        </svg>
-                      </button>
-                    </div>
                   </div>
                   <nav className="settings-nav">
                     {[
-                      { id: 'account',       label: t('your_account') },
-                      { id: 'customization', label: t('customization') },
-                      { id: 'usage',         label: t('usage') },
-                      { id: 'privacy',       label: t('privacy_safety') },
-                      { id: 'environment',   label: t('environment') },
-                      { id: 'companions',    label: t('companions') },
-                      { id: 'desktop',       label: 'Desktop and Mobile' },
-                      { id: 'accessibility', label: t('accessibility') },
-                      { id: 'about',         label: t('about') },
+                      { id: 'account',         label: t('your_account') },
+                      { id: 'privacy',         label: t('privacy_safety') },
+                      { id: 'customization',   label: t('customization') },
+                      { id: 'usage',           label: t('usage') },
+                      { id: 'environment',     label: t('environment') },
+                      { id: 'companions',      label: t('companions') },
+                      { id: 'authorized_apps', label: t('authorized_apps') || 'Authorized apps' },
+                      { id: 'accessibility',   label: t('accessibility') },
+                      { id: 'about',           label: t('about') },
                     ].map(item => (
                       <button
                         key={item.id}
@@ -14459,7 +15764,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         onClick={() => setSelectedSettingsCategory(item.id)}
                       >
                         <span className="settings-nav-item-label">{item.label}</span>
-                        {isMobile && <svg className="settings-nav-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                        {isMobile && <svg className="settings-nav-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
                       </button>
                     ))}
                     <div className="settings-nav-divider" />
@@ -14472,12 +15777,24 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         Reelms <span className="settings-ignite-word">Ignite</span>
                       </span>
                     </button>
+                    <button
+                      type="button"
+                      className={`settings-nav-item${selectedSettingsCategory === 'desktop' ? ' settings-nav-item-active' : ''}`}
+                      onClick={() => setSelectedSettingsCategory('desktop')}
+                    >
+                      <span className="settings-nav-item-label">{t('app_experiences') || 'App experiences'}</span>
+                      {isMobile && <svg className="settings-nav-item-arrow" width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M9 18l6-6-6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/></svg>}
+                    </button>
                   </nav>
-                  <button className="settings-help-center-btn" onClick={() => {
-                    setHelpForm({ name: currentUser?.displayName || '', email: currentUser?.email || '', message: '' })
-                    setHelpStatus('idle')
-                    setShowHelpCenter(true)
-                  }}>
+                  <button
+                    type="button"
+                    className={`settings-help-center-btn${selectedSettingsCategory === 'help_center' ? ' settings-help-center-btn--active' : ''}`}
+                    onClick={() => {
+                      setHelpForm({ name: currentUser?.displayName || '', email: currentUser?.email || '', message: '' })
+                      setHelpStatus('idle')
+                      setSelectedSettingsCategory('help_center')
+                    }}
+                  >
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
                       <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/>
                       <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
@@ -14485,23 +15802,23 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     </svg>
                     {getT(language)('help_center')}
                   </button>
+                  <button type="button" className="settings-sidebar-signout-btn" onClick={onLogOut}>
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                    {t('sign_out')}
+                  </button>
                 </div>
                 <div className="settings-content">
-                  <div className="settings-topbar">
-                    {isMobile && selectedSettingsCategory && (
+                  {isMobile && selectedSettingsCategory && (
+                    <div className="settings-mobile-topbar">
                       <button type="button" className="settings-mobile-back-btn" onClick={() => setSelectedSettingsCategory(null)}>
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
                           <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       </button>
-                    )}
-                    {!isMobile && <button type="button" className="settings-signout-btn" onClick={onLogOut}>{t('sign_out')}</button>}
-                    {!isMobile && <button type="button" className="settings-close-btn" onClick={() => setShowSettings(false)}>
-                      <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                        <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                      </svg>
-                    </button>}
-                  </div>
+                    </div>
+                  )}
                   <div key={selectedSettingsCategory} className="settings-content-panel">
                     {selectedSettingsCategory === 'account' && (
                       <AccountSettingsPanel
@@ -14513,9 +15830,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         uid={uid}
                         reelms={reelms}
                         onUnblock={unblockUserFn}
-                        spotifyConnected={spotifyConnected}
-                        onSpotifyConnect={connectSpotify}
-                        onSpotifyDisconnect={disconnectSpotify}
                         onOpenProfileEdit={() => { setShowSettings(false); setShowProfilePopup(true); setProfilePopupInitialEdit(true) }}
                       />
                     )}
@@ -14545,6 +15859,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         }}
                       />
                     )}
+                    {selectedSettingsCategory === 'authorized_apps' && (
+                      <AuthorizedAppsPanel
+                        user={currentUser}
+                        spotifyConnected={spotifyConnected}
+                        onSpotifyConnect={connectSpotify}
+                        onSpotifyDisconnect={disconnectSpotify}
+                      />
+                    )}
                     {selectedSettingsCategory === 'customization' && (
                       <CustomizationPanel
                         customization={customization}
@@ -14565,136 +15887,115 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       <AccessibilityPanel uid={uid} />
                     )}
                     {selectedSettingsCategory === 'usage' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
-                      <div className="accs-section">
-                        <div className="accs-section-title">{t('when_entering_reelm')}</div>
-                        <p style={{ margin: '0 0 14px', fontSize: '0.78rem', color: 'rgba(var(--ta-rgb), 0.45)', lineHeight: 1.5 }}>
-                          {t('when_entering_reelm_desc')}
-                        </p>
-                        <div style={{ display: 'flex', gap: 10 }}>
-                          {[{ val: 'chat', label: t('chat') }, { val: 'feed', label: t('feed') }].map(opt => (
-                            <button
-                              key={opt.val}
-                              onClick={() => updateReelmLandingView(opt.val)}
-                              style={{
-                                padding: '8px 22px',
-                                borderRadius: 12,
-                                border: `1.5px solid ${reelmLandingView === opt.val ? 'rgba(var(--ta-rgb), 0.7)' : 'rgba(var(--ta-rgb), 0.18)'}`,
-                                background: reelmLandingView === opt.val ? 'rgba(var(--ta-rgb), 0.12)' : 'none',
-                                color: reelmLandingView === opt.val ? 'rgba(var(--ta-rgb), 0.95)' : 'rgba(var(--ta-rgb), 0.45)',
-                                fontFamily: 'inherit',
-                                fontSize: '0.82rem',
-                                cursor: 'pointer',
-                                transition: 'all 0.15s',
-                              }}
-                            >{opt.label}</button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="accs-section">
-                        <div className="accs-section-title">{t('panels')}</div>
-                        <p style={{ margin: '0 0 14px', fontSize: '0.78rem', color: 'rgba(var(--ta-rgb), 0.45)', lineHeight: 1.5 }}>
-                          {t('panels_desc')}
-                        </p>
-                        <button
-                          onClick={() => {
-                            setLeftWidth(PANEL_DEFAULT)
-                            setRightWidth(PANEL_DEFAULT)
-                            userPutDoc('lpw', String(PANEL_DEFAULT)).catch(() => {})
-                            userPutDoc('rpw', String(PANEL_DEFAULT)).catch(() => {})
-                          }}
-                          style={{ padding: '8px 20px', borderRadius: 12, border: '1.5px solid rgba(var(--ta-rgb), 0.18)', background: 'none', color: 'rgba(var(--ta-rgb), 0.6)', fontFamily: 'inherit', fontSize: '0.82rem', cursor: 'pointer', transition: 'all 0.15s' }}
-                          onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(var(--ta-rgb), 0.5)'; e.currentTarget.style.color = 'rgba(var(--ta-rgb), 0.9)' }}
-                          onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(var(--ta-rgb), 0.18)'; e.currentTarget.style.color = 'rgba(var(--ta-rgb), 0.6)' }}
-                        >{t('reset_panels')}</button>
-                      </div>
-                      <div className="accs-section">
-                        <div className="accs-section-title">{t('language')}</div>
-                        <p style={{ margin: '0 0 14px', fontSize: '0.78rem', color: 'rgba(var(--ta-rgb), 0.45)', lineHeight: 1.5 }}>
-                          {t('language_desc')}
-                        </p>
-                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                          {LANGUAGES.map(lang => (
-                            <button
-                              key={lang.code}
-                              onClick={() => onLanguageChange(lang.code)}
-                              style={{
-                                padding: '8px 22px',
-                                borderRadius: 12,
-                                border: `1.5px solid ${language === lang.code ? 'rgba(var(--ta-rgb), 0.7)' : 'rgba(var(--ta-rgb), 0.18)'}`,
-                                background: language === lang.code ? 'rgba(var(--ta-rgb), 0.12)' : 'none',
-                                color: language === lang.code ? 'rgba(var(--ta-rgb), 0.95)' : 'rgba(var(--ta-rgb), 0.45)',
-                                fontFamily: 'inherit',
-                                fontSize: '0.82rem',
-                                cursor: 'pointer',
-                                transition: 'all 0.15s',
-                              }}
-                            >{lang.name}</button>
-                          ))}
-                        </div>
-                      </div>
-                      <div className="accs-section">
-                        <div className="accs-section-title">{t('sounds')}</div>
-                        <p style={{ margin: '0 0 18px', fontSize: '0.78rem', color: 'rgba(var(--ta-rgb), 0.45)', lineHeight: 1.5 }}>
-                          {t('sounds_desc')}
-                        </p>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                          {SOUND_CATEGORIES.map(cat => (
-                            <div key={cat.key} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                              <span style={{ fontSize: '0.82rem', color: 'rgba(var(--ta-rgb), 0.65)', minWidth: 180 }}>{cat.label}</span>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, flex: 1 }}>
-                                <select
-                                  value={soundSettings[cat.key] || ''}
-                                  onChange={e => {
-                                    const next = { ...soundSettings, [cat.key]: e.target.value }
-                                    setSoundSettings(next)
-                                    userPutDoc('sounds', next).catch(() => {})
-                                    if (e.target.value) previewSound(e.target.value)
-                                  }}
-                                  style={{
-                                    flex: 1,
-                                    background: 'rgba(var(--ta-rgb), 0.07)',
-                                    border: '1px solid rgba(var(--ta-rgb), 0.16)',
-                                    borderRadius: 10,
-                                    padding: '7px 10px',
-                                    color: 'rgba(230, 210, 200, 0.85)',
-                                    fontFamily: 'inherit',
-                                    fontSize: '0.82rem',
-                                    cursor: 'pointer',
-                                    outline: 'none',
-                                  }}
-                                >
-                                  <option value="">— Off —</option>
-                                  {availableSounds.map(f => (
-                                    <option key={f} value={f}>{f.replace(/\.[^.]+$/, '')}</option>
-                                  ))}
-                                </select>
-                                <button
-                                  onClick={() => soundSettings[cat.key] && previewSound(soundSettings[cat.key])}
-                                  disabled={!soundSettings[cat.key]}
-                                  title="Preview"
-                                  style={{
-                                    background: 'none',
-                                    border: '1px solid rgba(var(--ta-rgb), 0.16)',
-                                    borderRadius: 8,
-                                    color: 'rgba(var(--ta-rgb), 0.55)',
-                                    cursor: soundSettings[cat.key] ? 'pointer' : 'default',
-                                    opacity: soundSettings[cat.key] ? 1 : 0.3,
-                                    padding: '6px 8px',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    transition: 'all 0.15s',
-                                  }}
-                                >
-                                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                                    <polygon points="5 3 19 12 5 21 5 3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                                  </svg>
-                                </button>
+                      <div className="usage-settings-panel">
+                        {/* Section 1: When entering a reelm, Panels, and Category Icons grouped without dividers */}
+                        <div className="accs-section">
+                          <div className="usage-unified-group">
+                            <div className="usage-block">
+                              <div className="accs-section-title">{t('when_entering_reelm')}</div>
+                              <p className="accs-note" style={{ margin: '0 0 12px' }}>
+                                {t('when_entering_reelm_desc')}
+                              </p>
+                              <div style={{ display: 'flex', gap: 10 }}>
+                                {[{ val: 'chat', label: t('chat') }, { val: 'feed', label: t('feed') }].map(opt => (
+                                  <button
+                                    key={opt.val}
+                                    type="button"
+                                    onClick={() => updateReelmLandingView(opt.val)}
+                                    className={`usage-choice-btn${reelmLandingView === opt.val ? ' usage-choice-btn--active' : ''}`}
+                                  >{opt.label}</button>
+                                ))}
                               </div>
                             </div>
-                          ))}
+
+                            <div className="usage-block">
+                              <div className="accs-section-title">{t('panels')}</div>
+                              <p className="accs-note" style={{ margin: '0 0 12px' }}>
+                                {t('panels_desc')}
+                              </p>
+                              <button
+                                type="button"
+                                className="usage-action-btn"
+                                onClick={() => {
+                                  setLeftWidth(PANEL_DEFAULT)
+                                  setRightWidth(PANEL_DEFAULT)
+                                  userPutDoc('lpw', String(PANEL_DEFAULT)).catch(() => {})
+                                  userPutDoc('rpw', String(PANEL_DEFAULT)).catch(() => {})
+                                }}
+                              >{t('reset_panels')}</button>
+                            </div>
+
+                            <div className="usage-block">
+                              <div className="accs-section-title">{t('category_icons') || 'Category Icons'}</div>
+                              <div className="cust-toggle-row" style={{ marginTop: 0 }}>
+                                <div>
+                                  <span className="cust-toggle-label">{t('category_icons') || 'Show category icons'}</span>
+                                  <p className="accs-note">{t('category_icons_desc') || 'Display category icons next to channel groups.'}</p>
+                                </div>
+                                <button
+                                  type="button"
+                                  className={`cust-toggle${customization.showCategoryIcons !== false ? ' cust-toggle-on' : ''}`}
+                                  onClick={() => updateCustomizationData({ showCategoryIcons: customization.showCategoryIcons === false ? true : false })}
+                                ><span className="cust-toggle-knob" /></button>
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
+
+                        {/* Section 2: Language */}
+                        <div className="accs-section">
+                          <div className="accs-section-title">{t('language')}</div>
+                          <p className="accs-note" style={{ margin: '0 0 14px' }}>
+                            {t('language_desc')}
+                          </p>
+                          <div style={{ maxWidth: 260 }}>
+                            <ReelmsCustomSelect
+                              value={language}
+                              options={LANGUAGES.map(l => ({ value: l.code, label: l.name }))}
+                              placeholder=""
+                              onChange={code => onLanguageChange(code)}
+                            />
+                          </div>
+                        </div>
+
+                        {/* Section 3: Sounds (Optimized compact grid with custom select) */}
+                        <div className="accs-section">
+                          <div className="accs-section-title">{t('sounds')}</div>
+                          <p className="accs-note" style={{ margin: '0 0 16px' }}>
+                            {t('sounds_desc')}
+                          </p>
+                          <div className="usage-sounds-grid">
+                            {SOUND_CATEGORIES.map(cat => (
+                              <div key={cat.key} className="usage-sound-item">
+                                <span className="usage-sound-label" title={cat.label}>{cat.label}</span>
+                                <div className="usage-sound-ctrls">
+                                  <ReelmsCustomSelect
+                                    value={soundSettings[cat.key] || ''}
+                                    placeholder="— Off —"
+                                    options={availableSounds.map(f => ({ value: f, label: f.replace(/\.[^.]+$/, '') }))}
+                                    onChange={val => {
+                                      const next = { ...soundSettings, [cat.key]: val }
+                                      setSoundSettings(next)
+                                      userPutDoc('sounds', next).catch(() => {})
+                                      if (val) previewSound(val)
+                                    }}
+                                  />
+                                  <button
+                                    type="button"
+                                    className="usage-sound-preview-btn"
+                                    onClick={() => soundSettings[cat.key] && previewSound(soundSettings[cat.key])}
+                                    disabled={!soundSettings[cat.key]}
+                                    title="Preview"
+                                  >
+                                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none">
+                                      <polygon points="5 3 19 12 5 21 5 3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                    </svg>
+                                  </button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
                       </div>
                     )}
                     {selectedSettingsCategory === 'desktop' && (
@@ -14706,7 +16007,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           <div className="accs-section-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                             Reelms
                             <span style={{ fontSize: '0.72rem', fontWeight: 400, color: 'rgba(var(--ta-rgb), 0.4)', background: 'rgba(var(--ta-rgb), 0.07)', borderRadius: 8, padding: '2px 8px' }}>
-                              1.1/12062026
+                              2/25082026
                             </span>
                           </div>
                           {updateAvailable ? (
@@ -14725,26 +16026,104 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           <div className="accs-section-title">{t('release_notes')}</div>
                           {changelog.length === 0 ? (
                             <p style={{ margin: '8px 0 0', fontSize: '0.78rem', color: 'rgba(var(--ta-rgb), 0.4)' }}>Loading…</p>
-                          ) : changelog.map(release => {
-                            const langKey = `notes_${language}`
-                            const notes = release[langKey] || release.notes || []
+                          ) : (() => {
+                            const [latestRelease, ...prevReleases] = changelog
+                            const renderReleaseContent = (release) => {
+                              const langKey = `notes_${language}`
+                              const descKey = `description_${language}`
+                              const notes = release[langKey] || release.notes || []
+                              const desc = release[descKey] || release.description || ''
+                              return (
+                                <>
+                                  {release.title && (
+                                    <div className="about-release-title" style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--ta)', marginBottom: 6 }}>
+                                      {release.title}
+                                    </div>
+                                  )}
+                                  {desc && (
+                                    <p className="about-release-desc" style={{ fontSize: '0.78rem', color: 'rgba(var(--ta-rgb), 0.7)', lineHeight: 1.5, margin: '0 0 12px' }}>
+                                      {desc}
+                                    </p>
+                                  )}
+                                  <ul className="about-release-notes">
+                                    {notes.map((note, i) => {
+                                      const dashIndex = note.indexOf(' — ')
+                                      if (dashIndex !== -1) {
+                                        const prefix = note.slice(0, dashIndex).replace(/^\*\*/, '').replace(/\*\*$/, '')
+                                        const suffix = note.slice(dashIndex + 3)
+                                        return (
+                                          <li key={i}>
+                                            <strong style={{ color: 'rgba(var(--ta-rgb), 0.85)' }}>{prefix}</strong> — {suffix}
+                                          </li>
+                                        )
+                                      }
+                                      return <li key={i}>{note}</li>
+                                    })}
+                                  </ul>
+                                </>
+                              )
+                            }
+
                             return (
-                            <div key={release.version} className="about-release">
-                              <div className="about-release-header">
-                                <span className="about-release-version">{release.label || `v${release.version}`}</span>
-                                {!release.label && <span className="about-release-date">{release.date}</span>}
-                                {release.highlights && (
-                                  <span className="about-release-highlight">{release.highlights}</span>
+                              <div className="about-releases-container">
+                                {latestRelease && (
+                                  <div key={latestRelease.version} className="about-release about-release--latest">
+                                    <div className="about-release-header">
+                                      <span className="about-release-version">{latestRelease.label || `v${latestRelease.version}`}</span>
+                                      {!latestRelease.label && <span className="about-release-date">{latestRelease.date}</span>}
+                                      <span className="about-release-highlight" style={{ background: 'rgba(185, 152, 135, 0.2)', color: '#b99887' }}>Latest</span>
+                                      {latestRelease.highlights && (
+                                        <span className="about-release-highlight">{latestRelease.highlights}</span>
+                                      )}
+                                    </div>
+                                    {renderReleaseContent(latestRelease)}
+                                  </div>
+                                )}
+
+                                {prevReleases.length > 0 && (
+                                  <div className="about-prev-section" style={{ marginTop: 18 }}>
+                                    <button
+                                      type="button"
+                                      className={`about-prev-toggle${showPrevVersions ? ' open' : ''}`}
+                                      onClick={() => setShowPrevVersions(v => !v)}
+                                    >
+                                      <span>{t('previous_versions', 'Previous versions')} ({prevReleases.length})</span>
+                                      <svg
+                                        width="14"
+                                        height="14"
+                                        viewBox="0 0 24 24"
+                                        fill="none"
+                                        stroke="currentColor"
+                                        strokeWidth="2"
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        style={{ transform: showPrevVersions ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s ease' }}
+                                      >
+                                        <polyline points="6 9 12 15 18 9"/>
+                                      </svg>
+                                    </button>
+
+                                    {showPrevVersions && (
+                                      <div className="about-prev-list" style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
+                                        {prevReleases.map(release => (
+                                          <div key={release.version} className="about-release about-release--prev">
+                                            <div className="about-release-header">
+                                              <span className="about-release-version">{release.label || `v${release.version}`}</span>
+                                              {!release.label && <span className="about-release-date">{release.date}</span>}
+                                              {release.highlights && (
+                                                <span className="about-release-highlight">{release.highlights}</span>
+                                              )}
+                                            </div>
+                                            {renderReleaseContent(release)}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    )}
+                                  </div>
                                 )}
                               </div>
-                              <ul className="about-release-notes">
-                                {notes.map((note, i) => (
-                                  <li key={i}>{note}</li>
-                                ))}
-                              </ul>
-                            </div>
                             )
-                          })}
+                          })()}
                         </div>
                       </div>
                     )}
@@ -14766,6 +16145,17 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         </div>
                       </div>
                     )}
+                    {selectedSettingsCategory === 'help_center' && (
+                      <HelpCenterPanel
+                        currentUser={currentUser}
+                        language={language}
+                        helpForm={helpForm}
+                        setHelpForm={setHelpForm}
+                        helpStatus={helpStatus}
+                        setHelpStatus={setHelpStatus}
+                        feedbackSend={feedbackSend}
+                      />
+                    )}
                   </div>
                 </div>
               </div>
@@ -14773,7 +16163,19 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               <>
                 <div className={`panel panel-left${isMobile && mobileLeftPanelOpen ? ' panel-left--open' : ''}`} style={isMobile ? undefined : { flex: `0 0 ${leftWidth}px` }}>
                   <div className="reelm-sidebar">
-                    <div className={`reelm-cover-wrap${selectedReelm.image ? ' reelm-cover-wrap--has-image' : ''}${isDefaultCommunity(selectedReelm) ? ' reelm-cover-wrap--community' : ''}`}>
+                    <div
+                      className={`reelm-cover-wrap${selectedReelm.image ? ' reelm-cover-wrap--has-image' : ''}${isDefaultCommunity(selectedReelm) ? ' reelm-cover-wrap--community' : ''}`}
+                      onContextMenu={(e) => {
+                        e.preventDefault()
+                        e.stopPropagation()
+                        if (showReelmMenu) { setShowReelmMenu(null); return; }
+                        const r = e.currentTarget.getBoundingClientRect()
+                        const menuWidth = Math.max(200, Math.round(r.width))
+                        const x = Math.min(e.clientX, window.innerWidth - menuWidth - 12)
+                        const y = Math.min(e.clientY, window.innerHeight - 260)
+                        setShowReelmMenu({ x: Math.max(10, x), y: Math.max(10, y), w: menuWidth })
+                      }}
+                    >
                       {selectedReelm.image
                         ? <img src={selectedReelm.image} alt="cover" className="reelm-cover-img" />
                         : isDefaultCommunity(selectedReelm)
@@ -14782,9 +16184,48 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       }
                       {selectedReelm.image && <div className="reelm-cover-blur-strip" />}
                       <div className="reelm-sidebar-name-row" onClick={e => e.stopPropagation()}>
-                        <span className="reelm-sidebar-name" onClick={(e) => { if (showReelmMenu) { setShowReelmMenu(null); return; } const r = e.currentTarget.getBoundingClientRect(); setShowReelmMenu({ x: r.left, y: r.bottom + 4, w: r.width }) }}>{selectedReelm.name}</span>
+                        <span className="reelm-sidebar-name">{selectedReelm.name}</span>
                         {showReelmMenu && ReactDOM.createPortal(
-                          <div className="reelm-name-menu" style={{ top: showReelmMenu.y, left: showReelmMenu.x, width: showReelmMenu.w }}>
+                          <div className="reelm-name-menu" style={{ top: showReelmMenu.y, left: showReelmMenu.x, minWidth: 250 }}>
+                            {(() => {
+                              const _mm = selectedReelm.members?.find(m => m.userId === uid)
+                              const _mr = (selectedReelm.roles || []).filter(r => (_mm?.roleIds || []).includes(r.id))
+                              const _ia = canManageReelmClient(selectedReelm, uid) || _mr.some(isManagerRoleClient)
+                              return _ia ? (<>
+                                <button
+                                  type="button"
+                                  className="reelm-name-menu-item reelm-name-menu-insights"
+                                  onClick={() => {
+                                    setShowInsightsModal(selectedReelm)
+                                    setShowReelmMenu(null)
+                                  }}
+                                >
+                                  <div className="reelm-menu-left-row">
+                                    <svg className="reelm-insights-icon" width="13" height="12" viewBox="0 0 12 11" fill="currentColor"><rect x="0" y="6" width="2.5" height="5" rx="1"/><rect x="4.75" y="0" width="2.5" height="11" rx="1"/><rect x="9.5" y="3.5" width="2.5" height="7.5" rx="1"/></svg>
+                                    <span>Insights</span>
+                                  </div>
+                                  <span className="reelm-intel-pill">
+                                    <svg className="reelm-intel-star" width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+                                      <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z"/>
+                                    </svg>
+                                    intelligence
+                                  </span>
+                                </button>
+                                <div className="reelm-name-menu-divider" />
+                              </>) : null
+                            })()}
+                            {((!isDefaultCommunity(selectedReelm) && hasReelmPermissionClient(selectedReelm, uid, 'manageOverview')) || canManageReelmClient(selectedReelm, uid)) && (
+                              <button
+                                type="button"
+                                className="reelm-name-menu-item"
+                                onClick={() => {
+                                  reelmImageInputRef.current?.click()
+                                  setShowReelmMenu(null)
+                                }}
+                              >
+                                {selectedReelm.image ? (t('change_reelm_image') || 'Change Reelm image') : (t('add_reelm_image') || 'Add Reelm image')}
+                              </button>
+                            )}
                             {canOpenReelmSettingsClient(selectedReelm, uid) && (
                               <button className="reelm-name-menu-item" onClick={() => { setShowReelmSettings(true); setShowReelmMenu(null) }}>{t('reelm_settings_menu')}</button>
                             )}
@@ -15441,7 +16882,19 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   })()}
                   {selectedReelm && (
                     <div className="reelm-sidebar">
-                      <div className={`reelm-cover-wrap${selectedReelm.image ? ' reelm-cover-wrap--has-image' : ''}${isDefaultCommunity(selectedReelm) ? ' reelm-cover-wrap--community' : ''}`} onClick={() => { if ((!isDefaultCommunity(selectedReelm) && hasReelmPermissionClient(selectedReelm, uid, 'manageOverview')) || canManageReelmClient(selectedReelm, uid)) reelmImageInputRef.current?.click() }}>
+                      <div
+                        className={`reelm-cover-wrap${selectedReelm.image ? ' reelm-cover-wrap--has-image' : ''}${isDefaultCommunity(selectedReelm) ? ' reelm-cover-wrap--community' : ''}`}
+                        onContextMenu={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          if (showReelmMenu) { setShowReelmMenu(null); return; }
+                          const r = e.currentTarget.getBoundingClientRect()
+                          const menuWidth = Math.max(200, Math.round(r.width))
+                          const x = Math.min(e.clientX, window.innerWidth - menuWidth - 12)
+                          const y = Math.min(e.clientY, window.innerHeight - 260)
+                          setShowReelmMenu({ x: Math.max(10, x), y: Math.max(10, y), w: menuWidth })
+                        }}
+                      >
                         {selectedReelm.image
                           ? <img src={selectedReelm.image} alt="cover" className="reelm-cover-img" />
                           : isDefaultCommunity(selectedReelm)
@@ -15450,22 +16903,48 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         }
                         {selectedReelm.image && <div className="reelm-cover-blur-strip" />}
                         <div className="reelm-sidebar-name-row" onClick={e => e.stopPropagation()}>
-                          <span className="reelm-sidebar-name" onClick={(e) => { if (showReelmMenu) { setShowReelmMenu(null); return; } const r = e.currentTarget.getBoundingClientRect(); setShowReelmMenu({ x: r.left, y: r.bottom + 4, w: r.width }) }}>{selectedReelm.name}</span>
+                          <span className="reelm-sidebar-name">{selectedReelm.name}</span>
                           {showReelmMenu && ReactDOM.createPortal(
-                            <div className="reelm-name-menu" style={{ top: showReelmMenu.y, left: showReelmMenu.x, width: showReelmMenu.w }}>
+                            <div className="reelm-name-menu" style={{ top: showReelmMenu.y, left: showReelmMenu.x, minWidth: 250 }}>
                               {(() => {
                                 const _mm = selectedReelm.members?.find(m => m.userId === uid)
                                 const _mr = (selectedReelm.roles || []).filter(r => (_mm?.roleIds || []).includes(r.id))
                                 const _ia = canManageReelmClient(selectedReelm, uid) || _mr.some(isManagerRoleClient)
                                 return _ia ? (<>
-                                  <div className="reelm-name-menu-item reelm-name-menu-insights">
-                                    <svg className="reelm-insights-icon" width="12" height="11" viewBox="0 0 12 11" fill="currentColor"><rect x="0" y="6" width="2.5" height="5" rx="1"/><rect x="4.75" y="0" width="2.5" height="11" rx="1"/><rect x="9.5" y="3.5" width="2.5" height="7.5" rx="1"/></svg>
-                                    <span>Insights</span>
-                                    <span className="reelm-name-menu-coming-soon">coming soon</span>
-                                  </div>
+                                  <button
+                                    type="button"
+                                    className="reelm-name-menu-item reelm-name-menu-insights"
+                                    onClick={() => {
+                                      setShowInsightsModal(selectedReelm)
+                                      setShowReelmMenu(null)
+                                    }}
+                                  >
+                                    <div className="reelm-menu-left-row">
+                                      <svg className="reelm-insights-icon" width="13" height="12" viewBox="0 0 12 11" fill="currentColor"><rect x="0" y="6" width="2.5" height="5" rx="1"/><rect x="4.75" y="0" width="2.5" height="11" rx="1"/><rect x="9.5" y="3.5" width="2.5" height="7.5" rx="1"/></svg>
+                                      <span>Insights</span>
+                                    </div>
+                                    <span className="reelm-intel-pill">
+                                      <svg className="reelm-intel-star" width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z"/>
+                                      </svg>
+                                      intelligence
+                                    </span>
+                                  </button>
                                   <div className="reelm-name-menu-divider" />
                                 </>) : null
                               })()}
+                              {((!isDefaultCommunity(selectedReelm) && hasReelmPermissionClient(selectedReelm, uid, 'manageOverview')) || canManageReelmClient(selectedReelm, uid)) && (
+                                <button
+                                  type="button"
+                                  className="reelm-name-menu-item"
+                                  onClick={() => {
+                                    reelmImageInputRef.current?.click()
+                                    setShowReelmMenu(null)
+                                  }}
+                                >
+                                  {selectedReelm.image ? (t('change_reelm_image') || 'Change Reelm image') : (t('add_reelm_image') || 'Add Reelm image')}
+                                </button>
+                              )}
                               {canOpenReelmSettingsClient(selectedReelm, uid) && (
                                 <button className="reelm-name-menu-item" onClick={() => { setShowReelmSettings(true); setShowReelmMenu(null) }}>{t('reelm_settings_menu')}</button>
                               )}
@@ -15611,7 +17090,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               {(() => {
                                 const key = cat.icon || (cat.type === 'announcement' ? 'general' : cat.type === 'text' ? 'text' : cat.type === 'voice' ? 'multimedia' : 'liveaction')
                                 const src = { general: channelGeneralIcon, text: channelTextIcon, multimedia: channelMultimediaIcon, liveaction: channelLiveactionIcon }[key]
-                                return <span className="reelm-category-icon"><img src={src} className="reelm-category-icon-img" alt="" style={{ filter: categoryIconFilter(activeTheme.accent) }} /></span>
+                                return <span className="reelm-category-icon"><MaskIcon src={src} className="reelm-category-icon-img" style={{ width: 14, height: 14 }} /></span>
                               })()}
                               {cat.name}
                             </span>
@@ -17412,13 +18891,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
                       {allNodes.length > 0 ? (
                         <div className="floating-hub-stage floating-hub-stage--magnetic">
-                          {allNodes.length > 2 && (
-                            <div className="magnetic-field-rings" aria-hidden="true">
-                              <div className="magnetic-ring magnetic-ring-1" />
-                              {allNodes.length > 5 && <div className="magnetic-ring magnetic-ring-2" />}
-                              {allNodes.length > 13 && <div className="magnetic-ring magnetic-ring-3" />}
-                            </div>
-                          )}
                           {allNodes.map((node, index) => {
                             const driftClass = `floating-node-drift-${index % 6}`
                             const hasUnread = node.unread > 0
@@ -17962,12 +19434,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         )}
         {showFriendsPopup && (
           <button className="hpopup-float-icon" style={{ right: '120px' }} onClick={toggleFriendsPopup}>
-            <img src={friendsIcon} alt="Friends" className="header-icon" style={{ filter: headerIconThemeFilter(effectiveAccent) }} />
+            <MaskIcon src={friendsIcon} alt="Friends" className="header-icon" />
           </button>
         )}
         {showNotificationsPopup && (
           <button className="hpopup-float-icon" style={{ right: '74px' }} onClick={toggleNotifPopup}>
-            <img src={notificationIcon} alt="Notifications" className="header-icon" style={{ filter: headerIconThemeFilter(effectiveAccent) }} />
+            <MaskIcon src={notificationIcon} alt="Notifications" className="header-icon" />
           </button>
         )}
         {showFriendsPopup && (
@@ -18052,82 +19524,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           </div>
         )}
       </div>
-      {showHelpCenter && (
-        <div className="hc-overlay" onClick={() => setShowHelpCenter(false)}>
-          <div className="hc-modal" onClick={e => e.stopPropagation()}>
-            <div className="hc-header">
-              <span className="hc-title">{getT(language)('help_center')}</span>
-              <button className="hc-close" onClick={() => setShowHelpCenter(false)}>
-                <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                  <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                </svg>
-              </button>
-            </div>
-            {helpStatus === 'sent' ? (
-              <div className="hc-sent">
-                <svg width="36" height="36" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.6"/>
-                  <path d="M7.5 12l3 3 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <p>{getT(language)('feedback_sent')}</p>
-              </div>
-            ) : (
-              <form className="hc-form" onSubmit={async e => {
-                e.preventDefault()
-                if (!helpForm.message.trim()) return
-                setHelpStatus('sending')
-                try {
-                  await feedbackSend(helpForm.name, helpForm.email, helpForm.message)
-                  setHelpStatus('sent')
-                } catch {
-                  setHelpStatus('error')
-                }
-              }}>
-                <div className="hc-row">
-                  <label className="hc-label">{getT(language)('display_name')}</label>
-                  <input
-                    className="hc-input"
-                    type="text"
-                    value={helpForm.name}
-                    onChange={e => setHelpForm(f => ({ ...f, name: e.target.value }))}
-                    placeholder={getT(language)('your_name_ph')}
-                  />
-                </div>
-                <div className="hc-row">
-                  <label className="hc-label">{getT(language)('email')}</label>
-                  <input
-                    className="hc-input"
-                    type="email"
-                    value={helpForm.email}
-                    onChange={e => setHelpForm(f => ({ ...f, email: e.target.value }))}
-                    placeholder={getT(language)('email_placeholder')}
-                  />
-                </div>
-                <div className="hc-row">
-                  <label className="hc-label">{getT(language)('feedback_message')}</label>
-                  <textarea
-                    className="hc-textarea"
-                    value={helpForm.message}
-                    onChange={e => setHelpForm(f => ({ ...f, message: e.target.value }))}
-                    placeholder={getT(language)('feedback_placeholder')}
-                    rows={5}
-                  />
-                </div>
-                {helpStatus === 'error' && (
-                  <p className="hc-error">{getT(language)('feedback_error')}</p>
-                )}
-                <button
-                  type="submit"
-                  className="hc-submit"
-                  disabled={helpStatus === 'sending' || !helpForm.message.trim()}
-                >
-                  {helpStatus === 'sending' ? getT(language)('loading') : getT(language)('send')}
-                </button>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
+
       {remoteControlReq && (
         <div className="remote-ctrl-req-overlay">
           <div className="remote-ctrl-req-card" onClick={e => e.stopPropagation()}>
@@ -18247,7 +19644,17 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                 createSubchannel(selectedReelm.id, channelCtxMenu.catId, channelCtxMenu.chId)
                 setChannelCtxMenu(null)
               }}>+ {t('create_subchannel') || 'Create Subchannel'}</button>
-              <button className="reelm-channel-ctx-item" onClick={() => setChannelCtxMenu(null)}>{t('edit_permissions')}</button>
+              <button className="reelm-channel-ctx-item" onClick={() => {
+                const ch = selectedReelm?.categories?.flatMap(c => c.channels || []).find(c => c.id === channelCtxMenu.chId)
+                setChannelPermissionsTarget({
+                  reelmId: selectedReelm.id,
+                  catId: channelCtxMenu.catId,
+                  chId: channelCtxMenu.chId,
+                  targetName: ch?.name || 'channel',
+                  isCategory: false
+                })
+                setChannelCtxMenu(null)
+              }}>{t('edit_permissions')}</button>
               {channelCtxMenu.chType === 'voice' && (() => {
                 const ctxCh = selectedReelm?.categories.flatMap(c => c.channels).find(c => c.id === channelCtxMenu.chId)
                 const currentCap = ctxCh?.capacity ?? 8
@@ -18282,6 +19689,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           )}
         </div>,
         document.body
+      )}
+      {channelPermissionsTarget && selectedReelm && (
+        <ChannelPermissionsModal
+          reelm={selectedReelm}
+          target={channelPermissionsTarget}
+          onClose={() => setChannelPermissionsTarget(null)}
+          onSave={(updated) => updateReelm(updated)}
+        />
       )}
       {eventCtxMenu && ReactDOM.createPortal(
         <div
@@ -18483,6 +19898,34 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             </div>
           </div>
         </div>
+      )}
+      {showQuickSwitcher && (
+        <QuickSwitcherModal
+          isOpen={showQuickSwitcher}
+          onClose={() => setShowQuickSwitcher(false)}
+          reelms={reelms}
+          chats={chats}
+          friends={friends}
+          onSelectChannel={(r, ch) => {
+            setSelectedReelm(r)
+            setSelectedChannel(ch)
+            setSelectedChat(null)
+            setShowDiscover(false)
+            setShowFriendsPanel(false)
+            setShowSettings(false)
+          }}
+          onSelectChat={(chat) => {
+            setSelectedChat(chat)
+            setSelectedReelm(null)
+            setSelectedChannel(null)
+            setShowDiscover(false)
+            setShowFriendsPanel(false)
+            setShowSettings(false)
+          }}
+          onJoinVoice={(reelmId, channelId, channelName) => {
+            joinVoiceChannel(reelmId, channelId, channelName)
+          }}
+        />
       )}
       {shareTarget && (
         <ShareModal
@@ -19280,12 +20723,14 @@ function App() {
         <Route path="/signin" element={
           isLoggedIn ? <Navigate to="/dashboard" replace /> : (
             <>
-              <div className="auth-shapes" aria-hidden="true">
-                <div className="auth-shape auth-shape-1" />
-                <div className="auth-shape auth-shape-2" />
-                <div className="auth-shape auth-shape-3" />
-                <div className="auth-shape auth-shape-4" />
-                <div className="auth-shape auth-shape-5" />
+              <div className="auth-floating-logos" aria-hidden="true">
+                <div className="auth-floating-logo auth-logo-1"><img src={reelmsLogo} alt="" /></div>
+                <div className="auth-floating-logo auth-logo-2"><img src={reelmsLogo} alt="" /></div>
+                <div className="auth-floating-logo auth-logo-3"><img src={reelmsLogo} alt="" /></div>
+                <div className="auth-floating-logo auth-logo-4"><img src={reelmsLogo} alt="" /></div>
+                <div className="auth-floating-logo auth-logo-5"><img src={reelmsLogo} alt="" /></div>
+                <div className="auth-floating-logo auth-logo-6"><img src={reelmsLogo} alt="" /></div>
+                <div className="auth-floating-logo auth-logo-7"><img src={reelmsLogo} alt="" /></div>
               </div>
               <header className="app-header">
                 <div className="logo-area">
@@ -19299,7 +20744,7 @@ function App() {
                 </div>
               </main>
               <div style={{ position: 'absolute', bottom: '30px', right: '30px', opacity: 0.5, fontSize: '12px', pointerEvents: 'none' }}>
-                Reelm, LLC
+                Sun Intelligence
               </div>
             </>
           )
@@ -19307,12 +20752,14 @@ function App() {
         <Route path="/signup" element={
           isLoggedIn ? <Navigate to="/dashboard" replace /> : (
             <>
-              <div className="auth-shapes" aria-hidden="true">
-                <div className="auth-shape auth-shape-1" />
-                <div className="auth-shape auth-shape-2" />
-                <div className="auth-shape auth-shape-3" />
-                <div className="auth-shape auth-shape-4" />
-                <div className="auth-shape auth-shape-5" />
+              <div className="auth-floating-logos" aria-hidden="true">
+                <div className="auth-floating-logo auth-logo-1"><img src={reelmsLogo} alt="" /></div>
+                <div className="auth-floating-logo auth-logo-2"><img src={reelmsLogo} alt="" /></div>
+                <div className="auth-floating-logo auth-logo-3"><img src={reelmsLogo} alt="" /></div>
+                <div className="auth-floating-logo auth-logo-4"><img src={reelmsLogo} alt="" /></div>
+                <div className="auth-floating-logo auth-logo-5"><img src={reelmsLogo} alt="" /></div>
+                <div className="auth-floating-logo auth-logo-6"><img src={reelmsLogo} alt="" /></div>
+                <div className="auth-floating-logo auth-logo-7"><img src={reelmsLogo} alt="" /></div>
               </div>
               <header className="app-header">
                 <div className="logo-area">
@@ -19326,7 +20773,7 @@ function App() {
                 </div>
               </main>
               <div style={{ position: 'absolute', bottom: '30px', right: '30px', opacity: 0.5, fontSize: '12px', pointerEvents: 'none' }}>
-                Reelm, LLC
+                Sun Intelligence
               </div>
             </>
           )

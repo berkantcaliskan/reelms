@@ -9,6 +9,8 @@ import { verifyIdToken } from '../../modules/auth/authService.js'
 import { APP_PK, chanPk, deleteDoc, getDoc, putDoc, putDocIfAbsent, queryDocs, reelmPk, scanByPkPrefix, scanByPkPrefixAndSk, userPk } from '../../modules/store/docStore.js'
 import { canManageReelm, canUseReelmPermission, getActiveReelmTimeout, getMessageKeyAccess, getReelmChannel, getUserPublicProfile as getStoredPublicProfile, isReelmMember, normalizeEmail, normalizeUsername, publicProfileFromStored } from '../../modules/reelms/access.js'
 import { recordReelmAuditLog, getReelmAuditLogs } from '../../modules/reelms/auditLog.js'
+import { createReelmWebhook, deleteReelmWebhook, getReelmWebhooks, getWebhooksForChannel, findWebhookByIdAndToken, parseGitHubWebhookEvent } from '../../modules/reelms/webhooks.js'
+import { getReelmCommunityInsights, exportInsightsToCsv } from '../../modules/reelms/insights.js'
 import { autoJoinDefaultReelm, DEFAULT_REELM_ID, hasLeftDefaultReelm, setDefaultReelmLeft } from '../../modules/reelms/defaultReelm.js'
 import { isCommunityAdminUid, isSystemAdminUid, resolveCommunityAdminUids } from '../../modules/reelms/communityAdmins.js'
 import { buildUserUploadKey, getObjectStorage } from '../../modules/storage/objectStorage.js'
@@ -20,7 +22,7 @@ const USER_BOOTSTRAP_KEYS = [
   'pinned_items', 'bar_order', 'sounds', 'body_font'
 ]
 
-const PUBLIC_PATHS = [/^\/user\/check-username\//, /^\/user\/check-email\//, /^\/sounds\/list$/]
+const PUBLIC_PATHS = [/^\/user\/check-username\//, /^\/user\/check-email\//, /^\/sounds\/list$/, /^\/webhooks\//]
 
 export function createReelmsDataRouter(io: Server) {
   const router = Router()
@@ -964,6 +966,7 @@ export function createReelmsDataRouter(io: Server) {
     'manageInvites',
     'manageJoinRequests',
     'manageModeration',
+    'viewInsights',
     'manageReelm'
   ] as const
   type ReelmPermissionKey = typeof REELM_PERMISSION_KEYS[number]
@@ -977,6 +980,7 @@ export function createReelmsDataRouter(io: Server) {
     manageInvites: true,
     manageJoinRequests: true,
     manageModeration: true,
+    viewInsights: true,
     manageReelm: true
   }
   const isManagerRole = (role: any) => role?.permissions?.manageReelm === true
@@ -2171,6 +2175,49 @@ export function createReelmsDataRouter(io: Server) {
     } catch { res.status(500).json({ error: 'audit_log_failed' }) }
   })
 
+  router.get('/reelms/:reelmId/insights', async (req, res) => {
+    try {
+      const reelmId = String(req.params.reelmId || '')
+      const uid = String(req.userId || '')
+      if (!uid) return res.status(401).json({ error: 'unauthorized' })
+      const canView = (await canUseReelmPermission(uid, reelmId, 'viewInsights').catch(() => false)) || (await canManageReelm(uid, reelmId).catch(() => false))
+      if (!canView) {
+        return res.status(403).json({ error: 'forbidden' })
+      }
+      const filter = {
+        period: (req.query.period as any) || '30d',
+        startDate: req.query.startDate ? Number(req.query.startDate) : undefined,
+        endDate: req.query.endDate ? Number(req.query.endDate) : undefined,
+      }
+      const data = await getReelmCommunityInsights(reelmId, filter)
+      res.json({ data })
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'insights_failed' })
+    }
+  })
+
+  router.get('/reelms/:reelmId/insights/export', async (req, res) => {
+    try {
+      const reelmId = String(req.params.reelmId || '')
+      const uid = String(req.userId || '')
+      if (!uid) return res.status(401).json({ error: 'unauthorized' })
+      const canView = (await canUseReelmPermission(uid, reelmId, 'viewInsights').catch(() => false)) || (await canManageReelm(uid, reelmId).catch(() => false))
+      if (!canView) {
+        return res.status(403).json({ error: 'forbidden' })
+      }
+      const filter = {
+        period: (req.query.period as any) || '30d',
+      }
+      const data = await getReelmCommunityInsights(reelmId, filter)
+      const csv = exportInsightsToCsv(data)
+      res.setHeader('Content-Type', 'text/csv')
+      res.setHeader('Content-Disposition', `attachment; filename="reelms-insights-${reelmId}.csv"`)
+      res.send(csv)
+    } catch (err: any) {
+      res.status(500).json({ error: err?.message || 'export_failed' })
+    }
+  })
+
   router.get('/reelms/:reelmId/ban-list', async (req, res) => {
     try {
       const reelmId = String(req.params.reelmId || '')
@@ -3201,6 +3248,116 @@ export function createReelmsDataRouter(io: Server) {
       if (access.kind === 'reelm') io.to(`reelm:${access.reelmId}`).emit('reelms:pinned-message', payload)
       res.json({ ok: true, pinnedMessage })
     } catch { res.status(500).json({ error: 'pin_failed' }) }
+  })
+
+  // Webhook management
+  router.get('/reelms/:reelmId/webhooks', async (req, res) => {
+    try {
+      const uid = String(req.userId)
+      const reelmId = String(req.params.reelmId)
+      const canManage = await canUseReelmPermission(uid, reelmId, 'manageChannels').catch(() => false)
+        || await canManageReelm(uid, reelmId).catch(() => false)
+        || await isSystemAdminUid(uid).catch(() => false)
+      if (!canManage) return res.status(403).json({ error: 'forbidden' })
+      const list = await getReelmWebhooks(reelmId)
+      res.json({ webhooks: list })
+    } catch { res.status(500).json({ error: 'get_webhooks_failed' }) }
+  })
+
+  router.get('/reelms/:reelmId/channels/:channelId/webhooks', async (req, res) => {
+    try {
+      const uid = String(req.userId)
+      const reelmId = String(req.params.reelmId)
+      const channelId = String(req.params.channelId)
+      const canManage = await canUseReelmPermission(uid, reelmId, 'manageChannels').catch(() => false)
+        || await canManageReelm(uid, reelmId).catch(() => false)
+        || await isSystemAdminUid(uid).catch(() => false)
+      if (!canManage) return res.status(403).json({ error: 'forbidden' })
+      const list = await getWebhooksForChannel(reelmId, channelId)
+      res.json({ webhooks: list })
+    } catch { res.status(500).json({ error: 'get_webhooks_failed' }) }
+  })
+
+  router.post('/reelms/:reelmId/channels/:channelId/webhooks', async (req, res) => {
+    try {
+      const uid = String(req.userId)
+      const reelmId = String(req.params.reelmId)
+      const channelId = String(req.params.channelId)
+      const canManage = await canUseReelmPermission(uid, reelmId, 'manageChannels').catch(() => false)
+        || await canManageReelm(uid, reelmId).catch(() => false)
+        || await isSystemAdminUid(uid).catch(() => false)
+      if (!canManage) return res.status(403).json({ error: 'forbidden' })
+
+      const actorProfile = await getUserPublicProfile(uid).catch(() => null)
+      const created = await createReelmWebhook(reelmId, channelId, {
+        name: req.body?.name || 'Webhook Bot',
+        avatar: req.body?.avatar || null,
+        createdBy: uid,
+        actorName: actorProfile?.name || 'Moderator'
+      })
+      res.json({ webhook: created })
+    } catch { res.status(500).json({ error: 'create_webhook_failed' }) }
+  })
+
+  router.delete('/reelms/:reelmId/webhooks/:webhookId', async (req, res) => {
+    try {
+      const uid = String(req.userId)
+      const reelmId = String(req.params.reelmId)
+      const webhookId = String(req.params.webhookId)
+      const canManage = await canUseReelmPermission(uid, reelmId, 'manageChannels').catch(() => false)
+        || await canManageReelm(uid, reelmId).catch(() => false)
+        || await isSystemAdminUid(uid).catch(() => false)
+      if (!canManage) return res.status(403).json({ error: 'forbidden' })
+
+      const actorProfile = await getUserPublicProfile(uid).catch(() => null)
+      const deleted = await deleteReelmWebhook(reelmId, webhookId, {
+        id: uid,
+        name: actorProfile?.name || 'Moderator'
+      })
+      res.json({ ok: deleted })
+    } catch { res.status(500).json({ error: 'delete_webhook_failed' }) }
+  })
+
+  // Public webhook execution endpoint (Discord & GitHub payload compatible)
+  router.post(['/webhooks/:webhookId/:token', '/webhooks/:webhookId/:token/github'], async (req, res) => {
+    try {
+      const webhookId = String(req.params.webhookId)
+      const token = String(req.params.token)
+      const found = await findWebhookByIdAndToken(webhookId, token)
+      if (!found || !found.webhook) return res.status(404).json({ error: 'webhook_not_found', message: 'Invalid webhook ID or token' })
+
+      const isGitHub = req.path.endsWith('/github') || !!req.headers['x-github-event']
+      let payload = req.body || {}
+      if (isGitHub) {
+        const ghEvent = String(req.headers['x-github-event'] || 'push')
+        payload = parseGitHubWebhookEvent(ghEvent, req.body)
+      }
+
+      const { webhook } = found
+      const msgKey = `${webhook.reelmId}_${webhook.channelId}`
+      const msgId = `whmsg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
+      const ts = String(Date.now()).padStart(15, '0')
+
+      const message = {
+        id: msgId,
+        text: String(payload.content || payload.text || '').trim(),
+        senderId: webhook.id,
+        senderName: payload.username || webhook.name || 'Webhook',
+        senderPhoto: payload.avatar_url || payload.avatar || webhook.avatar || null,
+        isBot: true,
+        embeds: Array.isArray(payload.embeds) ? payload.embeds : [],
+        time: Date.now(),
+        source: 'webhook'
+      }
+
+      await putDoc(chanPk(msgKey), `MSG#${ts}#${msgId}`, message)
+      io.to(`chan:${msgKey}`).to(`reelm:${webhook.reelmId}`).emit('reelms:message', { msgKey, message })
+
+      res.json({ ok: true, id: msgId, message })
+    } catch (err) {
+      console.error('Webhook execution error:', err)
+      res.status(500).json({ error: 'webhook_execution_failed' })
+    }
   })
 
   router.get('/reactions/:msgKey', async (req, res) => {

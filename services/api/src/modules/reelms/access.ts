@@ -68,6 +68,7 @@ export type ReelmPermissionKey =
   | 'pinMessages'
   | 'createVaporRoom'
   | 'viewAuditLog'
+  | 'viewInsights'
   | 'bypassSlowMode'
   | 'manageReelm'
 
@@ -119,6 +120,47 @@ export async function canUseReelmPermission(uid: string, reelmId: string, permis
 
   const roleIds = new Set((member.roleIds || []).map(String))
   return (roles || []).some((role) => roleIds.has(String(role?.id || '')) && roleHasReelmPermission(role, permission))
+}
+
+export function resolveChannelPermission(
+  uid: string,
+  reelm: any,
+  channel: any,
+  category: any,
+  permission: ReelmPermissionKey | string
+): boolean {
+  if (!uid || !reelm) return false
+  if (String(reelm.ownerId || reelm.meta?.ownerId || '') === uid) return true
+
+  const members = Array.isArray(reelm.members) ? reelm.members : []
+  const member = members.find((m: any) => String(m.userId || m.id) === uid)
+  if (!member) return false
+  const roleIds = new Set((member.roleIds || []).map(String))
+  const roles = (Array.isArray(reelm.roles) ? reelm.roles : []).filter((r: any) => roleIds.has(String(r.id)))
+
+  if (roles.some((r: any) => r?.permissions?.manageReelm === true)) return true
+
+  const overrides = Array.isArray(channel?.permissionOverrides) && channel.permissionOverrides.length > 0
+    ? channel.permissionOverrides
+    : (channel?.syncWithCategory && Array.isArray(category?.permissionOverrides) ? category.permissionOverrides : [])
+
+  const memberOverride = overrides.find((o: any) => o.type === 'member' && String(o.id) === uid)
+  if (memberOverride) {
+    if (memberOverride.deny?.includes(permission)) return false
+    if (memberOverride.allow?.includes(permission)) return true
+  }
+
+  const allowedRoles = overrides.filter((o: any) => o.type === 'role' && roleIds.has(String(o.id)))
+  if (allowedRoles.some((o: any) => o.deny?.includes(permission))) return false
+  if (allowedRoles.some((o: any) => o.allow?.includes(permission))) return true
+
+  const everyoneOverride = overrides.find((o: any) => o.type === 'role' && (o.id === '@everyone' || o.id === 'everyone'))
+  if (everyoneOverride) {
+    if (everyoneOverride.deny?.includes(permission)) return false
+    if (everyoneOverride.allow?.includes(permission)) return true
+  }
+
+  return roles.some((r: any) => roleHasReelmPermission(r, permission as any))
 }
 
 export async function getUserPublicProfile(uid: string) {
