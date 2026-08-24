@@ -19605,125 +19605,133 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           )}
         </div>
         {showMenu && (
-          <div className="menu-backdrop" onClick={() => { setShowMenu(false); setCreateReelmStep(null); setSelectedTemplateId(null) }}>
-            <div className="menu-card-border" onClick={(e) => e.stopPropagation()}>
-              <div className="menu-card">
-                {createReelmStep === 'naming' ? (
-                  <div className="create-reelm-form">
-                    <button className="create-reelm-back" onClick={() => { setCreateReelmStep(null); setSelectedTemplateId(null) }}>
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </button>
-                    <span className="create-reelm-title">Name your Reelm</span>
-                    <input
-                      className="create-reelm-input"
-                      value={reelmNameInput}
-                      onChange={e => setReelmNameInput(e.target.value)}
-                      onKeyDown={e => e.key === 'Enter' && handleCreateReelm()}
-                      placeholder="My Reelm"
-                      autoFocus
-                      maxLength={50}
-                    />
-                    <button
-                      className={`create-reelm-template-trigger${activeTemplate ? ' has-template' : ''}`}
-                      onClick={() => setCreateReelmStep('templates')}
-                    >
-                      {activeTemplate
-                        ? <>{activeTemplate.emoji} <strong>{activeTemplate.name}</strong> · <span style={{ opacity: 0.6 }}>Change</span></>
-                        : '✦ Start from a template'}
-                    </button>
-                    <button
-                      className="create-reelm-btn"
-                      onClick={handleCreateReelm}
-                      disabled={!reelmNameInput.trim()}
-                    >Create</button>
-                  </div>
-                ) : createReelmStep === 'templates' ? (
-                  <div className="create-reelm-form create-reelm-templates-form">
-                    <button className="create-reelm-back" onClick={() => setCreateReelmStep('naming')}>
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </button>
-                    <span className="create-reelm-title">Choose a template</span>
-                    <div className="reelm-template-grid">
-                      {reelmTemplates.map(tpl => (
-                        <button
-                          key={tpl.id}
-                          className={`reelm-template-card${selectedTemplateId === tpl.id ? ' reelm-template-card--active' : ''}`}
-                          onClick={() => { setSelectedTemplateId(tpl.id); setCreateReelmStep('naming') }}
-                        >
-                          <div className="reelm-template-icon">{tpl.emoji}</div>
-                          <div className="reelm-template-name">{tpl.name}</div>
-                          <div className="reelm-template-desc">{tpl.desc}</div>
-                        </button>
-                      ))}
+          <div className="menu-backdrop menu-backdrop--new-actions" onClick={() => { setShowMenu(false); setCreateReelmStep(null); setSelectedTemplateId(null) }}>
+            {createReelmStep ? (
+              <div className="menu-card-border" onClick={(e) => e.stopPropagation()}>
+                <div className="menu-card">
+                  {createReelmStep === 'naming' ? (
+                    <div className="create-reelm-form">
+                      <button className="create-reelm-back" onClick={() => { setCreateReelmStep(null); setSelectedTemplateId(null) }}>
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                          <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                      <span className="create-reelm-title">Name your Reelm</span>
+                      <input
+                        className="create-reelm-input"
+                        value={reelmNameInput}
+                        onChange={e => setReelmNameInput(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleCreateReelm()}
+                        placeholder="My Reelm"
+                        autoFocus
+                        maxLength={50}
+                      />
+                      <button
+                        className={`create-reelm-template-trigger${activeTemplate ? ' has-template' : ''}`}
+                        onClick={() => setCreateReelmStep('templates')}
+                      >
+                        {activeTemplate
+                          ? <>{activeTemplate.emoji} <strong>{activeTemplate.name}</strong> · <span style={{ opacity: 0.6 }}>Change</span></>
+                          : '✦ Start from a template'}
+                      </button>
+                      <button
+                        className="create-reelm-btn"
+                        onClick={handleCreateReelm}
+                        disabled={!reelmNameInput.trim()}
+                      >Create</button>
                     </div>
-                  </div>
-                ) : createReelmStep === 'joining' ? (
-                  <div className="create-reelm-form">
-                    <button className="create-reelm-back" onClick={() => { setCreateReelmStep(null); setJoinError('') }}>
-                      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                        <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </button>
-                    <span className="create-reelm-title">Join a Reelm</span>
-                    <input
-                      className="create-reelm-input"
-                      value={joinCodeInput}
-                      onChange={e => setJoinCodeInput(e.target.value.toUpperCase())}
-                      onKeyDown={e => { if (e.key === 'Enter' && !joining) handleJoinReelm() }}
-                      placeholder="Enter reelm code"
-                      maxLength={12}
-                      autoFocus
-                    />
-                    {joinError && <p className="create-reelm-error">{joinError}</p>}
-                    <button
-                      className="create-reelm-btn"
-                      onClick={handleJoinReelm}
-                      disabled={!joinCodeInput.trim() || joining}
-                    >{joining ? 'Joining…' : 'Join'}</button>
-                  </div>
-                ) : (
-                  <>
-                    <div className="menu-items-row">
-                      <button 
-                        className="menu-item-with-icon"
-                        onClick={() => handleMenuItemClick('createReelm')}
-                      >
-                        <img src={feedIcon} alt="Create Reelm" className="menu-item-icon menu-item-icon-create" />
-                        <span>Create a Reelm</span>
+                  ) : createReelmStep === 'templates' ? (
+                    <div className="create-reelm-form create-reelm-templates-form">
+                      <button className="create-reelm-back" onClick={() => setCreateReelmStep('naming')}>
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                          <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
                       </button>
-                      <button 
-                        className="menu-item-with-icon"
-                        onClick={() => handleMenuItemClick('joinReelm')}
-                      >
-                        <img src={readyreelmIcon} alt="Join Reelm" className="menu-item-icon menu-item-icon-join" />
-                        <span>Join a Reelm</span>
-                      </button>
+                      <span className="create-reelm-title">Choose a template</span>
+                      <div className="reelm-template-grid">
+                        {reelmTemplates.map(tpl => (
+                          <button
+                            key={tpl.id}
+                            className={`reelm-template-card${selectedTemplateId === tpl.id ? ' reelm-template-card--active' : ''}`}
+                            onClick={() => { setSelectedTemplateId(tpl.id); setCreateReelmStep('naming') }}
+                          >
+                            <div className="reelm-template-icon">{tpl.emoji}</div>
+                            <div className="reelm-template-name">{tpl.name}</div>
+                            <div className="reelm-template-desc">{tpl.desc}</div>
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                    
-                    <div className="menu-items-row">
-                      <button 
-                        className="menu-item-with-icon"
-                        onClick={() => handleMenuItemClick('startChat')}
-                      >
-                        <img src={newdmIcon} alt="Start a chat" className="menu-item-icon menu-item-icon-newdm" />
-                        <span>Start a chat</span>
+                  ) : createReelmStep === 'joining' ? (
+                    <div className="create-reelm-form">
+                      <button className="create-reelm-back" onClick={() => { setCreateReelmStep(null); setJoinError('') }}>
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                          <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
                       </button>
-                      <button 
-                        className="menu-item-with-icon"
-                        onClick={() => handleMenuItemClick('startGroupChat')}
-                      >
-                        <img src={newgroupIcon} alt="Start a group chat" className="menu-item-icon menu-item-icon-newgroup" />
-                        <span>Start a group chat</span>
-                      </button>
+                      <span className="create-reelm-title">Join a Reelm</span>
+                      <input
+                        className="create-reelm-input"
+                        value={joinCodeInput}
+                        onChange={e => setJoinCodeInput(e.target.value.toUpperCase())}
+                        onKeyDown={e => { if (e.key === 'Enter' && !joining) handleJoinReelm() }}
+                        placeholder="Enter reelm code"
+                        maxLength={12}
+                        autoFocus
+                      />
+                      {joinError && <p className="create-reelm-error">{joinError}</p>}
+                      <button
+                        className="create-reelm-btn"
+                        onClick={handleJoinReelm}
+                        disabled={!joinCodeInput.trim() || joining}
+                      >{joining ? 'Joining…' : 'Join'}</button>
                     </div>
-                  </>
-                )}
+                  ) : null}
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="new-actions-strip" onClick={(e) => e.stopPropagation()}>
+                <button
+                  className="new-action-card"
+                  onClick={() => handleMenuItemClick('createReelm')}
+                >
+                  <div className="new-action-icon-circle">
+                    <img src={feedIcon} alt="" className="new-action-icon new-action-icon--create" />
+                  </div>
+                  <span className="new-action-title">Create a Reelm</span>
+                </button>
+
+                <button
+                  className="new-action-card"
+                  onClick={() => handleMenuItemClick('joinReelm')}
+                >
+                  <div className="new-action-icon-circle">
+                    <img src={readyreelmIcon} alt="" className="new-action-icon new-action-icon--join" />
+                  </div>
+                  <span className="new-action-title">Join a Reelm</span>
+                </button>
+
+                <button
+                  className="new-action-card"
+                  onClick={() => handleMenuItemClick('startChat')}
+                >
+                  <div className="new-action-icon-circle">
+                    <img src={newdmIcon} alt="" className="new-action-icon new-action-icon--dm" />
+                  </div>
+                  <span className="new-action-title">Start a chat</span>
+                </button>
+
+                <button
+                  className="new-action-card"
+                  onClick={() => handleMenuItemClick('startGroupChat')}
+                >
+                  <div className="new-action-icon-circle">
+                    <img src={newgroupIcon} alt="" className="new-action-icon new-action-icon--group" />
+                  </div>
+                  <span className="new-action-title">Start a group chat</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
         {showGroupCreator === 'friends' && (
