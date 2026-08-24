@@ -3209,9 +3209,18 @@ ${posts.length ? `<ul>${posts.map(p => { const raw = (p.text || p.content || '')
     onLogOut()
   }
 
-  const memberSinceFormatted = user.createdAt
-    ? new Date(user.createdAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })
-    : 'Recently Joined'
+  const memberSinceFormatted = (() => {
+    const raw = user?.createdAt || user?.created_at || user?.registeredAt
+    if (!raw) return t('recently_joined') || 'Recently Joined'
+    const ts = typeof raw === 'number' && raw < 1e12 ? raw * 1000 : (typeof raw === 'string' && !isNaN(Number(raw)) ? Number(raw) : raw)
+    const date = new Date(ts)
+    if (isNaN(date.getTime())) return t('recently_joined') || 'Recently Joined'
+    return date.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    })
+  })()
 
   return (
     <div className="accs-panel">
@@ -3253,14 +3262,9 @@ ${posts.length ? `<ul>${posts.map(p => { const raw = (p.text || p.content || '')
       {/* 3. Member Since */}
       <div className="accs-section">
         <div className="accs-section-title">{t('member_since') || 'Member Since'}</div>
-        <div className="accs-info-box">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" className="accs-info-icon">
-            <rect x="3" y="4" width="18" height="18" rx="2" stroke="currentColor" strokeWidth="2"/>
-            <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" strokeWidth="2"/>
-            <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" strokeWidth="2"/>
-            <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" strokeWidth="2"/>
-          </svg>
-          <span className="accs-info-val">{memberSinceFormatted}</span>
+        <div className="accs-member-since-display">
+          <span className="accs-member-cake-icon">🎂</span>
+          <span className="accs-member-since-date">{memberSinceFormatted}</span>
         </div>
       </div>
 

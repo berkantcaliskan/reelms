@@ -21426,23 +21426,26 @@ button, input, select, textarea,
 }
 
 /* ── Your Account New Layout Elements ── */
-.accs-info-box {
+.accs-member-since-display {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: rgba(var(--ta-rgb), 0.08);
-  border: 1px solid rgba(var(--ta-rgb), 0.15);
-  border-radius: 8px;
-  padding: 10px 14px;
+  padding: 4px 0 2px;
 }
-.accs-info-icon {
+.accs-member-cake-icon {
+  font-size: 1.45rem;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transform: translateY(-1px);
+}
+.accs-member-since-date {
+  font-family: 'Karla', sans-serif;
+  font-size: 1.12rem;
+  font-weight: 800;
   color: var(--ta);
-  opacity: 0.85;
-}
-.accs-info-val {
-  font-size: 0.88rem;
-  font-weight: 700;
-  color: #fff;
+  letter-spacing: -0.015em;
 }
 .accs-status-card {
   background: rgba(34, 197, 94, 0.06);
@@ -21578,19 +21581,6 @@ button, input, select, textarea,
   color: #1c1917 !important;
 }
 
-.theme-light .accs-info-box {
-  background: rgba(44, 37, 34, 0.06) !important;
-  border-color: rgba(44, 37, 34, 0.18) !important;
-}
-
-.theme-light .accs-info-val {
-  color: #1c1917 !important;
-  font-weight: 700 !important;
-}
-
-.theme-light .accs-info-icon {
-  color: #1c1917 !important;
-}
 
 .theme-light .accs-status-card {
   background: rgba(34, 197, 94, 0.1) !important;
