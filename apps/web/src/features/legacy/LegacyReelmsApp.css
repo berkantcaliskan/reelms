@@ -308,29 +308,38 @@ h6 {
 .hpopup {
   position: fixed;
   top: 16px;
-  width: 290px;
+  width: 300px;
+  max-width: calc(100vw - 24px);
   background: rgba(var(--ta-rgb), 0.18);
   -webkit-backdrop-filter: blur(48px) saturate(2.2);
   backdrop-filter: blur(48px) saturate(2.2);
   border: 1px solid rgba(var(--ta-rgb), 0.14);
   border-radius: 24px;
   z-index: 150;
-  overflow: hidden;
+  overflow: hidden !important;
+  overflow-x: hidden !important;
   display: flex;
   flex-direction: column;
   animation: hpopup-in 0.26s cubic-bezier(0.34, 1.4, 0.64, 1) both;
   transform-origin: top right;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255,255,255,0.05);
+  box-sizing: border-box;
 }
 
 .hpopup-friends { right: 108px; }
-.hpopup-notifs  { right: 62px; }
+.hpopup-notifs  {
+  right: 62px;
+  width: min(340px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+}
 
 .hpopup-top-row {
   display: flex;
   align-items: flex-end;
   padding: 20px 20px 14px 20px;
   flex-shrink: 0;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .hpopup-title {
@@ -345,6 +354,10 @@ h6 {
   display: flex;
   flex-direction: column;
   gap: 2px;
+  overflow-x: hidden !important;
+  overflow-y: auto !important;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .hpopup-empty {
@@ -363,6 +376,9 @@ h6 {
   border-radius: 14px;
   transition: background 0.15s;
   cursor: pointer;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
 }
 
 .hpopup-row:hover {
@@ -386,6 +402,9 @@ h6 {
 .hpopup-name {
   font-size: 0.88rem;
   color: rgba(230, 210, 200, 0.85);
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: break-word;
 }
 
 .hpopup-footer {
@@ -1174,7 +1193,8 @@ h6 {
   flex-direction: column;
   align-items: stretch;
   justify-content: flex-start;
-  overflow-y: auto;
+  overflow: hidden !important;
+  height: 100% !important;
 }
 
 /* ==========================================================================
@@ -1187,10 +1207,11 @@ h6 {
   align-items: center;
   justify-content: center;
   width: 100%;
-  height: 100%;
-  padding: 32px 24px;
+  height: 100% !important;
+  max-height: 100% !important;
+  padding: 24px 16px;
   position: relative;
-  overflow-y: auto;
+  overflow: hidden !important;
   box-sizing: border-box;
   user-select: none;
 }

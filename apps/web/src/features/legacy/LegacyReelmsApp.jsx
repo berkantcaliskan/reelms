@@ -10960,14 +10960,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }
 
   const handleSelectReelm = (reelm) => {
-    setSelectedReelm(reelm)
+    const full = (reelmsRef.current || []).find(r => String(r.id) === String(reelm?.id)) || reelm
+    setSelectedReelm(full)
     setSelectedChat(null)
     setShowDiscover(false)
     setShowFriendsPanel(false)
     setShowSettings(false)
     setShowChatList(false)
     setReelmLoading(true)
-    setTimeout(() => setReelmLoading(false), 350)
+    setTimeout(() => setReelmLoading(false), 200)
+    if (full?.id) {
+      hydrateReelmCore(full.id).then(r => r && mergeReelmIntoState(r)).catch(() => {})
+    }
     if (reelmLandingView === 'feed') {
       setShowFeed(true)
       setFeedTab('feed')
@@ -13232,6 +13236,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const mergeReelmIntoState = (nextReelm, { persist = false } = {}) => {
     if (!nextReelm?.id) return
+    setSelectedReelm(prev => (prev && String(prev.id) === String(nextReelm.id) ? { ...prev, ...nextReelm } : prev))
     setReelms(prev => {
       const next = prev.some(r => String(r.id) === String(nextReelm.id))
         ? prev.map(r => {
@@ -14815,20 +14820,22 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }
 
   const renderReelmMembersPanel = (panelKey = 'reelm') => {
-    if (!selectedReelm) return null
-    let members = selectedReelm.members || []
-    if (members.length === 0) return null
+    const activeReelm = (reelms || []).find(r => String(r.id) === String(selectedReelm?.id)) || selectedReelm
+    if (!activeReelm) return null
+    let members = Array.isArray(activeReelm.members) && activeReelm.members.length > 0
+      ? activeReelm.members
+      : (currentUser && uid ? [{ userId: uid, userName: currentUser.name || 'User', userPhoto: currentUser.photo || null }] : [])
     let showCitizenNotice = false
-    if (isDefaultCommunity(selectedReelm)) {
+    if (isDefaultCommunity(activeReelm)) {
       const myMember = members.find(m => String(m.userId) === String(uid))
-      if (getCommunityMemberLevel(selectedReelm, myMember) === 'citizen') {
-        members = members.filter(m => String(m.userId) === String(uid) || getCommunityMemberLevel(selectedReelm, m) !== 'citizen')
+      if (getCommunityMemberLevel(activeReelm, myMember) === 'citizen') {
+        members = members.filter(m => String(m.userId) === String(uid) || getCommunityMemberLevel(activeReelm, m) !== 'citizen')
         showCitizenNotice = true
       }
     }
-    const presence = reelmPresence[selectedReelm.id] || {}
+    const presence = reelmPresence[activeReelm.id] || {}
     const { groups, getMemberPresence, getMemberStatus } = buildReelmMemberGroupsClient({
-      reelm: selectedReelm,
+      reelm: activeReelm,
       members,
       presence,
       currentUser,
@@ -14836,7 +14843,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       profileStatus,
       getPresenceForUser,
     })
-    const orderedPanelRoles = getOrderedReelmRolesClient(selectedReelm)
+    const orderedPanelRoles = getOrderedReelmRolesClient(activeReelm)
     const getPrimaryPanelRole = (m) => {
       const roleIds = new Set(getMemberRoleIdsClient(m).map(String))
       return orderedPanelRoles.find(role => roleIds.has(String(role.id))) || null
