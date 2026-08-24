@@ -596,8 +596,7 @@ function LegacyAuthDownloadCta({ compact = false }) {
   const t = useT()
   return (
     <div className={`legacy-auth-download-cta${compact ? ' legacy-auth-download-cta--compact' : ''} su-drop su-drop-5`}>
-      <span className="legacy-auth-download-cta__text">{t('auth_download_cta_text') || 'Continue with the same account across all your devices.'}</span>
-      <DesktopDownloadButton variant="auth" size="sm">{t('download_app') || 'Download Reelms'}</DesktopDownloadButton>
+      <DesktopDownloadButton variant="auth-text" size="sm">{t('download_app') || 'Download Reelms'}</DesktopDownloadButton>
     </div>
   )
 }

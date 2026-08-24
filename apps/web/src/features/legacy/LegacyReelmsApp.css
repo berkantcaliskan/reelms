@@ -752,8 +752,7 @@ h6 {
   color: var(--ta);
   font-weight: 700;
   cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  text-decoration: none !important;
 }
 
 .signup-link span:hover {
@@ -15552,62 +15551,50 @@ button, input, select, textarea,
   opacity: 1;
 }
 
-/* Reelms desktop setup CTA on legacy auth screens.
-   Kept intentionally small so the original centered auth design stays the skeleton. */
+/* Reelms desktop setup CTA on legacy auth screens. */
 .legacy-auth-download-cta {
   width: min(420px, 100%);
-  margin: 18px auto 0;
+  margin: 14px auto 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  flex-wrap: wrap;
   text-align: center;
 }
 
 .legacy-auth-download-cta--compact {
-  margin-top: 18px;
+  margin-top: 14px;
 }
 
-.legacy-auth-download-cta__text {
-  max-width: 230px;
-  color: rgba(var(--ta-rgb), 0.5);
+.desktop-download-button--auth-text {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  background: transparent !important;
+  border: none !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  padding: 0 !important;
+  min-height: auto !important;
   font-family: 'Karla', sans-serif !important;
-  font-size: 0.76rem;
-  line-height: 1.45;
+  font-size: 0.82rem !important;
+  font-weight: 600 !important;
+  color: rgba(var(--ta-rgb), 0.5) !important;
+  text-decoration: none !important;
+  cursor: pointer !important;
+  transition: color 0.15s ease !important;
 }
 
-.desktop-download-button--auth {
-  min-height: 36px;
-  padding: 0 14px;
-  color: var(--ta);
-  font-family: 'Karla', sans-serif !important;
-  font-size: 0.78rem;
-  font-weight: 700;
-  letter-spacing: 0;
-  background:
-    linear-gradient(135deg, rgba(24, 22, 24, 0.76), rgba(255, 255, 255, 0.045)),
-    rgba(255, 255, 255, 0.035);
-  border: 1px solid rgba(var(--ta-rgb), 0.24);
-  box-shadow:
-    0 14px 38px rgba(0, 0, 0, 0.24),
-    inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(14px) brightness(0.92);
-  -webkit-backdrop-filter: blur(14px) brightness(0.92);
+.desktop-download-button--auth-text .desktop-download-button__pulse {
+  display: none !important;
 }
 
-.desktop-download-button--auth:hover {
-  color: #f1d5c2;
-  border-color: rgba(62, 207, 184, 0.46);
-  transform: translateY(-1px);
-  box-shadow:
-    0 18px 46px rgba(62, 207, 184, 0.11),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
-}
-
-.desktop-download-button--auth .desktop-download-button__pulse {
-  background: #3ecfb8;
-  box-shadow: 0 0 14px rgba(62, 207, 184, 0.72);
+.desktop-download-button--auth-text:hover {
+  color: var(--ta) !important;
+  transform: none !important;
+  box-shadow: none !important;
+  text-decoration: none !important;
 }
 
 .desktop-download-button--pending .desktop-download-button__pulse {
