@@ -4982,6 +4982,9 @@ function VirtualMessageList({
 
   const isNearBottomRef = useRef(true)
   const lastMsgCountRef = useRef(msgs.length)
+  const [swipingMsgId, setSwipingMsgId] = useState(null)
+  const [swipeOffset, setSwipeOffset] = useState(0)
+  const msgTouchStartRef = useRef({ x: 0, y: 0 })
 
   const handleScroll = useCallback(() => {
     const el = msgListRef.current
@@ -5042,6 +5045,8 @@ function VirtualMessageList({
           ))
         )
 
+        const isSwipingThis = swipingMsgId === msg.id
+
         return (
           <React.Fragment key={msg.id || `msg-${index}`}>
             {showDateSep && <div className="bubble-date-sep"><span>{msgDateLabel}</span></div>}
@@ -5051,32 +5056,83 @@ function VirtualMessageList({
                 <span className="msg-system-time">{formatTime(msg.time)}</span>
               </div>
             ) : !isBubbleMode ? (
-              <div
-                className={`msg-row${msg.id === newMsgId ? ' msg-row-new' : ''}${isMod ? ' msg-row-mod' : ''}${blocked.some(b => b.id === sender.id) ? ' msg-row-blocked' : ''}`}
-                onDoubleClick={() => !selectedChatSystemLocked && setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id })}
-                onContextMenu={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  if (!selectedChatSystemLocked) {
-                    setMsgCtxMenu({
-                      x: Math.min(e.clientX, window.innerWidth - 160),
-                      y: Math.min(e.clientY, window.innerHeight - 120),
-                      msgId: msg.id,
-                      chatKey: msgKey2,
-                      canDelete: canDeleteMsg,
-                      canPin: canPinInChannel,
-                      isPinned,
-                      msgData,
-                      isOwn,
-                      msgText: msg.text || '',
-                      replyInfo: { id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id }
-                    })
-                  }
-                }}
-                onTouchStart={(e) => handleMsgTouchStart(e, msg, msgKey2, canDeleteMsg, isOwn, canPinInChannel, isPinned)}
-                onTouchMove={handleMsgTouchMove}
-                onTouchEnd={handleMsgTouchEnd}
-              >
+              <div className="msg-row-wrap" style={{ position: 'relative', overflow: 'visible' }}>
+                {isSwipingThis && swipeOffset > 10 && (
+                  <div
+                    className="msg-swipe-reply-icon"
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: '50%',
+                      transform: `translateY(-50%) scale(${Math.min(1, swipeOffset / 32)})`,
+                      opacity: Math.min(1, swipeOffset / 28),
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 28,
+                      height: 28,
+                      borderRadius: '50%',
+                      background: 'rgba(var(--ta-rgb), 0.15)',
+                      color: 'var(--ta)',
+                      zIndex: 2
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="9 17 4 12 9 7"/>
+                      <path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
+                    </svg>
+                  </div>
+                )}
+                <div
+                  className={`msg-row${msg.id === newMsgId ? ' msg-row-new' : ''}${isMod ? ' msg-row-mod' : ''}${blocked.some(b => b.id === sender.id) ? ' msg-row-blocked' : ''}`}
+                  style={isSwipingThis ? { transform: `translateX(${swipeOffset}px)`, transition: 'none' } : { transition: 'transform 0.18s ease' }}
+                  onDoubleClick={() => !selectedChatSystemLocked && setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id })}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    if (!selectedChatSystemLocked) {
+                      setMsgCtxMenu({
+                        x: Math.min(e.clientX, window.innerWidth - 160),
+                        y: Math.min(e.clientY, window.innerHeight - 120),
+                        msgId: msg.id,
+                        chatKey: msgKey2,
+                        canDelete: canDeleteMsg,
+                        canPin: canPinInChannel,
+                        isPinned,
+                        msgData,
+                        isOwn,
+                        msgText: msg.text || '',
+                        replyInfo: { id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id }
+                      })
+                    }
+                  }}
+                  onTouchStart={(e) => {
+                    const t = e.touches[0]
+                    if (t) msgTouchStartRef.current = { x: t.clientX, y: t.clientY }
+                    handleMsgTouchStart(e, msg, msgKey2, canDeleteMsg, isOwn, canPinInChannel, isPinned)
+                  }}
+                  onTouchMove={(e) => {
+                    handleMsgTouchMove(e)
+                    if (selectedChatSystemLocked) return
+                    const t = e.touches[0]
+                    if (!t) return
+                    const dx = t.clientX - msgTouchStartRef.current.x
+                    const dy = Math.abs(t.clientY - msgTouchStartRef.current.y)
+                    if (dx > 8 && dx > dy * 1.2) {
+                      setSwipingMsgId(msg.id)
+                      setSwipeOffset(Math.min(dx * 0.7, 56))
+                    }
+                  }}
+                  onTouchEnd={() => {
+                    handleMsgTouchEnd()
+                    if (swipingMsgId === msg.id && swipeOffset >= 34) {
+                      if (navigator.vibrate) try { navigator.vibrate(25) } catch {}
+                      setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id })
+                    }
+                    setSwipingMsgId(null)
+                    setSwipeOffset(0)
+                  }}
+                >
                 <div className="msg-avatar">
                   {(sender.photo || sender.image)
                     ? <img src={sender.photo || sender.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
@@ -5163,116 +5219,169 @@ function VirtualMessageList({
                   )}
                 </div>
               </div>
+            </div>
             ) : (
-              <div
-                className={`bubble-row${isOwn ? ' bubble-row--own' : ' bubble-row--other'}${msg.id === newMsgId ? ' msg-row-new' : ''}`}
-                onDoubleClick={() => !selectedChatSystemLocked && setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id })}
-                onContextMenu={(e) => {
-                  e.preventDefault()
-                  e.stopPropagation()
-                  if (!selectedChatSystemLocked) {
-                    setMsgCtxMenu({
-                      x: Math.min(e.clientX, window.innerWidth - 160),
-                      y: Math.min(e.clientY, window.innerHeight - 120),
-                      msgId: msg.id,
-                      chatKey: msgKey2,
-                      canDelete: canDeleteMsg,
-                      canPin: canPinInChannel,
-                      isPinned,
-                      msgData,
-                      isOwn,
-                      msgText: msg.text || '',
-                      replyInfo: { id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id }
-                    })
-                  }
-                }}
-                onTouchStart={(e) => handleMsgTouchStart(e, msg, msgKey2, canDeleteMsg, isOwn, canPinInChannel, isPinned)}
-                onTouchMove={handleMsgTouchMove}
-                onTouchEnd={handleMsgTouchEnd}
-              >
-                {!isOwn && (
-                  <div className="bubble-avatar bubble-avatar--clickable" onClick={e => sender.id && openFriendProfile({ id: sender.id, name: sender.name, photo: sender.photo || sender.image || null }, e)}>
-                    {(sender.photo || sender.image)
-                      ? <img src={sender.photo || sender.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-                      : (sender.name || '?').charAt(0).toUpperCase()
-                    }
+              <div className="msg-row-wrap" style={{ position: 'relative', overflow: 'visible' }}>
+                {isSwipingThis && swipeOffset > 10 && (
+                  <div
+                    className="msg-swipe-reply-icon"
+                    style={{
+                      position: 'absolute',
+                      left: 0,
+                      top: '50%',
+                      transform: `translateY(-50%) scale(${Math.min(1, swipeOffset / 32)})`,
+                      opacity: Math.min(1, swipeOffset / 28),
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      width: 28,
+                      height: 28,
+                      borderRadius: '50%',
+                      background: 'rgba(var(--ta-rgb), 0.15)',
+                      color: 'var(--ta)',
+                      zIndex: 2
+                    }}
+                  >
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="9 17 4 12 9 7"/>
+                      <path d="M20 18v-2a4 4 0 0 0-4-4H4"/>
+                    </svg>
                   </div>
                 )}
-                <div className="bubble-content">
-                  {!isOwn && selectedChat?.type === 'group' && <span className="bubble-sender-name">{sender.name}</span>}
-                  <div className="bubble-and-time">
-                    {msg.mediaUrl && (msg.mediaType === 'gif' || msg.mediaType === 'sticker') && !msg.text ? (
-                      <img src={msg.mediaUrl} alt="" className={msg.mediaType === 'sticker' ? 'msg-sticker-img' : 'msg-gif-img'} />
-                    ) : msg.mediaUrl && msg.mediaType === 'image' && !msg.text && !msg.fileUrl ? (
-                      <img src={msg.mediaUrl} alt="" className="msg-media-img" onClick={() => setLightboxImg(msg.mediaUrl)} style={{ cursor: 'pointer' }} />
-                    ) : (
-                    <div className={`bubble${isOwn ? ' bubble--own' : ' bubble--other'}`}>
-                      {msg.replyTo && (
-                        <div className="msg-reply-quote msg-reply-quote--bubble">
-                          <span className="msg-reply-quote-name">{msg.replyTo.senderName}</span>
-                          <span className="msg-reply-quote-text">{msg.replyTo.text ? msg.replyTo.text.slice(0, 120) : '📎'}</span>
-                        </div>
-                      )}
-                      {msg.text && (
-                        <span className="bubble-text">
-                          {renderRichMessage(msg.richText || msg.text, uid, selectedReelm?.members, selectedReelm?.roles, !!msg.richText)}
-                          {(msg.isEdited || msg.editedAt) && <span className="msg-edited-tag">({t ? t('edited') : 'Düzenlendi'})</span>}
-                        </span>
-                      )}
-                      {msg.mediaUrl && msg.mediaType === 'image' && (
-                        <SpoilerMedia isSpoiler={Boolean(msg.isSpoiler || msg.mediaSpoiler)} mediaType="image">
-                          <img src={msg.mediaUrl} alt="" className="msg-media-img" onClick={() => setLightboxImg(msg.mediaUrl)} />
-                        </SpoilerMedia>
-                      )}
-                      {msg.mediaUrl && msg.mediaType === 'video' && (
-                        <SpoilerMedia isSpoiler={Boolean(msg.isSpoiler || msg.mediaSpoiler)} mediaType="video">
-                          <video src={msg.mediaUrl} className="msg-media-video" controls />
-                        </SpoilerMedia>
-                      )}
-                      {msg.mediaUrl && msg.mediaType === 'audio' && <VoiceMessage src={msg.mediaUrl} />}
-                      {msg.mediaUrl && (msg.mediaType === 'gif' || msg.mediaType === 'sticker') && (
-                        <SpoilerMedia isSpoiler={Boolean(msg.isSpoiler || msg.mediaSpoiler)} mediaType={msg.mediaType}>
-                          <img src={msg.mediaUrl} alt="" className={msg.mediaType === 'sticker' ? 'msg-sticker-img' : 'msg-gif-img'} />
-                        </SpoilerMedia>
-                      )}
-                      {msg.fileUrl && (
-                        <a href={msg.fileUrl} download={msg.fileName} className="msg-doc-card">
-                          <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                          <div className="msg-doc-info"><span className="msg-doc-name">{msg.fileName}</span></div>
-                        </a>
-                      )}
+                <div
+                  className={`bubble-row${isOwn ? ' bubble-row--own' : ' bubble-row--other'}${msg.id === newMsgId ? ' msg-row-new' : ''}`}
+                  style={isSwipingThis ? { transform: `translateX(${swipeOffset}px)`, transition: 'none' } : { transition: 'transform 0.18s ease' }}
+                  onDoubleClick={() => !selectedChatSystemLocked && setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id })}
+                  onContextMenu={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    if (!selectedChatSystemLocked) {
+                      setMsgCtxMenu({
+                        x: Math.min(e.clientX, window.innerWidth - 160),
+                        y: Math.min(e.clientY, window.innerHeight - 120),
+                        msgId: msg.id,
+                        chatKey: msgKey2,
+                        canDelete: canDeleteMsg,
+                        canPin: canPinInChannel,
+                        isPinned,
+                        msgData,
+                        isOwn,
+                        msgText: msg.text || '',
+                        replyInfo: { id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id }
+                      })
+                    }
+                  }}
+                  onTouchStart={(e) => {
+                    const t = e.touches[0]
+                    if (t) msgTouchStartRef.current = { x: t.clientX, y: t.clientY }
+                    handleMsgTouchStart(e, msg, msgKey2, canDeleteMsg, isOwn, canPinInChannel, isPinned)
+                  }}
+                  onTouchMove={(e) => {
+                    handleMsgTouchMove(e)
+                    if (selectedChatSystemLocked) return
+                    const t = e.touches[0]
+                    if (!t) return
+                    const dx = t.clientX - msgTouchStartRef.current.x
+                    const dy = Math.abs(t.clientY - msgTouchStartRef.current.y)
+                    if (dx > 8 && dx > dy * 1.2) {
+                      setSwipingMsgId(msg.id)
+                      setSwipeOffset(Math.min(dx * 0.7, 56))
+                    }
+                  }}
+                  onTouchEnd={() => {
+                    handleMsgTouchEnd()
+                    if (swipingMsgId === msg.id && swipeOffset >= 34) {
+                      if (navigator.vibrate) try { navigator.vibrate(25) } catch {}
+                      setReplyingTo({ id: msg.id, text: msg.text || '', senderName: sender.name, senderId: sender.id })
+                    }
+                    setSwipingMsgId(null)
+                    setSwipeOffset(0)
+                  }}
+                >
+                  {!isOwn && (
+                    <div className="bubble-avatar bubble-avatar--clickable" onClick={e => sender.id && openFriendProfile({ id: sender.id, name: sender.name, photo: sender.photo || sender.image || null }, e)}>
+                      {(sender.photo || sender.image)
+                        ? <img src={sender.photo || sender.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                        : (sender.name || '?').charAt(0).toUpperCase()
+                      }
                     </div>
-                    )}
-                    {!selectedChatSystemLocked && <div className="msg-react-ctrl">
-                      <button className="msg-react-btn msg-react-plus" title="+1" onClick={() => toggleReaction(msgKey2, msg.id, '+')}><img src={newIcon} alt="+" style={{ width: '12px', height: '12px', display: 'block', opacity: 0.65 }} /></button>
-                      <div className="msg-react-emoji-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
-                        <button className="msg-react-btn" title="Tepki ekle" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowMsgEmojiFor(f => f?.msgId === String(msg.id) ? null : { msgKey: msgKey2, msgId: String(msg.id) }) }}>
-                          <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><path d="M8 14s1.5 2 4 2 4-2 4-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="9" cy="10" r="1" fill="currentColor"/><circle cx="15" cy="10" r="1" fill="currentColor"/></svg>
-                        </button>
-                        {showMsgEmojiFor?.msgId === String(msg.id) && (
-                          <div className="msg-emoji-picker-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
-                            <EmojiPickerReact emojiStyle={EmojiStyle.APPLE} height={320} width={280} searchDisabled previewConfig={{ showPreview: false }} onEmojiClick={d => toggleReaction(msgKey2, msg.id, d.emoji)} />
+                  )}
+                  <div className="bubble-content">
+                    {!isOwn && selectedChat?.type === 'group' && <span className="bubble-sender-name">{sender.name}</span>}
+                    <div className="bubble-and-time">
+                      {msg.mediaUrl && (msg.mediaType === 'gif' || msg.mediaType === 'sticker') && !msg.text ? (
+                        <img src={msg.mediaUrl} alt="" className={msg.mediaType === 'sticker' ? 'msg-sticker-img' : 'msg-gif-img'} />
+                      ) : msg.mediaUrl && msg.mediaType === 'image' && !msg.text && !msg.fileUrl ? (
+                        <img src={msg.mediaUrl} alt="" className="msg-media-img" onClick={() => setLightboxImg(msg.mediaUrl)} style={{ cursor: 'pointer' }} />
+                      ) : (
+                      <div className={`bubble${isOwn ? ' bubble--own' : ' bubble--other'}`}>
+                        {msg.replyTo && (
+                          <div className="msg-reply-quote msg-reply-quote--bubble">
+                            <span className="msg-reply-quote-name">{msg.replyTo.senderName}</span>
+                            <span className="msg-reply-quote-text">{msg.replyTo.text ? msg.replyTo.text.slice(0, 120) : '📎'}</span>
                           </div>
                         )}
+                        {msg.text && (
+                          <span className="bubble-text">
+                            {renderRichMessage(msg.richText || msg.text, uid, selectedReelm?.members, selectedReelm?.roles, !!msg.richText)}
+                            {(msg.isEdited || msg.editedAt) && <span className="msg-edited-tag">({t ? t('edited') : 'Düzenlendi'})</span>}
+                          </span>
+                        )}
+                        {msg.mediaUrl && msg.mediaType === 'image' && (
+                          <SpoilerMedia isSpoiler={Boolean(msg.isSpoiler || msg.mediaSpoiler)} mediaType="image">
+                            <img src={msg.mediaUrl} alt="" className="msg-media-img" onClick={() => setLightboxImg(msg.mediaUrl)} />
+                          </SpoilerMedia>
+                        )}
+                        {msg.mediaUrl && msg.mediaType === 'video' && (
+                          <SpoilerMedia isSpoiler={Boolean(msg.isSpoiler || msg.mediaSpoiler)} mediaType="video">
+                            <video src={msg.mediaUrl} className="msg-media-video" controls />
+                          </SpoilerMedia>
+                        )}
+                        {msg.mediaUrl && msg.mediaType === 'audio' && <VoiceMessage src={msg.mediaUrl} />}
+                        {msg.mediaUrl && (msg.mediaType === 'gif' || msg.mediaType === 'sticker') && (
+                          <SpoilerMedia isSpoiler={Boolean(msg.isSpoiler || msg.mediaSpoiler)} mediaType={msg.mediaType}>
+                            <img src={msg.mediaUrl} alt="" className={msg.mediaType === 'sticker' ? 'msg-sticker-img' : 'msg-gif-img'} />
+                          </SpoilerMedia>
+                        )}
+                        {msg.fileUrl && (
+                          <a href={msg.fileUrl} download={msg.fileName} className="msg-doc-card">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/><polyline points="14 2 14 8 20 8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                            <div className="msg-doc-info"><span className="msg-doc-name">{msg.fileName}</span></div>
+                          </a>
+                        )}
                       </div>
-                    </div>}
-                    <span className="bubble-time">{formatTime(msg.time)}</span>
+                      )}
+                      {!selectedChatSystemLocked && <div className="msg-react-ctrl">
+                        <button className="msg-react-btn msg-react-plus" title="+1" onClick={() => toggleReaction(msgKey2, msg.id, '+')}><img src={newIcon} alt="+" style={{ width: '12px', height: '12px', display: 'block', opacity: 0.65 }} /></button>
+                        <div className="msg-react-emoji-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+                          <button className="msg-react-btn" title="Tepki ekle" onClick={(e) => { e.preventDefault(); e.stopPropagation(); setShowMsgEmojiFor(f => f?.msgId === String(msg.id) ? null : { msgKey: msgKey2, msgId: String(msg.id) }) }}>
+                            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><path d="M8 14s1.5 2 4 2 4-2 4-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="9" cy="10" r="1" fill="currentColor"/><circle cx="15" cy="10" r="1" fill="currentColor"/></svg>
+                          </button>
+                          {showMsgEmojiFor?.msgId === String(msg.id) && (
+                            <div className="msg-emoji-picker-wrap" onMouseDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+                              <EmojiPickerReact emojiStyle={EmojiStyle.APPLE} height={320} width={280} searchDisabled previewConfig={{ showPreview: false }} onEmojiClick={d => toggleReaction(msgKey2, msg.id, d.emoji)} />
+                            </div>
+                          )}
+                        </div>
+                      </div>}
+                      <span className="bubble-time">{formatTime(msg.time)}</span>
+                    </div>
+                    {Object.keys(msgReactions[msgKey2]?.[String(msg.id)] || {}).length > 0 && (
+                      <div className="msg-reactions msg-reactions--bubble">
+                        {Object.entries(msgReactions[msgKey2]?.[String(msg.id)] || {}).map(([emoji, users]) => (
+                          <button key={emoji} className={`reaction-pill${users.includes(String(uid)) ? ' reaction-pill--mine' : ''}`} onClick={() => toggleReaction(msgKey2, msg.id, emoji)}>
+                            {emoji} <span>{users.length}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                  {Object.keys(msgReactions[msgKey2]?.[String(msg.id)] || {}).length > 0 && (
-                    <div className="msg-reactions msg-reactions--bubble">
-                      {Object.entries(msgReactions[msgKey2]?.[String(msg.id)] || {}).map(([emoji, users]) => (
-                        <button key={emoji} className={`reaction-pill${users.includes(String(uid)) ? ' reaction-pill--mine' : ''}`} onClick={() => toggleReaction(msgKey2, msg.id, emoji)}>
-                          {emoji} <span>{users.length}</span>
-                        </button>
-                      ))}
+                  {isOwn && dmReadReceipts[msgKey2] && String(dmReadReceipts[msgKey2].lastMsgId) === String(msg.id) && dmReadReceipts[msgKey2].photo && (
+                    <div className="bubble-read-receipt">
+                      <img src={dmReadReceipts[msgKey2].photo} alt="" className="bubble-receipt-avatar" />
                     </div>
                   )}
                 </div>
-                {isOwn && dmReadReceipts[msgKey2] && String(dmReadReceipts[msgKey2].lastMsgId) === String(msg.id) && dmReadReceipts[msgKey2].photo && (
-                  <div className="bubble-read-receipt">
-                    <img src={dmReadReceipts[msgKey2].photo} alt="" className="bubble-receipt-avatar" />
-                  </div>
-                )}
               </div>
             )}
           </React.Fragment>
@@ -11743,6 +11852,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (msgLongPressTimerRef.current) clearTimeout(msgLongPressTimerRef.current)
   }
   const [lightboxImg, setLightboxImg] = useState(null)
+  const [discoverCategory, setDiscoverCategory] = useState('all')
   const [showInputEmoji, setShowInputEmoji] = useState(false)
   const [showGifPicker, setShowGifPicker] = useState(false)
   const [gifTab, setGifTab] = useState('gif')
@@ -15005,12 +15115,38 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             className="msg-ctx-menu msg-ctx-menu-fixed"
             style={{
               position: 'fixed',
-              left: Math.max(8, Math.min(msgCtxMenu.x, window.innerWidth - 150)),
-              top: Math.max(8, Math.min(msgCtxMenu.y, window.innerHeight - 100)),
+              left: Math.max(8, Math.min(msgCtxMenu.x, window.innerWidth - 220)),
+              top: Math.max(8, Math.min(msgCtxMenu.y, window.innerHeight - 180)),
               zIndex: 9999
             }}
           >
+            <div className="msg-ctx-reactions-bar">
+              {['👍', '❤️', '😂', '🔥', '😮', '🎉'].map(emoji => (
+                <button
+                  key={emoji}
+                  type="button"
+                  className="msg-ctx-emoji-btn"
+                  onClick={() => {
+                    toggleReaction(msgCtxMenu.chatKey, msgCtxMenu.msgId, emoji)
+                    setMsgCtxMenu(null)
+                  }}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
             <button className="msg-ctx-item" onClick={() => { setReplyingTo(msgCtxMenu.replyInfo); setMsgCtxMenu(null) }}>{t('reply')}</button>
+            {msgCtxMenu.msgText && (
+              <button
+                className="msg-ctx-item"
+                onClick={() => {
+                  try { navigator.clipboard.writeText(msgCtxMenu.msgText) } catch {}
+                  setMsgCtxMenu(null)
+                }}
+              >
+                {t('copy') || 'Kopyala'}
+              </button>
+            )}
             {msgCtxMenu.isOwn && msgCtxMenu.msgText && !isReelmsSystemChat(selectedChat) && (
               <button
                 className="msg-ctx-item"
@@ -18821,12 +18957,17 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   const q = discoverQuery.trim().toLowerCase()
                   const joinedReelmIds = new Set((reelms || []).map(r => String(r.id)))
                   const publicReelms = (discoverReelmsList || []).filter(r => !joinedReelmIds.has(String(r.id)))
+                  const filteredPublicReelms = discoverCategory === 'all'
+                    ? publicReelms
+                    : publicReelms.filter(r => (r.category || '').toLowerCase() === discoverCategory || (r.tags || []).some(t => t.toLowerCase() === discoverCategory))
+
                   const results = q ? [
                     ...reelms.filter(r => r.name?.toLowerCase().includes(q)).map(r => ({ ...r, _type: 'reelm', joined: true })),
-                    ...publicReelms.map(r => ({ ...r, _type: 'reelm', joined: false })),
+                    ...publicReelms.filter(r => r.name?.toLowerCase().includes(q) || (r.description && r.description.toLowerCase().includes(q))).map(r => ({ ...r, _type: 'reelm', joined: false })),
                     ...chats.filter(c => c.name?.toLowerCase().includes(q)).map(c => ({ ...c, _type: 'chat' })),
                     ...discoverUsers.map(u => ({ ...u, _type: 'user' })),
-                  ] : []
+                  ] : filteredPublicReelms.map(r => ({ ...r, _type: 'reelm', joined: false }))
+
                   return (
                     <>
                       <button className="discover-back-btn" onClick={() => { setShowDiscover(false); setShowFeed(true) }}>
@@ -18845,7 +18986,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             placeholder="Search reelms, people..."
                             value={discoverQuery}
                             onChange={e => setDiscoverQuery(e.target.value)}
-                            autoFocus
                           />
                           {discoverQuery && (
                             <button className="discover-clear-btn" onClick={() => setDiscoverQuery('')}>
@@ -18855,13 +18995,29 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             </button>
                           )}
                         </div>
+                        <div className="discover-chips-row">
+                          {[
+                            { id: 'all', label: 'All' },
+                            { id: 'gaming', label: '🎮 Gaming' },
+                            { id: 'music', label: '🎵 Music' },
+                            { id: 'community', label: '🌐 Community' },
+                            { id: 'tech', label: '💻 Tech' },
+                            { id: 'art', label: '🎨 Art' },
+                          ].map(chip => (
+                            <button
+                              key={chip.id}
+                              type="button"
+                              className={`discover-chip${discoverCategory === chip.id ? ' discover-chip--active' : ''}`}
+                              onClick={() => setDiscoverCategory(chip.id)}
+                            >
+                              {chip.label}
+                            </button>
+                          ))}
+                        </div>
                       </div>
                       <div className="discover-results">
-                        {!q && (
-                          <p className="discover-empty">Start typing to search across Reelms, chats and people.</p>
-                        )}
-                        {q && results.length === 0 && (
-                          <p className="discover-empty">No results for "{discoverQuery}"</p>
+                        {results.length === 0 && (
+                          <p className="discover-empty">No results found.</p>
                         )}
                         {results.map((item, i) => (
                           <div key={i} className="discover-result-row" onClick={() => {
@@ -20233,16 +20389,75 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           </div>
         </div>
       )}
+      {voiceChannel && (
+        <div className="global-voice-dock">
+          <div
+            className="gvd-info"
+            onClick={() => {
+              const reelm = reelms.find(r => r.id === voiceChannel.reelmId)
+              if (!reelm) return
+              const ch = reelm.categories.flatMap(c => c.channels).find(c => c.id === voiceChannel.channelId)
+              if (!ch) return
+              setSelectedReelm(reelm); setSelectedChannel(ch); setShowDiscover(false); setSelectedChat(null); setShowSettings(false)
+            }}
+          >
+            <span className="gvd-pulse-dot" />
+            <div className="gvd-text">
+              <span className="gvd-name">{voiceChannel.channelName || 'Voice Room'}</span>
+              <span className="gvd-sub">Connected</span>
+            </div>
+          </div>
+          <div className="gvd-actions">
+            <button
+              type="button"
+              className={`gvd-btn${voiceMuted ? ' gvd-btn--active' : ''}`}
+              onClick={voiceToggleMute}
+              title={voiceMuted ? 'Unmute' : 'Mute'}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </button>
+            <button
+              type="button"
+              className={`gvd-btn${voiceDeafened ? ' gvd-btn--active' : ''}`}
+              onClick={voiceToggleDeafen}
+              title={voiceDeafened ? 'Undeafen' : 'Deafen'}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M3 18v-6a9 9 0 0 1 18 0v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </button>
+            <button
+              type="button"
+              className="gvd-btn gvd-btn--disconnect"
+              onClick={() => leaveVoiceChannel(voiceChannel.reelmId, voiceChannel.channelId)}
+              title="Disconnect"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-6-6 19.8 19.8 0 0 1-3.12-8.68A2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                <line x1="23" y1="1" x2="1" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+      )}
       {lightboxImg && (
-        <div onClick={() => setLightboxImg(null)} style={{ position: 'fixed', inset: 0, zIndex: 99999, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.72)', backdropFilter: 'blur(18px)', WebkitBackdropFilter: 'blur(18px)' }}>
-          <img src={lightboxImg} alt="" onClick={e => e.stopPropagation()} style={{ maxWidth: '90vw', maxHeight: '88vh', borderRadius: '16px', objectFit: 'contain', boxShadow: '0 8px 48px rgba(0,0,0,0.6)' }} />
-          <a href={lightboxImg} download onClick={e => e.stopPropagation()} style={{ position: 'fixed', bottom: '32px', right: '32px', display: 'flex', alignItems: 'center', gap: '7px', background: 'rgba(30,20,50,0.85)', border: '1px solid rgba(185,152,135,0.3)', borderRadius: '999px', padding: '10px 20px', color: '#b99887', fontSize: '0.82rem', fontFamily: "'Dela Gothic One', sans-serif", textDecoration: 'none', cursor: 'pointer', backdropFilter: 'blur(8px)' }}>
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><path d="M12 3v13M7 11l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M5 21h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-            Kaydet
-          </a>
-          <button onClick={() => setLightboxImg(null)} style={{ position: 'fixed', top: '24px', right: '28px', background: 'rgba(30,20,50,0.7)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: '50%', width: '36px', height: '36px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'rgba(255,255,255,0.7)' }}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-          </button>
+        <div className="lightbox-overlay" onClick={() => setLightboxImg(null)}>
+          <div className="lightbox-content" onClick={e => e.stopPropagation()}>
+            <img src={lightboxImg} alt="" className="lightbox-img" />
+            <div className="lightbox-bar">
+              <a href={lightboxImg} download onClick={e => e.stopPropagation()} className="lightbox-btn" title="Download">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 3v13M7 11l5 5 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/><path d="M5 21h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                <span>Download</span>
+              </a>
+              <button type="button" onClick={() => setLightboxImg(null)} className="lightbox-btn lightbox-btn--close" title="Close">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+              </button>
+            </div>
+          </div>
         </div>
       )}
       {spotifyConnected && (
