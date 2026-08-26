@@ -4800,21 +4800,47 @@ function editorHasFormatting(root) {
   return !!(root && root.querySelector('b,strong,i,em,u,s,strike,del,code,font,span[style]'))
 }
 
+function linkifyLegacyText(text, keyBase) {
+  if (!text) return []
+  const urlRegex = /((?:https?:\/\/|www\.)[^\s<]+[^<.,:;"')\]\s])/gi
+  const parts = text.split(urlRegex)
+  if (parts.length <= 1) return [text]
+  return parts.map((chunk, idx) => {
+    if (!chunk) return null
+    if (chunk.match(/^(?:https?:\/\/|www\.)[^\s<]+[^<.,:;"')\]\s]$/i)) {
+      const href = chunk.startsWith('www.') ? `https://${chunk}` : chunk
+      return (
+        <a
+          key={`${keyBase}-lnk-${idx}`}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="msg-link"
+          onClick={e => e.stopPropagation()}
+        >
+          {chunk}
+        </a>
+      )
+    }
+    return chunk
+  }).filter(Boolean)
+}
+
 function mentionNodes(text, uid, members, roles, keyBase) {
   if (!text) return []
-  return text.split(/(@\w+)/g).map((part, i) => {
+  return text.split(/(@\w+)/g).flatMap((part, i) => {
     const key = `${keyBase}-m${i}`
-    if (!part.startsWith('@')) return part
+    if (!part.startsWith('@')) return linkifyLegacyText(part, key)
     const lower = part.slice(1).toLowerCase()
-    if (lower === 'everyone') return <span key={key} className="mention mention--everyone">{part}</span>
+    if (lower === 'everyone') return [<span key={key} className="mention mention--everyone">{part}</span>]
     const role = roles?.find(r => r.name?.toLowerCase() === lower)
-    if (role) return <span key={key} className="mention mention--role" style={{ color: role.color }}>{part}</span>
+    if (role) return [<span key={key} className="mention mention--role" style={{ color: role.color }}>{part}</span>]
     const member = members?.find(m => m.userName?.toLowerCase() === lower)
     if (member) {
       const isMe = String(member.userId) === String(uid)
-      return <span key={key} className={`mention mention--user${isMe ? ' mention--me' : ''}`}>{part}</span>
+      return [<span key={key} className={`mention mention--user${isMe ? ' mention--me' : ''}`}>{part}</span>]
     }
-    return part
+    return linkifyLegacyText(part, key)
   })
 }
 

@@ -103,26 +103,53 @@ export function SpoilerText({ children, onHeightChange }) {
   )
 }
 
+// ── Linkify text helper ──────────────────────────────────────────
+function linkifyRichText(text, keyBase) {
+  if (!text) return []
+  const urlRegex = /((?:https?:\/\/|www\.)[^\s<]+[^<.,:;"')\]\s])/gi
+  const parts = text.split(urlRegex)
+  if (parts.length <= 1) return [text]
+  return parts.map((chunk, idx) => {
+    if (!chunk) return null
+    if (chunk.match(/^(?:https?:\/\/|www\.)[^\s<]+[^<.,:;"')\]\s]$/i)) {
+      const href = chunk.startsWith('www.') ? `https://${chunk}` : chunk
+      return (
+        <a
+          key={`${keyBase}-lnk-${idx}`}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="msg-link"
+          onClick={e => e.stopPropagation()}
+        >
+          {chunk}
+        </a>
+      )
+    }
+    return chunk
+  }).filter(Boolean)
+}
+
 // ── Mentions Parser ─────────────────────────────────────────────
 function parseMentions(text, uid, members, roles, keyBase) {
   if (!text) return []
-  return text.split(/(@\w+)/g).map((part, i) => {
+  return text.split(/(@\w+)/g).flatMap((part, i) => {
     const key = `${keyBase}-m${i}`
-    if (!part.startsWith('@')) return part
+    if (!part.startsWith('@')) return linkifyRichText(part, key)
     const lower = part.slice(1).toLowerCase()
     if (lower === 'everyone') {
-      return <span key={key} className="mention mention--everyone">{part}</span>
+      return [<span key={key} className="mention mention--everyone">{part}</span>]
     }
     const role = roles?.find(r => r.name?.toLowerCase() === lower)
     if (role) {
-      return <span key={key} className="mention mention--role" style={{ color: role.color }}>{part}</span>
+      return [<span key={key} className="mention mention--role" style={{ color: role.color }}>{part}</span>]
     }
     const member = members?.find(m => m.userName?.toLowerCase() === lower || m.username?.toLowerCase() === lower)
     if (member) {
       const isMe = String(member.userId) === String(uid)
-      return <span key={key} className={`mention mention--user${isMe ? ' mention--me' : ''}`}>{part}</span>
+      return [<span key={key} className={`mention mention--user${isMe ? ' mention--me' : ''}`}>{part}</span>]
     }
-    return part
+    return linkifyRichText(part, key)
   })
 }
 
@@ -184,7 +211,10 @@ function parseInlineRich(text, opts) {
     if (linkMatch) {
       flush()
       const linkText = linkMatch[1]
-      const linkUrl = linkMatch[2]
+      let linkUrl = linkMatch[2].trim()
+      if (!/^https?:\/\//i.test(linkUrl) && !linkUrl.startsWith('mailto:')) {
+        linkUrl = `https://${linkUrl}`
+      }
       const isSafe = isValidLinkUrl(linkUrl)
       nodes.push(
         <a
@@ -202,21 +232,44 @@ function parseInlineRich(text, opts) {
       continue
     }
 
-    // 4. Auto Links (https://...)
-    const autoLinkMatch = text.slice(i).match(/^(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/)
-    if (autoLinkMatch) {
+    // 4. Angle Bracket Links: <https://...>
+    const angleLinkMatch = text.slice(i).match(/^<((?:https?:\/\/|www\.)[^>]+)>/i)
+    if (angleLinkMatch) {
       flush()
-      const url = autoLinkMatch[1]
+      const rawUrl = angleLinkMatch[1].trim()
+      const href = rawUrl.startsWith('www.') ? `https://${rawUrl}` : rawUrl
       nodes.push(
         <a
           key={`${keyPrefix}-alnk-${n++}`}
-          href={url}
+          href={href}
           target="_blank"
           rel="noopener noreferrer"
           className="msg-link"
           onClick={e => e.stopPropagation()}
         >
-          {url}
+          {rawUrl}
+        </a>
+      )
+      i += angleLinkMatch[0].length
+      continue
+    }
+
+    // 5. Auto Links (https://... or http://... or www....)
+    const autoLinkMatch = text.slice(i).match(/^((?:https?:\/\/|www\.)[^\s<]+[^<.,:;"')\]\s])/i)
+    if (autoLinkMatch) {
+      flush()
+      const rawUrl = autoLinkMatch[1]
+      const href = rawUrl.startsWith('www.') ? `https://${rawUrl}` : rawUrl
+      nodes.push(
+        <a
+          key={`${keyPrefix}-alnk-${n++}`}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="msg-link"
+          onClick={e => e.stopPropagation()}
+        >
+          {rawUrl}
         </a>
       )
       i += autoLinkMatch[0].length
