@@ -876,13 +876,13 @@ h6 {
   align-items: center;
   justify-content: center;
   pointer-events: all;
-  transition: opacity 0.48s cubic-bezier(0.22, 1, 0.36, 1), transform 0.48s cubic-bezier(0.22, 1, 0.36, 1);
+  transition: opacity 0.42s ease, transform 0.42s cubic-bezier(0.25, 1, 0.5, 1);
 }
 
 .app-intro-splash--fade {
   opacity: 0;
   pointer-events: none;
-  transform: scale(1.05);
+  transform: scale(1.06);
 }
 
 .app-intro-splash-inner {
@@ -890,7 +890,7 @@ h6 {
   display: flex;
   align-items: center;
   justify-content: center;
-  animation: splashLogoPopup 0.9s cubic-bezier(0.16, 1.3, 0.34, 1) both;
+  animation: splashLogoPopup 0.72s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 .app-intro-logo-glow {
@@ -898,7 +898,7 @@ h6 {
   width: 220px;
   height: 220px;
   border-radius: 50%;
-  background: radial-gradient(circle, rgba(var(--ta-rgb, 245, 226, 214), 0.3) 0%, rgba(224, 117, 53, 0.18) 45%, transparent 72%);
+  background: radial-gradient(circle, rgba(var(--ta-rgb, 245, 226, 214), 0.28) 0%, rgba(224, 117, 53, 0.15) 45%, transparent 72%);
   filter: blur(32px);
   animation: splashGlowPulse 1.2s ease-in-out infinite alternate;
   pointer-events: none;
@@ -906,37 +906,28 @@ h6 {
 
 .app-intro-logo-img {
   position: relative;
-  width: 128px;
-  height: 128px;
+  width: 124px;
+  height: 124px;
   object-fit: contain;
   filter: drop-shadow(0 14px 32px rgba(0, 0, 0, 0.6));
 }
 
 @keyframes splashLogoPopup {
   0% {
-    transform: scale(0.18);
+    transform: scale(0.24) translateY(10px);
     opacity: 0;
-    filter: blur(8px);
-  }
-  60% {
-    transform: scale(1.14);
-    opacity: 1;
-    filter: blur(0);
-  }
-  80% {
-    transform: scale(0.96);
-    opacity: 1;
+    filter: blur(6px);
   }
   100% {
-    transform: scale(1);
+    transform: scale(1) translateY(0);
     opacity: 1;
     filter: blur(0);
   }
 }
 
 @keyframes splashGlowPulse {
-  0% { transform: scale(0.85); opacity: 0.4; }
-  100% { transform: scale(1.25); opacity: 0.95; }
+  0% { transform: scale(0.9); opacity: 0.4; }
+  100% { transform: scale(1.2); opacity: 0.9; }
 }
 
 .auth-lang-close:hover {
