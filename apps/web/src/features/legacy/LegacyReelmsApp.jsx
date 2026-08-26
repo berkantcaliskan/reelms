@@ -22390,8 +22390,33 @@ function App() {
     navigateTo('/signin')
   }
 
+  const [showSplash, setShowSplash] = useState(true)
+  const [splashFading, setSplashFading] = useState(false)
+
+  useEffect(() => {
+    if (!showSplash) return
+    const fadeTimer = setTimeout(() => {
+      setSplashFading(true)
+    }, 1050)
+    const hideTimer = setTimeout(() => {
+      setShowSplash(false)
+    }, 1550)
+    return () => {
+      clearTimeout(fadeTimer)
+      clearTimeout(hideTimer)
+    }
+  }, [showSplash])
+
   return (
     <div className={`app ${isShaking ? 'app-shake-active' : ''}`}>
+      {showSplash && (
+        <div className={`app-intro-splash${splashFading ? ' app-intro-splash--fade' : ''}`} aria-hidden="true">
+          <div className="app-intro-splash-inner">
+            <div className="app-intro-logo-glow" />
+            <img src={reelmsLogo} alt="Reelms" className="app-intro-logo-img" />
+          </div>
+        </div>
+      )}
       <style>{`
         @keyframes popIn {
           0%   { transform: scale(0); opacity: 0; }
@@ -22437,7 +22462,7 @@ function App() {
           flex: 1;
           padding: 10px 14px;
           border: 1px solid rgba(185, 152, 135, 0.2);
-          border-radius: 18px;
+          border-radius: 16px;
           background-color: rgba(24, 18, 32, 0.72);
           color: rgba(245, 226, 214, 0.92);
           font-size: 0.9rem;
@@ -22488,8 +22513,8 @@ function App() {
                 </div>
               </main>
               <AuthLanguagePicker language={language} onLanguageChange={updateLanguage} />
-              <div style={{ position: 'absolute', bottom: '30px', right: '30px', opacity: 0.5, fontSize: '12px', pointerEvents: 'none' }}>
-                Sun Intelligence
+              <div style={{ position: 'absolute', bottom: '30px', right: '30px', opacity: 0.5, fontSize: '12px', pointerEvents: 'none', letterSpacing: '0.02em' }}>
+                Reelms from Sun Intelligence
               </div>
             </>
           )
@@ -22517,8 +22542,8 @@ function App() {
                 </div>
               </main>
               <AuthLanguagePicker language={language} onLanguageChange={updateLanguage} />
-              <div style={{ position: 'absolute', bottom: '30px', right: '30px', opacity: 0.5, fontSize: '12px', pointerEvents: 'none' }}>
-                Sun Intelligence
+              <div style={{ position: 'absolute', bottom: '30px', right: '30px', opacity: 0.5, fontSize: '12px', pointerEvents: 'none', letterSpacing: '0.02em' }}>
+                Reelms from Sun Intelligence
               </div>
             </>
           )
