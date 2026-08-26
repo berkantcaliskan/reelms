@@ -4771,7 +4771,11 @@ function serializeRichNode(node) {
   const tag = el.tagName
   if (tag === 'BR') return '\n'
   let out = Array.from(el.childNodes).map(serializeRichNode).join('')
-  if (!out) return tag === 'DIV' ? '\n' : ''
+  if (!out && tag === 'DIV') return '\n'
+  if (tag === 'A') {
+    const href = el.getAttribute('href') || ''
+    return out ? `[${out}](${href})` : href
+  }
   const style = el.style || {}
   const deco = `${style.textDecoration || ''} ${style.textDecorationLine || ''}`
   const fontFamily = (style.fontFamily || '').toLowerCase()
@@ -4780,13 +4784,25 @@ function serializeRichNode(node) {
   const isUnderline = tag === 'U' || /underline/.test(deco)
   const isStrike = tag === 'S' || tag === 'STRIKE' || tag === 'DEL' || /line-through/.test(deco)
   const isMono = tag === 'CODE' || /(^|\s)msg-mono(\s|$)/.test(el.className || '') || /mono|courier|consol/.test(fontFamily)
-  const colorHex = rgbToHex(style.color || (tag === 'FONT' ? el.getAttribute('color') : ''))
+  const colorAttr = el.dataset?.color || (style.color || (tag === 'FONT' ? el.getAttribute('color') : ''))
+  const isSpoiler = (el.className || '').includes('msg-spoiler-inline')
+  const isQuote = (el.className || '').includes('msg-quote-inline')
+
   if (isBold) out = `**${out}**`
   if (isItalic) out = `*${out}*`
   if (isUnderline) out = `__${out}__`
   if (isStrike) out = `~~${out}~~`
   if (isMono) out = '`' + out + '`'
-  if (colorHex) out = `[${colorHex}]${out}[/c]`
+  if (isSpoiler) out = '||' + out.replace(/^\|+|\|+$/g, '') + '||'
+  if (isQuote) out = '> ' + out.replace(/^>\s*/, '')
+  if (colorAttr) {
+    if (el.dataset?.color) {
+      out = `[color:${el.dataset.color}]${out}[/color]`
+    } else {
+      const hex = rgbToHex(colorAttr)
+      if (hex) out = `[${hex}]${out}[/c]`
+    }
+  }
   if (tag === 'DIV') out = '\n' + out
   return out
 }
@@ -4797,7 +4813,7 @@ function serializeRichEditor(root) {
 }
 
 function editorHasFormatting(root) {
-  return !!(root && root.querySelector('b,strong,i,em,u,s,strike,del,code,font,span[style]'))
+  return !!(root && (root.querySelector('b,strong,i,em,u,s,strike,del,code,font,span[style],span[data-color],span.msg-spoiler-inline,span.msg-quote-inline,a') || /[*_~`#|>]|\[color:/.test(root.innerText)))
 }
 
 function linkifyLegacyText(text, keyBase) {
@@ -15302,21 +15318,32 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const restoreSavedRange = () => {
     const el = editorRef.current
-    if (!el || !savedRangeRef.current) return false
+    if (!el) return false
     el.focus()
     const sel = window.getSelection()
+    if (savedRangeRef.current) {
+      sel.removeAllRanges()
+      sel.addRange(savedRangeRef.current)
+      return true
+    }
+    if (sel && sel.rangeCount > 0 && el.contains(sel.anchorNode)) {
+      return true
+    }
+    const range = document.createRange()
+    range.selectNodeContents(el)
+    range.collapse(false)
     sel.removeAllRanges()
-    sel.addRange(savedRangeRef.current)
+    sel.addRange(range)
     return true
   }
 
   const insertCodeBlock = (lang = 'javascript') => {
     const el = editorRef.current
     if (!el) return
-    el.focus()
+    restoreSavedRange()
     const sel = window.getSelection()
     const selectedText = sel ? sel.toString() : ''
-    const snippet = '```' + lang + '\n' + (selectedText || '// Code here') + '\n```'
+    const snippet = '```' + lang + '\n' + (selectedText || '// Code here') + '\n```\n'
     document.execCommand('insertText', false, snippet)
     messageInputRef.current = el.innerText.replace(/\n$/, '')
     setMessageInput(messageInputRef.current)
@@ -15325,9 +15352,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const insertLink = (title, url) => {
     const el = editorRef.current
     if (!el) return
-    el.focus()
-    const snippet = '[' + (title || url) + '](' + url + ')'
-    document.execCommand('insertText', false, snippet)
+    restoreSavedRange()
+    const linkUrl = url || prompt('Enter link URL (e.g. https://example.com):')
+    if (!linkUrl) return
+    const linkText = title || linkUrl
+    document.execCommand('insertHTML', false, `<a href="${linkUrl}" class="msg-link" style="color: #38bdf8; text-decoration: underline;">${linkText}</a>`)
     messageInputRef.current = el.innerText.replace(/\n$/, '')
     setMessageInput(messageInputRef.current)
   }
@@ -15338,29 +15367,41 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     const selText = sel ? sel.toString() : ''
 
     if (kind === 'spoiler') {
-      document.execCommand('insertText', false, selText ? '||' + selText + '||' : '||spoiler||')
+      document.execCommand('insertHTML', false, `<span class="msg-spoiler-inline" style="background: rgba(255,255,255,0.18); border-radius: 4px; padding: 1px 4px; font-weight: 500;">||${selText || 'spoiler'}||</span>`)
     } else if (kind === 'quote') {
       if (selText) {
-        const quoted = selText.split('\n').map(l => '> ' + l).join('\n')
-        document.execCommand('insertText', false, quoted)
+        document.execCommand('insertHTML', false, `<span class="msg-quote-inline" style="color: var(--accent, #b99887); border-left: 2px solid var(--accent, #b99887); padding-left: 6px; display: inline-block;">&gt; ${selText}</span>`)
       } else {
-        document.execCommand('insertText', false, '> ')
+        document.execCommand('insertHTML', false, `<span class="msg-quote-inline" style="color: var(--accent, #b99887); border-left: 2px solid var(--accent, #b99887); padding-left: 6px; display: inline-block;">&gt; quote</span>`)
       }
     } else if (kind === 'code' || kind === 'mono') {
-      document.execCommand('insertText', false, selText ? '`' + selText + '`' : '`code`')
+      document.execCommand('insertHTML', false, `<code class="msg-mono" style="font-family: monospace; background: rgba(255,255,255,0.12); padding: 1px 4px; border-radius: 4px;">${selText || 'code'}</code>`)
     } else if (kind === 'bold') {
-      document.execCommand('insertText', false, selText ? '**' + selText + '**' : '**bold**')
+      if (selText) {
+        document.execCommand('bold', false, null)
+      } else {
+        document.execCommand('insertHTML', false, '<strong>bold</strong>')
+      }
     } else if (kind === 'italic') {
-      document.execCommand('insertText', false, selText ? '*' + selText + '*' : '*italic*')
+      if (selText) {
+        document.execCommand('italic', false, null)
+      } else {
+        document.execCommand('insertHTML', false, '<em>italic</em>')
+      }
     } else if (kind === 'underline') {
-      document.execCommand('insertText', false, selText ? '__' + selText + '__' : '__underline__')
+      if (selText) {
+        document.execCommand('underline', false, null)
+      } else {
+        document.execCommand('insertHTML', false, '<u>underline</u>')
+      }
     } else if (kind === 'strike') {
-      document.execCommand('insertText', false, selText ? '~~' + selText + '~~' : '~~strikethrough~~')
+      if (selText) {
+        document.execCommand('strikeThrough', false, null)
+      } else {
+        document.execCommand('insertHTML', false, '<s>strikethrough</s>')
+      }
     } else if (kind === 'clear') {
       document.execCommand('removeFormat', false, null)
-    } else {
-      const cmd = { bold: 'bold', italic: 'italic', underline: 'underline', strike: 'strikeThrough' }[kind]
-      if (cmd) document.execCommand(cmd, false, null)
     }
     const el = editorRef.current
     if (el) { messageInputRef.current = el.innerText.replace(/\n$/, ''); setMessageInput(messageInputRef.current) }
@@ -15372,11 +15413,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (!restoreSavedRange()) return
     const sel = window.getSelection()
     const selText = sel ? sel.toString() : ''
-    if (selText) {
-      document.execCommand('insertText', false, '[color:' + colorIdOrHex + ']' + selText + '[/color]')
-    } else {
-      document.execCommand('insertText', false, '[color:' + colorIdOrHex + ']colored text[/color]')
-    }
+    const colorVal = colorIdOrHex.startsWith('#')
+      ? colorIdOrHex
+      : (SEMANTIC_COLOR_MAP.get(colorIdOrHex) || colorIdOrHex)
+    const content = selText || 'colored text'
+    document.execCommand('insertHTML', false, `<span style="color: ${colorVal}; font-weight: 500;" data-color="${colorIdOrHex}">${content}</span>`)
     const el = editorRef.current
     if (el) { messageInputRef.current = el.innerText.replace(/\n$/, ''); setMessageInput(messageInputRef.current) }
     setFmtMenu(null)

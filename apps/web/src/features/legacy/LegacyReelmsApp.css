@@ -8465,9 +8465,46 @@ h6 {
 .msg-input--rich .msg-mono {
   font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   font-size: 0.92em;
-  background: rgba(255, 255, 255, 0.08);
-  padding: 0 3px;
-  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 1px 4px;
+  border-radius: 4px;
+  color: #facc15;
+}
+.msg-input--rich b,
+.msg-input--rich strong {
+  font-weight: 700;
+  color: #fff;
+}
+.msg-input--rich i,
+.msg-input--rich em {
+  font-style: italic;
+}
+.msg-input--rich u {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.msg-input--rich s,
+.msg-input--rich strike,
+.msg-input--rich del {
+  text-decoration: line-through;
+  opacity: 0.85;
+}
+.msg-input--rich a,
+.msg-input--rich .msg-link {
+  color: #38bdf8;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.msg-input--rich .msg-spoiler-inline {
+  background: rgba(255, 255, 255, 0.16);
+  border-radius: 4px;
+  padding: 1px 4px;
+}
+.msg-input--rich .msg-quote-inline {
+  color: var(--accent, #b99887);
+  border-left: 2px solid var(--accent, #b99887);
+  padding-left: 6px;
+  display: inline-block;
 }
 
 /* Right-click formatting menu + color palette */
