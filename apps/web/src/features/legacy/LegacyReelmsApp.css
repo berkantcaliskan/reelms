@@ -980,7 +980,7 @@ h6 {
 }
 
 .panel-left {
-  flex: 0 0 248px;
+  flex: 0 0 254px;
   padding: 0;
   gap: 0;
   overflow: hidden;
@@ -996,7 +996,7 @@ h6 {
 }
 
 .panel-right {
-  flex: 0 0 248px;
+  flex: 0 0 276px;
 }
 
 .panel-divider {
@@ -4915,7 +4915,7 @@ h6 {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 5px 12px 5px 16px;
+  padding: 5px 12px 5px 12px;
   cursor: default;
 }
 .reelm-category-icon {
@@ -5012,7 +5012,7 @@ h6 {
   display: flex;
   align-items: flex-start;
   gap: 2px;
-  padding: 1px 12px 1px 25px;
+  padding: 2px 12px 2px 14px;
   margin: 0;
   cursor: pointer;
   flex-wrap: wrap;
@@ -11864,15 +11864,28 @@ h6 {
   transform: translateX(-50%);
 }
 
-/* Controls bar */
+/* Controls bar / Draggable Voice Actions Dock */
 .voice-controls {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 14px 24px 18px;
+  padding: 8px 14px;
   flex-shrink: 0;
   position: relative;
+  border-radius: 28px;
+  background: rgba(26, 21, 28, 0.92);
+  -webkit-backdrop-filter: blur(48px) saturate(2.2);
+  backdrop-filter: blur(48px) saturate(2.2);
+  border: 1px solid rgba(var(--ta-rgb, 185, 152, 135), 0.24);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  margin: 0 12px 12px 12px;
+  user-select: none;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+
+.voice-controls--draggable {
+  user-select: none;
 }
 
 .voice-controls-spatial {
@@ -11885,35 +11898,35 @@ h6 {
 .voice-controls-actions {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
-  margin-left: auto;
 }
 
 .voice-ctrl-btn {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 8px;
-  padding: 9px 18px;
-  border-radius: 100px;
+  gap: 6px;
+  padding: 7px 14px;
+  border-radius: 20px;
   border: 1px solid rgba(var(--ta-rgb), 0.12);
-  background: rgba(var(--ta-rgb), 0.04);
-  color: rgba(var(--ta-rgb), 0.6);
+  background: rgba(var(--ta-rgb), 0.06);
+  color: rgba(var(--ta-rgb), 0.75);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s, border-color 0.15s, opacity 0.15s, transform 0.15s, box-shadow 0.15s;
+  font-size: 0.82rem;
+  transition: all 0.15s ease;
 }
 .voice-ctrl-btn:hover {
-  background: rgba(var(--ta-rgb), 0.1);
-  border-color: rgba(var(--ta-rgb), 0.25);
-  color: var(--ta);
+  background: rgba(var(--ta-rgb), 0.16);
+  border-color: rgba(var(--ta-rgb), 0.3);
+  color: #fff;
 }
 .voice-ctrl-disabled { opacity: 0.3; cursor: not-allowed !important; }
 .voice-ctrl-disabled:hover { background: none !important; border-color: transparent !important; color: inherit !important; }
 .voice-ctrl-on {
-  background: rgba(var(--ta-rgb), 0.14) !important;
-  border-color: rgba(var(--ta-rgb), 0.35) !important;
-  color: var(--ta) !important;
+  background: rgba(var(--ta-rgb), 0.2) !important;
+  border-color: rgba(var(--ta-rgb), 0.4) !important;
+  color: #fff !important;
 }
 
 /* Round: icon-only buttons (Spatial, Leave) */
@@ -17497,31 +17510,29 @@ button, input, select, textarea,
 .reelm-channel-voice-users {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-start;
-  gap: 5px;
+  align-items: center;
+  gap: 4px;
   max-width: 180px;
   overflow: hidden;
+  padding: 2px 0;
 }
 .reelm-channel-voice-user {
   display: inline-flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  gap: 2px;
-  min-width: 38px;
-  max-width: 54px;
-  padding: 3px 4px;
-  border-radius: 13px;
-  background: rgba(var(--ta-rgb), 0.055);
-  border: 1px solid rgba(var(--ta-rgb), 0.08);
+  gap: 4px;
+  padding: 1px 3px;
+  border-radius: 6px;
+  background: transparent;
+  border: none;
   cursor: context-menu;
 }
 .reelm-channel-voice-user:hover {
-  background: rgba(var(--ta-rgb), 0.1);
-  border-color: rgba(var(--ta-rgb), 0.16);
+  background: rgba(var(--ta-rgb), 0.08);
 }
 .reelm-channel-voice-avatar {
-  width: 20px;
-  height: 20px;
+  width: 18px;
+  height: 18px;
   border-radius: 50%;
   overflow: hidden;
   background: rgba(var(--ta-rgb), 0.12);

@@ -12757,14 +12757,72 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setProfileBio(currentUser.bio || '')
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentUser?.id])
-  const PANEL_DEFAULT = 230
-  const [leftWidth, setLeftWidth] = useState(PANEL_DEFAULT)
-  const [rightWidth, setRightWidth] = useState(PANEL_DEFAULT)
+  const PANEL_LEFT_DEFAULT = 254
+  const PANEL_RIGHT_DEFAULT = 276
+  const [leftWidth, setLeftWidth] = useState(PANEL_LEFT_DEFAULT)
+  const [rightWidth, setRightWidth] = useState(PANEL_RIGHT_DEFAULT)
   const dragState = useRef(null)
   const [isMobile, setIsMobile] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768)
   const [mobileLeftPanelOpen, setMobileLeftPanelOpen] = useState(false)
   const [mobileRightPanelOpen, setMobileRightPanelOpen] = useState(false)
   const mobileTouchRef = useRef(null)
+
+  const [voiceDockPos, setVoiceDockPos] = useState(null)
+  const [isDraggingVoiceDock, setIsDraggingVoiceDock] = useState(false)
+  const voiceDockDragRef = useRef(null)
+
+  const handleVoiceDockDragStart = (e) => {
+    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) return
+    e.preventDefault()
+    setIsDraggingVoiceDock(true)
+    const el = e.currentTarget
+    const rect = el.getBoundingClientRect()
+    const offsetX = e.clientX - rect.left
+    const offsetY = e.clientY - rect.top
+    voiceDockDragRef.current = { offsetX, offsetY, w: rect.width, h: rect.height }
+
+    const onMove = (moveEvent) => {
+      const { offsetX: ox, offsetY: oy, w, h } = voiceDockDragRef.current || {}
+      const x = Math.max(8, Math.min(window.innerWidth - (w || 260) - 8, moveEvent.clientX - ox))
+      const y = Math.max(8, Math.min(window.innerHeight - (h || 60) - 8, moveEvent.clientY - oy))
+      setVoiceDockPos({ x, y })
+    }
+    const onUp = () => {
+      setIsDraggingVoiceDock(false)
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
+  const handleVoiceDockTouchStart = (e) => {
+    if (e.target.closest('button') || e.target.closest('input') || e.target.closest('select')) return
+    const touch = e.touches[0]
+    if (!touch) return
+    setIsDraggingVoiceDock(true)
+    const el = e.currentTarget
+    const rect = el.getBoundingClientRect()
+    const offsetX = touch.clientX - rect.left
+    const offsetY = touch.clientY - rect.top
+    voiceDockDragRef.current = { offsetX, offsetY, w: rect.width, h: rect.height }
+
+    const onMove = (moveEvent) => {
+      const t = moveEvent.touches[0]
+      if (!t) return
+      const { offsetX: ox, offsetY: oy, w, h } = voiceDockDragRef.current || {}
+      const x = Math.max(8, Math.min(window.innerWidth - (w || 260) - 8, t.clientX - ox))
+      const y = Math.max(8, Math.min(window.innerHeight - (h || 60) - 8, t.clientY - oy))
+      setVoiceDockPos({ x, y })
+    }
+    const onUp = () => {
+      setIsDraggingVoiceDock(false)
+      window.removeEventListener('touchmove', onMove)
+      window.removeEventListener('touchend', onUp)
+    }
+    window.addEventListener('touchmove', onMove)
+    window.addEventListener('touchend', onUp)
+  }
   useEffect(() => {
     const h = () => setIsMobile(window.innerWidth < 768)
     window.addEventListener('resize', h)
@@ -19194,7 +19252,22 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             )
                           })()}
                           </div>
-                          <div className={`voice-controls ${isLive ? 'live-action-controls' : ''}`}>
+                          <div
+                            className={`voice-controls voice-controls--draggable ${isLive ? 'live-action-controls' : ''}`}
+                            style={voiceDockPos ? {
+                              position: 'fixed',
+                              left: `${voiceDockPos.x}px`,
+                              top: `${voiceDockPos.y}px`,
+                              bottom: 'auto',
+                              right: 'auto',
+                              zIndex: 99999,
+                              cursor: isDraggingVoiceDock ? 'grabbing' : 'grab'
+                            } : {}}
+                            onDoubleClick={() => setVoiceDockPos(null)}
+                            onMouseDown={handleVoiceDockDragStart}
+                            onTouchStart={handleVoiceDockTouchStart}
+                            title="Drag to move anywhere. Double click to reset position."
+                          >
                             {(isLive || voiceParticipants.some(p => p.isScreenSharing)) && (
                               <div className="voice-controls-left">
                                 <div className="voice-bar-participants">
