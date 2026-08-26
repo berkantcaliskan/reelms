@@ -8368,7 +8368,7 @@ h6 {
   backdrop-filter: blur(48px) saturate(2.2);
   border: 1px solid rgba(var(--ta-rgb), 0.22);
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 4px 24px rgba(0, 0, 0, 0.22);
-  border-radius: 26px;
+  border-radius: 28px;
   margin: 0 12px 12px 12px;
   animation: msg-bar-slide-in 0.38s cubic-bezier(0.22, 1, 0.36, 1) both;
   flex-wrap: nowrap;
@@ -8671,7 +8671,7 @@ h6 {
 .msg-action-btn {
   width: 46px;
   height: 46px;
-  border-radius: 20px;
+  border-radius: 22px;
   background: rgba(var(--ta-rgb), 0.12);
   border: none;
   cursor: pointer;
@@ -18806,7 +18806,7 @@ button, input, select, textarea,
   backdrop-filter: blur(48px) saturate(2.2);
   border: 1px solid rgba(var(--ta-rgb), 0.22);
   box-shadow: inset 0 1px 0 rgba(255,255,255,0.08), 0 4px 24px rgba(0,0,0,0.22);
-  border-radius: 26px;
+  border-radius: 28px;
   flex-shrink: 0;
   width: 260px;
 }

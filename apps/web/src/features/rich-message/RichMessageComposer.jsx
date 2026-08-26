@@ -108,22 +108,22 @@ export function RichMessageComposerToolbar({
         <div
           className="msg-floating-toolbar"
           style={{ top: `${toolbarPos.top}px`, left: `${toolbarPos.left}px` }}
-          onMouseDown={e => e.preventDefault()}
+          onMouseDown={e => { e.preventDefault(); e.stopPropagation() }}
           onClick={e => e.stopPropagation()}
         >
           {!showColors ? (
             <>
-              <button className="fmt-btn" title="Bold (Ctrl+B)" onClick={() => onApplyFormat('bold')}><b>B</b></button>
-              <button className="fmt-btn" title="Italic (Ctrl+I)" onClick={() => onApplyFormat('italic')}><i>I</i></button>
-              <button className="fmt-btn" title="Underline (Ctrl+U)" onClick={() => onApplyFormat('underline')}><u>U</u></button>
-              <button className="fmt-btn" title="Strikethrough (Ctrl+Shift+S)" onClick={() => onApplyFormat('strike')}><s>S</s></button>
-              <button className="fmt-btn" title="Inline Code (Ctrl+Shift+C)" onClick={() => onApplyFormat('code')}>{'</>'}</button>
-              <button className="fmt-btn" title="Spoiler" onClick={() => onApplyFormat('spoiler')}>||</button>
-              <button className="fmt-btn" title="Quote" onClick={() => onApplyFormat('quote')}>&rdquo;</button>
-              <button className="fmt-btn" title="Link (Ctrl+K)" onClick={openLinkModal}>🔗</button>
+              <button className="fmt-btn" title="Bold (Ctrl+B)" onMouseDown={e => e.preventDefault()} onClick={() => onApplyFormat('bold')}><b>B</b></button>
+              <button className="fmt-btn" title="Italic (Ctrl+I)" onMouseDown={e => e.preventDefault()} onClick={() => onApplyFormat('italic')}><i>I</i></button>
+              <button className="fmt-btn" title="Underline (Ctrl+U)" onMouseDown={e => e.preventDefault()} onClick={() => onApplyFormat('underline')}><u>U</u></button>
+              <button className="fmt-btn" title="Strikethrough (Ctrl+Shift+S)" onMouseDown={e => e.preventDefault()} onClick={() => onApplyFormat('strike')}><s>S</s></button>
+              <button className="fmt-btn" title="Inline Code (Ctrl+Shift+C)" onMouseDown={e => e.preventDefault()} onClick={() => onApplyFormat('code')}>{'</>'}</button>
+              <button className="fmt-btn" title="Spoiler" onMouseDown={e => e.preventDefault()} onClick={() => onApplyFormat('spoiler')}>||</button>
+              <button className="fmt-btn" title="Quote" onMouseDown={e => e.preventDefault()} onClick={() => onApplyFormat('quote')}>&rdquo;</button>
+              <button className="fmt-btn" title="Link (Ctrl+K)" onMouseDown={e => e.preventDefault()} onClick={openLinkModal}>🔗</button>
               <div className="fmt-divider" />
-              <button className="fmt-btn" title="Text Color" onClick={() => setShowColors(true)}>🎨</button>
-              <button className="fmt-btn" title="Code Block" onClick={onInsertCodeBlock}>📦</button>
+              <button className="fmt-btn" title="Text Color" onMouseDown={e => e.preventDefault()} onClick={() => setShowColors(true)}>🎨</button>
+              <button className="fmt-btn" title="Code Block" onMouseDown={e => e.preventDefault()} onClick={onInsertCodeBlock}>📦</button>
             </>
           ) : (
             <div className="fmt-color-grid">
@@ -133,10 +133,11 @@ export function RichMessageComposerToolbar({
                   className="fmt-color-swatch"
                   style={{ background: c.color === 'inherit' ? '#e5e7eb' : c.color }}
                   title={c.label}
-                  onClick={() => { onApplyColor(c.id); setShowColors(false) }}
+                  onMouseDown={e => { e.preventDefault(); e.stopPropagation() }}
+                  onClick={(e) => { e.preventDefault(); e.stopPropagation(); onApplyColor(c.id); setShowColors(false) }}
                 />
               ))}
-              <button className="fmt-btn" style={{ fontSize: '0.7rem' }} onClick={() => setShowColors(false)}>✕</button>
+              <button className="fmt-btn" style={{ fontSize: '0.7rem' }} onMouseDown={e => e.preventDefault()} onClick={() => setShowColors(false)}>✕</button>
             </div>
           )}
         </div>,

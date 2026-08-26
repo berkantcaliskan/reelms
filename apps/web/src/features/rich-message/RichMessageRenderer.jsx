@@ -184,24 +184,46 @@ function parseInlineRich(text, opts) {
       }
     }
 
-    // 2. Semantic Colors: [color:red]...[/color] or [#ff0000]...[/c]
-    const colorMatch = text.slice(i).match(/^\[color:([a-zA-Z0-9_-]+)\]/) || text.slice(i).match(/^\[#([0-9a-fA-F]{3,8})\]/)
+    // 2. Semantic Colors: [color:red]...[/color], [color:#ff0000]...[/color], [#ff0000]...[/c]
+    const colorMatch = text.slice(i).match(/^\[color:([a-zA-Z0-9_#-]+)\]/i) || text.slice(i).match(/^\[#([0-9a-fA-F]{3,8})\]/i)
     if (colorMatch) {
-      const isToken = text.slice(i).startsWith('[color:')
+      const isToken = text.slice(i).toLowerCase().startsWith('[color:')
       const closeTag = isToken ? '[/color]' : '[/c]'
-      const close = text.indexOf(closeTag, i + colorMatch[0].length)
+      const close = text.toLowerCase().indexOf(closeTag.toLowerCase(), i + colorMatch[0].length)
       if (close !== -1) {
         flush()
         const inner = text.slice(i + colorMatch[0].length, close)
-        const colorVal = isToken
-          ? (SEMANTIC_COLOR_MAP.get(colorMatch[1]) || 'inherit')
-          : `#${colorMatch[1]}`
+        const rawKey = colorMatch[1]
+        let colorVal = rawKey
+        if (rawKey.startsWith('#')) {
+          colorVal = rawKey
+        } else if (SEMANTIC_COLOR_MAP.has(rawKey.toLowerCase())) {
+          colorVal = SEMANTIC_COLOR_MAP.get(rawKey.toLowerCase()) || rawKey
+        } else if (/^[0-9a-fA-F]{3,8}$/.test(rawKey)) {
+          colorVal = `#${rawKey}`
+        }
         nodes.push(
-          <span key={`${keyPrefix}-col-${n++}`} style={{ color: colorVal }}>
+          <span key={`${keyPrefix}-col-${n++}`} style={{ color: colorVal, fontWeight: 500 }}>
             {parseInlineRich(inner, { ...opts, keyPrefix: `${keyPrefix}-col${n}` })}
           </span>
         )
         i = close + closeTag.length
+        continue
+      }
+    }
+
+    // 2b. Inline Quote Tag: [quote]...[/quote]
+    if (text.toLowerCase().startsWith('[quote]', i)) {
+      const close = text.toLowerCase().indexOf('[/quote]', i + 7)
+      if (close !== -1) {
+        flush()
+        const inner = text.slice(i + 7, close)
+        nodes.push(
+          <div key={`${keyPrefix}-q-${n++}`} className="msg-quote-block msg-quote-inline">
+            {parseInlineRich(inner, { ...opts, keyPrefix: `${keyPrefix}-qi${n}` })}
+          </div>
+        )
+        i = close + 8
         continue
       }
     }
@@ -365,12 +387,22 @@ export function parseRichText(content, { uid, members, roles, onHeightChange, ke
       continue
     }
 
-    // 2. Blockquote (> text)
-    if (line.startsWith('> ') || line === '>') {
+    // 2. Blockquote (> text or >>> text)
+    if (line.startsWith('> ') || line === '>' || line.startsWith('>>> ') || line === '>>>') {
+      const isMulti = line.startsWith('>>> ') || line === '>>>'
       const quoteLines = []
-      while (lineIdx < lines.length && (lines[lineIdx].startsWith('> ') || lines[lineIdx] === '>')) {
-        quoteLines.push(lines[lineIdx].startsWith('> ') ? lines[lineIdx].slice(2) : '')
+      if (isMulti) {
+        if (line.startsWith('>>> ')) quoteLines.push(line.slice(4))
         lineIdx++
+        while (lineIdx < lines.length) {
+          quoteLines.push(lines[lineIdx])
+          lineIdx++
+        }
+      } else {
+        while (lineIdx < lines.length && (lines[lineIdx].startsWith('> ') || lines[lineIdx] === '>')) {
+          quoteLines.push(lines[lineIdx].startsWith('> ') ? lines[lineIdx].slice(2) : '')
+          lineIdx++
+        }
       }
       const quoteContent = quoteLines.join('\n')
       nodes.push(

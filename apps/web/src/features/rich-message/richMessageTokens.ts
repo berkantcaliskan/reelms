@@ -8,7 +8,7 @@ export interface SemanticColor {
 }
 
 export const SEMANTIC_COLORS: SemanticColor[] = [
-  { id: 'default', label: 'Default', color: 'inherit', darkValue: 'inherit' },
+  { id: 'default', label: 'Default', color: '#e5e7eb', darkValue: '#e5e7eb' },
   { id: 'muted', label: 'Muted', color: '#9ca3af', darkValue: '#9ca3af' },
   { id: 'red', label: 'Red', color: '#f87171', darkValue: '#f87171' },
   { id: 'orange', label: 'Orange', color: '#fb923c', darkValue: '#fb923c' },
