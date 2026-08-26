@@ -11869,11 +11869,13 @@ h6 {
 .voice-controls {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: center;
   gap: 8px;
   padding: 14px 24px 18px;
   flex-shrink: 0;
   position: relative;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .voice-controls-spatial {
@@ -11886,9 +11888,10 @@ h6 {
 .voice-controls-actions {
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   flex-shrink: 0;
-  margin-left: auto;
+  margin: 0 auto;
 }
 
 .voice-ctrl-btn {
@@ -23530,14 +23533,15 @@ button, input, select, textarea,
   z-index: 900;
   display: flex;
   align-items: center;
-  gap: 12px;
-  background: rgba(26, 21, 28, 0.92);
+  gap: 6px;
+  max-width: 178px;
+  background: rgba(var(--ta-rgb), 0.09);
   -webkit-backdrop-filter: blur(48px) saturate(2.2);
   backdrop-filter: blur(48px) saturate(2.2);
-  border: 1px solid rgba(var(--ta-rgb, 185, 152, 135), 0.24);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(var(--ta-rgb), 0.18);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   border-radius: 28px;
-  padding: 6px 10px 6px 14px;
+  padding: 4px 8px;
   box-sizing: border-box;
   user-select: none;
   cursor: grab;
@@ -23556,16 +23560,18 @@ button, input, select, textarea,
 .gvd-info {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 5px;
   cursor: pointer;
   user-select: none;
+  min-width: 0;
+  flex-shrink: 1;
 }
 .gvd-pulse-dot {
-  width: 9px;
-  height: 9px;
+  width: 7px;
+  height: 7px;
   border-radius: 50%;
   background: #22c55e;
-  box-shadow: 0 0 10px rgba(34, 197, 94, 0.8);
+  box-shadow: 0 0 8px rgba(34, 197, 94, 0.8);
   animation: gvdPulse 2s infinite ease-in-out;
   flex-shrink: 0;
 }
@@ -23577,54 +23583,63 @@ button, input, select, textarea,
 .gvd-text {
   display: flex;
   flex-direction: column;
-  line-height: 1.15;
+  line-height: 1.1;
+  min-width: 0;
 }
 .gvd-name {
   font-family: 'Karla', sans-serif;
-  font-size: 0.82rem;
+  font-size: 0.72rem;
   font-weight: 700;
   color: var(--ta);
-  max-width: 140px;
+  max-width: 62px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .gvd-sub {
-  font-size: 0.65rem;
-  color: rgba(var(--ta-rgb), 0.5);
+  font-size: 0.58rem;
+  color: rgba(var(--ta-rgb), 0.6);
 }
 
 .gvd-actions {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 3px;
+  flex-shrink: 0;
 }
 .gvd-btn {
-  width: 32px;
-  height: 32px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   background: rgba(var(--ta-rgb), 0.08);
-  border: 1px solid rgba(var(--ta-rgb), 0.12);
+  border: 1px solid rgba(var(--ta-rgb), 0.14);
   color: var(--ta);
   cursor: pointer;
+  padding: 0;
   transition: all 0.15s ease;
+  flex-shrink: 0;
+}
+.gvd-btn svg {
+  width: 12px;
+  height: 12px;
 }
 .gvd-btn:hover {
-  background: rgba(var(--ta-rgb), 0.18);
-  transform: scale(1.05);
+  background: rgba(var(--ta-rgb), 0.2);
+  border-color: rgba(var(--ta-rgb), 0.32);
+  transform: scale(1.08);
 }
 .gvd-btn--active {
-  background: rgba(239, 68, 68, 0.18) !important;
-  color: #ef4444 !important;
-  border-color: rgba(239, 68, 68, 0.3) !important;
+  background: rgba(239, 68, 68, 0.22) !important;
+  color: #f87171 !important;
+  border-color: rgba(239, 68, 68, 0.45) !important;
 }
 .gvd-btn--disconnect {
-  background: rgba(239, 68, 68, 0.15) !important;
-  color: #ef4444 !important;
-  border-color: rgba(239, 68, 68, 0.25) !important;
+  background: rgba(239, 68, 68, 0.18) !important;
+  color: #f87171 !important;
+  border-color: rgba(239, 68, 68, 0.35) !important;
 }
 .gvd-btn--disconnect:hover {
   background: rgba(239, 68, 68, 0.85) !important;
