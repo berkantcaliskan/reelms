@@ -1,6 +1,4 @@
-import { lazy, Suspense } from 'react'
-
-const LegacyReelmsApp = lazy(() => import('./LegacyReelmsApp.jsx'))
+import LegacyReelmsApp from './LegacyReelmsApp.jsx'
 
 /**
  * Strangler boundary for the imported legacy client.
@@ -11,9 +9,5 @@ const LegacyReelmsApp = lazy(() => import('./LegacyReelmsApp.jsx'))
  * src/features/<feature-name> and then replace the matching region here.
  */
 export function ReelmsLegacyBoundary() {
-  return (
-    <Suspense fallback={<div className="reelms-app-loading">Loading Reelms…</div>}>
-      <LegacyReelmsApp />
-    </Suspense>
-  )
+  return <LegacyReelmsApp />
 }

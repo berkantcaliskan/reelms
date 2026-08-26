@@ -1,20 +1,93 @@
+:root {
+  --ta-rgb: 245, 226, 214;
+  --ta: #f5e2d6;
+}
+
 *,
 *::before,
 *::after {
   box-sizing: border-box;
 }
 
-body {
+html, body {
   margin: 0;
   padding: 0;
   min-height: 100vh;
+  background-color: #141118 !important;
+  color: #fff;
   display: block;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
 }
 
 #root {
   min-height: 100vh;
   position: relative;
   z-index: 1;
+  background-color: #141118;
+}
+
+/* ── Global Splash Screen (Immediate Initial Frame) ── */
+.app-intro-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: #141118;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: all;
+  transition: opacity 0.42s ease, transform 0.42s cubic-bezier(0.25, 1, 0.5, 1);
+}
+
+.app-intro-splash--fade {
+  opacity: 0;
+  pointer-events: none;
+  transform: scale(1.06);
+}
+
+.app-intro-splash-inner {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: splashLogoPopup 0.72s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.app-intro-logo-glow {
+  position: absolute;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(245, 226, 214, 0.28) 0%, rgba(224, 117, 53, 0.15) 45%, transparent 72%);
+  filter: blur(32px);
+  animation: splashGlowPulse 1.2s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+.app-intro-logo-img {
+  position: relative;
+  width: 124px;
+  height: 124px;
+  object-fit: contain;
+  filter: drop-shadow(0 14px 32px rgba(0, 0, 0, 0.6));
+}
+
+@keyframes splashLogoPopup {
+  0% {
+    transform: scale(0.24) translateY(10px);
+    opacity: 0;
+    filter: blur(6px);
+  }
+  100% {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+@keyframes splashGlowPulse {
+  0% { transform: scale(0.9); opacity: 0.4; }
+  100% { transform: scale(1.2); opacity: 0.9; }
 }
