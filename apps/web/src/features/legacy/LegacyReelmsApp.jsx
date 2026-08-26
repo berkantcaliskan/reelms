@@ -11044,7 +11044,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [modDeleteTick, setModDeleteTick] = useState(0)
   const [appStoriesTick, setAppStoriesTick] = useState(0)
   const [shareTarget, setShareTarget] = useState(null)
-  const [showChatList, setShowChatList] = useState(() => typeof window !== 'undefined' && window.innerWidth < 768)
+  const [showChatList, setShowChatList] = useState(false)
   const [chatListFilter, setChatListFilter] = useState('all')
   const [showChatFilterMore, setShowChatFilterMore] = useState(false)
   const [chatListSearch, setChatListSearch] = useState('')
