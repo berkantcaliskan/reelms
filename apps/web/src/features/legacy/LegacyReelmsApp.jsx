@@ -6727,20 +6727,18 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
 
   return (
     <div className="settings-layout">
+      <button
+        type="button"
+        className="settings-floating-close-btn"
+        onClick={onClose}
+        title={t('close') || 'Close'}
+      >
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+          <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+        </svg>
+      </button>
       <div className="settings-sidebar">
-        <div className="settings-sidebar-top-row">
-          <h2 className="settings-title">{reelm.name}</h2>
-          <button
-            type="button"
-            className="settings-floating-close-btn"
-            onClick={onClose}
-            title={t('close') || 'Close'}
-          >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-            </svg>
-          </button>
-        </div>
+        <h2 className="settings-title">{reelm.name}</h2>
         <nav className="settings-nav">
           {availableTabs.map(tab => (
             <button
@@ -17355,22 +17353,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               />
             ) : showSettings ? (
               <div className={`settings-layout${isMobile ? (!selectedSettingsCategory ? ' settings-layout--mobile-menu' : ' settings-layout--mobile-content') : ''}`}>
+                <button
+                  type="button"
+                  className="settings-floating-close-btn"
+                  onClick={() => setShowSettings(false)}
+                  title={t('close')}
+                >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                    <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                  </svg>
+                </button>
                 <div className="settings-sidebar">
-                  <div className="settings-sidebar-top-row">
-                    <h2 className="settings-title">{t('settings')}</h2>
-                    {!isMobile && (
-                      <button
-                        type="button"
-                        className="settings-floating-close-btn"
-                        onClick={() => setShowSettings(false)}
-                        title={t('close')}
-                      >
-                        <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                          <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                        </svg>
-                      </button>
-                    )}
-                  </div>
+                  <h2 className="settings-title">{t('settings')}</h2>
                   <nav className="settings-nav">
                     {[
                       { id: 'account',         label: t('your_account') },
