@@ -22462,7 +22462,7 @@ function App() {
           flex: 1;
           padding: 10px 14px;
           border: 1px solid rgba(185, 152, 135, 0.2);
-          border-radius: 16px;
+          border-radius: 20px;
           background-color: rgba(24, 18, 32, 0.72);
           color: rgba(245, 226, 214, 0.92);
           font-size: 0.9rem;

@@ -581,8 +581,8 @@ h6 {
 
 .pill-input {
   width: 100%;
-  padding: 14px 20px;
-  border-radius: 20px;
+  padding: 14px 22px;
+  border-radius: 28px;
   border: 1px solid rgba(var(--ta-rgb), 0.22);
   background: rgba(255, 255, 255, 0.05);
   color: var(--ta);
