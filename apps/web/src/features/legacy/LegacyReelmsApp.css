@@ -5021,7 +5021,7 @@ h6 {
 .reelm-channel-label {
   display: inline-flex;
   align-items: center;
-  gap: 3px;
+  gap: 0px;
   padding: 1px 6px 1px 4px;
   border-radius: 13px;
   transition: background 0.15s;
@@ -5049,14 +5049,12 @@ h6 {
   color: var(--text-fg);
   opacity: 0.45;
   flex-shrink: 0;
-  width: 12px;
+  width: 14px;
   text-align: center;
-  margin-right: 1px;
+  margin-left: -16px;
+  margin-right: 2px;
 }
 
-.reelm-channel-label:not(:has(.reelm-channel-prefix)) {
-  padding-left: 4px;
-}
 .reelm-channel-name {
   font-size: 0.82rem;
   color: var(--text-fg);
@@ -18750,9 +18748,9 @@ button, input, select, textarea,
 .reelm-left-bottom-feed-bar {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  padding: 0 14px 12px 14px;
-  height: 60px;
+  justify-content: space-between;
+  padding: 0 12px 10px 12px;
+  height: 52px;
   flex-shrink: 0;
   box-sizing: border-box;
   width: 100%;
@@ -23526,10 +23524,7 @@ button, input, select, textarea,
 
 /* Global Floating Voice Mini Dock */
 .global-voice-dock {
-  position: fixed;
-  bottom: 12px;
-  left: 80px;
-  right: auto;
+  position: relative;
   z-index: 900;
   display: flex;
   align-items: center;
@@ -23546,6 +23541,8 @@ button, input, select, textarea,
   user-select: none;
   cursor: grab;
   animation: gvdSlideUp 0.3s cubic-bezier(0.2, 0.9, 0.3, 1);
+  flex-shrink: 1;
+  min-width: 0;
 }
 
 .global-voice-dock:active {
@@ -23588,10 +23585,10 @@ button, input, select, textarea,
 }
 .gvd-name {
   font-family: 'Karla', sans-serif;
-  font-size: 0.72rem;
+  font-size: 0.66rem;
   font-weight: 700;
   color: var(--ta);
-  max-width: 62px;
+  max-width: 66px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -23608,42 +23605,56 @@ button, input, select, textarea,
   flex-shrink: 0;
 }
 .gvd-btn {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(var(--ta-rgb), 0.08);
-  border: 1px solid rgba(var(--ta-rgb), 0.14);
+  background: transparent;
+  border: none;
   color: var(--ta);
+  opacity: 0.8;
   cursor: pointer;
   padding: 0;
-  transition: all 0.15s ease;
+  transition: opacity 0.15s ease, transform 0.15s ease, color 0.15s ease;
   flex-shrink: 0;
 }
 .gvd-btn svg {
-  width: 12px;
-  height: 12px;
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+.gvd-actions .gvd-btn:first-child svg {
+  transform: translateY(0.75px);
 }
 .gvd-btn:hover {
-  background: rgba(var(--ta-rgb), 0.2);
-  border-color: rgba(var(--ta-rgb), 0.32);
-  transform: scale(1.08);
+  opacity: 1;
+  transform: scale(1.14);
+}
+.gvd-actions .gvd-btn:first-child:hover svg {
+  transform: translateY(0.75px) scale(1.14);
+}
+.gvd-btn:active {
+  transform: scale(0.92);
 }
 .gvd-btn--active {
-  background: rgba(239, 68, 68, 0.22) !important;
+  background: transparent !important;
   color: #f87171 !important;
-  border-color: rgba(239, 68, 68, 0.45) !important;
+  opacity: 1 !important;
+  border: none !important;
 }
 .gvd-btn--disconnect {
-  background: rgba(239, 68, 68, 0.18) !important;
+  background: transparent !important;
   color: #f87171 !important;
-  border-color: rgba(239, 68, 68, 0.35) !important;
+  opacity: 0.85;
+  border: none !important;
 }
 .gvd-btn--disconnect:hover {
-  background: rgba(239, 68, 68, 0.85) !important;
-  color: #fff !important;
+  background: transparent !important;
+  color: #ef4444 !important;
+  opacity: 1;
+  border: none !important;
 }
 
 @media (max-width: 767px) {

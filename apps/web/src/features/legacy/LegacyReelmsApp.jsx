@@ -18895,67 +18895,78 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       </div>
                     </div>
                   )}
-                  {voiceChannel && voiceChannel.channelId !== selectedChannel?.id && (
-                    <div className="voice-mini-bar">
-                      <button
-                        className="vmb-channel"
-                        onClick={() => {
-                          const reelm = reelms.find(r => r.id === voiceChannel.reelmId)
-                          if (!reelm) return
-                          const ch = reelm.categories.flatMap(c => c.channels).find(c => c.id === voiceChannel.channelId)
-                          if (!ch) return
-                          setSelectedReelm(reelm); setSelectedChannel(ch); setShowDiscover(false); setSelectedChat(null); setShowSettings(false)
-                        }}
-                        title="Go to voice channel"
-                      >
-                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" className="vmb-mic-icon">
-                          <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                          <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                        </svg>
-                        <span className="vmb-name">{voiceChannel.channelName}</span>
-                      </button>
-                      <button
-                        className={`vmb-btn${voiceMuted ? ' vmb-btn-muted' : ''}`}
-                        onClick={voiceToggleMute}
-                        title={voiceMuted ? 'Unmute' : 'Mute'}
-                      >
-                        {voiceMuted ? (
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                            <line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
-                            <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                          </svg>
-                        ) : (
-                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                            <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                            <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                          </svg>
-                        )}
-                      </button>
-                      <button
-                        className={`vmb-btn${voiceDeafened ? ' vmb-btn-muted' : ''}`}
-                        onClick={voiceToggleDeafen}
-                        title={voiceDeafened ? 'Undeafen' : 'Deafen'}
-                      >
-                        🎧
-                      </button>
-                      <button
-                        className={`vmb-btn${voiceMuted && voiceDeafened ? ' vmb-btn-muted' : ''}`}
-                        onClick={voiceToggleFullMute}
-                        title={voiceMuted && voiceDeafened ? 'Unsilence' : 'Silent'}
-                      >
-                        🔇
-                      </button>
-                      <button className="vmb-btn vmb-btn-leave" onClick={leaveVoiceChannel} title="Leave">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          <polyline points="16 17 21 12 16 7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                          <line x1="21" y1="12" x2="9" y2="12" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                        </svg>
-                      </button>
-                    </div>
-                  )}
                   {selectedReelm && !isMobile && (
                     <div className="reelm-left-bottom-feed-bar">
+                      {voiceChannel && (
+                        <div
+                          className="global-voice-dock global-voice-dock--draggable"
+                          style={voiceDockPos ? {
+                            position: 'fixed',
+                            left: `${voiceDockPos.x}px`,
+                            top: `${voiceDockPos.y}px`,
+                            bottom: 'auto',
+                            right: 'auto',
+                            zIndex: 99999,
+                            cursor: isDraggingVoiceDock ? 'grabbing' : 'grab'
+                          } : {}}
+                          onDoubleClick={() => setVoiceDockPos(null)}
+                          onMouseDown={handleVoiceDockDragStart}
+                          onTouchStart={handleVoiceDockTouchStart}
+                          title="Drag to move anywhere. Double click to reset to default position."
+                        >
+                          <div
+                            className="gvd-info"
+                            onClick={() => {
+                              const reelm = reelms.find(r => r.id === voiceChannel.reelmId)
+                              if (!reelm) return
+                              const ch = reelm.categories.flatMap(c => c.channels).find(c => c.id === voiceChannel.channelId)
+                              if (!ch) return
+                              setSelectedReelm(reelm); setSelectedChannel(ch); setShowDiscover(false); setSelectedChat(null); setShowSettings(false)
+                            }}
+                          >
+                            <span className="gvd-pulse-dot" />
+                            <div className="gvd-text">
+                              <span className="gvd-name">{voiceChannel.channelName || 'Voice Room'}</span>
+                              <span className="gvd-sub">Connected</span>
+                            </div>
+                          </div>
+                          <div className="gvd-actions">
+                            <button
+                              type="button"
+                              className={`gvd-btn${voiceMuted ? ' gvd-btn--active' : ''}`}
+                              onClick={voiceToggleMute}
+                              title={voiceMuted ? 'Unmute' : 'Mute'}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                                <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              className={`gvd-btn${voiceDeafened ? ' gvd-btn--active' : ''}`}
+                              onClick={voiceToggleDeafen}
+                              title={voiceDeafened ? 'Undeafen' : 'Deafen'}
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                                <path d="M3 18v-6a9 9 0 0 1 18 0v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                                <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              className="gvd-btn gvd-btn--disconnect"
+                              onClick={() => leaveVoiceChannel(voiceChannel.reelmId, voiceChannel.channelId)}
+                              title="Disconnect"
+                            >
+                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                                <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-6-6 19.8 19.8 0 0 1-3.12-8.68A2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                                <line x1="23" y1="1" x2="1" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
+                      )}
                       <button
                         type="button"
                         className={`reelm-left-bottom-feed-btn${showFeed ? ' reelm-left-bottom-feed-btn--active' : ''}`}
@@ -21640,76 +21651,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               const f = friends.find(fr => fr.id === activeNudge.id) || { id: activeNudge.id, name: activeNudge.name };
               startDM(f);
             }}>{t('send_message_btn')}</button>
-          </div>
-        </div>
-      )}
-      {voiceChannel && (
-        <div
-          className="global-voice-dock global-voice-dock--draggable"
-          style={voiceDockPos ? {
-            position: 'fixed',
-            left: `${voiceDockPos.x}px`,
-            top: `${voiceDockPos.y}px`,
-            bottom: 'auto',
-            right: 'auto',
-            zIndex: 99999,
-            cursor: isDraggingVoiceDock ? 'grabbing' : 'grab'
-          } : {}}
-          onDoubleClick={() => setVoiceDockPos(null)}
-          onMouseDown={handleVoiceDockDragStart}
-          onTouchStart={handleVoiceDockTouchStart}
-          title="Drag to move anywhere. Double click to reset to bottom-left."
-        >
-          <div
-            className="gvd-info"
-            onClick={() => {
-              const reelm = reelms.find(r => r.id === voiceChannel.reelmId)
-              if (!reelm) return
-              const ch = reelm.categories.flatMap(c => c.channels).find(c => c.id === voiceChannel.channelId)
-              if (!ch) return
-              setSelectedReelm(reelm); setSelectedChannel(ch); setShowDiscover(false); setSelectedChat(null); setShowSettings(false)
-            }}
-          >
-            <span className="gvd-pulse-dot" />
-            <div className="gvd-text">
-              <span className="gvd-name">{voiceChannel.channelName || 'Voice Room'}</span>
-              <span className="gvd-sub">Connected</span>
-            </div>
-          </div>
-          <div className="gvd-actions">
-            <button
-              type="button"
-              className={`gvd-btn${voiceMuted ? ' gvd-btn--active' : ''}`}
-              onClick={voiceToggleMute}
-              title={voiceMuted ? 'Unmute' : 'Mute'}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
-            </button>
-            <button
-              type="button"
-              className={`gvd-btn${voiceDeafened ? ' gvd-btn--active' : ''}`}
-              onClick={voiceToggleDeafen}
-              title={voiceDeafened ? 'Undeafen' : 'Deafen'}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M3 18v-6a9 9 0 0 1 18 0v6" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                <path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
-            </button>
-            <button
-              type="button"
-              className="gvd-btn gvd-btn--disconnect"
-              onClick={() => leaveVoiceChannel(voiceChannel.reelmId, voiceChannel.channelId)}
-              title="Disconnect"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                <path d="M10.68 13.31a16 16 0 0 0 3.41 2.6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7 2 2 0 0 1 1.72 2v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.42 19.42 0 0 1-6-6 19.8 19.8 0 0 1-3.12-8.68A2 2 0 0 1 4 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                <line x1="23" y1="1" x2="1" y2="23" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-              </svg>
-            </button>
           </div>
         </div>
       )}
