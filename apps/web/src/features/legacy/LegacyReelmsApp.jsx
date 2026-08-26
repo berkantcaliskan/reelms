@@ -19252,22 +19252,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             )
                           })()}
                           </div>
-                          <div
-                            className={`voice-controls voice-controls--draggable ${isLive ? 'live-action-controls' : ''}`}
-                            style={voiceDockPos ? {
-                              position: 'fixed',
-                              left: `${voiceDockPos.x}px`,
-                              top: `${voiceDockPos.y}px`,
-                              bottom: 'auto',
-                              right: 'auto',
-                              zIndex: 99999,
-                              cursor: isDraggingVoiceDock ? 'grabbing' : 'grab'
-                            } : {}}
-                            onDoubleClick={() => setVoiceDockPos(null)}
-                            onMouseDown={handleVoiceDockDragStart}
-                            onTouchStart={handleVoiceDockTouchStart}
-                            title="Drag to move anywhere. Double click to reset position."
-                          >
+                          <div className={`voice-controls ${isLive ? 'live-action-controls' : ''}`}>
                             {(isLive || voiceParticipants.some(p => p.isScreenSharing)) && (
                               <div className="voice-controls-left">
                                 <div className="voice-bar-participants">
@@ -21659,7 +21644,22 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         </div>
       )}
       {voiceChannel && (
-        <div className="global-voice-dock">
+        <div
+          className="global-voice-dock global-voice-dock--draggable"
+          style={voiceDockPos ? {
+            position: 'fixed',
+            left: `${voiceDockPos.x}px`,
+            top: `${voiceDockPos.y}px`,
+            bottom: 'auto',
+            right: 'auto',
+            zIndex: 99999,
+            cursor: isDraggingVoiceDock ? 'grabbing' : 'grab'
+          } : {}}
+          onDoubleClick={() => setVoiceDockPos(null)}
+          onMouseDown={handleVoiceDockDragStart}
+          onTouchStart={handleVoiceDockTouchStart}
+          title="Drag to move anywhere. Double click to reset to bottom-left."
+        >
           <div
             className="gvd-info"
             onClick={() => {

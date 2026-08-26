@@ -4584,7 +4584,7 @@ h6 {
   overflow-y: auto;
   overflow-x: hidden;
   min-height: 0;
-  padding: 10px 8px;
+  padding: 8px 0;
 }
 .reelm-cover-wrap {
   width: calc(100% - 20px);
@@ -5012,7 +5012,7 @@ h6 {
   display: flex;
   align-items: flex-start;
   gap: 2px;
-  padding: 2px 12px 2px 14px;
+  padding: 2px 12px;
   margin: 0;
   cursor: pointer;
   flex-wrap: wrap;
@@ -11864,28 +11864,15 @@ h6 {
   transform: translateX(-50%);
 }
 
-/* Controls bar / Draggable Voice Actions Dock */
+/* Controls bar */
 .voice-controls {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 8px 14px;
+  padding: 14px 24px 18px;
   flex-shrink: 0;
   position: relative;
-  border-radius: 28px;
-  background: rgba(26, 21, 28, 0.92);
-  -webkit-backdrop-filter: blur(48px) saturate(2.2);
-  backdrop-filter: blur(48px) saturate(2.2);
-  border: 1px solid rgba(var(--ta-rgb, 185, 152, 135), 0.24);
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
-  margin: 0 12px 12px 12px;
-  user-select: none;
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
-}
-
-.voice-controls--draggable {
-  user-select: none;
 }
 
 .voice-controls-spatial {
@@ -11898,35 +11885,35 @@ h6 {
 .voice-controls-actions {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .voice-ctrl-btn {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 6px;
-  padding: 7px 14px;
-  border-radius: 20px;
+  gap: 8px;
+  padding: 9px 18px;
+  border-radius: 100px;
   border: 1px solid rgba(var(--ta-rgb), 0.12);
-  background: rgba(var(--ta-rgb), 0.06);
-  color: rgba(var(--ta-rgb), 0.75);
+  background: rgba(var(--ta-rgb), 0.04);
+  color: rgba(var(--ta-rgb), 0.6);
   cursor: pointer;
-  font-size: 0.82rem;
-  transition: all 0.15s ease;
+  transition: background 0.15s, color 0.15s, border-color 0.15s, opacity 0.15s, transform 0.15s, box-shadow 0.15s;
 }
 .voice-ctrl-btn:hover {
-  background: rgba(var(--ta-rgb), 0.16);
-  border-color: rgba(var(--ta-rgb), 0.3);
-  color: #fff;
+  background: rgba(var(--ta-rgb), 0.1);
+  border-color: rgba(var(--ta-rgb), 0.25);
+  color: var(--ta);
 }
 .voice-ctrl-disabled { opacity: 0.3; cursor: not-allowed !important; }
 .voice-ctrl-disabled:hover { background: none !important; border-color: transparent !important; color: inherit !important; }
 .voice-ctrl-on {
-  background: rgba(var(--ta-rgb), 0.2) !important;
-  border-color: rgba(var(--ta-rgb), 0.4) !important;
-  color: #fff !important;
+  background: rgba(var(--ta-rgb), 0.14) !important;
+  border-color: rgba(var(--ta-rgb), 0.35) !important;
+  color: var(--ta) !important;
 }
 
 /* Round: icon-only buttons (Spatial, Leave) */
@@ -23536,21 +23523,28 @@ button, input, select, textarea,
 /* Global Floating Voice Mini Dock */
 .global-voice-dock {
   position: fixed;
-  bottom: 24px;
-  right: 24px;
+  bottom: 12px;
+  left: 80px;
+  right: auto;
   z-index: 900;
   display: flex;
   align-items: center;
   gap: 12px;
-  background: rgba(var(--bg-rgb, 14, 12, 22), 0.88);
-  -webkit-backdrop-filter: blur(24px) saturate(1.8);
-  backdrop-filter: blur(24px) saturate(1.8);
-  border: 1px solid rgba(var(--ta-rgb), 0.18);
-  box-shadow: 0 10px 36px rgba(0, 0, 0, 0.45);
-  border-radius: 999px;
+  background: rgba(26, 21, 28, 0.92);
+  -webkit-backdrop-filter: blur(48px) saturate(2.2);
+  backdrop-filter: blur(48px) saturate(2.2);
+  border: 1px solid rgba(var(--ta-rgb, 185, 152, 135), 0.24);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border-radius: 28px;
   padding: 6px 10px 6px 14px;
   box-sizing: border-box;
+  user-select: none;
+  cursor: grab;
   animation: gvdSlideUp 0.3s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+
+.global-voice-dock:active {
+  cursor: grabbing;
 }
 
 @keyframes gvdSlideUp {
