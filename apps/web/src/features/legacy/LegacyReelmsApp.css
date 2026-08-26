@@ -17487,37 +17487,41 @@ button, input, select, textarea,
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
+  gap: 3px;
   min-width: 0;
-  flex: 0 0 calc(100% - 22px);
-  margin-left: 20px;
-  margin-top: 1px;
+  width: 100% !important;
+  flex: 0 0 100% !important;
+  margin-left: 0 !important;
+  padding-left: 0 !important;
+  margin-top: 3px;
 }
 .reelm-channel-voice-meta--active .reelm-channel-capacity {
   color: rgba(var(--ta-rgb), 0.72);
 }
 .reelm-channel-voice-users {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 4px;
-  max-width: 180px;
-  overflow: hidden;
-  padding: 2px 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 1px 0 !important;
 }
 .reelm-channel-voice-user {
   display: inline-flex;
   flex-direction: row;
   align-items: center;
-  gap: 4px;
-  padding: 1px 3px;
+  gap: 5px;
+  padding: 1px 0 !important;
+  margin: 0 !important;
   border-radius: 6px;
-  background: transparent;
-  border: none;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
   cursor: context-menu;
 }
 .reelm-channel-voice-user:hover {
-  background: rgba(var(--ta-rgb), 0.08);
+  background: rgba(var(--ta-rgb), 0.08) !important;
 }
 .reelm-channel-voice-avatar {
   width: 18px;
@@ -17543,11 +17547,11 @@ button, input, select, textarea,
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
-  font-size: 0.58rem;
+  font-size: 0.72rem;
   line-height: 1.1;
-  text-align: center;
-  color: rgba(var(--ta-rgb), 0.68);
-  max-width: 48px;
+  text-align: left;
+  color: rgba(var(--ta-rgb), 0.78);
+  max-width: 100px;
 }
 .reelm-channel-voice-more {
   font-size: 0.62rem;
@@ -18013,7 +18017,6 @@ button, input, select, textarea,
 .fpp-list-action:hover { background: rgba(var(--ta-rgb), 0.08); color: var(--ta); border-radius: 20px; }
 .fpp-list-action svg { flex-shrink: 0; opacity: 0.75; }
 .fpp-list-action--danger { color: #fca5a5; }
-.reelm-channel-voice-meta { padding-right: 42px; }
 .reelm-channel-voice-meta .reelm-channel-capacity {
   position: absolute;
   right: 10px;
@@ -18029,16 +18032,16 @@ button, input, select, textarea,
   max-width: none;
 }
 .reelm-channel-voice-user {
-  width: calc(100% - 4px);
+  width: 100%;
   max-width: none;
   min-width: 0;
   display: flex;
   flex-direction: row;
   align-items: center;
   justify-content: flex-start;
-  gap: 6px;
+  gap: 5px;
   text-align: left;
-  padding: 4px 6px;
+  padding: 2px 0px;
   cursor: context-menu;
 }
 .reelm-channel-voice-user[draggable="true"] { cursor: grab; }
