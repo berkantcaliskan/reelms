@@ -5012,7 +5012,7 @@ h6 {
   display: flex;
   align-items: flex-start;
   gap: 2px;
-  padding: 2px 12px;
+  padding: 2px 12px 2px 38px;
   margin: 0;
   cursor: pointer;
   flex-wrap: wrap;
@@ -5021,8 +5021,8 @@ h6 {
 .reelm-channel-label {
   display: inline-flex;
   align-items: center;
-  gap: 1px;
-  padding: 1px 5px 1px 4px;
+  gap: 3px;
+  padding: 1px 6px 1px 4px;
   border-radius: 13px;
   transition: background 0.15s;
   position: relative;
@@ -5051,10 +5051,11 @@ h6 {
   flex-shrink: 0;
   width: 12px;
   text-align: center;
+  margin-right: 1px;
 }
 
 .reelm-channel-label:not(:has(.reelm-channel-prefix)) {
-  padding-left: 17px;
+  padding-left: 4px;
 }
 .reelm-channel-name {
   font-size: 0.82rem;
