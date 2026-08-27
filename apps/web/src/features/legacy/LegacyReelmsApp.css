@@ -8139,6 +8139,28 @@ h6 {
   letter-spacing: -0.01em;
 }
 
+.msg-name--clickable,
+.bubble-sender-name--clickable {
+  cursor: pointer;
+  transition: color 0.15s ease, text-decoration 0.15s ease;
+}
+.msg-name--clickable:hover,
+.bubble-sender-name--clickable:hover {
+  text-decoration: underline;
+  color: var(--ta) !important;
+}
+
+.msg-avatar--clickable,
+.bubble-avatar--clickable {
+  cursor: pointer;
+  transition: transform 0.16s ease, filter 0.16s ease;
+}
+.msg-avatar--clickable:hover,
+.bubble-avatar--clickable:hover {
+  transform: scale(1.08);
+  filter: brightness(1.1);
+}
+
 .msg-time {
   font-size: 0.68rem;
   color: rgba(224, 201, 188, 0.38);

@@ -5327,7 +5327,11 @@ function VirtualMessageList({
                     setSwipeOffset(0)
                   }}
                 >
-                <div className="msg-avatar">
+                <div
+                  className="msg-avatar msg-avatar--clickable"
+                  onClick={e => sender.id && openFriendProfile({ id: sender.id, name: sender.name, photo: sender.photo || sender.image || null, username: sender.username || null }, e)}
+                  title={sender.name}
+                >
                   {(sender.photo || sender.image)
                     ? <img src={sender.photo || sender.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
                     : (sender.name || '?').charAt(0).toUpperCase()
@@ -5335,7 +5339,13 @@ function VirtualMessageList({
                 </div>
                 <div className="msg-body">
                   <div className="msg-header">
-                    <span className="msg-name">{sender.name}</span>
+                    <span
+                      className="msg-name msg-name--clickable"
+                      onClick={e => sender.id && openFriendProfile({ id: sender.id, name: sender.name, photo: sender.photo || sender.image || null, username: sender.username || null }, e)}
+                      title={sender.name}
+                    >
+                      {sender.name}
+                    </span>
                     <span className="msg-time">{formatTime(msg.time)}</span>
                     {msg.isQueued && (
                       <span className="msg-queued-pill" title="Çevrimdışı — Bağlantı geldiğinde otomatik gönderilecek">
@@ -5361,7 +5371,16 @@ function VirtualMessageList({
                     )}
                   </div>
                   {msg.replyTo && (
-                    <div className="msg-reply-quote">
+                    <div
+                      className="msg-reply-quote"
+                      onClick={e => {
+                        if (msg.replyTo.senderId) {
+                          e.stopPropagation()
+                          openFriendProfile({ id: msg.replyTo.senderId, name: msg.replyTo.senderName }, e)
+                        }
+                      }}
+                      style={{ cursor: msg.replyTo.senderId ? 'pointer' : 'default' }}
+                    >
                       <span className="msg-reply-quote-name">{msg.replyTo.senderName}</span>
                       <span className="msg-reply-quote-text">{msg.replyTo.text ? msg.replyTo.text.slice(0, 120) : '📎'}</span>
                     </div>
@@ -5498,16 +5517,26 @@ function VirtualMessageList({
                     setSwipeOffset(0)
                   }}
                 >
-                  {!isOwn && (
-                    <div className="bubble-avatar bubble-avatar--clickable" onClick={e => sender.id && openFriendProfile({ id: sender.id, name: sender.name, photo: sender.photo || sender.image || null }, e)}>
-                      {(sender.photo || sender.image)
-                        ? <img src={sender.photo || sender.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-                        : (sender.name || '?').charAt(0).toUpperCase()
-                      }
-                    </div>
-                  )}
+                  <div
+                    className="bubble-avatar bubble-avatar--clickable"
+                    onClick={e => sender.id && openFriendProfile({ id: sender.id, name: sender.name, photo: sender.photo || sender.image || null, username: sender.username || null }, e)}
+                    title={sender.name}
+                  >
+                    {(sender.photo || sender.image)
+                      ? <img src={sender.photo || sender.image} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                      : (sender.name || '?').charAt(0).toUpperCase()
+                    }
+                  </div>
                   <div className="bubble-content">
-                    {!isOwn && selectedChat?.type === 'group' && <span className="bubble-sender-name">{sender.name}</span>}
+                    {selectedChat?.type === 'group' && (
+                      <span
+                        className="bubble-sender-name bubble-sender-name--clickable"
+                        onClick={e => sender.id && openFriendProfile({ id: sender.id, name: sender.name, photo: sender.photo || sender.image || null, username: sender.username || null }, e)}
+                        title={sender.name}
+                      >
+                        {sender.name}
+                      </span>
+                    )}
                     <div className="bubble-and-time">
                       {msg.mediaUrl && (msg.mediaType === 'gif' || msg.mediaType === 'sticker') && !msg.text ? (
                         <img src={msg.mediaUrl} alt="" className={msg.mediaType === 'sticker' ? 'msg-sticker-img' : 'msg-gif-img'} />
