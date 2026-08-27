@@ -125,6 +125,72 @@ export function createSpotifyRouter(io: Server) {
     res.json({ token })
   })
 
+  router.post('/spotify/player/toggle', authenticate, async (req, res) => {
+    const uid = String(req.userId || '')
+    const stored = spotifyTokens.get(uid)
+    if (!stored) return res.status(404).json({ error: 'not_connected' })
+    let token = stored.accessToken
+    if (Date.now() > stored.expiresAt - 30000) {
+      const refreshed = await refreshSpotifyToken(uid)
+      if (!refreshed) return res.status(401).json({ error: 'token_expired' })
+      token = refreshed
+    }
+    try {
+      const stateRes = await fetch('https://api.spotify.com/v1/me/player', { headers: { Authorization: `Bearer ${token}` } })
+      if (stateRes.status === 200) {
+        const state = await stateRes.json() as any
+        if (state.is_playing) {
+          await fetch('https://api.spotify.com/v1/me/player/pause', { method: 'PUT', headers: { Authorization: `Bearer ${token}` } })
+          return res.json({ ok: true, is_playing: false })
+        } else {
+          await fetch('https://api.spotify.com/v1/me/player/play', { method: 'PUT', headers: { Authorization: `Bearer ${token}` } })
+          return res.json({ ok: true, is_playing: true })
+        }
+      } else {
+        await fetch('https://api.spotify.com/v1/me/player/play', { method: 'PUT', headers: { Authorization: `Bearer ${token}` } })
+        return res.json({ ok: true })
+      }
+    } catch (err: any) {
+      return res.status(500).json({ error: err.message || 'player_control_failed' })
+    }
+  })
+
+  router.post('/spotify/player/next', authenticate, async (req, res) => {
+    const uid = String(req.userId || '')
+    const stored = spotifyTokens.get(uid)
+    if (!stored) return res.status(404).json({ error: 'not_connected' })
+    let token = stored.accessToken
+    if (Date.now() > stored.expiresAt - 30000) {
+      const refreshed = await refreshSpotifyToken(uid)
+      if (!refreshed) return res.status(401).json({ error: 'token_expired' })
+      token = refreshed
+    }
+    try {
+      await fetch('https://api.spotify.com/v1/me/player/next', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+      res.json({ ok: true })
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'next_failed' })
+    }
+  })
+
+  router.post('/spotify/player/previous', authenticate, async (req, res) => {
+    const uid = String(req.userId || '')
+    const stored = spotifyTokens.get(uid)
+    if (!stored) return res.status(404).json({ error: 'not_connected' })
+    let token = stored.accessToken
+    if (Date.now() > stored.expiresAt - 30000) {
+      const refreshed = await refreshSpotifyToken(uid)
+      if (!refreshed) return res.status(401).json({ error: 'token_expired' })
+      token = refreshed
+    }
+    try {
+      await fetch('https://api.spotify.com/v1/me/player/previous', { method: 'POST', headers: { Authorization: `Bearer ${token}` } })
+      res.json({ ok: true })
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || 'prev_failed' })
+    }
+  })
+
   router.post('/spotify/disconnect/:uid', authenticate, (req, res) => {
     if (String(req.userId) !== String(req.params.uid)) return res.status(403).json({ error: 'forbidden' })
     spotifyTokens.delete(String(req.params.uid))

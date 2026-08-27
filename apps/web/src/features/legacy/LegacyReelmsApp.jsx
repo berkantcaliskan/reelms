@@ -12228,7 +12228,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           userPutDoc('spotify_connected', false).catch(() => {})
           setSpotifyConnected(false)
           setSpotifyNowPlaying(null)
+          setSpotifyInlinePaused(true)
           return
+        }
+        if (typeof data.playing === 'boolean') {
+          setSpotifyInlinePaused(!data.playing)
         }
         setSpotifyNowPlaying(data.playing && data.track ? data.track : null)
       } catch { /* noop */ }
@@ -12310,6 +12314,63 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setSpotifyConnected(false)
     setSpotifyNowPlaying(null)
   }
+
+  const handleSpotifyTogglePlay = useCallback(async () => {
+    if (spotifyControlsRef.current?.togglePlay) {
+      try { spotifyControlsRef.current.togglePlay() } catch {}
+    }
+    const token = await getIdToken().catch(() => null)
+    if (token) {
+      try {
+        const res = await fetch(`${BACKEND_URL}/spotify/player/toggle`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        })
+        const data = await res.json().catch(() => ({}))
+        if (typeof data.is_playing === 'boolean') {
+          setSpotifyInlinePaused(!data.is_playing)
+        } else {
+          setSpotifyInlinePaused(p => !p)
+        }
+      } catch (err) {
+        console.warn('Spotify toggle failed:', err)
+      }
+    }
+  }, [getIdToken])
+
+  const handleSpotifyNext = useCallback(async () => {
+    if (spotifyControlsRef.current?.nextTrack) {
+      try { spotifyControlsRef.current.nextTrack() } catch {}
+    }
+    const token = await getIdToken().catch(() => null)
+    if (token) {
+      try {
+        await fetch(`${BACKEND_URL}/spotify/player/next`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      } catch (err) {
+        console.warn('Spotify next failed:', err)
+      }
+    }
+  }, [getIdToken])
+
+  const handleSpotifyPrev = useCallback(async () => {
+    if (spotifyControlsRef.current?.prevTrack) {
+      try { spotifyControlsRef.current.prevTrack() } catch {}
+    }
+    const token = await getIdToken().catch(() => null)
+    if (token) {
+      try {
+        await fetch(`${BACKEND_URL}/spotify/player/previous`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}` }
+        })
+      } catch (err) {
+        console.warn('Spotify prev failed:', err)
+      }
+    }
+  }, [getIdToken])
 
 
   async function toggleRecording() {
@@ -20218,16 +20279,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 <span className="msb-artist">{spotifyNowPlaying.artist}</span>
                               </div>
                               <div className="msb-controls">
-                                <button className="msb-btn" onClick={() => spotifyControlsRef.current?.prevTrack()}>
+                                <button className="msb-btn" onClick={handleSpotifyPrev} title="Previous Track">
                                   <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M3.3 1a.7.7 0 0 1 .7.7v5.15L14 1.108A.7.7 0 0 1 15 1.7v12.6a.7.7 0 0 1-1.05.607L4 9.149V13.3a.7.7 0 0 1-.7.7H1.7a.7.7 0 0 1-.7-.7V1.7a.7.7 0 0 1 .7-.7h1.6z"/></svg>
                                 </button>
-                                <button className="msb-btn msb-btn-play" onClick={() => spotifyControlsRef.current?.togglePlay()}>
+                                <button className="msb-btn msb-btn-play" onClick={handleSpotifyTogglePlay} title={spotifyInlinePaused ? 'Play' : 'Pause'}>
                                   {spotifyInlinePaused
                                     ? <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M3 1.713a.7.7 0 0 1 1.05-.607l10.89 6.288a.7.7 0 0 1 0 1.212L4.05 14.894A.7.7 0 0 1 3 14.288V1.713z"/></svg>
                                     : <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor"><path d="M2.7 1a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7H2.7zm8 0a.7.7 0 0 0-.7.7v12.6a.7.7 0 0 0 .7.7h2.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-2.6z"/></svg>
                                   }
                                 </button>
-                                <button className="msb-btn" onClick={() => spotifyControlsRef.current?.nextTrack()}>
+                                <button className="msb-btn" onClick={handleSpotifyNext} title="Next Track">
                                   <svg width="13" height="13" viewBox="0 0 16 16" fill="currentColor"><path d="M12.7 1a.7.7 0 0 0-.7.7v5.15L2.05 1.108A.7.7 0 0 0 1 1.7v12.6a.7.7 0 0 0 1.05.607L12 9.149V13.3a.7.7 0 0 0 .7.7h1.6a.7.7 0 0 0 .7-.7V1.7a.7.7 0 0 0-.7-.7h-1.6z"/></svg>
                                 </button>
                               </div>
