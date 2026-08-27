@@ -7,7 +7,7 @@
       "DOM.Iterable",
       "ES2022"
     ],
-    "allowJs": false,
+    "allowJs": true,
     "skipLibCheck": true,
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
@@ -21,6 +21,9 @@
     "jsx": "react-jsx",
     "baseUrl": ".",
     "paths": {
+      "@reelms/config": [
+        "../../packages/config/src/index.ts"
+      ],
       "@reelms/shared": [
         "../../packages/shared/src/index.ts"
       ]

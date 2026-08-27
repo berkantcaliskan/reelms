@@ -13,6 +13,8 @@ dist/
 **/dist/
 dist-electron/
 **/dist-electron/
+dist-electron-build/
+**/dist-electron-build/
 win-unpacked/
 **/win-unpacked/
 

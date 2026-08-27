@@ -14,12 +14,19 @@
     "release:win": "npm run build && cross-env CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --win --publish always"
   },
   "dependencies": {
+    "@mediapipe/selfie_segmentation": "^0.1.1675465747",
+    "@reelms/config": "0.1.0",
     "@reelms/shared": "0.1.0",
+    "@tanstack/react-virtual": "^3.14.10",
     "electron-store": "8.2.0",
     "electron-updater": "6.3.9",
+    "emoji-picker-react": "^4.19.1",
+    "livekit-client": "^2.22.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "socket.io-client": "4.8.1"
+    "react-router-dom": "^6.30.1",
+    "socket.io-client": "4.8.1",
+    "tweetnacl": "^1.0.3"
   },
   "devDependencies": {
     "@types/node": "22.10.7",
@@ -37,9 +44,9 @@
   "build": {
     "appId": "io.reelms.desktop",
     "productName": "Reelms",
-    "artifactName": "Reelms-Setup-${version}.${ext}",
+    "artifactName": "Reelms.${ext}",
     "directories": {
-      "output": "dist-electron"
+      "output": "dist-electron-build"
     },
     "files": [
       "dist/**/*",
@@ -50,33 +57,32 @@
     "win": {
       "target": [
         {
-          "target": "nsis",
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "dir",
           "arch": [
             "x64"
           ]
         }
       ],
       "icon": "build/icon.ico",
-      "artifactName": "Reelms-Setup-${version}.${ext}",
+      "artifactName": "Reelms.${ext}",
       "verifyUpdateCodeSignature": false,
       "requestedExecutionLevel": "asInvoker"
     },
-    "nsis": {
-      "oneClick": false,
-      "perMachine": false,
-      "allowElevation": false,
-      "allowToChangeInstallationDirectory": false,
-      "createDesktopShortcut": true,
-      "createStartMenuShortcut": true,
-      "shortcutName": "Reelms",
-      "uninstallDisplayName": "Reelms",
-      "deleteAppDataOnUninstall": false,
-      "runAfterFinish": true
+    "portable": {
+      "artifactName": "Reelms.${ext}",
+      "requestExecutionLevel": "user"
     },
     "publish": [
       {
-        "provider": "generic",
-        "url": "https://download.reelms.io/win/"
+        "provider": "github",
+        "owner": "berkantcaliskan",
+        "repo": "reelms"
       }
     ]
   },

@@ -1,6 +1,10 @@
 const path = require('node:path')
-const { app, BrowserWindow, ipcMain, shell } = require('electron')
+const { app, BrowserWindow, ipcMain, shell, Menu } = require('electron')
 const { autoUpdater } = require('electron-updater')
+const { GameDetector } = require('./gameDetector.cjs')
+const { RemoteControlExecutor } = require('./remoteControl.cjs')
+
+Menu.setApplicationMenu(null)
 
 const PROTOCOL = 'reelms'
 const DEV_RENDERER_URL = 'http://127.0.0.1:3105'
@@ -18,6 +22,8 @@ let mainWindow = null
 let updaterWindow = null
 let pendingAuthCode = null
 let updateDownloaded = false
+const remoteControlExecutor = new RemoteControlExecutor()
+let gameDetector = null
 
 function getAssetPath(...parts) {
   return path.join(__dirname, '..', ...parts)
@@ -81,6 +87,8 @@ function createWindow() {
     height: 820,
     minWidth: 980,
     minHeight: 680,
+    frame: false,
+    titleBarStyle: 'hidden',
     show: false,
     backgroundColor: '#070812',
     title: 'Reelms',
@@ -91,6 +99,13 @@ function createWindow() {
       nodeIntegration: false,
       sandbox: false
     }
+  })
+
+  mainWindow.on('maximize', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('window:maximize-change', true)
+  })
+  mainWindow.on('unmaximize', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('window:maximize-change', false)
   })
 
   if (isDev) {
@@ -110,9 +125,23 @@ function createWindow() {
       mainWindow.webContents.send('auth:code', pendingAuthCode)
       pendingAuthCode = null
     }
+
+    // Start automatic game & app activity detection
+    if (!gameDetector) {
+      gameDetector = new GameDetector((activity) => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.send('activity:update', activity)
+        }
+      })
+      gameDetector.start(4000)
+    }
   })
 
   mainWindow.on('closed', () => {
+    if (gameDetector) {
+      gameDetector.stop()
+      gameDetector = null
+    }
     mainWindow = null
   })
 
@@ -123,11 +152,14 @@ function createWindow() {
 
 function handleDeepLink(rawUrl) {
   try {
-    const url = new URL(rawUrl)
+    if (!rawUrl || typeof rawUrl !== 'string') return
+    const clean = rawUrl.replace(/^"+|"+$/g, '').trim()
+    const url = new URL(clean)
 
     if (url.protocol !== `${PROTOCOL}:`) return
 
-    if (url.hostname === 'auth') {
+    const hostname = url.hostname || url.pathname.replace(/^\/+/, '').split('/')[0]
+    if (hostname === 'auth') {
       const code = url.searchParams.get('code')
       if (!code) return
 
@@ -151,8 +183,10 @@ function setupSingleInstanceLock() {
   }
 
   app.on('second-instance', (_event, argv) => {
-    const deepLink = argv.find((arg) => arg.startsWith(`${PROTOCOL}://`))
-    if (deepLink) handleDeepLink(deepLink)
+    const deepLink = argv.find((arg) => typeof arg === 'string' && arg.includes(`${PROTOCOL}://`))
+    if (deepLink) {
+      handleDeepLink(deepLink)
+    }
 
     if (mainWindow && !mainWindow.isDestroyed()) {
       if (mainWindow.isMinimized()) mainWindow.restore()
@@ -190,7 +224,27 @@ function setupIpcHandlers() {
   })
 
   ipcMain.handle('auth:google-open', () => {
-    return shell.openExternal(`${apiUrl}/auth/google/login?platform=desktop`)
+    return shell.openExternal(`${apiUrl}/google/login?platform=desktop`)
+  })
+
+  ipcMain.handle('window:minimize', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.minimize()
+  })
+
+  ipcMain.handle('window:toggle-maximize', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      if (mainWindow.isMaximized()) mainWindow.unmaximize()
+      else mainWindow.maximize()
+    }
+  })
+
+  ipcMain.handle('window:close', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.close()
+  })
+
+  ipcMain.handle('window:is-maximized', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) return mainWindow.isMaximized()
+    return false
   })
 
   ipcMain.handle('window:set-fullscreen', (_event, enabled) => {
@@ -209,9 +263,16 @@ function setupIpcHandlers() {
       autoUpdater.quitAndInstall(false, true)
     }
   })
+
+  ipcMain.handle('remote-control:exec-event', (_event, payload) => {
+    return remoteControlExecutor.executeEvent(payload)
+  })
 }
 
 function setupAutoUpdaterForMainWindow() {
+  autoUpdater.autoDownload = true
+  autoUpdater.autoInstallOnAppQuit = true
+
   autoUpdater.on('update-available', (info) => {
     mainWindow?.webContents.send('updates:available', info)
   })
@@ -235,91 +296,28 @@ function setupAutoUpdaterForMainWindow() {
 }
 
 async function runUpdateGate() {
-  console.log(`[electron] Local backend is never started by desktop. apiUrl=${apiUrl}`)
+  console.log(`[electron] Starting Reelms... apiUrl=${apiUrl}`)
+  createWindow()
 
-  if (!app.isPackaged) {
-    createWindow()
-    return
-  }
-
-  createUpdaterWindow()
-
-  let finished = false
-
-  const continueToApp = () => {
-    if (finished) return
-    finished = true
-    createWindow()
-  }
-
-  const failSafeTimer = setTimeout(() => {
-    sendUpdaterStatus('Update check skipped. Starting Reelms...')
-    setTimeout(continueToApp, 700)
-  }, 10000)
-
-  autoUpdater.autoDownload = true
-
-  autoUpdater.on('checking-for-update', () => {
-    sendUpdaterStatus('Checking for updates...')
-    sendUpdaterProgress(8)
-  })
-
-  autoUpdater.on('update-not-available', () => {
-    clearTimeout(failSafeTimer)
-    sendUpdaterStatus('Reelms is up to date.')
-    sendUpdaterProgress(100)
-
-    setTimeout(continueToApp, 700)
-  })
-
-  autoUpdater.on('update-available', () => {
-    clearTimeout(failSafeTimer)
-    sendUpdaterStatus('New update found. Downloading...')
-    sendUpdaterProgress(15)
-  })
-
-  autoUpdater.on('download-progress', (progress) => {
-    const percent = Math.round(progress.percent || 0)
-    sendUpdaterStatus(`Downloading update... ${percent}%`)
-    sendUpdaterProgress(percent)
-  })
-
-  autoUpdater.on('update-downloaded', () => {
-    clearTimeout(failSafeTimer)
-    updateDownloaded = true
-
-    sendUpdaterStatus('Update ready. Restarting Reelms...')
-    sendUpdaterProgress(100)
-
-    setTimeout(() => {
-      autoUpdater.quitAndInstall(false, true)
-    }, 1200)
-  })
-
-  autoUpdater.on('error', (err) => {
-    clearTimeout(failSafeTimer)
-
-    console.error('[updates] check failed', err)
-    sendUpdaterStatus('Could not check updates. Starting Reelms...')
-
-    setTimeout(continueToApp, 900)
-  })
-
-  try {
-    await autoUpdater.checkForUpdates()
-  } catch (err) {
-    clearTimeout(failSafeTimer)
-
-    console.error('[updates] check failed', err)
-    sendUpdaterStatus('Could not check updates. Starting Reelms...')
-
-    setTimeout(continueToApp, 900)
+  if (app.isPackaged) {
+    try {
+      autoUpdater.checkForUpdates().catch((err) => {
+        console.warn('[updates] background check:', err?.message)
+      })
+    } catch (err) {
+      console.warn('[updates] background check error:', err)
+    }
   }
 }
 
 setupSingleInstanceLock()
 setupProtocolHandler()
 setupIpcHandlers()
+
+const coldStartDeepLink = process.argv.find((arg) => typeof arg === 'string' && arg.includes(`${PROTOCOL}://`))
+if (coldStartDeepLink) {
+  handleDeepLink(coldStartDeepLink)
+}
 
 app.whenReady().then(() => {
   if (app.isPackaged) {

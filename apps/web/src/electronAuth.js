@@ -3,7 +3,7 @@ import { getApiBaseUrl } from './config/api'
 
 const BACKEND = getApiBaseUrl()
 
-export const isElectron = typeof window !== 'undefined' && typeof window.electronAPI !== 'undefined'
+export const isElectron = typeof window !== 'undefined' && Boolean(window.electronAPI || window.reelms)
 
 // ── Internal state ───────────────────────────────────────────────────────────
 let _raw = null  // { uid, email, token }
@@ -107,12 +107,21 @@ export function electronSignOut() {
 }
 
 export function electronSignInWithGoogle() {
-  if (window.electronAPI?.openGoogleAuth) window.electronAPI.openGoogleAuth()
+  if (window.reelms?.openGoogleAuth) {
+    window.reelms.openGoogleAuth()
+  } else if (window.electronAPI?.openGoogleAuth) {
+    window.electronAPI.openGoogleAuth()
+  }
 }
 
 export async function electronCompleteGoogleAuth({ token, uid, email }) {
   _raw = { uid, email, token }
-  localStorage.setItem('_ea', JSON.stringify(_raw))
+  try {
+    localStorage.setItem('_ea', JSON.stringify(_raw))
+    localStorage.setItem('reelms.token', token)
+    localStorage.setItem('reelms:auth-session', JSON.stringify({ token, user: { uid, email } }))
+    localStorage.setItem('reelms:auth-event', JSON.stringify({ type: 'signin', token, uid, email, at: Date.now() }))
+  } catch {}
   await claimElectronClient(_raw)
   _notify(_raw)
 }

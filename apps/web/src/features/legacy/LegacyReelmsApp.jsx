@@ -59,6 +59,8 @@ import { QuickSwitcherModal } from '../quick-switcher/QuickSwitcherModal.jsx'
 import { ReelmsInsights } from '../insights/ReelmsInsights.jsx'
 import { getCachedMessages, saveCachedMessages, enqueueOutboxMessage, flushOutbox, isAppOnline } from '../offline/offlineQueue.js'
 
+const BACKEND_URL = getApiBaseUrl()
+
 // Audit Log components
 function AuditLogView({ reelmId }) {
   const [logs, setLogs] = useState([])
@@ -692,11 +694,31 @@ function SignInScreen({ onGoSignUp, onSignInSuccess }) {
       setLoginError('This account was opened in another session. Please sign in again here if you want to continue on this tab.')
       window.history.replaceState({}, '', window.location.pathname)
     }
-    if (isElectron && window.electronAPI?.onGoogleAuth) {
-      window.electronAPI.onGoogleAuth((data) => {
-        electronCompleteGoogleAuth(data)
-        onSignInSuccess()
-      })
+    if (isElectron) {
+      const handleAuth = async (data) => {
+        if (typeof data === 'string') {
+          try {
+            const apiEndpoint = (window.reelms?.apiUrl || window.electronAPI?.apiUrl || BACKEND_URL || getApiBaseUrl()).replace(/\/$/, '')
+            const resp = await fetch(`${apiEndpoint}/auth/desktop/exchange`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ code: data })
+            })
+            if (resp.ok) {
+              const res = await resp.json()
+              await electronCompleteGoogleAuth(res)
+              onSignInSuccess()
+            }
+          } catch (e) {
+            console.error('Desktop auth code exchange error:', e)
+          }
+        } else if (data && typeof data === 'object') {
+          await electronCompleteGoogleAuth(data)
+          onSignInSuccess()
+        }
+      }
+      if (window.reelms?.onAuthCode) window.reelms.onAuthCode(handleAuth)
+      if (window.electronAPI?.onGoogleAuth) window.electronAPI.onGoogleAuth(handleAuth)
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1448,6 +1470,7 @@ const DEFAULT_CUSTOMIZATION = {
   customBase: null,
   customTextColor: 'white',
   customGreeting: null,
+  greetingPunctuation: '!',
 }
 
 const CLASSIC_GREETINGS = ['Good morning', 'Good afternoon', 'Good evening', 'Good night']
@@ -2038,9 +2061,31 @@ function CustomizationPanel({ customization, onChange, bodyFont, BODY_FONTS, onF
             if (CLASSIC_GREETINGS.includes(customization.customGreeting)) onChange({ customGreeting: null })
           }}
         />
+        <div className="cust-greeting-sublabel" style={{ marginTop: 18 }}>Greeting Punctuation</div>
+        <div className="cust-greeting-pills">
+          {[
+            { id: '!', label: '! (Default)' },
+            { id: '.', label: '.' },
+            { id: '?', label: '?' },
+            { id: 'none', label: 'None' },
+          ].map(p => {
+            const currentPunct = customization.greetingPunctuation || '!'
+            const isActive = currentPunct === p.id
+            return (
+              <button
+                key={p.id}
+                type="button"
+                className={`cust-greeting-pill${isActive ? ' cust-greeting-pill--active' : ''}`}
+                onClick={() => onChange({ greetingPunctuation: p.id })}
+              >
+                {p.label}
+              </button>
+            )
+          })}
+        </div>
         {customization.customGreeting && (
           <p className="cust-greeting-preview">
-            {customization.customGreeting}, {user?.name || user?.username || 'you'}!
+            {customization.customGreeting}, {user?.name || user?.username || 'you'}{customization.greetingPunctuation === 'none' ? '' : (customization.greetingPunctuation || '!')}
           </p>
         )}
       </div>
@@ -3396,11 +3441,11 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
   const dragSocialKeyRef = useRef(null)
   const [dragOverSocialKey, setDragOverSocialKey] = useState(null)
   const [socialCtxMenu, setSocialCtxMenu] = useState(null)
+  const [showActivitySetter, setShowActivitySetter] = useState(false)
+  const [mediaSaving, setMediaSaving] = useState(null)
   const [showMyReelms, setShowMyReelms] = useState(false)
   const [showMyActivity, setShowMyActivity] = useState(false)
   const [activityItems, setActivityItems] = useState([])
-  const [showActivitySetter, setShowActivitySetter] = useState(false)
-  const [mediaSaving, setMediaSaving] = useState(null)
 
   useEffect(() => {
     if (!showMyActivity || !reelms || !uid) return
@@ -3765,21 +3810,25 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
         </div>
 
         <div className="pp-action-row">
-          <button className="pp-action-btn" onClick={() => { setShowMyReelms(true); setShowMyActivity(false) }}>
+          <button type="button" className="pp-action-btn" onClick={() => { setShowMyReelms(true); setShowMyActivity(false) }}>
             <span className="pp-action-count">{reelms?.length || 0}</span>
-            {"Reelms you're in"}
+            <span>{"Reelms you're in"}</span>
           </button>
-          <button className="pp-action-btn" onClick={() => { setShowMyActivity(true); setShowMyReelms(false) }}>
-            All activity
+          <button type="button" className="pp-action-btn" onClick={() => { setShowMyActivity(true); setShowMyReelms(false) }}>
+            <span>All activity</span>
           </button>
         </div>
+
         {onViewFullProfile && (
           <button
             type="button"
             className="profile-view-full-btn"
             onClick={e => { e.stopPropagation(); onClose(); onViewFullProfile() }}
           >
-            {t('see_full_profile')}
+            <span>{t('see_full_profile')}</span>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+              <polyline points="9 18 15 12 9 6" />
+            </svg>
           </button>
         )}
       </div>
@@ -4125,7 +4174,11 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
         <div className="fpp-names">
           <span className="fpp-name">{nickname || safeFriend.name}</span>
           {safeFriend.username && <span className="fpp-username">{'@' + (safeFriend.username.startsWith('@') ? safeFriend.username.slice(1) : safeFriend.username)}</span>}
-          {safeFriend.activity?.name && <ActivityBadge activity={safeFriend.activity} />}
+          {safeFriend.activity?.name && (
+            <div className="fpp-activity-wrap">
+              <ActivityBadge activity={safeFriend.activity} />
+            </div>
+          )}
         </div>
       </div>
       {!isSelf && (
@@ -5038,6 +5091,174 @@ function VoiceMessage({ src }) {
   )
 }
 
+function formatReelmDate(timestamp) {
+  if (!timestamp) return 'Yeni'
+  const d = new Date(timestamp)
+  if (isNaN(d.getTime())) return 'Yeni'
+  return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short', year: 'numeric' })
+}
+
+function ReelmInfoMenu({ reelm, pos, onClose, onOpenInsights, isOwnerOrAdmin, t, uid, onCopyCode }) {
+  if (!reelm || !pos) return null
+  const totalMembers = Array.isArray(reelm.members) ? reelm.members.length : 1
+  const onlineMembers = Array.isArray(reelm.members)
+    ? reelm.members.filter(m => m.status === 'online' || m.online).length
+    : 1
+  const totalChannels = (reelm.categories || []).reduce((acc, cat) => acc + (cat.channels || []).length, 0)
+    + (reelm.channels || []).length
+  const reelmCategory = isDefaultCommunity(reelm)
+    ? 'Resmi Topluluk'
+    : (reelm.category || (reelm.isWorkspace ? 'Çalışma Alanı' : 'Topluluk'))
+  const createdDate = formatReelmDate(reelm.createdAt)
+  const ownerDisplayName = reelm.ownerName || reelm.owner?.name || (reelm.ownerId === uid ? 'Sen' : 'Reelms')
+
+  const copyCode = (code, e) => {
+    e.stopPropagation()
+    if (code && navigator.clipboard) {
+      navigator.clipboard.writeText(code)
+      if (onCopyCode) onCopyCode(code)
+    }
+  }
+
+  return (
+    <div className="reelm-info-menu" style={{ top: pos.y, left: pos.x, width: pos.w || 280 }} onClick={e => e.stopPropagation()}>
+      {/* 1. Insights Intelligence Button */}
+      <button
+        type="button"
+        className="reelm-info-menu-item reelm-info-menu-insights"
+        onClick={() => {
+          onOpenInsights(reelm)
+          onClose()
+        }}
+      >
+        <div className="reelm-menu-left-row">
+          <svg className="reelm-insights-icon" width="14" height="13" viewBox="0 0 12 11" fill="currentColor"><rect x="0" y="6" width="2.5" height="5" rx="1"/><rect x="4.75" y="0" width="2.5" height="11" rx="1"/><rect x="9.5" y="3.5" width="2.5" height="7.5" rx="1"/></svg>
+          <span style={{ fontWeight: 700 }}>Insights</span>
+        </div>
+        <span className="reelm-intel-pill">
+          <svg className="reelm-intel-star" width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z"/>
+          </svg>
+          intelligence
+        </span>
+      </button>
+
+      <div className="reelm-name-menu-divider" />
+
+      {/* 2. Reelm Info Details */}
+      <div className="reelm-info-details">
+        <div className="reelm-info-row">
+          <span className="reelm-info-label">🏷️ Kategori</span>
+          <span className="reelm-info-value">{reelmCategory}</span>
+        </div>
+        <div className="reelm-info-row">
+          <span className="reelm-info-label">👥 Üyeler</span>
+          <span className="reelm-info-value">{totalMembers} üye <span style={{ opacity: 0.65, fontSize: '0.72rem' }}>({onlineMembers} aktif)</span></span>
+        </div>
+        <div className="reelm-info-row">
+          <span className="reelm-info-label">💬 Kanallar</span>
+          <span className="reelm-info-value">{totalChannels} kanal</span>
+        </div>
+        <div className="reelm-info-row">
+          <span className="reelm-info-label">👑 Kurucu</span>
+          <span className="reelm-info-value">{ownerDisplayName}</span>
+        </div>
+        <div className="reelm-info-row">
+          <span className="reelm-info-label">📅 Kuruluş</span>
+          <span className="reelm-info-value">{createdDate}</span>
+        </div>
+        {(reelm.joinCode || reelm.code) && (
+          <div className="reelm-info-row">
+            <span className="reelm-info-label">🔑 Katılım Kodu</span>
+            <span className="reelm-info-code-badge" onClick={(e) => copyCode(reelm.joinCode || reelm.code, e)} title="Kodu Kopyala">
+              {reelm.joinCode || reelm.code} 📋
+            </span>
+          </div>
+        )}
+        {reelm.description && (
+          <div className="reelm-info-desc">
+            "{reelm.description}"
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function formatPollTimeLeft(expiresAt) {
+  const diff = expiresAt - Date.now()
+  if (diff <= 0) return 'Sona erdi'
+  const hours = Math.floor(diff / (1000 * 60 * 60))
+  if (hours < 1) {
+    const mins = Math.max(1, Math.floor(diff / (1000 * 60)))
+    return `${mins}dk`
+  }
+  if (hours < 24) return `${hours}sa`
+  const days = Math.floor(hours / (1000 * 60 * 60 * 24))
+  return `${days}g`
+}
+
+function PollCard({ poll, onVote, myUid, disabled }) {
+  if (!poll) return null
+  const totalVotes = (poll.options || []).reduce((sum, opt) => sum + (opt.voters || []).length, 0)
+  const isExpired = poll.expiresAt ? Date.now() >= poll.expiresAt : false
+  const timeLeft = poll.expiresAt && !isExpired ? formatPollTimeLeft(poll.expiresAt) : null
+
+  return (
+    <div className={`poll-msg-card${isExpired ? ' poll-msg-card--expired' : ''}`}>
+      <div className="poll-msg-header">
+        <div className="poll-msg-title-wrap">
+          <span className="poll-msg-badge">📊 Anket</span>
+          <span className="poll-msg-question">{poll.question}</span>
+        </div>
+        <div className="poll-msg-status">
+          {isExpired ? (
+            <span className="poll-status-tag poll-status-tag--expired">🔒 Sona erdi</span>
+          ) : timeLeft ? (
+            <span className="poll-status-tag poll-status-tag--active">⏳ {timeLeft} kaldı</span>
+          ) : (
+            <span className="poll-status-tag poll-status-tag--infinite">♾️ Süresiz</span>
+          )}
+        </div>
+      </div>
+      <div className="poll-msg-options">
+        {(poll.options || []).map((opt, idx) => {
+          const voteCount = (opt.voters || []).length
+          const pct = totalVotes > 0 ? Math.round((voteCount / totalVotes) * 100) : 0
+          const hasMyVote = (opt.voters || []).includes(myUid)
+          return (
+            <button
+              key={idx}
+              type="button"
+              className={`poll-option-btn${hasMyVote ? ' poll-option-btn--voted' : ''}${isExpired || disabled ? ' poll-option-btn--disabled' : ''}`}
+              onClick={() => !isExpired && !disabled && onVote && onVote(idx)}
+              disabled={isExpired || disabled}
+            >
+              <div className="poll-option-fill" style={{ width: `${pct}%` }} />
+              <div className="poll-option-content">
+                <div className="poll-option-left">
+                  <span className={`poll-option-radio${hasMyVote ? ' poll-option-radio--checked' : ''}`}>
+                    {hasMyVote && <span className="poll-option-dot" />}
+                  </span>
+                  <span className="poll-option-text">{opt.text}</span>
+                </div>
+                <div className="poll-option-right">
+                  {totalVotes > 0 && <span className="poll-option-pct">%{pct}</span>}
+                  <span className="poll-option-count">{voteCount} oy</span>
+                </div>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+      <div className="poll-msg-footer">
+        <span className="poll-total-votes">{totalVotes} toplam oy</span>
+        <span className="poll-hint">{isExpired ? 'Bu anket tamamlandı.' : 'Oyunuzu değiştirmek veya kaldırmak için seçeneğe tıklayabilirsiniz.'}</span>
+      </div>
+    </div>
+  )
+}
+
 function VirtualMessageList({
   msgs,
   isBubbleMode,
@@ -5065,6 +5286,7 @@ function VirtualMessageList({
   dmReadReceipts,
   msgReactions,
   msgListRef,
+  onVotePoll,
 }) {
   const formatTime = useCallback((tm) => (tm instanceof Date ? tm : new Date(tm)).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }), [])
   const formatDateLabel = useCallback((tm) => {
@@ -5294,6 +5516,9 @@ function VirtualMessageList({
                     </SpoilerMedia>
                   )}
                   {msg.mediaUrl && msg.mediaType === 'audio' && <VoiceMessage src={msg.mediaUrl} />}
+                  {(msg.type === 'poll' || msg.poll) && (
+                    <PollCard poll={msg.poll} onVote={(optIdx) => onVotePoll && onVotePoll(msgKey2, msg.id, optIdx)} myUid={uid} disabled={selectedChatSystemLocked} />
+                  )}
                   {msg.mediaUrl && (msg.mediaType === 'gif' || msg.mediaType === 'sticker') && (
                     <SpoilerMedia isSpoiler={Boolean(msg.isSpoiler || msg.mediaSpoiler)} mediaType={msg.mediaType}>
                       <img src={msg.mediaUrl} alt="" className={msg.mediaType === 'sticker' ? 'msg-sticker-img' : 'msg-gif-img'} />
@@ -5436,6 +5661,9 @@ function VirtualMessageList({
                           </SpoilerMedia>
                         )}
                         {msg.mediaUrl && msg.mediaType === 'audio' && <VoiceMessage src={msg.mediaUrl} />}
+                        {(msg.type === 'poll' || msg.poll) && (
+                          <PollCard poll={msg.poll} onVote={(optIdx) => onVotePoll && onVotePoll(msgKey2, msg.id, optIdx)} myUid={uid} disabled={selectedChatSystemLocked} />
+                        )}
                         {msg.mediaUrl && (msg.mediaType === 'gif' || msg.mediaType === 'sticker') && (
                           <SpoilerMedia isSpoiler={Boolean(msg.isSpoiler || msg.mediaSpoiler)} mediaType={msg.mediaType}>
                             <img src={msg.mediaUrl} alt="" className={msg.mediaType === 'sticker' ? 'msg-sticker-img' : 'msg-gif-img'} />
@@ -6334,6 +6562,7 @@ function ChannelPermissionsModal({ reelm, target, onClose, onSave }) {
 }
 
 function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onCloseReelm, onAnnouncement, onApproveJoin, onRejectJoin, onInviteFriend, onBanMember, onUnbanMember, onTimeoutMember, onUntimeoutMember }) {
+  const t = useT()
   const [activeTab, setActiveTab] = useState('general')
   const [roles, setRoles] = useState(() => (reelm.roles || []).map((role, i) => normalizeRoleForClient(role, `role-${i}`)))
   const [members, setMembers] = useState(() => reelm.members || [])
@@ -6565,6 +6794,16 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
     saveAll(roles, updatedMembers)
   }
 
+  const banList = Array.isArray(reelm.banList) ? reelm.banList : []
+  const bannedIds = new Set(banList.map(entry => String(entry?.userId || entry?.id || '')).filter(Boolean))
+  const timeoutList = Array.isArray(reelm.timeoutList) ? reelm.timeoutList.filter(entry => Number(entry?.expiresAt || 0) > Date.now()) : []
+  const timedOutIds = new Set(timeoutList.map(entry => String(entry?.userId || entry?.id || '')).filter(Boolean))
+  const formatTimeoutUntil = (expiresAt) => {
+    const ts = Number(expiresAt || 0)
+    if (!ts) return 'timeout active'
+    try { return `until ${new Date(ts).toLocaleString()}` } catch { return 'timeout active' }
+  }
+
   const inviteFriendToReelm = (friend) => {
     if ((!canManageInvites && !canManageMembers) || !friend?.id || members.find(m => m.userId === friend.id) || bannedIds.has(String(friend.id))) return
     onInviteFriend?.(reelm.id, friend.id)
@@ -6619,15 +6858,6 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
   const filteredNonMembers = memberSearch.trim()
     ? nonMembers.filter(f => f.name?.toLowerCase().includes(memberSearch.toLowerCase()))
     : nonMembers
-  const banList = Array.isArray(reelm.banList) ? reelm.banList : []
-  const bannedIds = new Set(banList.map(entry => String(entry?.userId || entry?.id || '')).filter(Boolean))
-  const timeoutList = Array.isArray(reelm.timeoutList) ? reelm.timeoutList.filter(entry => Number(entry?.expiresAt || 0) > Date.now()) : []
-  const timedOutIds = new Set(timeoutList.map(entry => String(entry?.userId || entry?.id || '')).filter(Boolean))
-  const formatTimeoutUntil = (expiresAt) => {
-    const ts = Number(expiresAt || 0)
-    if (!ts) return 'timeout active'
-    try { return `until ${new Date(ts).toLocaleString()}` } catch { return 'timeout active' }
-  }
 
   const allChannels = useMemo(() => (reelm.categories || []).flatMap(c => (c.channels || []).map(ch => ({ ...ch, categoryId: c.id, categoryName: c.name }))), [reelm.categories])
 
@@ -10726,6 +10956,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     scheduleUserPersist('feed_nav', order)
   }
   const [showReelmMenu, setShowReelmMenu] = useState(null)
+  const [showReelmInfoMenu, setShowReelmInfoMenu] = useState(null)
   const [showReelmSettings, setShowReelmSettings] = useState(false)
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [copiedInvite, setCopiedInvite] = useState(false)
@@ -11037,6 +11268,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [showPollCreator, setShowPollCreator] = useState(false)
   const [pollQuestion, setPollQuestion] = useState('')
   const [pollOptions, setPollOptions] = useState(['', ''])
+  const [pollDuration, setPollDuration] = useState(null)
   const [reportModal, setReportModal] = useState(null)
   const [reports, setReports] = useState([])
   const [modDeleteTick, setModDeleteTick] = useState(0)
@@ -12236,22 +12468,64 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   function sendPoll() {
     const opts = pollOptions.filter(o => o.trim())
     if (!pollQuestion.trim() || opts.length < 2) return
-    const chatKey = selectedChat ? selectedChat.id : composeReelmMsgKey(selectedReelm, selectedChannel)
-    if (!chatKey) return
+    const msgKey = selectedChat ? selectedChat.id : composeReelmMsgKey(selectedReelm, selectedChannel)
+    if (!msgKey) return
+    const now = Date.now()
+    const pollId = createClientMessageId()
+    const expiresAt = pollDuration ? now + pollDuration : null
     const pollMsg = {
+      id: pollId,
       type: 'poll',
-      question: pollQuestion.trim(),
-      options: opts.map(o => ({ text: o.trim(), votes: [] })),
-      senderId: uid,
-      senderName: currentUser?.displayName || currentUser?.name || '',
-      senderPhoto: currentUser?.photoURL || currentUser?.photo || null,
-      timestamp: Date.now(),
+      text: `📊 ${pollQuestion.trim()}`,
+      poll: {
+        question: pollQuestion.trim(),
+        options: opts.map((opt, idx) => ({ id: idx, text: opt.trim(), voters: [] })),
+        expiresAt,
+        durationLabel: pollDuration === 86400000 ? '1 gün' : pollDuration === 604800000 ? '1 hafta' : 'Süresiz',
+        createdAt: now
+      },
+      sender: { id: currentUser.id, name: currentUser.name, photo: getPersonPhoto(currentUser) || null },
+      time: now,
+      timestamp: now
     }
-    socketEmitMessage(chatKey, pollMsg)
+    setMessages(prev => appendUniqueMessage(prev, msgKey, pollMsg))
+    messageSend(msgKey, pollMsg).catch(err => handleRemoteMessageError(err, msgKey, pollMsg.id))
+    setNewMsgId(pollMsg.id)
     setShowPollCreator(false)
     setPollQuestion('')
     setPollOptions(['', ''])
+    setPollDuration(null)
     setShowPlusMenu(false)
+  }
+
+  const handleVotePoll = (chatKey, msgId, optionIdx) => {
+    if (!uid) return
+    setMessages(prev => {
+      const chatMsgs = prev[chatKey] || []
+      const nextMsgs = chatMsgs.map(m => {
+        if (String(m.id) !== String(msgId) || !m.poll) return m
+        if (m.poll.expiresAt && m.poll.expiresAt < Date.now()) return m
+        const nextOptions = (m.poll.options || []).map((opt, idx) => {
+          const hasVoted = (opt.voters || []).includes(uid)
+          if (idx === optionIdx) {
+            const newVoters = hasVoted ? opt.voters.filter(v => v !== uid) : [...(opt.voters || []), uid]
+            return { ...opt, voters: newVoters }
+          } else {
+            return { ...opt, voters: (opt.voters || []).filter(v => v !== uid) }
+          }
+        })
+        const updatedMsg = {
+          ...m,
+          poll: {
+            ...m.poll,
+            options: nextOptions
+          }
+        }
+        messageEdit(chatKey, msgId, updatedMsg.text, { poll: updatedMsg.poll }).catch(() => {})
+        return updatedMsg
+      })
+      return { ...prev, [chatKey]: nextMsgs }
+    })
   }
 
   // Fetch changelog once on mount
@@ -13202,13 +13476,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }, [openCategoryMenu])
 
   useEffect(() => {
-    if (!showReelmMenu) return
+    if (!showReelmMenu && !showReelmInfoMenu) return
     const handler = (e) => {
-      if (!e.target.closest('.reelm-name-menu') && !e.target.closest('.reelm-sidebar-name')) setShowReelmMenu(null)
+      if (!e.target.closest('.reelm-name-menu') && !e.target.closest('.reelm-info-menu') && !e.target.closest('.reelm-sidebar-name') && !e.target.closest('.reelm-sidebar-name-row')) {
+        setShowReelmMenu(null)
+        setShowReelmInfoMenu(null)
+      }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [showReelmMenu])
+  }, [showReelmMenu, showReelmInfoMenu])
 
   useEffect(() => {
     if (!showDmFriendMenu) return
@@ -13500,15 +13777,21 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       sendControlEvent(peer, { type: 'ctrl_mouse', event: e.type, x: (e.clientX - rect.left) / w, y: (e.clientY - rect.top) / h, button: e.button })
     }
     return {
-      style: { cursor: 'crosshair' },
+      style: { cursor: 'crosshair', outline: 'none' },
+      tabIndex: 0,
       onMouseMove: onMouse,
-      onMouseDown: onMouse,
+      onMouseDown: (e) => { e.currentTarget.focus(); onMouse(e) },
       onMouseUp: onMouse,
+      onClick: onMouse,
       onWheel: (e) => {
         e.preventDefault()
         sendControlEvent(peer, { type: 'ctrl_wheel', deltaX: e.deltaX, deltaY: e.deltaY })
       },
-      onContextMenu: (e) => { e.preventDefault() },
+      onContextMenu: (e) => { e.preventDefault(); onMouse(e) },
+      onKeyDown: (e) => {
+        if (['Control', 'Shift', 'Alt', 'Meta'].includes(e.key)) return
+        sendControlEvent(peer, { type: 'ctrl_key', key: e.key })
+      }
     }
   }
 
@@ -13762,6 +14045,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       setRemoteControlActive({ controllerId: uid, controllerName: currentUserRef.current?.name, sharingUserId: from, sharingUserName: msg.sharingUserName })
     } else if (type === 'remote_ctrl_decline' && String(msg.requesterId) === String(uid)) {
       setRemoteControlActive(null)
+      addNotification('Remote control request was declined.')
+    } else if (type === 'remote_ctrl_stop') {
+      setRemoteControlActive(null)
+      addNotification('Remote control session ended.')
     } else if (type === 'nudge' && String(msg.targetUserId) === String(uid)) {
       addNotification(`${msg.senderName} nudged you!`, { type: 'dm', userId: String(from) })
       playSound.nudge()
@@ -14141,6 +14428,15 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (!remoteControlReq) return
     socketVcSignal(remoteControlReq.requesterId, { type: 'remote_ctrl_decline', requesterId: remoteControlReq.requesterId })
     setRemoteControlReq(null)
+  }
+
+  const releaseRemoteControl = (targetUserId) => {
+    const peerKey = String(targetUserId || remoteControlActive?.sharingUserId || remoteControlActive?.controllerId || '')
+    if (peerKey) {
+      socketVcSignal(peerKey, { type: 'remote_ctrl_stop', requesterId: uid, sharingUserId: peerKey })
+    }
+    setRemoteControlActive(null)
+    addNotification('Remote control session ended.')
   }
 
   useEffect(() => {
@@ -16282,15 +16578,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     <span className={`profile-name${(currentUser.name || '').length > 14 ? ' profile-name--small' : ''}${spotifyNowPlaying ? ' profile-name--listening' : ''}`}>{currentUser.name}</span>
                     <span className="profile-status-dot" style={{ background: { online: '#4ade80', idle: '#fbbf24', busy: '#f87171', invisible: '#9ca3af' }[profileStatus] }} />
                   </div>
-                  {spotifyNowPlaying && (
+                  {spotifyNowPlaying ? (
                     <div className="profile-nowplaying" aria-live="polite">
                       <span className="profile-nowplaying-track">{spotifyNowPlaying.name}</span>
                       <span className="profile-nowplaying-sep"> • </span>
                       <span className="profile-nowplaying-artist">{spotifyNowPlaying.artist}</span>
                     </div>
+                  ) : (
+                    <>
+                      {serverRole && <span className="profile-role">{serverRole}</span>}
+                      {currentActivity?.name && <ActivityBadge activity={currentActivity} />}
+                    </>
                   )}
-                  {serverRole && <span className="profile-role">{serverRole}</span>}
-                  {currentActivity?.name && <ActivityBadge activity={currentActivity} />}
                 </div>
                 <img src={getPersonPhoto(currentUser) || avatarUIcon} alt="Avatar" className="profile-avatar" />
               </div>
@@ -17785,12 +18084,23 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   <div className="reelm-sidebar">
                     <div
                       className={`reelm-cover-wrap${selectedReelm.image ? ' reelm-cover-wrap--has-image' : ''}${isDefaultCommunity(selectedReelm) ? ' reelm-cover-wrap--community' : ''}`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (showReelmInfoMenu) { setShowReelmInfoMenu(null); return }
+                        setShowReelmMenu(null)
+                        const r = e.currentTarget.getBoundingClientRect()
+                        const menuWidth = Math.max(260, Math.round(r.width))
+                        const x = Math.min(e.clientX || r.left, window.innerWidth - menuWidth - 12)
+                        const y = Math.min((e.clientY || r.bottom) + 4, window.innerHeight - 340)
+                        setShowReelmInfoMenu({ x: Math.max(10, x), y: Math.max(10, y), w: menuWidth })
+                      }}
                       onContextMenu={(e) => {
                         e.preventDefault()
                         e.stopPropagation()
                         if (showReelmMenu) { setShowReelmMenu(null); return; }
+                        setShowReelmInfoMenu(null)
                         const r = e.currentTarget.getBoundingClientRect()
-                        const menuWidth = Math.max(200, Math.round(r.width))
+                        const menuWidth = Math.max(220, Math.round(r.width))
                         const x = Math.min(e.clientX, window.innerWidth - menuWidth - 12)
                         const y = Math.min(e.clientY, window.innerHeight - 260)
                         setShowReelmMenu({ x: Math.max(10, x), y: Math.max(10, y), w: menuWidth })
@@ -17803,37 +18113,32 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           : <div className="reelm-cover-placeholder"></div>
                       }
                       {selectedReelm.image && <div className="reelm-cover-blur-strip" />}
-                      <div className="reelm-sidebar-name-row" onClick={e => e.stopPropagation()}>
+                      <div className="reelm-sidebar-name-row" onClick={e => {
+                        e.stopPropagation()
+                        if (showReelmInfoMenu) { setShowReelmInfoMenu(null); return }
+                        setShowReelmMenu(null)
+                        const r = e.currentTarget.getBoundingClientRect()
+                        const menuWidth = Math.max(260, Math.round(r.width))
+                        const x = Math.min(e.clientX || r.left, window.innerWidth - menuWidth - 12)
+                        const y = Math.min((e.clientY || r.bottom) + 4, window.innerHeight - 340)
+                        setShowReelmInfoMenu({ x: Math.max(10, x), y: Math.max(10, y), w: menuWidth })
+                      }}>
                         <span className="reelm-sidebar-name">{selectedReelm.name}</span>
+                        {showReelmInfoMenu && ReactDOM.createPortal(
+                          <ReelmInfoMenu
+                            reelm={selectedReelm}
+                            pos={showReelmInfoMenu}
+                            onClose={() => setShowReelmInfoMenu(null)}
+                            onOpenInsights={(r) => setShowInsightsModal(r)}
+                            isOwnerOrAdmin={canManageReelmClient(selectedReelm, uid)}
+                            t={t}
+                            uid={uid}
+                            onCopyCode={() => addNotification('Reelm kodu kopyalandı!')}
+                          />,
+                          document.body
+                        )}
                         {showReelmMenu && ReactDOM.createPortal(
-                          <div className="reelm-name-menu" style={{ top: showReelmMenu.y, left: showReelmMenu.x, minWidth: 250 }}>
-                            {(() => {
-                              const _mm = selectedReelm.members?.find(m => m.userId === uid)
-                              const _mr = (selectedReelm.roles || []).filter(r => (_mm?.roleIds || []).includes(r.id))
-                              const _ia = canManageReelmClient(selectedReelm, uid) || _mr.some(isManagerRoleClient)
-                              return _ia ? (<>
-                                <button
-                                  type="button"
-                                  className="reelm-name-menu-item reelm-name-menu-insights"
-                                  onClick={() => {
-                                    setShowInsightsModal(selectedReelm)
-                                    setShowReelmMenu(null)
-                                  }}
-                                >
-                                  <div className="reelm-menu-left-row">
-                                    <svg className="reelm-insights-icon" width="13" height="12" viewBox="0 0 12 11" fill="currentColor"><rect x="0" y="6" width="2.5" height="5" rx="1"/><rect x="4.75" y="0" width="2.5" height="11" rx="1"/><rect x="9.5" y="3.5" width="2.5" height="7.5" rx="1"/></svg>
-                                    <span>Insights</span>
-                                  </div>
-                                  <span className="reelm-intel-pill">
-                                    <svg className="reelm-intel-star" width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
-                                      <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z"/>
-                                    </svg>
-                                    intelligence
-                                  </span>
-                                </button>
-                                <div className="reelm-name-menu-divider" />
-                              </>) : null
-                            })()}
+                          <div className="reelm-name-menu" style={{ top: showReelmMenu.y, left: showReelmMenu.x, minWidth: 220 }} onClick={e => e.stopPropagation()}>
                             {((!isDefaultCommunity(selectedReelm) && hasReelmPermissionClient(selectedReelm, uid, 'manageOverview')) || canManageReelmClient(selectedReelm, uid)) && (
                               <button
                                 type="button"
@@ -18502,12 +18807,23 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     <div className="reelm-sidebar">
                       <div
                         className={`reelm-cover-wrap${selectedReelm.image ? ' reelm-cover-wrap--has-image' : ''}${isDefaultCommunity(selectedReelm) ? ' reelm-cover-wrap--community' : ''}`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          if (showReelmInfoMenu) { setShowReelmInfoMenu(null); return }
+                          setShowReelmMenu(null)
+                          const r = e.currentTarget.getBoundingClientRect()
+                          const menuWidth = Math.max(260, Math.round(r.width))
+                          const x = Math.min(e.clientX || r.left, window.innerWidth - menuWidth - 12)
+                          const y = Math.min((e.clientY || r.bottom) + 4, window.innerHeight - 340)
+                          setShowReelmInfoMenu({ x: Math.max(10, x), y: Math.max(10, y), w: menuWidth })
+                        }}
                         onContextMenu={(e) => {
                           e.preventDefault()
                           e.stopPropagation()
                           if (showReelmMenu) { setShowReelmMenu(null); return; }
+                          setShowReelmInfoMenu(null)
                           const r = e.currentTarget.getBoundingClientRect()
-                          const menuWidth = Math.max(200, Math.round(r.width))
+                          const menuWidth = Math.max(220, Math.round(r.width))
                           const x = Math.min(e.clientX, window.innerWidth - menuWidth - 12)
                           const y = Math.min(e.clientY, window.innerHeight - 260)
                           setShowReelmMenu({ x: Math.max(10, x), y: Math.max(10, y), w: menuWidth })
@@ -18520,37 +18836,32 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             : <div className="reelm-cover-placeholder"><span>+</span></div>
                         }
                         {selectedReelm.image && <div className="reelm-cover-blur-strip" />}
-                        <div className="reelm-sidebar-name-row" onClick={e => e.stopPropagation()}>
+                        <div className="reelm-sidebar-name-row" onClick={e => {
+                          e.stopPropagation()
+                          if (showReelmInfoMenu) { setShowReelmInfoMenu(null); return }
+                          setShowReelmMenu(null)
+                          const r = e.currentTarget.getBoundingClientRect()
+                          const menuWidth = Math.max(260, Math.round(r.width))
+                          const x = Math.min(e.clientX || r.left, window.innerWidth - menuWidth - 12)
+                          const y = Math.min((e.clientY || r.bottom) + 4, window.innerHeight - 340)
+                          setShowReelmInfoMenu({ x: Math.max(10, x), y: Math.max(10, y), w: menuWidth })
+                        }}>
                           <span className="reelm-sidebar-name">{selectedReelm.name}</span>
+                          {showReelmInfoMenu && ReactDOM.createPortal(
+                            <ReelmInfoMenu
+                              reelm={selectedReelm}
+                              pos={showReelmInfoMenu}
+                              onClose={() => setShowReelmInfoMenu(null)}
+                              onOpenInsights={(r) => setShowInsightsModal(r)}
+                              isOwnerOrAdmin={canManageReelmClient(selectedReelm, uid)}
+                              t={t}
+                              uid={uid}
+                              onCopyCode={() => addNotification('Reelm kodu kopyalandı!')}
+                            />,
+                            document.body
+                          )}
                           {showReelmMenu && ReactDOM.createPortal(
-                            <div className="reelm-name-menu" style={{ top: showReelmMenu.y, left: showReelmMenu.x, minWidth: 250 }}>
-                              {(() => {
-                                const _mm = selectedReelm.members?.find(m => m.userId === uid)
-                                const _mr = (selectedReelm.roles || []).filter(r => (_mm?.roleIds || []).includes(r.id))
-                                const _ia = canManageReelmClient(selectedReelm, uid) || _mr.some(isManagerRoleClient)
-                                return _ia ? (<>
-                                  <button
-                                    type="button"
-                                    className="reelm-name-menu-item reelm-name-menu-insights"
-                                    onClick={() => {
-                                      setShowInsightsModal(selectedReelm)
-                                      setShowReelmMenu(null)
-                                    }}
-                                  >
-                                    <div className="reelm-menu-left-row">
-                                      <svg className="reelm-insights-icon" width="13" height="12" viewBox="0 0 12 11" fill="currentColor"><rect x="0" y="6" width="2.5" height="5" rx="1"/><rect x="4.75" y="0" width="2.5" height="11" rx="1"/><rect x="9.5" y="3.5" width="2.5" height="7.5" rx="1"/></svg>
-                                      <span>Insights</span>
-                                    </div>
-                                    <span className="reelm-intel-pill">
-                                      <svg className="reelm-intel-star" width="9" height="9" viewBox="0 0 24 24" fill="currentColor">
-                                        <path d="M12 0L14.59 9.41L24 12L14.59 14.59L12 24L9.41 14.59L0 12L9.41 9.41L12 0Z"/>
-                                      </svg>
-                                      intelligence
-                                    </span>
-                                  </button>
-                                  <div className="reelm-name-menu-divider" />
-                                </>) : null
-                              })()}
+                            <div className="reelm-name-menu" style={{ top: showReelmMenu.y, left: showReelmMenu.x, minWidth: 220 }} onClick={e => e.stopPropagation()}>
                               {((!isDefaultCommunity(selectedReelm) && hasReelmPermissionClient(selectedReelm, uid, 'manageOverview')) || canManageReelmClient(selectedReelm, uid)) && (
                                 <button
                                   type="button"
@@ -19040,16 +19351,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                       {p.userId !== uid && p.screenStream && (
                                         <button
                                           className={`live-remote-ctrl-btn${isActivelyControllingPeer(p.userId) ? ' live-remote-ctrl-btn--active' : ''}`}
-                                          onClick={() => requestRemoteControl(p.userId, p.userName)}
-                                          title="Request remote control"
+                                          onClick={() => isActivelyControllingPeer(p.userId) ? releaseRemoteControl(p.userId) : requestRemoteControl(p.userId, p.userName)}
+                                          title={isActivelyControllingPeer(p.userId) ? 'Kontrolü Bırak' : 'Ekran Kontrolü İste'}
                                           disabled={remoteControlActive?.pending && String(remoteControlActive.controllerId) === String(uid)}
                                         >
                                           <img src={channelLiveactionIcon} alt="Remote control" width="14" height="14" style={{filter:'brightness(0.8)',opacity:0.85}}/>
-                                          <span>{isActivelyControllingPeer(p.userId) ? 'In control' : (remoteControlActive?.pending && String(remoteControlActive.sharingUserId) === String(p.userId) ? 'Pending…' : 'Request control')}</span>
+                                          <span>{isActivelyControllingPeer(p.userId) ? 'Kontrol Ediliyor (Bırak)' : (remoteControlActive?.pending && String(remoteControlActive.sharingUserId) === String(p.userId) ? 'Bekleniyor…' : 'Kontrol İste')}</span>
                                         </button>
                                       )}
                                       {String(p.userId) === String(uid) && remoteControlActive?.sharingUserId === uid && !remoteControlActive?.pending && (
-                                        <span className="live-controlled-badge">{remoteControlActive.controllerName} is controlling</span>
+                                        <button className="live-controlled-badge" onClick={() => releaseRemoteControl(remoteControlActive.controllerId)} title="Kontrolü Sonlandır" style={{ cursor: 'pointer' }}>
+                                          🔴 {remoteControlActive.controllerName} kontrol ediyor (Sonlandır)
+                                        </button>
                                       )}
                                     </div>
                                     <div className="live-screen-preview">
@@ -19094,11 +19407,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                               <button
                                                 type="button"
                                                 className={`live-remote-ctrl-btn${isActivelyControllingPeer(expandedScreenUser.userId) ? ' live-remote-ctrl-btn--active' : ''}`}
-                                                onClick={() => requestRemoteControl(expandedScreenUser.userId, expandedScreenUser.userName)}
-                                                title="Request remote control"
+                                                onClick={() => isActivelyControllingPeer(expandedScreenUser.userId) ? releaseRemoteControl(expandedScreenUser.userId) : requestRemoteControl(expandedScreenUser.userId, expandedScreenUser.userName)}
+                                                title={isActivelyControllingPeer(expandedScreenUser.userId) ? 'Kontrolü Bırak' : 'Ekran Kontrolü İste'}
                                               >
                                                 <img src={channelLiveactionIcon} alt="" width="14" height="14" style={{ filter: 'brightness(0.8)', opacity: 0.85 }} />
-                                                <span>{isActivelyControllingPeer(expandedScreenUser.userId) ? 'In control' : 'Request control'}</span>
+                                                <span>{isActivelyControllingPeer(expandedScreenUser.userId) ? 'Kontrol Ediliyor (Bırak)' : 'Kontrol İste'}</span>
                                               </button>
                                             )}
                                             <button type="button" className="voice-screen-bar-btn" onClick={toggleVoiceScreenFullscreen} title={voiceScreenFullscreen ? 'Exit fullscreen' : 'Fullscreen'}>
@@ -19573,6 +19886,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               dmReadReceipts={dmReadReceipts}
                               msgReactions={msgReactions}
                               msgListRef={msgListRef}
+                              onVotePoll={handleVotePoll}
                             />
                           )}
                         </div>
@@ -19852,12 +20166,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 </button>
                               </div>
                             )}
-                            {/* Inline input-right buttons: Emoji · GIF/Sticker · Voice */}
-                            <div className="msg-inline-actions">
+                            {/* Unified actions toolbar: Gönder -> Emoji -> GIF -> Fotoğraf/Belge -> Ses -> Birlikte Yap -> Daha Fazlası */}
+                            <div className="msg-actions-toolbar">
+                              {/* 1. Gönder (Send) */}
+                              <button className="msg-bar-btn msg-bar-btn--send" onClick={sendMessage} disabled={!canPost} title="Gönder">
+                                <img src={sendIcon} alt="Send" className="msg-bar-icon" />
+                              </button>
+
+                              {/* 2. Emoji */}
                               {!isMobile && (
-                                <div className="msg-action-emoji-wrap">
-                                  <button className="msg-inline-btn" title="Emoji" onClick={() => { setShowInputEmoji(v => !v); setShowGifPicker(false) }}>
-                                    <svg width="19" height="19" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><path d="M8 14s1.5 2 4 2 4-2 4-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="9" cy="10" r="1.5" fill="currentColor"/><circle cx="15" cy="10" r="1.5" fill="currentColor"/></svg>
+                                <div className="msg-action-wrap">
+                                  <button className="msg-bar-btn msg-bar-btn--emoji" title="Emoji" onClick={() => { setShowInputEmoji(v => !v); setShowGifPicker(false); setShowPlusMenu(false) }}>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="msg-bar-icon"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><path d="M8 14s1.5 2 4 2 4-2 4-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="9" cy="10" r="1.5" fill="currentColor"/><circle cx="15" cy="10" r="1.5" fill="currentColor"/></svg>
                                   </button>
                                   {showInputEmoji && (
                                     <div className="input-emoji-picker-wrap">
@@ -19877,10 +20197,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                   )}
                                 </div>
                               )}
+
+                              {/* 3. GIF */}
                               {!isMobile && (
-                                <div className="msg-gif-picker-wrap">
-                                  <button className="msg-inline-btn msg-inline-btn--gif" title="GIF / Sticker" onClick={() => { setShowGifPicker(v => !v); setShowInputEmoji(false) }}>
-                                    GIF
+                                <div className="msg-action-wrap">
+                                  <button className="msg-bar-btn msg-bar-btn--gif" title="GIF / Sticker" onClick={() => { setShowGifPicker(v => !v); setShowInputEmoji(false); setShowPlusMenu(false) }}>
+                                    <span className="msg-gif-label">GIF</span>
                                   </button>
                                   {showGifPicker && (
                                     <div className="gif-picker">
@@ -19914,11 +20236,36 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                   )}
                                 </div>
                               )}
-                              <button className={`msg-inline-btn${isRecording ? ' msg-inline-btn--recording' : ''}`} title={isRecording ? `Stop & Send (${recordingSeconds}s)` : 'Voice message'} disabled={!canPost} onClick={toggleRecording}>
+
+                              {/* 4. Fotoğraf / Belge */}
+                              <button className="msg-bar-btn msg-bar-btn--media" title="Fotoğraf veya Belge Yükle" disabled={!canPost} onClick={() => mediaInputRef.current?.click()}>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="msg-bar-icon">
+                                  <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.8"/>
+                                  <circle cx="8.5" cy="10.5" r="1.5" stroke="currentColor" strokeWidth="1.5"/>
+                                  <path d="M3 17l5-5 3.5 4 2.5-2.5 5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                              </button>
+                              <input ref={mediaInputRef} type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar" style={{ display: 'none' }} onChange={e => {
+                                const file = e.target.files[0]
+                                if (file) {
+                                  const isMedia = file.type.startsWith('image/') || file.type.startsWith('video/')
+                                  if (isMedia) {
+                                    const reader = new FileReader()
+                                    reader.onload = ev => setPendingAttachment({ dataUrl: ev.target.result, file, mediaType: file.type.startsWith('video/') ? 'video' : 'image' })
+                                    reader.readAsDataURL(file)
+                                  } else {
+                                    sendAttachment(file, 'doc')
+                                  }
+                                }
+                                e.target.value = ''
+                              }} />
+
+                              {/* 5. Ses Kaydet */}
+                              <button className={`msg-bar-btn msg-bar-btn--voice${isRecording ? ' msg-bar-btn--recording' : ''}`} title={isRecording ? `Durdur ve Gönder (${recordingSeconds}s)` : 'Sesli Mesaj'} disabled={!canPost} onClick={toggleRecording}>
                                 {isRecording ? (
-                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" className="msg-bar-icon"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
                                 ) : (
-                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="msg-bar-icon">
                                     <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
                                     <path d="M19 10v2a7 7 0 0 1-14 0v-2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
                                     <line x1="12" y1="19" x2="12" y2="23" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
@@ -19926,78 +20273,61 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                   </svg>
                                 )}
                               </button>
-                            </div>
-                            <button className="msg-send-btn" onClick={sendMessage} disabled={!canPost}>
-                              <img src={sendIcon} alt="Send" width="36" height="36" />
-                            </button>
-                          </div>
-                          <div className="msg-actions">
-                            <button className="msg-action-btn" title="Media" disabled={!canPost} onClick={() => mediaInputRef.current?.click()}>
-                              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                                <rect x="3" y="5" width="18" height="14" rx="2" stroke="currentColor" strokeWidth="1.8"/>
-                                <circle cx="8.5" cy="10.5" r="1.5" stroke="currentColor" strokeWidth="1.5"/>
-                                <path d="M3 17l5-5 3.5 4 2.5-2.5 5 3.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"/>
-                              </svg>
-                            </button>
-                            <input ref={mediaInputRef} type="file" accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar" style={{ display: 'none' }} onChange={e => {
-                              const file = e.target.files[0]
-                              if (file) {
-                                const isMedia = file.type.startsWith('image/') || file.type.startsWith('video/')
-                                if (isMedia) {
-                                  const reader = new FileReader()
-                                  reader.onload = ev => setPendingAttachment({ dataUrl: ev.target.result, file, mediaType: file.type.startsWith('video/') ? 'video' : 'image' })
-                                  reader.readAsDataURL(file)
-                                } else {
-                                  sendAttachment(file, 'doc')
-                                }
-                              }
-                              e.target.value = ''
-                            }} />
-                            {!isMobile && !spotifyNowPlaying && (
-                              <button className="msg-action-btn" title="Together">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                                  <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.8"/>
-                                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                                  <path d="M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
-                                </svg>
-                              </button>
-                            )}
-                            {!isMobile && (
-                              <div className="msg-plus-wrap">
-                              <button className="msg-action-btn" onClick={() => setShowPlusMenu(v => !v)} title="Daha Fazla">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                                  <line x1="12" y1="5" x2="12" y2="19" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
-                                  <line x1="5" y1="12" x2="19" y2="12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/>
-                                </svg>
-                              </button>
-                              {showPlusMenu && (
-                                <div className="msg-plus-menu">
-                                  {spotifyNowPlaying && (
-                                    <>
-                                      <button className="msg-plus-menu-item">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.8"/><path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><path d="M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-                                        Birlikte Yap
-                                      </button>
-                                      <button className="msg-plus-menu-item">
-                                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><rect x="2" y="6" width="20" height="12" rx="6" stroke="currentColor" strokeWidth="1.8"/><path d="M6 12h4M8 10v4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="15" cy="11" r="1" fill="currentColor"/><circle cx="17" cy="13" r="1" fill="currentColor"/></svg>
-                                        Oyun
-                                      </button>
-                                    </>
-                                  )}
-                                  <button className="msg-plus-menu-item" onClick={() => { setShowPollCreator(true); setShowPlusMenu(false) }}>
-                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                                      <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.8"/>
-                                      <line x1="3" y1="9" x2="21" y2="9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                                      <line x1="3" y1="15" x2="21" y2="15" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                                      <line x1="9" y1="9" x2="9" y2="21" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
-                                    </svg>
-                                    Anket
+
+                              {/* 6. Birlikte Yap */}
+                              {!isMobile && (
+                                <button className="msg-bar-btn msg-bar-btn--together" title="Birlikte Yap" onClick={() => addNotification('Birlikte Yap özellikleri açılıyor...')}>
+                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" className="msg-bar-icon">
+                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                                    <circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.8"/>
+                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                                    <path d="M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                                  </svg>
+                                </button>
+                              )}
+
+                              {/* 7. Daha Fazla (More - newIcon ile ve katmanı kaldırılmış) */}
+                              {!isMobile && (
+                                <div className="msg-action-wrap msg-plus-wrap">
+                                  <button className="msg-bar-btn msg-bar-btn--more" onClick={() => { setShowPlusMenu(v => !v); setShowInputEmoji(false); setShowGifPicker(false) }} title="Daha Fazla">
+                                    <img src={newIcon} alt="Daha Fazla" className="msg-bar-icon msg-bar-icon--new" />
                                   </button>
+                                  {showPlusMenu && (
+                                    <div className="msg-plus-menu">
+                                      <button className="msg-plus-menu-item" onClick={() => { setShowPollCreator(true); setShowPlusMenu(false) }}>
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                                          <rect x="3" y="3" width="18" height="18" rx="3" stroke="currentColor" strokeWidth="1.8"/>
+                                          <line x1="3" y1="9" x2="21" y2="9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                                          <line x1="3" y1="15" x2="21" y2="15" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                                          <line x1="9" y1="9" x2="9" y2="21" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/>
+                                        </svg>
+                                        <span>Anket Oluştur</span>
+                                      </button>
+                                      <button className="msg-plus-menu-item" onClick={() => { insertCodeBlock(); setShowPlusMenu(false) }}>
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                                          <polyline points="16 18 22 12 16 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                          <polyline points="8 6 2 12 8 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                                        </svg>
+                                        <span>Kod Bloğu Ekle</span>
+                                      </button>
+                                      <button className="msg-plus-menu-item" onClick={() => {
+                                        if (editorRef.current) {
+                                          editorRef.current.focus()
+                                          document.execCommand('insertText', false, '📌 Hatırlatıcı: ')
+                                        }
+                                        setShowPlusMenu(false)
+                                      }}>
+                                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none">
+                                          <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/>
+                                          <polyline points="12 6 12 12 16 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/>
+                                        </svg>
+                                        <span>Hatırlatıcı / Not</span>
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
                               )}
                             </div>
-                            )}
                           </div>
                           </div>
                           {spotifyNowPlaying && !isMobile && (
@@ -20030,45 +20360,74 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             <div className="poll-creator-overlay" onClick={e => { if (e.target === e.currentTarget) setShowPollCreator(false) }}>
                               <div className="poll-creator">
                                 <div className="poll-creator-header">
-                                  <span className="poll-creator-title">Anket Oluştur</span>
-                                  <button className="poll-creator-close" onClick={() => setShowPollCreator(false)}>
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
+                                  <div className="poll-creator-title-row">
+                                    <span className="poll-creator-badge">📊</span>
+                                    <span className="poll-creator-title">Anket Oluştur</span>
+                                  </div>
+                                  <button className="poll-creator-close" onClick={() => setShowPollCreator(false)} title="Kapat">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
                                   </button>
                                 </div>
-                                <input
-                                  className="poll-creator-question"
-                                  placeholder="Soru..."
-                                  value={pollQuestion}
-                                  onChange={e => setPollQuestion(e.target.value)}
-                                  maxLength={200}
-                                />
-                                <div className="poll-creator-options">
-                                  {pollOptions.map((opt, i) => (
-                                    <div key={i} className="poll-creator-option-row">
-                                      <input
-                                        className="poll-creator-option-input"
-                                        placeholder={`Seçenek ${i + 1}`}
-                                        value={opt}
-                                        onChange={e => { const next = [...pollOptions]; next[i] = e.target.value; setPollOptions(next) }}
-                                        maxLength={100}
-                                      />
-                                      {pollOptions.length > 2 && (
-                                        <button className="poll-creator-remove-opt" onClick={() => setPollOptions(pollOptions.filter((_, j) => j !== i))}>
-                                          <svg width="10" height="10" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
-                                        </button>
-                                      )}
-                                    </div>
-                                  ))}
-                                  {pollOptions.length < 6 && (
-                                    <button className="poll-creator-add-opt" onClick={() => setPollOptions([...pollOptions, ''])}>
-                                      + Seçenek ekle
+                                <div className="poll-creator-body">
+                                  <label className="poll-creator-label">Soru</label>
+                                  <input
+                                    className="poll-creator-question"
+                                    placeholder="Bir soru sorun..."
+                                    value={pollQuestion}
+                                    onChange={e => setPollQuestion(e.target.value)}
+                                    maxLength={200}
+                                    autoFocus
+                                  />
+                                  <label className="poll-creator-label">Seçenekler</label>
+                                  <div className="poll-creator-options">
+                                    {pollOptions.map((opt, i) => (
+                                      <div key={i} className="poll-creator-option-row">
+                                        <input
+                                          className="poll-creator-option-input"
+                                          placeholder={`Seçenek ${i + 1}`}
+                                          value={opt}
+                                          onChange={e => { const next = [...pollOptions]; next[i] = e.target.value; setPollOptions(next) }}
+                                          maxLength={100}
+                                        />
+                                        {pollOptions.length > 2 && (
+                                          <button className="poll-creator-remove-opt" onClick={() => setPollOptions(pollOptions.filter((_, j) => j !== i))} title="Seçeneği kaldır">
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/></svg>
+                                          </button>
+                                        )}
+                                      </div>
+                                    ))}
+                                    {pollOptions.length < 6 && (
+                                      <button className="poll-creator-add-opt" onClick={() => setPollOptions([...pollOptions, ''])}>
+                                        + Seçenek ekle
+                                      </button>
+                                    )}
+                                  </div>
+
+                                  <label className="poll-creator-label">Anket Süresi</label>
+                                  <div className="poll-duration-pills">
+                                    <button
+                                      type="button"
+                                      className={`poll-duration-pill${pollDuration === 86400000 ? ' poll-duration-pill--active' : ''}`}
+                                      onClick={() => setPollDuration(prev => prev === 86400000 ? null : 86400000)}
+                                    >
+                                      ⏱️ 1 Gün
                                     </button>
-                                  )}
+                                    <button
+                                      type="button"
+                                      className={`poll-duration-pill${pollDuration === 604800000 ? ' poll-duration-pill--active' : ''}`}
+                                      onClick={() => setPollDuration(prev => prev === 604800000 ? null : 604800000)}
+                                    >
+                                      📅 1 Hafta
+                                    </button>
+                                    <span className="poll-duration-hint">
+                                      {pollDuration ? (pollDuration === 86400000 ? '1 gün sonra oylama kapanır' : '1 hafta sonra oylama kapanır') : 'Seçilmedi: Süresiz aktif kalır'}
+                                    </span>
+                                  </div>
                                 </div>
                                 <div className="poll-creator-footer">
                                   <button className="poll-creator-cancel" onClick={() => setShowPollCreator(false)}>İptal</button>
                                   <button className="poll-creator-send" onClick={sendPoll} disabled={!pollQuestion.trim() || pollOptions.filter(o => o.trim()).length < 2}>
-                                    Gönder
+                                    Anketi Gönder
                                   </button>
                                 </div>
                               </div>
@@ -20473,6 +20832,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               <div className="panel panel-middle home-panel">
                 {(() => {
                   const greetingWord = customization.customGreeting || 'Hey'
+                  const greetPunct = customization.greetingPunctuation === 'none' ? '' : (customization.greetingPunctuation || '!')
                   const greetName = currentUser?.name || currentUser?.username || ''
 
                   if (isMobile) {
@@ -20537,7 +20897,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     <div className="floating-hub-wrapper">
                       <div className="floating-hub-header">
                         <h1 className="floating-hub-greeting">
-                          {greetingWord}{greetName ? `, ${greetName}!` : '!'}
+                          {greetingWord}{greetName ? `, ${greetName}` : ''}{greetPunct}
                         </h1>
                         {totalUnreadCount > 0 && (
                           <div className="floating-hub-subtext floating-hub-subtext--has-unread">
@@ -22183,8 +22543,6 @@ function parseDeviceInfo(ua) {
   return `${os} · ${browser}`
 }
 
-const BACKEND_URL = getApiBaseUrl()
-
 const REPORT_REASONS = [
   'Spam',
   'Harassment or hate speech',
@@ -22433,6 +22791,7 @@ function App() {
   const t = getT(language)
 
   useEffect(() => {
+    if (isElectron) document.body.classList.add('is-desktop-app')
     seedModerationAccount()
     return isElectron
       ? electronOnAuthStateChanged((u) => setIsLoggedIn(!!u))

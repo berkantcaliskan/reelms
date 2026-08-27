@@ -1,9 +1,14 @@
 export function getApiBaseUrl() {
-  return (
-    import.meta.env.VITE_API_BASE_URL ||
-    import.meta.env.VITE_BACKEND_URL ||
-    'http://127.0.0.1:5000'
-  ).replace(/\/$/, '')
+  if (typeof window !== 'undefined' && (window.reelms?.apiUrl || window.electronAPI?.apiUrl)) {
+    return (window.reelms?.apiUrl || window.electronAPI?.apiUrl).replace(/\/$/, '')
+  }
+  if (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL) {
+    return (import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_BACKEND_URL).replace(/\/$/, '')
+  }
+  if (import.meta.env.PROD || (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1')) {
+    return 'https://api.reelms.io'
+  }
+  return 'http://127.0.0.1:5000'
 }
 
 /**

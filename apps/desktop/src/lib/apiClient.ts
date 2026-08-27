@@ -13,5 +13,5 @@ export async function exchangeDesktopAuthCode(code: string) {
     body: JSON.stringify({ code })
   })
   if (!response.ok) throw new Error('Desktop auth exchange failed')
-  return response.json() as Promise<{ token: string; user?: { email?: string } }>
+  return response.json() as Promise<{ token: string; uid?: string; email?: string; user?: { uid?: string; email?: string } }>
 }

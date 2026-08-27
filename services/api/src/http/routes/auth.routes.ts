@@ -521,13 +521,108 @@ async function handleGoogleCallback(req: any, res: any) {
 
     if (platform === 'desktop') {
       const desktopCode = createDesktopAuthCode(auth)
-      return res.redirect(`${env.PUBLIC_DESKTOP_PROTOCOL}://auth?code=${encodeURIComponent(desktopCode)}`)
+      const deepLinkUrl = `${env.PUBLIC_DESKTOP_PROTOCOL}://auth?code=${encodeURIComponent(desktopCode)}`
+      return res.status(200).send(`<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8">
+  <title>Reelms Desktop</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background: #070812;
+      color: #e0c9bc;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      text-align: center;
+    }
+    .card {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(224, 201, 188, 0.15);
+      border-radius: 20px;
+      padding: 40px 32px;
+      max-width: 420px;
+      margin: 20px;
+      box-shadow: 0 24px 48px rgba(0, 0, 0, 0.6);
+      backdrop-filter: blur(12px);
+    }
+    .logo {
+      font-size: 26px;
+      font-weight: 800;
+      color: #e0c9bc;
+      margin-bottom: 20px;
+      letter-spacing: -0.02em;
+    }
+    .spinner {
+      width: 28px;
+      height: 28px;
+      border: 2.5px solid rgba(224, 201, 188, 0.2);
+      border-top-color: #e0c9bc;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      margin: 0 auto 20px auto;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    h2 {
+      font-size: 20px;
+      margin: 0 0 10px 0;
+      color: #ffffff;
+      font-weight: 700;
+    }
+    p {
+      font-size: 14px;
+      color: rgba(224, 201, 188, 0.75);
+      margin: 0 0 28px 0;
+      line-height: 1.5;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      background: #e0c9bc;
+      color: #070812;
+      font-weight: 700;
+      font-size: 14px;
+      padding: 12px 28px;
+      border-radius: 999px;
+      text-decoration: none;
+      cursor: pointer;
+      transition: opacity 0.15s, transform 0.15s;
+    }
+    .btn:hover { opacity: 0.9; transform: scale(1.02); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">Reelms</div>
+    <div class="spinner"></div>
+    <h2>Giriş Başarılı!</h2>
+    <p>Reelms masaüstü uygulamasına yönlendiriliyorsunuz. Uygulama otomatik olarak açılmazsa butona tıklayabilirsiniz.</p>
+    <a id="open-btn" class="btn" href="${deepLinkUrl}">Reelms'i Aç</a>
+  </div>
+  <script>
+    const deepUrl = ${JSON.stringify(deepLinkUrl)};
+    window.location.href = deepUrl;
+    setTimeout(() => {
+      window.location.href = deepUrl;
+    }, 400);
+  </script>
+</body>
+</html>`)
     }
 
     const params = new URLSearchParams({ google: 'success', token: auth.token, uid: auth.uid, email: auth.email })
     return res.redirect(`${env.PUBLIC_WEB_URL}/?${params}`)
   } catch (err) {
     console.error('Google callback error:', err)
+    if (platform === 'desktop') {
+      return res.status(200).send(`<!DOCTYPE html><html><body style="background:#070812;color:#e0c9bc;font-family:sans-serif;text-align:center;padding-top:60px;"><h2>Giriş Başarısız</h2><p>Google ile giriş yapılırken bir hata oluştu. Lütfen masaüstü uygulamasından tekrar deneyin.</p></body></html>`)
+    }
     return res.redirect(`${env.PUBLIC_WEB_URL}/?google=error`)
   }
 }
