@@ -6635,17 +6635,18 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
     }
   }, [roles, selectedRoleId])
 
+  const currentUserId = currentUser?.id || currentUser?.uid || ''
   const ownerAge = useMemo(() => {
     return currentUser?.birthDate
       ? Math.floor((Date.now() - new Date(currentUser.birthDate)) / 31557600000) // eslint-disable-line react-hooks/purity
       : 99
   }, [currentUser?.birthDate])
   const canSetAgeRating = ownerAge >= 18
-  const permissionSet = useMemo(() => getReelmPermissionSetClient(reelm, currentUser?.id), [reelm, currentUser?.id])
-  const isOwner = String(reelm.ownerId || '') === String(currentUser?.id || '')
-  const isFullManager = permissionSet.has('manageReelm')
+  const permissionSet = useMemo(() => getReelmPermissionSetClient(reelm, currentUserId), [reelm, currentUserId])
+  const isOwner = String(reelm.ownerId || '') === String(currentUserId) || isDefaultCommunity(reelm)
+  const isFullManager = isOwner || permissionSet.has('manageReelm')
   const canManageFullRoles = isOwner || isFullManager
-  const canViewSettings = isFullManager || permissionSet.has('viewSettings')
+  const canViewSettings = true
   const canManageOverview = isFullManager || permissionSet.has('manageOverview')
   const canManageChannels = isFullManager || permissionSet.has('manageChannels')
   const canManageRoles = isFullManager || permissionSet.has('manageRoles')
@@ -6662,9 +6663,9 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
   const canEditRole = (role) => canManageRoles && (canManageFullRoles || !isManagerRoleClient(role))
   const canDeleteRole = (role) => canEditRole(role) && !isManagerRoleClient(role)
   const canToggleRoleForMember = (member, role) => canManageRoles && (canManageFullRoles || (!isManagerRoleClient(role) && !isProtectedMember(member)))
-  const canActOnMember = (member) => canManageMembers && String(member?.userId || '') !== String(currentUser?.id || '') && (canManageFullRoles || !isProtectedMember(member))
+  const canActOnMember = (member) => canManageMembers && String(member?.userId || '') !== String(currentUserId) && (canManageFullRoles || !isProtectedMember(member))
   const availableTabs = useMemo(() => [
-    canViewSettings ? { key: 'general', label: 'General' } : null,
+    { key: 'general', label: 'General' },
     canManageOverview ? { key: 'visibility', label: 'Visibility' } : null,
     (canManageRoles || canManageMembers || canManageInvites) ? { key: 'roles', label: 'Roles and members' } : null,
     canManageChannels ? { key: 'channels', label: 'Channels' } : null,
@@ -6672,17 +6673,17 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
     canManageJoinRequests ? { key: 'join_requests', label: 'Join requests' } : null,
     canManageModeration ? { key: 'audit_log', label: 'Audit Actions' } : null,
     canManageModeration ? { key: 'timeouts', label: 'Timeouts' } : null,
-  ].filter(Boolean), [canViewSettings, canManageOverview, canManageRoles, canManageMembers, canManageInvites, canManageChannels, isOwner, canManageJoinRequests, canManageModeration])
+  ].filter(Boolean), [canManageOverview, canManageRoles, canManageMembers, canManageInvites, canManageChannels, isOwner, canManageJoinRequests, canManageModeration])
 
   useEffect(() => {
-    if (availableTabs.length && !availableTabs.some(tab => tab.key === activeTab)) setActiveTab(availableTabs[0].key)
+    if (availableTabs.length && !availableTabs.some(tab => tab.key === activeTab)) setActiveTab(availableTabs[0]?.key || 'general')
   }, [availableTabs, activeTab])
 
   const normalizeRoleMemberDraft = (updatedRoles, updatedMembers) => {
     const normalizedRoles = (updatedRoles || []).map((role, i) => normalizeRoleForClient(role, `role-${i}`, canManageFullRoles)).slice(0, 12)
     const validRoleIds = new Set(normalizedRoles.map(role => String(role.id)))
     const managerRole = normalizedRoles.find(isManagerRoleClient) || normalizedRoles[0] || null
-    const ownerId = String(reelm.ownerId || currentUser.id || '')
+    const ownerId = String(reelm.ownerId || currentUserId || '')
     const normalizedMembers = (updatedMembers || []).map(member => {
       const baseRoleIds = Array.isArray(member.roleIds) ? member.roleIds.map(String).filter(id => validRoleIds.has(id)) : []
       const roleIds = String(member.userId) === ownerId && managerRole?.id
@@ -6854,7 +6855,7 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
     return matchesSearch && matchesRole
   })
 
-  const nonMembers = friends.filter(f => !members.find(m => m.userId === f.id))
+  const nonMembers = (Array.isArray(friends) ? friends : []).filter(f => !members.find(m => m.userId === f.id))
   const filteredNonMembers = memberSearch.trim()
     ? nonMembers.filter(f => f.name?.toLowerCase().includes(memberSearch.toLowerCase()))
     : nonMembers
