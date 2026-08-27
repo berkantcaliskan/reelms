@@ -3443,41 +3443,6 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
   const [socialCtxMenu, setSocialCtxMenu] = useState(null)
   const [showActivitySetter, setShowActivitySetter] = useState(false)
   const [mediaSaving, setMediaSaving] = useState(null)
-  const [showMyReelms, setShowMyReelms] = useState(false)
-  const [showMyActivity, setShowMyActivity] = useState(false)
-  const [activityItems, setActivityItems] = useState([])
-
-  useEffect(() => {
-    if (!showMyActivity || !reelms || !uid) return
-    let cancelled = false
-    ;(async () => {
-      const items = []
-      for (const r of reelms) {
-        try {
-          const ps = (await reelmGetDoc(r.id, 'feed_posts')) || []
-          if (!Array.isArray(ps) || cancelled) continue
-          ps.forEach(p => {
-            const postText = p.text || p.content
-            if (p.userId === uid) {
-              items.push({ type: 'post', reelmName: r.name, text: postText, createdAt: p.createdAt })
-            }
-            if (Array.isArray(p.likes) && p.likes.includes(uid) && p.userId !== uid) {
-              items.push({ type: 'like', reelmName: r.name, text: postText, createdAt: p.createdAt })
-            }
-            ;(p.comments || []).forEach(c => {
-              if (c.userId === uid) {
-                items.push({ type: 'comment', reelmName: r.name, text: c.text, createdAt: c.createdAt })
-              }
-            })
-          })
-        } catch { /* skip */ }
-      }
-      if (cancelled) return
-      items.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0))
-      setActivityItems(items)
-    })()
-    return () => { cancelled = true }
-  }, [showMyActivity, reelms, uid])
 
   const statusOptions = [
     { key: 'online', label: 'Online', color: '#4ade80' },
@@ -3809,16 +3774,6 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
           )}
         </div>
 
-        <div className="pp-action-row">
-          <button type="button" className="pp-action-btn" onClick={() => { setShowMyReelms(true); setShowMyActivity(false) }}>
-            <span className="pp-action-count">{reelms?.length || 0}</span>
-            <span>{"Reelms you're in"}</span>
-          </button>
-          <button type="button" className="pp-action-btn" onClick={() => { setShowMyActivity(true); setShowMyReelms(false) }}>
-            <span>All activity</span>
-          </button>
-        </div>
-
         {onViewFullProfile && (
           <button
             type="button"
@@ -3833,84 +3788,6 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
         )}
       </div>
     </div>
-
-    {showMyReelms && ReactDOM.createPortal(
-      <div className="pp-panel-overlay" onMouseDown={() => setShowMyReelms(false)}>
-        <div className="pp-panel" onMouseDown={e => e.stopPropagation()}>
-          <div className="pp-panel-header">
-            <span className="pp-panel-title">Reelms you're in <span className="pp-panel-count">{reelms?.length || 0}</span></span>
-            <button className="pp-panel-close" onClick={() => setShowMyReelms(false)}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-            </button>
-          </div>
-          <div className="pp-panel-list">
-            {(reelms || []).length === 0 && (
-              <p className="pp-panel-empty">You haven't joined any reelms yet.</p>
-            )}
-            {(reelms || []).map(r => (
-              <div className="pp-panel-row" key={r.id}>
-                <div className="pp-panel-reelm-avatar">
-                  {r.photo
-                    ? <img src={r.photo} alt={r.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '10px' }} />
-                    : <span>{r.name?.[0]?.toUpperCase() || 'R'}</span>}
-                </div>
-                <div className="pp-panel-row-info">
-                  <span className="pp-panel-row-name">{r.name}</span>
-                  <span className="pp-panel-row-sub">{r.members?.length || 0} members</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>,
-      document.body
-    )}
-
-    {showMyActivity && ReactDOM.createPortal(
-      <div className="pp-panel-overlay" onMouseDown={() => setShowMyActivity(false)}>
-        <div className="pp-panel" onMouseDown={e => e.stopPropagation()}>
-          <div className="pp-panel-header">
-            <span className="pp-panel-title">All activity</span>
-            <button className="pp-panel-close" onClick={() => setShowMyActivity(false)}>
-              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-            </button>
-          </div>
-          <div className="pp-panel-list">
-            {activityItems.length === 0 && (
-              <p className="pp-panel-empty">No activity yet.</p>
-            )}
-            {activityItems.map((item, i) => (
-              <div className="pp-panel-row pp-activity-row" key={i}>
-                <span className={`pp-activity-icon pp-activity-icon-${item.type}`}>
-                  {item.type === 'post' && (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 013 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
-                  )}
-                  {item.type === 'like' && (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
-                  )}
-                  {item.type === 'comment' && (
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>
-                  )}
-                </span>
-                <div className="pp-panel-row-info">
-                  <span className="pp-panel-row-name">
-                    {item.type === 'post' && 'Shared a post'}
-                    {item.type === 'like' && 'Liked a post'}
-                    {item.type === 'comment' && 'Left a comment'}
-                    <span className="pp-activity-reelm"> · {item.reelmName}</span>
-                  </span>
-                  {item.text && <span className="pp-panel-row-sub pp-activity-text">{item.text.slice(0, 80)}{item.text.length > 80 ? '…' : ''}</span>}
-                </div>
-                {item.createdAt && (
-                  <span className="pp-activity-time">{new Date(item.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}</span>
-                )}
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>,
-      document.body
-    )}
     </>
   )
 }
