@@ -736,5 +736,13 @@
   "activity": "Atividade",
   "no_active_activity": "Sem atividade ativa",
   "more": "a mais",
-  "friend": "Amigo"
+  "friend": "Amigo",
+  "rs_require_approval_title": "Exigir aprovação antes de entrar",
+  "rs_require_approval_desc": "Quando ativado, os novos membros devem ser aprovados por um moderador antes de poderem entrar neste reelm.",
+  "rs_pending_requests_title": "Solicitações pendentes",
+  "rs_no_pending_requests": "Nenhuma solicitação de entrada pendente.",
+  "rs_join_requests_tab": "Solicitações de entrada",
+  "rs_approve_request": "Aprovar",
+  "rs_reject_request": "Recusar",
+  "rs_wants_to_join": "quer entrar"
 }

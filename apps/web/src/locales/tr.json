@@ -763,5 +763,13 @@
   "reelm_events": "Reelm Etkinlikleri",
   "event_title": "Etkinlik Başlığı",
   "date_and_time": "Tarih ve Saat",
-  "location_or_room": "Konum / Kanal"
+  "location_or_room": "Konum / Kanal",
+  "rs_require_approval_title": "Katılmadan önce onay gerektir",
+  "rs_require_approval_desc": "Etkinleştirildiğinde, yeni üyelerin bu reelm'e katılabilmesi için bir yetkili tarafından onaylanması gerekir.",
+  "rs_pending_requests_title": "Bekleyen İstekler",
+  "rs_no_pending_requests": "Bekleyen katılım isteği bulunmuyor.",
+  "rs_join_requests_tab": "Katılım İstekleri",
+  "rs_approve_request": "Onayla",
+  "rs_reject_request": "Reddet",
+  "rs_wants_to_join": "katılmak istiyor"
 }

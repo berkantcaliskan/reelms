@@ -736,5 +736,13 @@
   "activity": "Activité",
   "no_active_activity": "Aucune activité active",
   "more": "de plus",
-  "friend": "Ami"
+  "friend": "Ami",
+  "rs_require_approval_title": "Exiger une approbation avant de rejoindre",
+  "rs_require_approval_desc": "Lorsqu'elle est activée, les nouveaux membres doivent être approuvés par un responsable avant de pouvoir accéder à ce reelm.",
+  "rs_pending_requests_title": "Demandes en attente",
+  "rs_no_pending_requests": "Aucune demande d'adhésion en attente.",
+  "rs_join_requests_tab": "Demandes d'adhésion",
+  "rs_approve_request": "Approuver",
+  "rs_reject_request": "Refuser",
+  "rs_wants_to_join": "souhaite rejoindre"
 }

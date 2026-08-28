@@ -6576,10 +6576,10 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
     (canManageRoles || canManageMembers || canManageInvites) ? { key: 'roles', label: 'Roles and members' } : null,
     canManageChannels ? { key: 'channels', label: 'Channels' } : null,
     (canManageChannels || canManageOverview || isOwner) ? { key: 'integrations', label: 'Integrations & Webhooks' } : null,
-    canManageJoinRequests ? { key: 'join_requests', label: 'Join requests' } : null,
+    canManageJoinRequests ? { key: 'join_requests', label: t('rs_join_requests_tab') || 'Join requests' } : null,
     canManageModeration ? { key: 'audit_log', label: 'Audit Actions' } : null,
     canManageModeration ? { key: 'timeouts', label: 'Timeouts' } : null,
-  ].filter(Boolean), [canManageOverview, canManageRoles, canManageMembers, canManageInvites, canManageChannels, isOwner, canManageJoinRequests, canManageModeration])
+  ].filter(Boolean), [canManageOverview, canManageRoles, canManageMembers, canManageInvites, canManageChannels, isOwner, canManageJoinRequests, canManageModeration, t])
 
   useEffect(() => {
     if (availableTabs.length && !availableTabs.some(tab => tab.key === activeTab)) setActiveTab(availableTabs[0]?.key || 'general')
@@ -7169,10 +7169,35 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
           {activeTab === 'join_requests' && canManageJoinRequests && (
             <div className="rs-section">
               <div className="rs-section-header">
-                <span className="rs-section-title">Join requests</span>
+                <span className="rs-section-title">{t('rs_join_requests_tab') || 'Join requests'}</span>
               </div>
+
+              <div className="cust-toggle-row" style={{ marginTop: '4px', marginBottom: '20px' }}>
+                <div>
+                  <span className="cust-toggle-label">{t('rs_require_approval_title') || 'Require approval before joining'}</span>
+                  <p className="accs-note">{t('rs_require_approval_desc') || 'When enabled, new members must be approved by a manager before they can enter this reelm.'}</p>
+                </div>
+                <button
+                  className={`cust-toggle${joinMode !== 'open' ? ' cust-toggle-on' : ''}`}
+                  onClick={() => {
+                    const next = joinMode === 'open' ? 'request' : 'open'
+                    setJoinMode(next)
+                    onUpdate({ ...reelm, roles, members, showInDiscover, autoJoinOnInvite, memberInvitesEnabled, memberInviteMode, joinMode: next })
+                  }}
+                ><span className="cust-toggle-knob" /></button>
+              </div>
+
+              <div className="rs-section-header" style={{ borderTop: '1px solid rgba(var(--ta-rgb), 0.12)', paddingTop: '16px' }}>
+                <span className="rs-section-title" style={{ fontSize: '0.92rem' }}>
+                  {t('rs_pending_requests_title') || 'Pending requests'}
+                  {Array.isArray(reelm.joinRequests) && reelm.joinRequests.length > 0 && (
+                    <span className="rm-subnav-badge" style={{ marginLeft: '8px' }}>{reelm.joinRequests.length}</span>
+                  )}
+                </span>
+              </div>
+
               {(!Array.isArray(reelm.joinRequests) || reelm.joinRequests.length === 0) ? (
-                <p className="rs-section-hint">No pending join requests.</p>
+                <p className="rs-section-hint">{t('rs_no_pending_requests') || 'No pending join requests.'}</p>
               ) : (
                 <div className="discover-results" style={{ padding: 0 }}>
                   {reelm.joinRequests.map(req => (
@@ -7182,11 +7207,11 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
                       </div>
                       <div className="discover-result-info">
                         <span className="discover-result-name">{req.name || req.username || 'Member'}</span>
-                        <span className="discover-result-type">{req.username ? `@${req.username}` : 'wants to join'}</span>
+                        <span className="discover-result-type">{req.username ? `@${req.username}` : (t('rs_wants_to_join') || 'wants to join')}</span>
                       </div>
                       <div className="friend-req-actions">
-                        <button className="friend-add-btn friend-add-btn--compact" onClick={() => onApproveJoin?.(reelm.id, req.userId || req.id)}>✓</button>
-                        <button className="friend-reject-btn friend-reject-btn--compact" onClick={() => onRejectJoin?.(reelm.id, req.userId || req.id)}>✕</button>
+                        <button className="friend-add-btn friend-add-btn--compact" title={t('rs_approve_request') || 'Approve'} onClick={() => onApproveJoin?.(reelm.id, req.userId || req.id)}>✓</button>
+                        <button className="friend-reject-btn friend-reject-btn--compact" title={t('rs_reject_request') || 'Decline'} onClick={() => onRejectJoin?.(reelm.id, req.userId || req.id)}>✕</button>
                       </div>
                     </div>
                   ))}

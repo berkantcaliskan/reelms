@@ -736,5 +736,13 @@
   "activity": "Actividad",
   "no_active_activity": "Sin actividad activa",
   "more": "más",
-  "friend": "Amigo"
+  "friend": "Amigo",
+  "rs_require_approval_title": "Requerir aprobación para unirse",
+  "rs_require_approval_desc": "Cuando está habilitado, los nuevos miembros deben ser aprobados antes de poder ingresar a este reelm.",
+  "rs_pending_requests_title": "Solicitudes pendientes",
+  "rs_no_pending_requests": "No hay solicitudes de unión pendientes.",
+  "rs_join_requests_tab": "Solicitudes de unión",
+  "rs_approve_request": "Aprobar",
+  "rs_reject_request": "Rechazar",
+  "rs_wants_to_join": "quiere unirse"
 }

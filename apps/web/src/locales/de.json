@@ -736,5 +736,13 @@
   "activity": "Aktivität",
   "no_active_activity": "Keine aktive Aktivität",
   "more": "weitere",
-  "friend": "Freund"
+  "friend": "Freund",
+  "rs_require_approval_title": "Vor dem Beitritt Genehmigung anfordern",
+  "rs_require_approval_desc": "Wenn aktiviert, müssen neue Mitglieder von einem Moderator genehmigt werden, bevor sie beitreten können.",
+  "rs_pending_requests_title": "Ausstehende Anfragen",
+  "rs_no_pending_requests": "Keine ausstehenden Beitrittsanfragen.",
+  "rs_join_requests_tab": "Beitrittsanfragen",
+  "rs_approve_request": "Genehmigen",
+  "rs_reject_request": "Ablehnen",
+  "rs_wants_to_join": "möchte beitreten"
 }

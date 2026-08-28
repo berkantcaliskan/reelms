@@ -763,5 +763,13 @@
   "reelm_events": "Reelm Events",
   "event_title": "Event Title",
   "date_and_time": "Date & Time",
-  "location_or_room": "Location / Channel"
+  "location_or_room": "Location / Channel",
+  "rs_require_approval_title": "Require approval before joining",
+  "rs_require_approval_desc": "When enabled, new members must be approved by a manager before they can enter this reelm.",
+  "rs_pending_requests_title": "Pending requests",
+  "rs_no_pending_requests": "No pending join requests.",
+  "rs_join_requests_tab": "Join requests",
+  "rs_approve_request": "Approve",
+  "rs_reject_request": "Decline",
+  "rs_wants_to_join": "wants to join"
 }
