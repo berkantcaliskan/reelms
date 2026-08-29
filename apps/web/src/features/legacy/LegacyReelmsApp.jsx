@@ -62,6 +62,42 @@ import { getCachedMessages, saveCachedMessages, enqueueOutboxMessage, flushOutbo
 
 const BACKEND_URL = getApiBaseUrl()
 
+function IntelligenceIcon({ size = 20, className = 'msg-bar-icon msg-bar-icon--intelligence', style }) {
+  return (
+    <svg
+      viewBox="0 0 360 360"
+      width={size}
+      height={size}
+      className={className}
+      style={{ display: 'block', fill: 'currentColor', ...style }}
+      aria-hidden="true"
+    >
+      <defs>
+        <clipPath id="rc-intel-c1"><path d="M 29.738 8.762 L 330.488 8.762 L 330.488 351.512 L 29.738 351.512 Z" /></clipPath>
+        <clipPath id="rc-intel-c2"><path d="M 0.738 126 L 209 126 L 209 343.23 L 0.738 343.23 Z" /></clipPath>
+        <clipPath id="rc-intel-c3"><path d="M 185 138 L 301.488 138 L 301.488 260 L 185 260 Z" /></clipPath>
+        <clipPath id="rc-intel-c4"><path d="M 96 0.762 L 253 0.762 L 253 165 L 96 165 Z" /></clipPath>
+        <clipPath id="rc-intel-c5"><rect x="0" width="302" y="0" height="344" /></clipPath>
+      </defs>
+      <g clipPath="url(#rc-intel-c1)">
+        <g transform="matrix(1, 0, 0, 1, 29, 8)">
+          <g clipPath="url(#rc-intel-c5)">
+            <g clipPath="url(#rc-intel-c2)">
+              <path fill="currentColor" d="M 0.758 234.758 C 16.371 234.551 101.008 228.184 104.293 126.496 C 107.785 228.184 192.422 234.551 208.039 234.758 C 192.426 235.168 107.785 241.535 104.293 343.223 C 101.008 241.535 16.371 235.168 0.758 234.758 Z" />
+            </g>
+            <g clipPath="url(#rc-intel-c3)">
+              <path fill="currentColor" d="M 185.234 199.012 C 194.066 198.805 241.523 195.313 243.371 138.203 C 245.219 195.313 292.676 198.805 301.305 199.012 C 292.676 199.215 245.219 202.707 243.371 259.613 C 241.523 202.707 194.066 199.215 185.234 199.012 Z" />
+            </g>
+            <g clipPath="url(#rc-intel-c4)">
+              <path fill="currentColor" d="M 96.281 82.531 C 108.195 82.328 172.086 77.602 174.551 0.77 C 177.223 77.602 241.109 82.328 252.82 82.531 C 241.109 82.941 177.223 87.668 174.551 164.5 C 172.086 87.668 108.195 82.328 96.281 82.531 Z" />
+            </g>
+          </g>
+        </g>
+      </g>
+    </svg>
+  )
+}
+
 // Audit Log components
 function AuditLogView({ reelmId }) {
   const [logs, setLogs] = useState([])
@@ -20898,7 +20934,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 onClick={() => setShowAICopilot(v => !v)}
                                 title="Reelms Intelligence"
                               >
-                                <img src={intelligenceIcon} alt="Reelms Intelligence" className="msg-bar-icon msg-bar-icon--intelligence" />
+                                <IntelligenceIcon size={20} />
                               </button>
 
                               {/* 2. Emoji */}
