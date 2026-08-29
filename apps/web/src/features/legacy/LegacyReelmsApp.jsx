@@ -21123,6 +21123,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 <SendIcon size={20} />
                               </button>
 
+                              <div className="msg-bar-divider" />
+
                               {/* 1.1 Reelms Intelligence */}
                               <button
                                 type="button"
