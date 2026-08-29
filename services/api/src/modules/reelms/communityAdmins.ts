@@ -32,7 +32,7 @@ export function getCommunityAdminEmails() {
 
 export function getCommunityAdminUsernames() {
   const envList = listFromEnv(env.REELMS_COMMUNITY_ADMIN_USERNAMES)
-  return Array.from(new Set([...envList, 'berkannt', 'berkant']))
+  return Array.from(new Set([...envList, 'berkannt']))
 }
 
 export function isCommunityAdminEmail(value: unknown) {
