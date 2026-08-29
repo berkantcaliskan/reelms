@@ -12328,15 +12328,33 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }
 
   const handleSelectReelm = (reelm) => {
-    const full = (reelmsRef.current || []).find(r => String(r.id) === String(reelm?.id)) || reelm
+    if (!reelm?.id) return
+    const id = String(reelm.id)
+    const fromState = (reelmsRef.current || []).find(r => String(r.id) === id)
+    const fromCache = REELM_CACHE[id]
+    let fromLocal = null
+    try {
+      const stored = localStorage.getItem(`reelms:reelm_cache:${id}`)
+      if (stored) fromLocal = JSON.parse(stored)
+    } catch {}
+
+    const full = {
+      ...(reelm || {}),
+      ...(fromLocal || {}),
+      ...(fromCache || {}),
+      ...(fromState || {}),
+      members: (fromState?.members?.length ? fromState.members : (fromCache?.members?.length ? fromCache.members : (fromLocal?.members?.length ? fromLocal.members : (reelm?.members || [])))),
+      roles: (fromState?.roles?.length ? fromState.roles : (fromCache?.roles?.length ? fromCache.roles : (fromLocal?.roles?.length ? fromLocal.roles : (reelm?.roles || [])))),
+      categories: (fromState?.categories?.length ? fromState.categories : (fromCache?.categories?.length ? fromCache.categories : (fromLocal?.categories?.length ? fromLocal.categories : (reelm?.categories || [])))),
+    }
+
     setSelectedReelm(full)
     setSelectedChat(null)
     setShowDiscover(false)
     setShowFriendsPanel(false)
     setShowSettings(false)
     setShowChatList(false)
-    setReelmLoading(true)
-    setTimeout(() => setReelmLoading(false), 200)
+    setReelmLoading(false)
     if (full?.id) {
       hydrateReelmCore(full.id).then(r => r && mergeReelmIntoState(r)).catch(() => {})
     }
@@ -14771,6 +14789,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       joined: true,
     }
 
+    try {
+      localStorage.setItem(`reelms:reelm_cache:${reelmId}`, JSON.stringify({
+        members: baseReelm.members,
+        roles: baseReelm.roles,
+        categories: baseReelm.categories
+      }))
+    } catch {}
+
     const permissionSet = getReelmPermissionSetClient(baseReelm, uid)
     const canReadJoinRequests = permissionSet.has('manageReelm') || permissionSet.has('manageJoinRequests')
     const canReadModeration = permissionSet.has('manageReelm') || permissionSet.has('manageModeration')
@@ -14791,12 +14817,44 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const mergeReelmIntoState = (nextReelm, { persist = false } = {}) => {
     if (!nextReelm?.id) return
-    setSelectedReelm(prev => (prev && String(prev.id) === String(nextReelm.id) ? { ...prev, ...nextReelm } : prev))
+    const id = String(nextReelm.id)
+
+    if (Array.isArray(nextReelm.members) && nextReelm.members.length > 0) {
+      try {
+        localStorage.setItem(`reelms:reelm_cache:${id}`, JSON.stringify({
+          members: nextReelm.members,
+          roles: nextReelm.roles || [],
+          categories: nextReelm.categories || []
+        }))
+      } catch {}
+    }
+
+    setSelectedReelm(prev => {
+      if (String(prev?.id || '') !== id && prev) return prev
+      const merged = { ...(prev || {}), ...nextReelm }
+      if (prev && (!Array.isArray(nextReelm.members) || nextReelm.members.length === 0) && Array.isArray(prev.members) && prev.members.length > 0) {
+        merged.members = prev.members
+      }
+      if (prev && (!Array.isArray(nextReelm.roles) || nextReelm.roles.length === 0) && Array.isArray(prev.roles) && prev.roles.length > 0) {
+        merged.roles = prev.roles
+      }
+      if (prev && !Array.isArray(nextReelm.joinRequests) && Array.isArray(prev.joinRequests)) merged.joinRequests = prev.joinRequests
+      if (prev && !Array.isArray(nextReelm.banList) && Array.isArray(prev.banList)) merged.banList = prev.banList
+      if (prev && !Array.isArray(nextReelm.timeoutList) && Array.isArray(prev.timeoutList)) merged.timeoutList = prev.timeoutList
+      return merged
+    })
+
     setReelms(prev => {
-      const next = prev.some(r => String(r.id) === String(nextReelm.id))
+      const next = prev.some(r => String(r.id) === id)
         ? prev.map(r => {
-            if (String(r.id) !== String(nextReelm.id)) return r
+            if (String(r.id) !== id) return r
             const merged = { ...r, ...nextReelm }
+            if ((!Array.isArray(nextReelm.members) || nextReelm.members.length === 0) && Array.isArray(r.members) && r.members.length > 0) {
+              merged.members = r.members
+            }
+            if ((!Array.isArray(nextReelm.roles) || nextReelm.roles.length === 0) && Array.isArray(r.roles) && r.roles.length > 0) {
+              merged.roles = r.roles
+            }
             if (!Array.isArray(nextReelm.joinRequests) && Array.isArray(r.joinRequests)) merged.joinRequests = r.joinRequests
             if (!Array.isArray(nextReelm.banList) && Array.isArray(r.banList)) merged.banList = r.banList
             if (!Array.isArray(nextReelm.timeoutList) && Array.isArray(r.timeoutList)) merged.timeoutList = r.timeoutList
@@ -14805,14 +14863,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         : [nextReelm, ...prev]
       if (persist) scheduleUserPersist('reelms', next)
       return next
-    })
-    setSelectedReelm(prev => {
-      if (String(prev?.id || '') !== String(nextReelm.id) && prev) return prev
-      const merged = { ...(prev || {}), ...nextReelm }
-      if (prev && !Array.isArray(nextReelm.joinRequests) && Array.isArray(prev.joinRequests)) merged.joinRequests = prev.joinRequests
-      if (prev && !Array.isArray(nextReelm.banList) && Array.isArray(prev.banList)) merged.banList = prev.banList
-      if (prev && !Array.isArray(nextReelm.timeoutList) && Array.isArray(prev.timeoutList)) merged.timeoutList = prev.timeoutList
-      return merged
     })
   }
 
@@ -16612,15 +16662,25 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (!activeReelm) return null
     let members = Array.isArray(activeReelm.members) && activeReelm.members.length > 0
       ? activeReelm.members
-      : (currentUser && uid ? [{ userId: uid, userName: currentUser.name || 'User', userPhoto: currentUser.photo || null }] : [])
-    let showCitizenNotice = false
-    if (isDefaultCommunity(activeReelm)) {
-      const myMember = members.find(m => String(m.userId) === String(uid))
-      if (getCommunityMemberLevel(activeReelm, myMember) === 'citizen') {
-        members = members.filter(m => String(m.userId) === String(uid) || getCommunityMemberLevel(activeReelm, m) !== 'citizen')
-        showCitizenNotice = true
-      }
+      : (REELM_CACHE[activeReelm.id]?.members?.length ? REELM_CACHE[activeReelm.id].members : [])
+
+    if (!members.length) {
+      try {
+        const stored = localStorage.getItem(`reelms:reelm_cache:${activeReelm.id}`)
+        if (stored) {
+          const parsed = JSON.parse(stored)
+          if (Array.isArray(parsed?.members) && parsed.members.length > 0) {
+            members = parsed.members
+          }
+        }
+      } catch {}
     }
+
+    if (!members.length && currentUser && uid) {
+      members = [{ userId: uid, userName: currentUser.name || 'User', userPhoto: currentUser.photo || null }]
+    }
+
+    const showCitizenNotice = false
     const presence = reelmPresence[activeReelm.id] || {}
     const { groups, getMemberPresence, getMemberStatus } = buildReelmMemberGroupsClient({
       reelm: activeReelm,
