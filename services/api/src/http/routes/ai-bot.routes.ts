@@ -9,7 +9,7 @@ import { isAIConfigured, generateAIChatResponse, summarizeChannelConversation } 
 
 export const AI_BOT_UID = env.REELMS_AI_BOT_UID
 const AI_BOT_USERNAME = 'reelmsai'
-const AI_BOT_NAME = 'Reelms AI'
+const AI_BOT_NAME = 'Reelms Intelligence'
 
 async function ensureAIBotProfile() {
   const existing = await getDoc<any>(userPk(AI_BOT_UID), 'profile').catch(() => null)
@@ -196,7 +196,7 @@ export function createAIBotRouter(io: Server) {
       const botMember = {
         userId: AI_BOT_UID, userName: AI_BOT_NAME, username: AI_BOT_USERNAME,
         userPhoto: null, photo: null, cover: null, coverImage: null, coverUrl: null,
-        bio: 'Reelms AI — @reelmsai ile sohbet et, /ai <soru> veya /summarize kullan',
+        bio: 'Reelms Intelligence — @reelmsai / @reelmsintelligence ile sohbet et, /ai veya /summarize kullan',
         activity: 'Reelms Intelligence', profileTheme: null, roleIds: [], isBot: true, joinedAt: Date.now()
       }
       await putDoc(pk, 'members', [botMember, ...safeMembers])

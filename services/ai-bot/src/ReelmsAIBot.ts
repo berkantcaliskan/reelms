@@ -30,9 +30,9 @@ export class ReelmsAIBot {
   private digestTimers = new Map<string, NodeJS.Timeout>()
 
   async start() {
-    console.log('[Reelms AI] Başlatılıyor...')
+    console.log('[Reelms Intelligence] Başlatılıyor...')
     this.creds = await this.authenticate()
-    console.log(`[Reelms AI] Auth tamam — UID: ${this.creds.uid}`)
+    console.log(`[Reelms Intelligence] Auth tamam — UID: ${this.creds.uid}`)
     this.connect()
   }
 

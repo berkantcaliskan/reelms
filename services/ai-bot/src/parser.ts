@@ -4,9 +4,8 @@ export interface ParsedCommand {
 }
 
 const SLASH_RE = /^\/(\S+)(?:\s+(.*))?$/
-// @reelmsai is the current handle; @reelms-intelligence kept as a backwards-compat alias
-const MENTION_CMD_RE = /^@(?:reelmsai|reelms-intelligence)\s+(.+)$/i
-const MENTION_RE = /^@(?:reelmsai|reelms-intelligence)\s*$/i
+const MENTION_CMD_RE = /^@(?:reelmsai|reelmsintelligence|reelms-intelligence|intelligence)\s+(.+)$/i
+const MENTION_RE = /^@(?:reelmsai|reelmsintelligence|reelms-intelligence|intelligence)\s*$/i
 
 export function parse(text: string): ParsedCommand | null {
   const t = text.trim()

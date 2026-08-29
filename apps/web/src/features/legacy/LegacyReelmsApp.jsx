@@ -6203,14 +6203,14 @@ function IntegrationsTab({ reelm, channels = [] }) {
         Create webhook endpoints compatible with Discord bots and GitHub events. Any tool (Zapier, IFTTT, GitHub, custom Discord bots) can post directly to your Reelms channels without modifying their code.
       </p>
 
-      {/* Reelms AI Integration Card */}
+      {/* Reelms Intelligence Integration Card */}
       <div className="rs-ai-bot-card" style={{ marginBottom: 20, padding: 16, background: 'rgba(255, 255, 255, 0.04)', borderRadius: 12, border: '1px solid rgba(255, 255, 255, 0.1)' }}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <span style={{ fontSize: 24 }}>✨</span>
             <div>
-              <div style={{ fontWeight: 600, fontSize: 15, color: '#fff' }}>Reelms AI Intelligence Bot</div>
-              <div style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.6)' }}>OpenRouter • @reelmsai • /ai • /summarize</div>
+              <div style={{ fontWeight: 600, fontSize: 15, color: '#fff' }}>Reelms Intelligence Bot</div>
+              <div style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.6)' }}>OpenRouter • @reelmsai / @reelmsintelligence • /ai • /summarize</div>
             </div>
           </div>
           <button
@@ -6221,20 +6221,20 @@ function IntegrationsTab({ reelm, channels = [] }) {
               try {
                 const res = await aiAddBotToReelm(reelm.id)
                 if (res?.ok) {
-                  alert('Reelms AI başarıyla bu Reelm topluluğuna eklendi!')
+                  alert('Reelms Intelligence başarıyla bu Reelm topluluğuna eklendi!')
                 } else {
-                  alert(res?.error || 'Reelms AI eklenemedi.')
+                  alert(res?.error || 'Reelms Intelligence eklenemedi.')
                 }
               } catch (err) {
                 alert('Hata: ' + (err?.message || 'Bot eklenemedi'))
               }
             }}
           >
-            + Add Reelms AI Bot
+            + Add Reelms Intelligence Bot
           </button>
         </div>
         <div style={{ fontSize: 13, color: 'rgba(255, 255, 255, 0.7)', lineHeight: 1.5 }}>
-          Bu Reelm'e Reelms AI botunu dahil edin. Kanallarda <code>/ai &lt;soru&gt;</code>, <code>/summarize</code> komutları veya <code>@reelmsai</code> etiketiyle anında akıllı yanıtlar ve özetler alın.
+          Bu Reelm'e Reelms Intelligence botunu dahil edin. Kanallarda <code>/ai &lt;soru&gt;</code>, <code>/summarize</code> komutları veya <code>@reelmsai</code> etiketiyle anında akıllı yanıtlar ve özetler alın.
         </div>
       </div>
 
@@ -10972,7 +10972,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [showAICopilot, setShowAICopilot] = useState(false)
   const [aiCopilotTab, setAiCopilotTab] = useState('chat')
   const [aiCopilotMessages, setAiCopilotMessages] = useState(() => [
-    { role: 'assistant', content: 'Merhaba! Ben **Reelms AI**. OpenRouter destekli zekamla sana ve topluluğuna yardımcı olmak için buradayım. Bana soru sorabilir, kanalını özetletebilir veya yaratıcı içerikler ürettirebilirsin!' }
+    { role: 'assistant', content: 'Merhaba! Ben **Reelms Intelligence**. OpenRouter destekli zekamla sana ve topluluğuna yardımcı olmak için buradayım. Bana soru sorabilir, kanalını özetletebilir veya yaratıcı içerikler ürettirebilirsin!' }
   ])
   const [aiCopilotInput, setAiCopilotInput] = useState('')
   const [aiCopilotLoading, setAiCopilotLoading] = useState(false)
@@ -15635,7 +15635,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       ]
     },
     {
-      bot: 'Reelms AI',
+      bot: 'Reelms Intelligence',
       commands: [
         { cmd: '/ai', args: '<message>', desc: t('slash_cmd_ai_desc') },
         { cmd: '/summarize', args: '[n]', desc: t('slash_cmd_summarize_desc') },
@@ -15657,7 +15657,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const [slashShowAll, setSlashShowAll] = useState(false)
   // Which bot's commands are shown in the slash menu (no-filter view). null → default:
-  // "Reelms AI" if present, otherwise the bot with the longest command list.
+  // "Reelms Intelligence" if present, otherwise the bot with the longest command list.
   const [slashExpandedBot, setSlashExpandedBot] = useState(null)
 
   const slashOptions = useMemo(() => {
@@ -15978,11 +15978,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     try {
       const channelMessages = (messages[msgKey] || [])
       const aiBotId = 'reelms-ai-bot'
-      const aiBotSender = { id: aiBotId, name: 'Reelms AI', username: 'reelmsai', photo: null, isBot: true }
+      const aiBotSender = { id: aiBotId, name: 'Reelms Intelligence', username: 'reelmsai', photo: null, isBot: true }
       
       let aiResultText = ''
       if (userText.startsWith('/ai-help')) {
-        aiResultText = `✨ **Reelms AI Komutları (OpenRouter):**\n\n• \`/ai <soru>\` — Reelms AI'a soru sor veya bir konu hakkında sohbet et\n• \`/summarize [n]\` — Bu kanaldaki son mesajların özetini çıkart\n• \`@reelmsai <mesaj>\` — Sohbette AI'ı etiketle\n• Kanal başlığındaki **✨ AI** butonuna tıklayarak sohbet ve üretim araçlarını kullanabilirsin!`
+        aiResultText = `✨ **Reelms Intelligence Komutları (OpenRouter):**\n\n• \`/ai <soru>\` — Reelms Intelligence'a soru sor veya bir konu hakkında sohbet et\n• \`/summarize [n]\` — Bu kanaldaki son mesajların özetini çıkart\n• \`@reelmsai <mesaj>\` veya \`@reelmsintelligence <mesaj>\` — Sohbette AI'ı etiketle\n• Kanal başlığındaki **✨ AI Copilot** butonuna tıklayarak sohbet ve üretim araçlarını kullanabilirsin!`
       } else if (userText.startsWith('/summarize')) {
         const res = await aiSummarize({ msgKey, channelName: selectedChannel?.name || selectedChat?.name || 'Kanal', messages: channelMessages.slice(-50) })
         aiResultText = res?.summary || 'Özet alınamadı.'
@@ -17747,7 +17747,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   <div className="ai-copilot-title-row">
                     <div className="ai-copilot-icon-badge">✨</div>
                     <div>
-                      <div className="ai-copilot-title">Reelms AI Copilot</div>
+                      <div className="ai-copilot-title">Reelms Intelligence Copilot</div>
                       <div className="ai-copilot-subtitle">OpenRouter • nvidia/nemotron-3.5-lightning:free</div>
                     </div>
                   </div>
@@ -17787,7 +17787,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         {aiCopilotMessages.map((msg, i) => (
                           <div key={i} className={`ai-copilot-msg-bubble ${msg.role}`}>
                             <div className="ai-copilot-msg-author">
-                              {msg.role === 'assistant' ? '🤖 Reelms AI' : (currentUser?.name || 'Sen')}
+                              {msg.role === 'assistant' ? '🤖 Reelms Intelligence' : (currentUser?.name || 'Sen')}
                             </div>
                             <div className="ai-copilot-msg-text">{msg.content}</div>
                             {msg.role === 'assistant' && (
@@ -17823,7 +17823,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         ))}
                         {aiCopilotLoading && (
                           <div className="ai-copilot-msg-bubble assistant loading">
-                            <span className="ai-copilot-typing-dots">✨ Reelms AI yanıt hazırlıyor...</span>
+                            <span className="ai-copilot-typing-dots">✨ Reelms Intelligence yanıt hazırlıyor...</span>
                           </div>
                         )}
                       </div>
@@ -17867,7 +17867,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       >
                         <input
                           className="ai-copilot-input"
-                          placeholder="Reelms AI'a bir şey sor..."
+                          placeholder="Reelms Intelligence'a bir şey sor..."
                           value={aiCopilotInput}
                           onChange={e => setAiCopilotInput(e.target.value)}
                           disabled={aiCopilotLoading}
@@ -17927,7 +17927,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                   const aiMsg = {
                                     id: createClientMessageId(),
                                     text: `📊 **#${selectedChannel?.name || 'Kanal'} Özeti:**\n\n${aiCopilotSummary}`,
-                                    sender: { id: 'reelms-ai-bot', name: 'Reelms AI', username: 'reelmsai', photo: null, isBot: true },
+                                    sender: { id: 'reelms-ai-bot', name: 'Reelms Intelligence', username: 'reelmsai', photo: null, isBot: true },
                                     time: Date.now()
                                   }
                                   setMessages(prev => appendUniqueMessage(prev, msgKey, aiMsg))
@@ -20290,11 +20290,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             <button
                               type="button"
                               className={`channel-ai-copilot-btn${showAICopilot ? ' active' : ''}`}
-                              title="Reelms AI Copilot (OpenRouter)"
+                              title="Reelms Intelligence Copilot (OpenRouter)"
                               onClick={() => setShowAICopilot(v => !v)}
                             >
                               <span className="channel-ai-copilot-sparkle">✨</span>
-                              <span className="channel-ai-copilot-label">AI Copilot</span>
+                              <span className="channel-ai-copilot-label">Intelligence</span>
                             </button>
                           </div>
                         )}
