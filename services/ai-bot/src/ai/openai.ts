@@ -11,25 +11,46 @@ Kullanıcının yazdığı dilde cevap ver. Türkçe yazıyorlarsa Türkçe, İn
 Kısa, samimi ve yardımsever ol. Markdown kullanabilirsin.
 Kanalın son mesajlarını hatırlıyor ve sohbet bağlamını takip ediyorsun.`
 
+function getAIConfig(forSummarize = false) {
+  const isOpenRouter = !!config.OPENROUTER_API_KEY
+  const apiKey = config.OPENROUTER_API_KEY || config.OPENAI_API_KEY || ''
+  const endpoint = isOpenRouter
+    ? `${config.OPENROUTER_BASE_URL.replace(/\/+$/, '')}/chat/completions`
+    : 'https://api.openai.com/v1/chat/completions'
+  const model = isOpenRouter
+    ? (forSummarize ? config.OPENROUTER_SUMMARIZE_MODEL : config.OPENROUTER_MODEL)
+    : (forSummarize ? config.OPENAI_SUMMARIZE_MODEL : config.OPENAI_MODEL)
+  
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${apiKey}`
+  }
+  if (isOpenRouter) {
+    headers['HTTP-Referer'] = 'https://reelms.app'
+    headers['X-Title'] = 'Reelms'
+  }
+  return { endpoint, apiKey, model, headers }
+}
+
 export async function chatWithAI(
   history: ChatMessage[],
   userMessage: string,
   senderName: string
 ): Promise<string> {
+  const { endpoint, apiKey, model, headers } = getAIConfig(false)
+  if (!apiKey) throw new Error('AI is not configured. OPENROUTER_API_KEY or OPENAI_API_KEY required.')
+
   const messages: ChatMessage[] = [
     { role: 'system', content: SYSTEM_PROMPT },
     ...history,
     { role: 'user', content: `${senderName}: ${userMessage}` }
   ]
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const response = await fetch(endpoint, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${config.OPENAI_API_KEY}`
-    },
+    headers,
     body: JSON.stringify({
-      model: config.OPENAI_MODEL,
+      model,
       messages,
       max_tokens: 800,
       temperature: 0.7
@@ -38,7 +59,7 @@ export async function chatWithAI(
 
   if (!response.ok) {
     const err = await response.json().catch(() => ({})) as any
-    throw new Error(`OpenAI error ${response.status}: ${err?.error?.message || 'unknown'}`)
+    throw new Error(`AI error ${response.status}: ${err?.error?.message || err?.message || 'unknown'}`)
   }
 
   const data = await response.json() as any
@@ -67,14 +88,14 @@ Maximum 10 bullets, 1-2 sentences each:
 
 ${formatted}`
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
+  const { endpoint, apiKey, model, headers } = getAIConfig(true)
+  if (!apiKey) throw new Error('AI is not configured. OPENROUTER_API_KEY or OPENAI_API_KEY required.')
+
+  const response = await fetch(endpoint, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${config.OPENAI_API_KEY}`
-    },
+    headers,
     body: JSON.stringify({
-      model: config.OPENAI_SUMMARIZE_MODEL,
+      model,
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 600,
       temperature: 0.3

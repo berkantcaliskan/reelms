@@ -1052,3 +1052,40 @@ export async function mediaShare(mediaId, isPublic) {
 export async function feedbackSend(name, email, message) {
   return api('/api/v1/feedback', { method: 'POST', body: JSON.stringify({ name, email, message }) })
 }
+
+// AI Service API Helpers
+export async function aiGetStatus() {
+  return api('/api/v1/ai/status')
+}
+
+export async function aiChat({ messages, prompt, systemPrompt, model, temperature, maxTokens }) {
+  return api('/api/v1/ai/chat', {
+    method: 'POST',
+    body: JSON.stringify({ messages, prompt, systemPrompt, model, temperature, maxTokens })
+  })
+}
+
+export async function aiSummarize({ msgKey, messages, channelName, limit, language }) {
+  return api('/api/v1/ai/summarize', {
+    method: 'POST',
+    body: JSON.stringify({ msgKey, messages, channelName, limit, language })
+  })
+}
+
+export async function aiGenerate({ type, context, language }) {
+  return api('/api/v1/ai/generate', {
+    method: 'POST',
+    body: JSON.stringify({ type, context, language })
+  })
+}
+
+export async function aiAddBotToReelm(reelmId) {
+  return api(`/api/v1/reelms/${encodeURIComponent(reelmId)}/add-ai-bot`, {
+    method: 'POST'
+  })
+}
+
+export async function aiGetBotStatus(reelmId) {
+  return api(`/api/v1/reelms/${encodeURIComponent(reelmId)}/ai-bot-status`)
+}
+

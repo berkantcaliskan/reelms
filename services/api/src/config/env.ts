@@ -97,6 +97,11 @@ const schema = z.object({
   SPOTIFY_REDIRECT_URI: optionalString(),
 
   OPENAI_API_KEY: optionalString(),
+  OPENROUTER_API_KEY: optionalString(),
+  OPENROUTER_MODEL: z.string().default('nvidia/nemotron-3.5-lightning:free'),
+  OPENROUTER_BASE_URL: z.string().default('https://openrouter.ai/api/v1'),
+  OPENROUTER_SITE_NAME: z.string().default('Reelms'),
+  OPENROUTER_SITE_URL: z.string().default('https://reelms.app'),
   REELMS_AI_BOT_UID: z.string().default('reelms-ai-bot'),
   REELMS_AI_BOT_SECRET: z.string().default(''),
   AWS_REGION: z.string().default('eu-central-1'),

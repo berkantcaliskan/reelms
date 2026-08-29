@@ -1088,59 +1088,12 @@ export function createReelmsDataRouter(io: Server) {
       return { roles, members }
     }
 
-    const rawAdminSource = rawRoles.find((role: any) => String(role?.id || '') === CUSTOM_ADMIN_ROLE_ID)
-      || rawRoles.find(isAdminLikeRole)
-      || rawRoles.find(isManagerRole)
-      || { id: CUSTOM_ADMIN_ROLE_ID, name: 'Admin', color: '#f87171', position: 0, permissions: { ...FULL_MANAGER_PERMISSIONS } }
-    const rawMembersSource = rawRoles.find((role: any) => String(role?.id || '') === CUSTOM_MEMBERS_ROLE_ID)
-      || rawRoles.find((role: any) => !isAdminLikeRole(role) && isDefaultMemberLikeRole(role))
-      || rawRoles.find((role: any) => !isManagerRole(role) && !isAdminLikeRole(role))
-      || { id: CUSTOM_MEMBERS_ROLE_ID, name: 'Members', color: '#60a5fa', position: 1, permissions: {} }
-
-    rawRoles.forEach((role: any) => {
-      const rawId = String(role?.id || '')
-      if (!rawId) return
-      if (rawId === CUSTOM_ADMIN_ROLE_ID || isManagerRole(role) || isAdminLikeRole(role) || /^role-admin-/i.test(rawId)) {
-        roleIdMap.set(rawId, CUSTOM_ADMIN_ROLE_ID)
-      } else if (rawId === CUSTOM_MEMBERS_ROLE_ID || isDefaultMemberLikeRole(role) || /^role-(member|members|citizen)-/i.test(rawId) || rawId === DEFAULT_CITIZEN_ROLE_ID) {
-        roleIdMap.set(rawId, CUSTOM_MEMBERS_ROLE_ID)
-      }
-    })
-
-    const adminRole = sanitizeRole({
-      ...rawAdminSource,
-      id: CUSTOM_ADMIN_ROLE_ID,
-      name: String(rawAdminSource?.name || '').trim() || 'Admin',
-      color: ROLE_COLOR_RE.test(String(rawAdminSource?.color || '')) ? rawAdminSource.color : '#f87171',
-      position: 0,
-      permissions: { ...FULL_MANAGER_PERMISSIONS }
-    }, CUSTOM_ADMIN_ROLE_ID, { allowManageReelm: true, forceManager: true })
-
-    const membersRole = sanitizeRole({
-      ...rawMembersSource,
-      id: CUSTOM_MEMBERS_ROLE_ID,
-      name: String(rawMembersSource?.name || '').trim() || 'Members',
-      color: ROLE_COLOR_RE.test(String(rawMembersSource?.color || '')) ? rawMembersSource.color : '#60a5fa',
-      position: 1,
-      permissions: {}
-    }, CUSTOM_MEMBERS_ROLE_ID, { allowManageReelm: true })
-
-    const seenCustomKeys = new Set<string>()
-    const customRoles = rawRoles
-      .filter((role: any) => {
-        const rawId = String(role?.id || '')
-        if (!rawId || roleIdMap.has(rawId) || rawId === CUSTOM_ADMIN_ROLE_ID || rawId === CUSTOM_MEMBERS_ROLE_ID) return false
-        if (isAdminLikeRole(role) || isDefaultMemberLikeRole(role) || isManagerRole(role)) return false
-        const key = roleNameKey(role) || rawId
-        if (seenCustomKeys.has(key)) return false
-        seenCustomKeys.add(key)
-        return true
-      })
-      .map((role: any, index: number) => sanitizeRole({ ...role, position: Number(role?.position ?? role?.order ?? index + 2) }, `role-custom-${index}`, { allowManageReelm: true }))
-      .filter((role: any) => String(role?.id || '') !== CUSTOM_ADMIN_ROLE_ID && String(role?.id || '') !== CUSTOM_MEMBERS_ROLE_ID)
-
     const seenRoleIds = new Set<string>()
-    const roles = [adminRole, membersRole, ...customRoles]
+    const sanitizedRoles = rawRoles
+      .map((role: any, index: number) => {
+        const id = String(role?.id || `role-${index}`).replace(/[^a-zA-Z0-9._:-]/g, '').slice(0, 80)
+        return sanitizeRole({ ...role, id, position: Number(role?.position ?? role?.order ?? index) }, `role-${index}`, { allowManageReelm: true, forceManager: isManagerRole(role) })
+      })
       .filter((role: any) => {
         const rawId = String(role?.id || '')
         if (!rawId || seenRoleIds.has(rawId)) return false
@@ -1149,16 +1102,23 @@ export function createReelmsDataRouter(io: Server) {
       })
       .sort((a: any, b: any) => (Number(a?.position ?? a?.order ?? 0) - Number(b?.position ?? b?.order ?? 0)))
 
+    const roles = sanitizedRoles.length > 0 ? sanitizedRoles : [
+      { id: CUSTOM_ADMIN_ROLE_ID, name: 'Admin', color: '#f87171', position: 0, permissions: { ...FULL_MANAGER_PERMISSIONS } },
+      { id: CUSTOM_MEMBERS_ROLE_ID, name: 'Members', color: '#60a5fa', position: 1, permissions: {} }
+    ]
+    if (!roles.some(isManagerRole)) {
+      roles[0] = { ...roles[0], permissions: { ...FULL_MANAGER_PERMISSIONS } }
+    }
+
     const validRoleIds = new Set(roles.map((role: any) => String(role.id)))
     const members = rawMembers
       .map((member: any) => {
-        const existingIds = Array.isArray(member?.roleIds) ? member.roleIds : []
-        const mappedIds = existingIds.map(String).map((roleId: string) => roleIdMap.get(roleId) || roleId)
-        const hadAdmin = mappedIds.includes(CUSTOM_ADMIN_ROLE_ID)
+        const existingIds = Array.isArray(member?.roleIds) ? member.roleIds.map(String) : []
+        const validIds = Array.from(new Set(existingIds.filter((id: string) => validRoleIds.has(id))))
         return {
           ...member,
           userId: memberUserId(member),
-          roleIds: normalizeRoleIdListForClient(mappedIds, roleIdMap, validRoleIds, hadAdmin ? CUSTOM_ADMIN_ROLE_ID : CUSTOM_MEMBERS_ROLE_ID)
+          roleIds: validIds
         }
       })
       .filter((member: any) => member.userId)

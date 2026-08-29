@@ -455,6 +455,12 @@ import {
   usersList,
   getIdToken,
   feedbackSend,
+  aiChat,
+  aiSummarize,
+  aiGenerate,
+  aiAddBotToReelm,
+  aiGetBotStatus,
+  aiGetStatus,
   getVoiceIceServers,
   mediaUploadToS3,
   e2eeRegisterKey,
@@ -5933,10 +5939,17 @@ function getOrderedReelmRolesClient(reelm) {
 }
 
 function getMemberRoleIdsClient(member) {
-  return Array.from(new Set((Array.isArray(member?.roleIds) ? member.roleIds : []).map(String).filter(Boolean)))
+  if (!member) return []
+  const ids = Array.isArray(member.roleIds)
+    ? member.roleIds
+    : Array.isArray(member.roles)
+      ? member.roles.map(r => typeof r === 'object' ? r?.id : r)
+      : []
+  return Array.from(new Set(ids.map(String).filter(Boolean)))
 }
 
 function getPrimaryRoleForMemberClient(member, roles = []) {
+  if (!member || !Array.isArray(roles) || roles.length === 0) return null
   const roleIds = new Set(getMemberRoleIdsClient(member))
   return roles.find(role => roleIds.has(String(role.id))) || null
 }
@@ -5962,10 +5975,18 @@ function canActOnReelmMemberClient(reelm, actorUid, targetMember, permission = '
 
 function buildReelmMemberGroupsClient({ reelm, members, presence, currentUser, uid, profileStatus, getPresenceForUser }) {
   const orderedRoles = getOrderedReelmRolesClient(reelm)
+  const managerRole = orderedRoles.find(isManagerRoleClient) || orderedRoles[0] || null
+  const ownerId = String(reelm?.ownerId || '')
   const assigned = new Set()
-  const getMemberPresence = (m) => String(m.userId) === String(uid)
-    ? { status: profileStatus, userName: currentUser?.name, userPhoto: getPersonPhoto(currentUser) || m.userPhoto }
-    : (presence?.[String(m.userId)] || getPresenceForUser?.(m.userId) || {})
+
+  const getUid = (m) => String(m?.userId || m?.id || '').trim()
+
+  const getMemberPresence = (m) => {
+    const mid = getUid(m)
+    return mid && mid === String(uid)
+      ? { status: profileStatus, userName: currentUser?.name || m.userName, userPhoto: getPersonPhoto(currentUser) || m.userPhoto }
+      : (presence?.[mid] || getPresenceForUser?.(mid) || {})
+  }
   const getMemberStatus = (m) => getMemberPresence(m).status || 'offline'
   const sortMembers = (list) => [...list].sort((a, b) => {
     const aMain = isMainAdminMemberClient(reelm, a) ? -1 : 0
@@ -5974,21 +5995,39 @@ function buildReelmMemberGroupsClient({ reelm, members, presence, currentUser, u
     const aOnline = isActiveStatus(getMemberStatus(a)) ? 0 : 1
     const bOnline = isActiveStatus(getMemberStatus(b)) ? 0 : 1
     if (aOnline !== bOnline) return aOnline - bOnline
-    const an = String(getMemberPresence(a).userName || a.userName || '').toLowerCase()
-    const bn = String(getMemberPresence(b).userName || b.userName || '').toLowerCase()
+    const an = String(getMemberPresence(a).userName || a.userName || a.name || '').toLowerCase()
+    const bn = String(getMemberPresence(b).userName || b.userName || b.name || '').toLowerCase()
     return an.localeCompare(bn)
   })
+
+  // Normalize members list so userId is always set and owner gets top manager role if no role is explicitly assigned
+  const normalizedMemberList = (members || []).map(m => {
+    const mid = getUid(m)
+    let roleIds = getMemberRoleIdsClient(m)
+    if (mid && mid === ownerId && managerRole?.id && !roleIds.length) {
+      roleIds = [String(managerRole.id)]
+    }
+    return { ...m, userId: mid, roleIds }
+  })
+
   const groups = []
   for (const role of orderedRoles) {
-    const roleMembers = sortMembers((members || []).filter(m => {
-      if (assigned.has(String(m.userId))) return false
+    const roleMembers = sortMembers(normalizedMemberList.filter(m => {
+      const mid = getUid(m)
+      if (!mid || assigned.has(mid)) return false
       const primary = getPrimaryRoleForMemberClient(m, orderedRoles)
       return primary && String(primary.id) === String(role.id)
     }))
-    roleMembers.forEach(m => assigned.add(String(m.userId)))
+    roleMembers.forEach(m => {
+      const mid = getUid(m)
+      if (mid) assigned.add(mid)
+    })
     if (roleMembers.length) groups.push({ role, members: roleMembers })
   }
-  const unassigned = (members || []).filter(m => !assigned.has(String(m.userId)))
+  const unassigned = normalizedMemberList.filter(m => {
+    const mid = getUid(m)
+    return mid && !assigned.has(mid)
+  })
   const botMembers = sortMembers(unassigned.filter(m => m.isBot))
   const noRoleMembers = sortMembers(unassigned.filter(m => !m.isBot))
   if (noRoleMembers.length) groups.push({ role: { id: '__no_role__', name: 'No role', color: '#94a3b8' }, members: noRoleMembers, noRole: true })
@@ -6163,6 +6202,41 @@ function IntegrationsTab({ reelm, channels = [] }) {
       <p className="rs-section-hint">
         Create webhook endpoints compatible with Discord bots and GitHub events. Any tool (Zapier, IFTTT, GitHub, custom Discord bots) can post directly to your Reelms channels without modifying their code.
       </p>
+
+      {/* Reelms AI Integration Card */}
+      <div className="rs-ai-bot-card" style={{ marginBottom: 20, padding: 16, background: 'rgba(255, 255, 255, 0.04)', borderRadius: 12, border: '1px solid rgba(255, 255, 255, 0.1)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <span style={{ fontSize: 24 }}>✨</span>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: 15, color: '#fff' }}>Reelms AI Intelligence Bot</div>
+              <div style={{ fontSize: 12, color: 'rgba(255, 255, 255, 0.6)' }}>OpenRouter • @reelmsai • /ai • /summarize</div>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="rs-add-btn"
+            style={{ background: 'linear-gradient(135deg, #06b6d4, #8b5cf6)', color: '#fff', border: 'none', padding: '6px 14px', borderRadius: 8, cursor: 'pointer', fontWeight: 600 }}
+            onClick={async () => {
+              try {
+                const res = await aiAddBotToReelm(reelm.id)
+                if (res?.ok) {
+                  alert('Reelms AI başarıyla bu Reelm topluluğuna eklendi!')
+                } else {
+                  alert(res?.error || 'Reelms AI eklenemedi.')
+                }
+              } catch (err) {
+                alert('Hata: ' + (err?.message || 'Bot eklenemedi'))
+              }
+            }}
+          >
+            + Add Reelms AI Bot
+          </button>
+        </div>
+        <div style={{ fontSize: 13, color: 'rgba(255, 255, 255, 0.7)', lineHeight: 1.5 }}>
+          Bu Reelm'e Reelms AI botunu dahil edin. Kanallarda <code>/ai &lt;soru&gt;</code>, <code>/summarize</code> komutları veya <code>@reelmsai</code> etiketiyle anında akıllı yanıtlar ve özetler alın.
+        </div>
+      </div>
 
       {creating && (
         <div className="rs-webhook-create-card">
@@ -6691,12 +6765,17 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
   }
 
   const toggleMemberRole = (userId, roleId) => {
+    const uid = String(userId)
+    const rid = String(roleId)
     const updatedMembers = members.map(m => {
-      if (m.userId !== userId) return m
-      const role = roles.find(r => r.id === roleId)
+      const mid = String(m.userId || m.id || '')
+      if (mid !== uid) return m
+      const role = roles.find(r => String(r.id) === rid)
       if (!canToggleRoleForMember(m, role)) return m
-      const has = (m.roleIds || []).includes(roleId)
-      return { ...m, roleIds: has ? m.roleIds.filter(r => r !== roleId) : [...(m.roleIds || []), roleId] }
+      const currentRoleIds = getMemberRoleIdsClient(m)
+      const has = currentRoleIds.includes(rid)
+      const nextRoleIds = has ? currentRoleIds.filter(r => r !== rid) : [...currentRoleIds, rid]
+      return { ...m, userId: mid, roleIds: nextRoleIds }
     })
     saveAll(roles, updatedMembers)
   }
@@ -10890,6 +10969,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [showReelmMenu, setShowReelmMenu] = useState(null)
   const [showReelmInfoMenu, setShowReelmInfoMenu] = useState(null)
   const [showReelmSettings, setShowReelmSettings] = useState(false)
+  const [showAICopilot, setShowAICopilot] = useState(false)
+  const [aiCopilotTab, setAiCopilotTab] = useState('chat')
+  const [aiCopilotMessages, setAiCopilotMessages] = useState(() => [
+    { role: 'assistant', content: 'Merhaba! Ben **Reelms AI**. OpenRouter destekli zekamla sana ve topluluğuna yardımcı olmak için buradayım. Bana soru sorabilir, kanalını özetletebilir veya yaratıcı içerikler ürettirebilirsin!' }
+  ])
+  const [aiCopilotInput, setAiCopilotInput] = useState('')
+  const [aiCopilotLoading, setAiCopilotLoading] = useState(false)
+  const [aiCopilotSummary, setAiCopilotSummary] = useState('')
+  const [aiGenerateType, setAiGenerateType] = useState('bio')
+  const [aiGenerateContext, setAiGenerateContext] = useState('')
+  const [aiGenerateResult, setAiGenerateResult] = useState('')
+  const [aiGenerateLoading, setAiGenerateLoading] = useState(false)
   const [showInviteModal, setShowInviteModal] = useState(false)
   const [copiedInvite, setCopiedInvite] = useState(false)
   const [copiedLink, setCopiedLink] = useState(false)
@@ -14723,9 +14814,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const persistReelmCore = async (reelm, options = {}) => {
     if (!reelm?.id) return
     const only = Array.isArray(options.only) ? new Set(options.only) : null
-    const tasks = []
     if (!only || only.has('meta')) {
-      tasks.push(reelmPutDoc(reelm.id, 'meta', {
+      await reelmPutDoc(reelm.id, 'meta', {
         id: reelm.id,
         name: reelm.name,
         code: reelm.code,
@@ -14739,15 +14829,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         memberInviteMode: reelm.memberInviteMode === 'auto' ? 'auto' : 'request',
         ageRating: reelm.ageRating || 'under18',
         updatedAt: Date.now(),
-      }))
+      }).catch(() => {})
     }
-    if (!only || only.has('structure')) tasks.push(reelmPutDoc(reelm.id, 'structure', { categories: reelm.categories || [] }))
+    if (!only || only.has('structure')) {
+      await reelmPutDoc(reelm.id, 'structure', { categories: reelm.categories || [] }).catch(() => {})
+    }
     const includeMembership = options.includeMembership === true || !!only
-    if ((includeMembership && (!only || only.has('roles'))) && Array.isArray(reelm.roles)) tasks.push(reelmPutDoc(reelm.id, 'roles', reelm.roles))
-    if ((includeMembership && (!only || only.has('members'))) && Array.isArray(reelm.members)) tasks.push(reelmPutDoc(reelm.id, 'members', reelm.members, { allowMemberRemoval: options.allowMemberRemoval === true }))
-    const results = await Promise.allSettled(tasks)
-    const failed = results.find((result) => result.status === 'rejected')
-    if (failed) throw failed.reason || new Error('persist_reelm_failed')
+    if ((includeMembership && (!only || only.has('roles'))) && Array.isArray(reelm.roles)) {
+      await reelmPutDoc(reelm.id, 'roles', reelm.roles)
+    }
+    if ((includeMembership && (!only || only.has('members'))) && Array.isArray(reelm.members)) {
+      await reelmPutDoc(reelm.id, 'members', reelm.members, { allowMemberRemoval: options.allowMemberRemoval === true })
+    }
   }
 
   const createDefaultReelm = (name, template = null, t = k => k) => {
@@ -15881,6 +15974,106 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     }
   }
 
+  const handleTriggerAIChat = async (msgKey, userText, userMsg) => {
+    try {
+      const channelMessages = (messages[msgKey] || [])
+      const aiBotId = 'reelms-ai-bot'
+      const aiBotSender = { id: aiBotId, name: 'Reelms AI', username: 'reelmsai', photo: null, isBot: true }
+      
+      let aiResultText = ''
+      if (userText.startsWith('/ai-help')) {
+        aiResultText = `✨ **Reelms AI Komutları (OpenRouter):**\n\n• \`/ai <soru>\` — Reelms AI'a soru sor veya bir konu hakkında sohbet et\n• \`/summarize [n]\` — Bu kanaldaki son mesajların özetini çıkart\n• \`@reelmsai <mesaj>\` — Sohbette AI'ı etiketle\n• Kanal başlığındaki **✨ AI** butonuna tıklayarak sohbet ve üretim araçlarını kullanabilirsin!`
+      } else if (userText.startsWith('/summarize')) {
+        const res = await aiSummarize({ msgKey, channelName: selectedChannel?.name || selectedChat?.name || 'Kanal', messages: channelMessages.slice(-50) })
+        aiResultText = res?.summary || 'Özet alınamadı.'
+      } else {
+        let cleanPrompt = userText
+        if (cleanPrompt.startsWith('/ai')) cleanPrompt = cleanPrompt.replace(/^\/ai\s*/, '')
+        cleanPrompt = cleanPrompt.replace(/^@(?:reelmsai|reelms-intelligence)\s*/i, '').trim()
+        if (!cleanPrompt) cleanPrompt = 'Merhaba! Sana nasıl yardımcı olabilirim?'
+        
+        // Build recent history
+        const history = channelMessages.slice(-8).map(m => ({
+          role: String(m.sender?.id) === aiBotId ? 'assistant' : 'user',
+          content: `${m.sender?.name || 'User'}: ${m.text || ''}`
+        }))
+        const res = await aiChat({ prompt: cleanPrompt, messages: history })
+        aiResultText = res?.text || 'Yanıt alınamadı.'
+      }
+
+      if (aiResultText) {
+        const aiMsg = {
+          id: createClientMessageId(),
+          text: aiResultText,
+          sender: aiBotSender,
+          time: Date.now(),
+          replyTo: userMsg ? { id: userMsg.id, text: userMsg.text?.slice(0, 80), senderName: currentUser.name, senderId: currentUser.id } : undefined
+        }
+        setMessages(prev => appendUniqueMessage(prev, msgKey, aiMsg))
+        messageSend(msgKey, aiMsg).catch(() => {})
+      }
+    } catch (err) {
+      console.error('[AI UI] error:', err)
+    }
+  }
+
+  const handleAICopilotSend = async () => {
+    const prompt = aiCopilotInput.trim()
+    if (!prompt || aiCopilotLoading) return
+    const userEntry = { role: 'user', content: prompt }
+    const nextList = [...aiCopilotMessages, userEntry]
+    setAiCopilotMessages(nextList)
+    setAiCopilotInput('')
+    setAiCopilotLoading(true)
+    try {
+      const history = nextList.slice(-10).map(m => ({ role: m.role, content: m.content }))
+      const res = await aiChat({ prompt, messages: history.slice(0, -1) })
+      if (res?.text) {
+        setAiCopilotMessages(prev => [...prev, { role: 'assistant', content: res.text }])
+      } else {
+        setAiCopilotMessages(prev => [...prev, { role: 'assistant', content: 'Üzgünüm, şu anda yanıt oluşturulamadı.' }])
+      }
+    } catch (err) {
+      setAiCopilotMessages(prev => [...prev, { role: 'assistant', content: `⚠️ Hata: ${err?.message || 'Bağlantı kurulamadı'}` }])
+    } finally {
+      setAiCopilotLoading(false)
+    }
+  }
+
+  const handleAICopilotSummarize = async () => {
+    const msgKey = selectedChat ? selectedChat.id : composeReelmMsgKey(selectedReelm, selectedChannel)
+    if (!msgKey) return
+    const channelMessages = messages[msgKey] || []
+    setAiCopilotLoading(true)
+    try {
+      const res = await aiSummarize({
+        msgKey,
+        channelName: selectedChannel?.name || selectedChat?.name || 'Sohbet',
+        messages: channelMessages.slice(-50)
+      })
+      setAiCopilotSummary(res?.summary || 'Bu kanalda özetlenecek mesaj bulunamadı.')
+    } catch (err) {
+      setAiCopilotSummary(`⚠️ Özet alınamadı: ${err?.message || 'Hata oluştu'}`)
+    } finally {
+      setAiCopilotLoading(false)
+    }
+  }
+
+  const handleAICopilotGenerate = async () => {
+    setAiGenerateLoading(true)
+    try {
+      const res = await aiGenerate({
+        type: aiGenerateType,
+        context: aiGenerateContext || (selectedChannel ? selectedChannel.name : selectedReelm?.name || 'Reelms')
+      })
+      setAiGenerateResult(res?.result || '')
+    } catch (err) {
+      setAiGenerateResult(`⚠️ Üretilemedi: ${err?.message || 'Hata oluştu'}`)
+    } finally {
+      setAiGenerateLoading(false)
+    }
+  }
+
   const sendMessage = async () => {
     const text = messageInputRef.current.trim()
     const richMarkup = editorHasFormatting(editorRef.current) ? serializeRichEditor(editorRef.current).trim() : ''
@@ -15916,10 +16109,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       return
     }
 
-    if (isReelmsSystemChat(selectedChat)) {
-      setModerationWarning('Reelms System is a read-only server notification inbox.')
-      return
-    }
     if (isReelmsSystemChat(selectedChat)) {
       setModerationWarning('Reelms System is a read-only server notification inbox.')
       return
@@ -15976,6 +16165,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (text) {
       let outgoingText = text
       let isPollCommand = false
+      const isAICommand = outgoingText.startsWith('/ai ') || outgoingText === '/ai' || outgoingText.startsWith('/summarize') || outgoingText.startsWith('/ai-help') || /^@(?:reelmsai|reelms-intelligence)\b/i.test(outgoingText)
 
       if (outgoingText.startsWith('/shrug')) {
         const rest = outgoingText.slice(6).trim()
@@ -16018,7 +16208,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           isPollCommand = true
         }
       } else if (outgoingText.startsWith('/help')) {
-        outgoingText = '💡 **Commands:** `/shrug`, `/tableflip`, `/unflip`, `/poll <q>`, `/roll <NdM>`, `/flip`, `/clear`, `/tts <text>`, `/me <action>`'
+        outgoingText = '💡 **Commands:** `/ai <soru>`, `/summarize`, `/shrug`, `/tableflip`, `/unflip`, `/poll <q>`, `/roll <NdM>`, `/flip`, `/clear`, `/tts <text>`, `/me <action>`'
       }
 
       const isOnlineNow = isAppOnline()
@@ -16036,6 +16226,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         saveCachedMessages(msgKey, next[msgKey] || [])
         return next
       })
+
+      if (isAICommand) {
+        handleTriggerAIChat(msgKey, outgoingText, msg)
+      }
 
       if (!isOnlineNow) {
         enqueueOutboxMessage(msgKey, msg)
@@ -16265,17 +16459,28 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       if (!profileReelm || !canManageRoles) return
       const rid = String(roleId)
       const currentMembers = Array.isArray(profileReelm.members) ? [...profileReelm.members] : []
-      const targetMemberIdx = currentMembers.findIndex(m => String(m.userId) === String(f?.id))
-      if (targetMemberIdx === -1) return
-      const targetMember = { ...currentMembers[targetMemberIdx] }
-      const existingRoleIds = new Set((targetMember.roleIds || []).map(String))
+      const targetUid = String(f?.id || f?.userId || '')
+      if (!targetUid) return
+      let targetMemberIdx = currentMembers.findIndex(m => String(m.userId || m.id || '') === targetUid)
+      let targetMember = targetMemberIdx !== -1 ? { ...currentMembers[targetMemberIdx] } : {
+        userId: targetUid,
+        userName: f?.name || f?.username || 'Member',
+        userPhoto: getPersonPhoto(f) || null,
+        roleIds: []
+      }
+      const existingRoleIds = new Set(getMemberRoleIdsClient(targetMember))
       if (existingRoleIds.has(rid)) {
         existingRoleIds.delete(rid)
       } else {
         existingRoleIds.add(rid)
       }
+      targetMember.userId = targetUid
       targetMember.roleIds = Array.from(existingRoleIds)
-      currentMembers[targetMemberIdx] = targetMember
+      if (targetMemberIdx === -1) {
+        currentMembers.push(targetMember)
+      } else {
+        currentMembers[targetMemberIdx] = targetMember
+      }
       const updatedReelm = { ...profileReelm, members: currentMembers }
       updateReelm(updatedReelm, { scope: 'roles-members' })
     }
@@ -17531,6 +17736,285 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   )}
                 </div>
                 <button className="invite-modal-close" onClick={() => setShowInviteModal(false)}>Close</button>
+              </div>
+            </div>
+          )}
+
+          {showAICopilot && (
+            <div className="ai-copilot-overlay" onClick={() => setShowAICopilot(false)}>
+              <div className="ai-copilot-modal" onClick={e => e.stopPropagation()}>
+                <div className="ai-copilot-header">
+                  <div className="ai-copilot-title-row">
+                    <div className="ai-copilot-icon-badge">✨</div>
+                    <div>
+                      <div className="ai-copilot-title">Reelms AI Copilot</div>
+                      <div className="ai-copilot-subtitle">OpenRouter • nvidia/nemotron-3.5-lightning:free</div>
+                    </div>
+                  </div>
+                  <button className="ai-copilot-close-btn" onClick={() => setShowAICopilot(false)} title="Kapat">
+                    ✕
+                  </button>
+                </div>
+
+                <div className="ai-copilot-tabs">
+                  <button
+                    type="button"
+                    className={`ai-copilot-tab-btn${aiCopilotTab === 'chat' ? ' active' : ''}`}
+                    onClick={() => setAiCopilotTab('chat')}
+                  >
+                    💬 Sohbet
+                  </button>
+                  <button
+                    type="button"
+                    className={`ai-copilot-tab-btn${aiCopilotTab === 'summarize' ? ' active' : ''}`}
+                    onClick={() => setAiCopilotTab('summarize')}
+                  >
+                    📝 Kanal Özeti
+                  </button>
+                  <button
+                    type="button"
+                    className={`ai-copilot-tab-btn${aiCopilotTab === 'generate' ? ' active' : ''}`}
+                    onClick={() => setAiCopilotTab('generate')}
+                  >
+                    💡 Yaratıcı Araçlar
+                  </button>
+                </div>
+
+                <div className="ai-copilot-body">
+                  {aiCopilotTab === 'chat' && (
+                    <div className="ai-copilot-chat-view">
+                      <div className="ai-copilot-chat-history">
+                        {aiCopilotMessages.map((msg, i) => (
+                          <div key={i} className={`ai-copilot-msg-bubble ${msg.role}`}>
+                            <div className="ai-copilot-msg-author">
+                              {msg.role === 'assistant' ? '🤖 Reelms AI' : (currentUser?.name || 'Sen')}
+                            </div>
+                            <div className="ai-copilot-msg-text">{msg.content}</div>
+                            {msg.role === 'assistant' && (
+                              <div className="ai-copilot-msg-actions">
+                                <button
+                                  type="button"
+                                  className="ai-copilot-action-btn"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(msg.content)
+                                    addNotification('Yanıt kopyalandı!')
+                                  }}
+                                >
+                                  📋 Kopyala
+                                </button>
+                                <button
+                                  type="button"
+                                  className="ai-copilot-action-btn"
+                                  onClick={() => {
+                                    if (editorRef.current) {
+                                      editorRef.current.innerText = msg.content
+                                      messageInputRef.current = msg.content
+                                      setMessageInput(msg.content)
+                                    }
+                                    setShowAICopilot(false)
+                                    addNotification('Metin mesaj kutusuna eklendi!')
+                                  }}
+                                >
+                                  💬 Kutuya Aktar
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                        {aiCopilotLoading && (
+                          <div className="ai-copilot-msg-bubble assistant loading">
+                            <span className="ai-copilot-typing-dots">✨ Reelms AI yanıt hazırlıyor...</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="ai-copilot-quick-prompts">
+                        <button
+                          type="button"
+                          className="ai-copilot-chip"
+                          onClick={() => {
+                            setAiCopilotInput('Bu kanal için ilgi çekici 3 sohbet başlatıcı konu önerir misin?')
+                          }}
+                        >
+                          💡 Konu Öner
+                        </button>
+                        <button
+                          type="button"
+                          className="ai-copilot-chip"
+                          onClick={() => {
+                            setAiCopilotInput('Topluluk için adil ve samimi 5 temel kural yazabilir misin?')
+                          }}
+                        >
+                          📜 Sunucu Kuralları
+                        </button>
+                        <button
+                          type="button"
+                          className="ai-copilot-chip"
+                          onClick={() => {
+                            setAiCopilotInput('Yeni katılan üyeler için sıcak bir karşılama mesajı hazırla.')
+                          }}
+                        >
+                          👋 Karşılama Mesajı
+                        </button>
+                      </div>
+
+                      <form
+                        className="ai-copilot-input-form"
+                        onSubmit={e => {
+                          e.preventDefault()
+                          handleAICopilotSend()
+                        }}
+                      >
+                        <input
+                          className="ai-copilot-input"
+                          placeholder="Reelms AI'a bir şey sor..."
+                          value={aiCopilotInput}
+                          onChange={e => setAiCopilotInput(e.target.value)}
+                          disabled={aiCopilotLoading}
+                        />
+                        <button
+                          type="submit"
+                          className="ai-copilot-send-btn"
+                          disabled={!aiCopilotInput.trim() || aiCopilotLoading}
+                        >
+                          {aiCopilotLoading ? '...' : 'Gönder'}
+                        </button>
+                      </form>
+                    </div>
+                  )}
+
+                  {aiCopilotTab === 'summarize' && (
+                    <div className="ai-copilot-summarize-view">
+                      <div className="ai-copilot-summary-header">
+                        <div>
+                          <div className="ai-copilot-summary-title">
+                            #{selectedChannel?.name || selectedChat?.name || 'Sohbet'} Kanal Özeti
+                          </div>
+                          <div className="ai-copilot-summary-desc">
+                            Kanalın son 50 mesajını yapay zeka ile analiz eder ve maddeler halinde özetler.
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="ai-copilot-primary-btn"
+                          onClick={handleAICopilotSummarize}
+                          disabled={aiCopilotLoading}
+                        >
+                          {aiCopilotLoading ? '✨ Analiz ediliyor...' : '📊 Şimdi Özetle'}
+                        </button>
+                      </div>
+
+                      {aiCopilotSummary && (
+                        <div className="ai-copilot-summary-result">
+                          <div className="ai-copilot-summary-text">{aiCopilotSummary}</div>
+                          <div className="ai-copilot-msg-actions">
+                            <button
+                              type="button"
+                              className="ai-copilot-action-btn"
+                              onClick={() => {
+                                navigator.clipboard.writeText(aiCopilotSummary)
+                                addNotification('Özet kopyalandı!')
+                              }}
+                            >
+                              📋 Özeti Kopyala
+                            </button>
+                            <button
+                              type="button"
+                              className="ai-copilot-action-btn"
+                              onClick={() => {
+                                const msgKey = selectedChat ? selectedChat.id : composeReelmMsgKey(selectedReelm, selectedChannel)
+                                if (msgKey) {
+                                  const aiMsg = {
+                                    id: createClientMessageId(),
+                                    text: `📊 **#${selectedChannel?.name || 'Kanal'} Özeti:**\n\n${aiCopilotSummary}`,
+                                    sender: { id: 'reelms-ai-bot', name: 'Reelms AI', username: 'reelmsai', photo: null, isBot: true },
+                                    time: Date.now()
+                                  }
+                                  setMessages(prev => appendUniqueMessage(prev, msgKey, aiMsg))
+                                  messageSend(msgKey, aiMsg).catch(() => {})
+                                  setShowAICopilot(false)
+                                  addNotification('Özet kanala paylaşıldı!')
+                                }
+                              }}
+                            >
+                              🚀 Kanala Paylaş
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {aiCopilotTab === 'generate' && (
+                    <div className="ai-copilot-generate-view">
+                      <div className="ai-copilot-form-group">
+                        <label className="ai-copilot-form-label">Üretim Türü</label>
+                        <select
+                          className="ai-copilot-select"
+                          value={aiGenerateType}
+                          onChange={e => setAiGenerateType(e.target.value)}
+                        >
+                          <option value="bio">👤 Profil Biyografisi (Bio)</option>
+                          <option value="channel_topic">💡 Kanal Sohbet Konusu / Başlığı</option>
+                          <option value="reelm_rules">📜 Sunucu / Reelm Kuralları</option>
+                          <option value="welcome_message">👋 Topluluk Karşılama Mesajı</option>
+                        </select>
+                      </div>
+
+                      <div className="ai-copilot-form-group">
+                        <label className="ai-copilot-form-label">İçerik / İpuçları</label>
+                        <input
+                          className="ai-copilot-input"
+                          placeholder="Örn: Oyun, müzik ve yazılım odaklı topluluk"
+                          value={aiGenerateContext}
+                          onChange={e => setAiGenerateContext(e.target.value)}
+                        />
+                      </div>
+
+                      <button
+                        type="button"
+                        className="ai-copilot-primary-btn"
+                        onClick={handleAICopilotGenerate}
+                        disabled={aiGenerateLoading}
+                      >
+                        {aiGenerateLoading ? '✨ Üretiliyor...' : '✨ İçerik Üret'}
+                      </button>
+
+                      {aiGenerateResult && (
+                        <div className="ai-copilot-summary-result" style={{ marginTop: 14 }}>
+                          <div className="ai-copilot-summary-text">{aiGenerateResult}</div>
+                          <div className="ai-copilot-msg-actions">
+                            <button
+                              type="button"
+                              className="ai-copilot-action-btn"
+                              onClick={() => {
+                                navigator.clipboard.writeText(aiGenerateResult)
+                                addNotification('Kopyalandı!')
+                              }}
+                            >
+                              📋 Kopyala
+                            </button>
+                            <button
+                              type="button"
+                              className="ai-copilot-action-btn"
+                              onClick={() => {
+                                if (editorRef.current) {
+                                  editorRef.current.innerText = aiGenerateResult
+                                  messageInputRef.current = aiGenerateResult
+                                  setMessageInput(aiGenerateResult)
+                                }
+                                setShowAICopilot(false)
+                                addNotification('Metin kutusuna aktarıldı!')
+                              }}
+                            >
+                              💬 Kutuya Aktar
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
@@ -19803,6 +20287,15 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               {channelTitle}
                               {selectedChannel?.isFlyingRoom && <span className="channel-header-flying">✦ {flyingRoomTick >= 0 && formatTimeLeft(selectedChannel.expiresAt)}</span>}
                             </span>
+                            <button
+                              type="button"
+                              className={`channel-ai-copilot-btn${showAICopilot ? ' active' : ''}`}
+                              title="Reelms AI Copilot (OpenRouter)"
+                              onClick={() => setShowAICopilot(v => !v)}
+                            >
+                              <span className="channel-ai-copilot-sparkle">✨</span>
+                              <span className="channel-ai-copilot-label">AI Copilot</span>
+                            </button>
                           </div>
                         )}
                         {pinnedMessages[msgKey] && (
