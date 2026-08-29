@@ -4,8 +4,7 @@ export interface ParsedCommand {
 }
 
 const SLASH_RE = /^\/(\S+)(?:\s+(.*))?$/
-const MENTION_CMD_RE = /^@(?:reelmsai|reelmsintelligence|reelms-intelligence|intelligence)\s+(.+)$/i
-const MENTION_RE = /^@(?:reelmsai|reelmsintelligence|reelms-intelligence|intelligence)\s*$/i
+const MENTION_ANYWHERE_RE = /@(?:reelms\s*intelligence|reelmsintelligence|reelms-intelligence|reelmsai|intelligence)\b/i
 
 export function parse(text: string): ParsedCommand | null {
   const t = text.trim()
@@ -20,10 +19,10 @@ export function parse(text: string): ParsedCommand | null {
     return null
   }
 
-  const mention = t.match(MENTION_CMD_RE)
-  if (mention) return { command: 'ai', args: mention[1].trim() }
-
-  if (MENTION_RE.test(t)) return { command: 'ai', args: '' }
+  if (MENTION_ANYWHERE_RE.test(t)) {
+    const cleanArgs = t.replace(new RegExp(MENTION_ANYWHERE_RE.source, 'gi'), '').trim()
+    return { command: 'ai', args: cleanArgs }
+  }
 
   return null
 }

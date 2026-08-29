@@ -15983,24 +15983,30 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     try {
       const channelMessages = (messages[msgKey] || [])
       const aiBotId = 'reelms-ai-bot'
-      const aiBotSender = { id: aiBotId, name: 'Reelms Intelligence', username: 'reelmsai', photo: null, isBot: true }
+      const aiBotSender = { id: aiBotId, name: 'Reelms Intelligence', username: 'reelmsintelligence', photo: null, isBot: true }
       
       let aiResultText = ''
       if (userText.startsWith('/ai-help')) {
-        aiResultText = `✨ **Reelms Intelligence Komutları (OpenRouter):**\n\n• \`/ai <soru>\` — Reelms Intelligence'a soru sor veya bir konu hakkında sohbet et\n• \`/summarize [n]\` — Bu kanaldaki son mesajların özetini çıkart\n• \`@reelmsai <mesaj>\` veya \`@reelmsintelligence <mesaj>\` — Sohbette AI'ı etiketle\n• Kanal başlığındaki **✨ AI Copilot** butonuna tıklayarak sohbet ve üretim araçlarını kullanabilirsin!`
+        aiResultText = `✨ **Reelms Intelligence:**\n\n• \`/ai <mesaj>\` veya \`@Reelms Intelligence <mesaj>\` — Bana seslen, sohbete katılayım!\n• \`/summarize [n]\` — Kanaldaki konuşulanları özetleyeyim\n• Mesaj kutusundaki **✨ Reelms Intelligence** ikonundan veya kanal başlığından özet ve moderasyon menüsüne ulaşabilirsin.`
       } else if (userText.startsWith('/summarize')) {
         const res = await aiSummarize({ msgKey, channelName: selectedChannel?.name || selectedChat?.name || 'Kanal', messages: channelMessages.slice(-50) })
         aiResultText = res?.summary || 'Özet alınamadı.'
       } else {
         let cleanPrompt = userText
         if (cleanPrompt.startsWith('/ai')) cleanPrompt = cleanPrompt.replace(/^\/ai\s*/, '')
-        cleanPrompt = cleanPrompt.replace(/^@(?:reelmsai|reelms-intelligence)\s*/i, '').trim()
-        if (!cleanPrompt) cleanPrompt = 'Merhaba! Sana nasıl yardımcı olabilirim?'
+        cleanPrompt = cleanPrompt.replace(/@(?:reelms\s*intelligence|reelmsintelligence|reelms-intelligence|reelmsai|intelligence)\b/gi, '').trim()
+        if (!cleanPrompt) {
+          if (userMsg?.replyTo) {
+            cleanPrompt = `Yanıt verilen mesaj: "${userMsg.replyTo.text || ''}". Bu mesaja ne dersin?`
+          } else {
+            cleanPrompt = 'Selam! Neler yapıyorsunuz, sohbet nasıl gidiyor?'
+          }
+        }
         
-        // Build recent history
-        const history = channelMessages.slice(-8).map(m => ({
+        // Build recent history with contextual sender names
+        const history = channelMessages.slice(-12).map(m => ({
           role: String(m.sender?.id) === aiBotId ? 'assistant' : 'user',
-          content: `${m.sender?.name || 'User'}: ${m.text || ''}`
+          content: `${m.sender?.name || m.sender?.username || 'Kullanıcı'}: ${m.text || ''}`
         }))
         const res = await aiChat({ prompt: cleanPrompt, messages: history })
         aiResultText = res?.text || 'Yanıt alınamadı.'
@@ -16215,9 +16221,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
     // Then send text
     if (text) {
-      let outgoingText = text
-      let isPollCommand = false
-      const isAICommand = outgoingText.startsWith('/ai ') || outgoingText === '/ai' || outgoingText.startsWith('/summarize') || outgoingText.startsWith('/ai-help') || /^@(?:reelmsai|reelms-intelligence)\b/i.test(outgoingText)
+      const isAIMention = /@(?:reelms\s*intelligence|reelmsintelligence|reelms-intelligence|reelmsai|intelligence)\b/i.test(outgoingText) || (replySnap && String(replySnap.senderId) === 'reelms-ai-bot')
+      const isAICommand = outgoingText.startsWith('/ai ') || outgoingText === '/ai' || outgoingText.startsWith('/summarize') || outgoingText.startsWith('/ai-help') || isAIMention
 
       if (outgoingText.startsWith('/shrug')) {
         const rest = outgoingText.slice(6).trim()
