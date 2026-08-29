@@ -25105,3 +25105,232 @@ body.is-desktop-app .hpopup-float-icon,
   font-size: 0.86rem;
   outline: none;
 }
+
+/* ─── Message Input Intelligence Button ──────────────────────────────────── */
+.msg-bar-btn--intelligence {
+  background: rgba(139, 92, 246, 0.12) !important;
+  border: 1px solid rgba(139, 92, 246, 0.3) !important;
+  color: #c4b5fd !important;
+  transition: all 0.2s ease !important;
+  padding: 4px !important;
+  margin-left: 2px !important;
+}
+
+.msg-bar-btn--intelligence:hover,
+.msg-bar-btn--intelligence.active {
+  background: linear-gradient(135deg, rgba(6, 182, 212, 0.35), rgba(139, 92, 246, 0.45)) !important;
+  border-color: rgba(6, 182, 212, 0.6) !important;
+  color: #ffffff !important;
+  transform: translateY(-1px) scale(1.05);
+  box-shadow: 0 0 12px rgba(139, 92, 246, 0.4);
+}
+
+.msg-bar-icon--intelligence {
+  width: 20px !important;
+  height: 20px !important;
+  object-fit: contain;
+}
+
+/* ─── Tier Badges & Banners ─────────────────────────────────────────────── */
+.ai-tier-tag {
+  font-size: 0.62rem;
+  font-weight: 800;
+  padding: 2px 5px;
+  border-radius: 6px;
+  margin-left: 4px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.ai-tier-tag--free {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.ai-tier-tag--pro {
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.25), rgba(139, 92, 246, 0.3));
+  color: #f472b6;
+  border: 1px solid rgba(236, 72, 153, 0.4);
+}
+
+.ai-tier-banner {
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 0.76rem;
+  margin-bottom: 12px;
+  line-height: 1.4;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ai-tier-banner--free {
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  color: #a7f3d0;
+}
+
+.ai-tier-banner--pro {
+  background: linear-gradient(135deg, rgba(236, 72, 153, 0.12), rgba(139, 92, 246, 0.16));
+  border: 1px solid rgba(236, 72, 153, 0.25);
+  color: #fbcfe8;
+}
+
+/* ─── Range Selector ────────────────────────────────────────────────────── */
+.ai-copilot-range-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.ai-range-label {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.5);
+  font-weight: 600;
+}
+
+.ai-range-chips {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.ai-range-chip {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.7);
+  padding: 4px 9px;
+  border-radius: 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.ai-range-chip:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.ai-range-chip.active {
+  background: rgba(6, 182, 212, 0.25);
+  border-color: rgba(6, 182, 212, 0.6);
+  color: #a5f3fc;
+  box-shadow: 0 0 8px rgba(6, 182, 212, 0.25);
+}
+
+/* ─── Moderation View ───────────────────────────────────────────────────── */
+.ai-copilot-moderate-view {
+  display: flex;
+  flex-direction: column;
+}
+
+.ai-mod-status-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.ai-mod-badge {
+  padding: 4px 10px;
+  border-radius: 8px;
+  font-size: 0.76rem;
+  font-weight: 700;
+}
+
+.ai-mod-badge.safe {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+
+.ai-mod-badge.warning {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.ai-mod-advice-box {
+  background: rgba(139, 92, 246, 0.1);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  padding: 10px 12px;
+  border-radius: 10px;
+  margin-top: 10px;
+  font-size: 0.8rem;
+  color: #ddd6fe;
+  line-height: 1.45;
+}
+
+.ai-flagged-list {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.ai-flagged-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #f87171;
+}
+
+.ai-flagged-item {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  padding: 8px 12px;
+  border-radius: 10px;
+  font-size: 0.8rem;
+}
+
+.ai-flagged-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 3px;
+}
+
+.ai-flagged-author {
+  font-weight: 700;
+  color: #fca5a5;
+}
+
+.ai-flagged-severity {
+  font-size: 0.65rem;
+  padding: 2px 6px;
+  border-radius: 6px;
+  text-transform: uppercase;
+  font-weight: 800;
+}
+
+.ai-flagged-severity.high {
+  background: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+  border: 1px solid rgba(239, 68, 68, 0.5);
+}
+
+.ai-flagged-severity.medium {
+  background: rgba(245, 158, 11, 0.25);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.ai-flagged-severity.low {
+  background: rgba(148, 163, 184, 0.2);
+  color: #cbd5e1;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+}
+
+.ai-flagged-text {
+  color: rgba(255, 255, 255, 0.9);
+  margin-bottom: 2px;
+}
+
+.ai-flagged-reason {
+  font-size: 0.72rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+

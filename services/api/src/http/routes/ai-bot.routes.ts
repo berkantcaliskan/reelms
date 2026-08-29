@@ -5,7 +5,7 @@ import { signToken } from '../../modules/auth/authService.js'
 import { chanPk, getDoc, putDoc, queryDocs, reelmPk, userPk } from '../../modules/store/docStore.js'
 import { authenticate } from '../middleware/authenticate.js'
 import { isReelmMember } from '../../modules/reelms/access.js'
-import { isAIConfigured, generateAIChatResponse, summarizeChannelConversation } from '../../modules/ai/aiService.js'
+import { isAIConfigured, generateAIChatResponse, summarizeChannelConversation, moderateChannelMessages } from '../../modules/ai/aiService.js'
 
 export const AI_BOT_UID = env.REELMS_AI_BOT_UID
 const AI_BOT_USERNAME = 'reelmsai'
@@ -37,7 +37,7 @@ function textChannelsFromStructure(reelmId: string, structure: any): Array<{ cha
 export function createAIBotRouter(io: Server) {
   const router = Router()
 
-  // AI Service Status
+  // AI Service Status & Feature Tier Info
   router.get('/api/v1/ai/status', (_req, res) => {
     const configured = isAIConfigured()
     res.json({
@@ -46,11 +46,21 @@ export function createAIBotRouter(io: Server) {
       provider: env.OPENROUTER_API_KEY ? 'openrouter' : env.OPENAI_API_KEY ? 'openai' : 'none',
       model: env.OPENROUTER_API_KEY ? env.OPENROUTER_MODEL : 'gpt-4o-mini',
       botUsername: AI_BOT_USERNAME,
-      botName: AI_BOT_NAME
+      botName: AI_BOT_NAME,
+      features: {
+        free: [
+          { key: 'summarize', name: 'Kanal Mesaj Özeti (Tamamı veya Belirli Aralık)', tier: 'free' },
+          { key: 'moderation', name: 'Kanal Güvenliği ve Akıllı Moderasyon', tier: 'free' }
+        ],
+        premium: [
+          { key: 'chat', name: 'Yapay Zeka Sohbet & Danışman (Chat Modu)', tier: 'premium', status: 'active_in_beta' },
+          { key: 'generators', name: 'Yaratıcı İçerik Üreticileri', tier: 'premium', status: 'active_in_beta' }
+        ]
+      }
     })
   })
 
-  // Direct AI Chat Endpoint
+  // Direct AI Chat Endpoint (Premium Feature - currently unlocked in Beta)
   router.post('/api/v1/ai/chat', authenticate, async (req, res) => {
     try {
       if (!isAIConfigured()) {
@@ -68,42 +78,82 @@ export function createAIBotRouter(io: Server) {
         maxTokens: Number(maxTokens) || 1000,
         model
       })
-      res.json({ ok: true, text: result.text, model: result.model })
+      res.json({ ok: true, text: result.text, model: result.model, tier: 'premium' })
     } catch (err: any) {
       console.error('[AI API] Chat error:', err)
       res.status(500).json({ error: 'ai_chat_failed', message: err?.message || 'AI request failed' })
     }
   })
 
-  // Direct AI Summarize Endpoint
+  // Direct AI Summarize Endpoint (FREE Feature: can read all messages or specific range)
   router.post('/api/v1/ai/summarize', authenticate, async (req, res) => {
     try {
       if (!isAIConfigured()) {
         return res.status(503).json({ error: 'ai_not_configured', message: 'OpenRouter AI API key is not configured.' })
       }
-      const { msgKey, messages: inputMessages, channelName, limit = 50, language = 'auto' } = req.body || {}
+      const { msgKey, messages: inputMessages, channelName, limit = 50, since, language = 'auto', rangeDescription } = req.body || {}
       let messagesToSummarize = Array.isArray(inputMessages) ? inputMessages : []
 
       if (!messagesToSummarize.length && msgKey) {
-        const items = await queryDocs(chanPk(String(msgKey)), 'MSG#').catch(() => [])
-        const raw = items.map((item) => item.data).filter(Boolean)
-        messagesToSummarize = raw.slice(-Math.min(Number(limit) || 50, 100))
+        const items = await queryDocs<any>(chanPk(String(msgKey)), 'MSG#').catch(() => [])
+        let raw: any[] = items.map((item) => item.data).filter(Boolean)
+
+        if (since && Number(since) > 0) {
+          raw = raw.filter((m: any) => Number(m?.time) >= Number(since))
+        }
+
+        if (limit === 'all' || limit === 0 || limit === -1) {
+          messagesToSummarize = raw
+        } else {
+          const numLimit = Math.min(Number(limit) || 50, 500)
+          messagesToSummarize = raw.slice(-numLimit)
+        }
       }
 
       if (!messagesToSummarize.length) {
-        return res.json({ ok: true, summary: 'Bu kanalda özetlenecek mesaj bulunmuyor.' })
+        return res.json({ ok: true, summary: 'Bu aralıkta veya kanalda özetlenecek mesaj bulunmuyor.' })
       }
 
+      const calculatedRangeDesc = rangeDescription || (limit === 'all' ? 'Tüm kanal geçmişi' : `Son ${messagesToSummarize.length} mesaj`)
       const summary = await summarizeChannelConversation({
         messages: messagesToSummarize,
         channelName,
+        rangeDescription: calculatedRangeDesc,
         language
       })
 
-      res.json({ ok: true, summary })
+      res.json({ ok: true, summary, messageCount: messagesToSummarize.length, tier: 'free' })
     } catch (err: any) {
       console.error('[AI API] Summarize error:', err)
       res.status(500).json({ error: 'ai_summarize_failed', message: err?.message || 'Summarization failed' })
+    }
+  })
+
+  // Direct AI Channel Moderation Endpoint (FREE Feature)
+  router.post('/api/v1/ai/moderate', authenticate, async (req, res) => {
+    try {
+      if (!isAIConfigured()) {
+        return res.status(503).json({ error: 'ai_not_configured' })
+      }
+      const { msgKey, messages: inputMessages, channelName, serverRules, limit = 50 } = req.body || {}
+      let messagesToScan = Array.isArray(inputMessages) ? inputMessages : []
+
+      if (!messagesToScan.length && msgKey) {
+        const items = await queryDocs<any>(chanPk(String(msgKey)), 'MSG#').catch(() => [])
+        const raw: any[] = items.map((item) => item.data).filter(Boolean)
+        messagesToScan = raw.slice(-Math.min(Number(limit) || 50, 100))
+      }
+
+      const moderationResult = await moderateChannelMessages({
+        messages: messagesToScan,
+        channelName,
+        serverRules
+      })
+
+      res.json({ ok: true, ...moderationResult, scannedCount: messagesToScan.length, tier: 'free' })
+    } catch (err: any) {
+      console.error('[AI API] Moderation error:', err)
+      res.status(500).json({ error: 'ai_moderation_failed', message: err?.message || 'Moderation scan failed' })
     }
   })
 

@@ -40,6 +40,7 @@ import channelMultimediaIcon from '../../assets/icons/channel-multimedia.svg'
 import channelLiveactionIcon from '../../assets/icons/channel-liveaction.svg'
 import discoverIcon from '../../assets/icons/discover-icon.svg'
 import sendIcon from '../../assets/icons/send.svg'
+import intelligenceIcon from '../../assets/icons/intelligence-icon.svg'
 import messagesIcon from '../../assets/icons/messages-icon.svg'
 import likePostIcon from '../../assets/icons/likepost-icon_reelms.svg'
 import commentPostIcon from '../../assets/icons/commentpost-icon.svg'
@@ -457,6 +458,7 @@ import {
   feedbackSend,
   aiChat,
   aiSummarize,
+  aiModerate,
   aiGenerate,
   aiAddBotToReelm,
   aiGetBotStatus,
@@ -10977,6 +10979,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [aiCopilotInput, setAiCopilotInput] = useState('')
   const [aiCopilotLoading, setAiCopilotLoading] = useState(false)
   const [aiCopilotSummary, setAiCopilotSummary] = useState('')
+  const [aiSummarizeRange, setAiSummarizeRange] = useState('all') // 'all' | '50' | '100' | '24h'
+  const [aiModerateLoading, setAiModerateLoading] = useState(false)
+  const [aiModerationResult, setAiModerationResult] = useState(null)
   const [aiGenerateType, setAiGenerateType] = useState('bio')
   const [aiGenerateContext, setAiGenerateContext] = useState('')
   const [aiGenerateResult, setAiGenerateResult] = useState('')
@@ -16040,22 +16045,69 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     }
   }
 
-  const handleAICopilotSummarize = async () => {
+  const handleAICopilotSummarize = async (overrideRange) => {
     const msgKey = selectedChat ? selectedChat.id : composeReelmMsgKey(selectedReelm, selectedChannel)
     if (!msgKey) return
     const channelMessages = messages[msgKey] || []
+    const range = overrideRange || aiSummarizeRange
+    let limit = 50
+    let since = undefined
+    let rangeDescription = 'Son 50 mesaj'
+
+    if (range === 'all') {
+      limit = 'all'
+      rangeDescription = 'Tüm kanal geçmişi'
+    } else if (range === '100') {
+      limit = 100
+      rangeDescription = 'Son 100 mesaj'
+    } else if (range === '24h') {
+      since = Date.now() - 24 * 60 * 60 * 1000
+      rangeDescription = 'Son 24 saat'
+      limit = 'all'
+    }
+
     setAiCopilotLoading(true)
     try {
+      let filteredMessages = channelMessages
+      if (since) {
+        filteredMessages = channelMessages.filter(m => Number(m.time) >= since)
+      } else if (limit !== 'all') {
+        filteredMessages = channelMessages.slice(-Number(limit))
+      }
+
       const res = await aiSummarize({
         msgKey,
         channelName: selectedChannel?.name || selectedChat?.name || 'Sohbet',
-        messages: channelMessages.slice(-50)
+        messages: filteredMessages,
+        limit,
+        since,
+        rangeDescription
       })
       setAiCopilotSummary(res?.summary || 'Bu kanalda özetlenecek mesaj bulunamadı.')
     } catch (err) {
       setAiCopilotSummary(`⚠️ Özet alınamadı: ${err?.message || 'Hata oluştu'}`)
     } finally {
       setAiCopilotLoading(false)
+    }
+  }
+
+  const handleAICopilotModerate = async () => {
+    const msgKey = selectedChat ? selectedChat.id : composeReelmMsgKey(selectedReelm, selectedChannel)
+    if (!msgKey) return
+    const channelMessages = messages[msgKey] || []
+    setAiModerateLoading(true)
+    try {
+      const res = await aiModerate({
+        msgKey,
+        channelName: selectedChannel?.name || selectedChat?.name || 'Sohbet',
+        messages: channelMessages.slice(-60),
+        serverRules: selectedReelm?.rules || 'Saygılı iletişim, spam ve hakaret yasağı.'
+      })
+      setAiModerationResult(res)
+    } catch (err) {
+      setAiModerationResult({ safe: false, summary: `⚠️ Denetim başarısız: ${err?.message || 'Hata oluştu'}`, flaggedMessages: [], moderationAdvice: 'Lütfen tekrar deneyin.' })
+    } finally {
+      setAiModerateLoading(false)
     }
   }
 
@@ -17762,27 +17814,38 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     className={`ai-copilot-tab-btn${aiCopilotTab === 'chat' ? ' active' : ''}`}
                     onClick={() => setAiCopilotTab('chat')}
                   >
-                    💬 Sohbet
+                    💬 Sohbet <span className="ai-tier-tag ai-tier-tag--pro">PRO</span>
                   </button>
                   <button
                     type="button"
                     className={`ai-copilot-tab-btn${aiCopilotTab === 'summarize' ? ' active' : ''}`}
                     onClick={() => setAiCopilotTab('summarize')}
                   >
-                    📝 Kanal Özeti
+                    📝 Kanal Özeti <span className="ai-tier-tag ai-tier-tag--free">FREE</span>
+                  </button>
+                  <button
+                    type="button"
+                    className={`ai-copilot-tab-btn${aiCopilotTab === 'moderate' ? ' active' : ''}`}
+                    onClick={() => setAiCopilotTab('moderate')}
+                  >
+                    🛡️ Moderasyon <span className="ai-tier-tag ai-tier-tag--free">FREE</span>
                   </button>
                   <button
                     type="button"
                     className={`ai-copilot-tab-btn${aiCopilotTab === 'generate' ? ' active' : ''}`}
                     onClick={() => setAiCopilotTab('generate')}
                   >
-                    💡 Yaratıcı Araçlar
+                    💡 Araçlar <span className="ai-tier-tag ai-tier-tag--pro">PRO</span>
                   </button>
                 </div>
 
                 <div className="ai-copilot-body">
                   {aiCopilotTab === 'chat' && (
                     <div className="ai-copilot-chat-view">
+                      <div className="ai-tier-banner ai-tier-banner--pro">
+                        <span>💎 <strong>Chat Modu (Premium)</strong> — Yapay zeka ile birebir akıllı sohbet. Beta boyunca herkese ücretsiz!</span>
+                      </div>
+
                       <div className="ai-copilot-chat-history">
                         {aiCopilotMessages.map((msg, i) => (
                           <div key={i} className={`ai-copilot-msg-bubble ${msg.role}`}>
@@ -17885,19 +17948,53 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
                   {aiCopilotTab === 'summarize' && (
                     <div className="ai-copilot-summarize-view">
+                      <div className="ai-tier-banner ai-tier-banner--free">
+                        <span>✨ <strong>Mesaj Özeti (Ücretsiz)</strong> — Kanalın tamamını veya seçtiğiniz aralıktaki tüm mesajları okuyup özetler.</span>
+                      </div>
+
                       <div className="ai-copilot-summary-header">
-                        <div>
+                        <div style={{ flex: 1 }}>
                           <div className="ai-copilot-summary-title">
                             #{selectedChannel?.name || selectedChat?.name || 'Sohbet'} Kanal Özeti
                           </div>
-                          <div className="ai-copilot-summary-desc">
-                            Kanalın son 50 mesajını yapay zeka ile analiz eder ve maddeler halinde özetler.
+                          <div className="ai-copilot-range-selector">
+                            <span className="ai-range-label">Aralık:</span>
+                            <div className="ai-range-chips">
+                              <button
+                                type="button"
+                                className={`ai-range-chip${aiSummarizeRange === 'all' ? ' active' : ''}`}
+                                onClick={() => setAiSummarizeRange('all')}
+                              >
+                                📚 Tüm Kanal
+                              </button>
+                              <button
+                                type="button"
+                                className={`ai-range-chip${aiSummarizeRange === '100' ? ' active' : ''}`}
+                                onClick={() => setAiSummarizeRange('100')}
+                              >
+                                Son 100 Mesaj
+                              </button>
+                              <button
+                                type="button"
+                                className={`ai-range-chip${aiSummarizeRange === '50' ? ' active' : ''}`}
+                                onClick={() => setAiSummarizeRange('50')}
+                              >
+                                Son 50 Mesaj
+                              </button>
+                              <button
+                                type="button"
+                                className={`ai-range-chip${aiSummarizeRange === '24h' ? ' active' : ''}`}
+                                onClick={() => setAiSummarizeRange('24h')}
+                              >
+                                ⏳ Son 24 Saat
+                              </button>
+                            </div>
                           </div>
                         </div>
                         <button
                           type="button"
                           className="ai-copilot-primary-btn"
-                          onClick={handleAICopilotSummarize}
+                          onClick={() => handleAICopilotSummarize()}
                           disabled={aiCopilotLoading}
                         >
                           {aiCopilotLoading ? '✨ Analiz ediliyor...' : '📊 Şimdi Özetle'}
@@ -17926,7 +18023,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 if (msgKey) {
                                   const aiMsg = {
                                     id: createClientMessageId(),
-                                    text: `📊 **#${selectedChannel?.name || 'Kanal'} Özeti:**\n\n${aiCopilotSummary}`,
+                                    text: aiCopilotSummary,
                                     sender: { id: 'reelms-ai-bot', name: 'Reelms Intelligence', username: 'reelmsai', photo: null, isBot: true },
                                     time: Date.now()
                                   }
@@ -17945,8 +18042,78 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     </div>
                   )}
 
+                  {aiCopilotTab === 'moderate' && (
+                    <div className="ai-copilot-moderate-view">
+                      <div className="ai-tier-banner ai-tier-banner--free">
+                        <span>🛡️ <strong>Kanal Moderasyonu (Ücretsiz)</strong> — Kanaldaki mesajları kurallara, spam ve toksisiteye karşı denetler.</span>
+                      </div>
+
+                      <div className="ai-copilot-summary-header">
+                        <div>
+                          <div className="ai-copilot-summary-title">
+                            #{selectedChannel?.name || 'Kanal'} Moderasyon Denetimi
+                          </div>
+                          <div className="ai-copilot-summary-desc">
+                            Topluluk kurallarına aykırı mesajları, küfür, spam veya hakaretleri yapay zeka ile denetleyin.
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          className="ai-copilot-primary-btn"
+                          onClick={handleAICopilotModerate}
+                          disabled={aiModerateLoading}
+                        >
+                          {aiModerateLoading ? '🛡️ Denetleniyor...' : '🛡️ Kanalı Denetle'}
+                        </button>
+                      </div>
+
+                      {aiModerationResult && (
+                        <div className="ai-copilot-summary-result">
+                          <div className="ai-mod-status-row">
+                            <span className={`ai-mod-badge ${aiModerationResult.safe ? 'safe' : 'warning'}`}>
+                              {aiModerationResult.safe ? '✅ Kanal Güvenli' : '⚠️ İnceleme Gerektiren Durumlar Var'}
+                            </span>
+                            <span style={{ fontSize: '0.78rem', color: 'rgba(255, 255, 255, 0.6)' }}>
+                              {aiModerationResult.scannedCount || 0} mesaj tarandı
+                            </span>
+                          </div>
+
+                          <div className="ai-copilot-summary-text" style={{ marginTop: 8 }}>
+                            {aiModerationResult.summary}
+                          </div>
+
+                          {aiModerationResult.moderationAdvice && (
+                            <div className="ai-mod-advice-box">
+                              <strong>💡 Yönetici Tavsiyesi:</strong> {aiModerationResult.moderationAdvice}
+                            </div>
+                          )}
+
+                          {Array.isArray(aiModerationResult.flaggedMessages) && aiModerationResult.flaggedMessages.length > 0 && (
+                            <div className="ai-flagged-list">
+                              <div className="ai-flagged-title">🚩 İşaretlenen Mesajlar:</div>
+                              {aiModerationResult.flaggedMessages.map((flag, idx) => (
+                                <div key={idx} className="ai-flagged-item">
+                                  <div className="ai-flagged-header">
+                                    <span className="ai-flagged-author">{flag.senderName || 'Kullanıcı'}:</span>
+                                    <span className={`ai-flagged-severity ${flag.severity || 'medium'}`}>{flag.severity || 'uyarı'}</span>
+                                  </div>
+                                  <div className="ai-flagged-text">"{flag.text}"</div>
+                                  <div className="ai-flagged-reason">Sebep: {flag.reason}</div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {aiCopilotTab === 'generate' && (
                     <div className="ai-copilot-generate-view">
+                      <div className="ai-tier-banner ai-tier-banner--pro">
+                        <span>💡 <strong>Yaratıcı Üretim Araçları (Premium)</strong> — Beta süresince ücretsiz açık!</span>
+                      </div>
+
                       <div className="ai-copilot-form-group">
                         <label className="ai-copilot-form-label">Üretim Türü</label>
                         <select
@@ -20657,6 +20824,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               {/* 1. Gönder (Send) */}
                               <button className="msg-bar-btn msg-bar-btn--send" onClick={sendMessage} disabled={!canPost} title="Gönder">
                                 <img src={sendIcon} alt="Send" className="msg-bar-icon" />
+                              </button>
+
+                              {/* 1.1 Reelms Intelligence */}
+                              <button
+                                type="button"
+                                className={`msg-bar-btn msg-bar-btn--intelligence${showAICopilot ? ' active' : ''}`}
+                                onClick={() => setShowAICopilot(v => !v)}
+                                title="Reelms Intelligence"
+                              >
+                                <img src={intelligenceIcon} alt="Reelms Intelligence" className="msg-bar-icon msg-bar-icon--intelligence" />
                               </button>
 
                               {/* 2. Emoji */}

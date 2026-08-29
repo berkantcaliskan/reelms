@@ -1065,10 +1065,17 @@ export async function aiChat({ messages, prompt, systemPrompt, model, temperatur
   })
 }
 
-export async function aiSummarize({ msgKey, messages, channelName, limit, language }) {
+export async function aiSummarize({ msgKey, messages, channelName, limit, since, language, rangeDescription }) {
   return api('/api/v1/ai/summarize', {
     method: 'POST',
-    body: JSON.stringify({ msgKey, messages, channelName, limit, language })
+    body: JSON.stringify({ msgKey, messages, channelName, limit, since, language, rangeDescription })
+  })
+}
+
+export async function aiModerate({ msgKey, messages, channelName, serverRules, limit }) {
+  return api('/api/v1/ai/moderate', {
+    method: 'POST',
+    body: JSON.stringify({ msgKey, messages, channelName, serverRules, limit })
   })
 }
 
@@ -1088,4 +1095,5 @@ export async function aiAddBotToReelm(reelmId) {
 export async function aiGetBotStatus(reelmId) {
   return api(`/api/v1/reelms/${encodeURIComponent(reelmId)}/ai-bot-status`)
 }
+
 

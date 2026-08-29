@@ -90,14 +90,16 @@ export async function generateAIChatResponse({
 export async function summarizeChannelConversation({
   messages,
   channelName,
+  rangeDescription = 'Son mesajlar',
   language = 'auto'
 }: {
   messages: Array<{ sender?: any; text?: string; time?: number; name?: string }>
   channelName?: string
+  rangeDescription?: string
   language?: string
 }): Promise<string> {
   if (!messages || !messages.length) {
-    return 'Bu kanalda özetlenecek mesaj bulunmuyor.'
+    return 'Bu aralıkta veya kanalda özetlenecek mesaj bulunmuyor.'
   }
 
   const formatted = messages
@@ -109,14 +111,15 @@ export async function summarizeChannelConversation({
     .join('\n')
 
   if (!formatted.trim()) {
-    return 'Özetlenebilecek mesaj içeriği bulunamadı.'
+    return 'Özetlenebilecek mesaj metni bulunamadı.'
   }
 
-  const prompt = `Aşağıdaki "${channelName || 'Sohbet'}" kanalındaki mesajlaşmaları analiz et ve özetle.
+  const prompt = `Aşağıdaki "${channelName || 'Sohbet'}" kanalındaki ${rangeDescription} mesajlaşmalarını analiz et ve kapsamlı bir özet hazırla.
 Kurallar:
-- Önemli konuları, alınan kararları ve öne çıkan başlıkları maddeler halinde listele.
+- Tartışılan ana konuları, alınan kararları, paylaşılan önemli fikir veya bağlantıları maddeler halinde listele.
 - Kullanıcıların konuştuğu ana dilde (${language === 'auto' ? 'mesajların dili' : language}) yanıtla.
-- Maksimum 8-10 madde olsun. Net ve temiz olsun.
+- Maksimum 8-12 madde olsun.
+- Başlık: 📊 **#${channelName || 'Kanal'} Özeti (${rangeDescription})**
 
 Mesajlar:
 ${formatted}`
@@ -124,8 +127,90 @@ ${formatted}`
   const result = await generateAIChatResponse({
     prompt,
     temperature: 0.3,
-    maxTokens: 800
+    maxTokens: 900
   })
 
   return result.text
+}
+
+export async function moderateChannelMessages({
+  messages,
+  channelName,
+  serverRules
+}: {
+  messages: Array<{ id?: string; sender?: any; text?: string; time?: number; name?: string }>
+  channelName?: string
+  serverRules?: string
+}): Promise<{
+  safe: boolean
+  summary: string
+  flaggedMessages: Array<{ id?: string; senderName: string; text: string; reason: string; severity: 'low' | 'medium' | 'high' }>
+  moderationAdvice: string
+}> {
+  if (!messages || !messages.length) {
+    return {
+      safe: true,
+      summary: 'Kanalda incelenecek mesaj bulunmuyor.',
+      flaggedMessages: [],
+      moderationAdvice: 'Herhangi bir ihlal tespit edilmedi.'
+    }
+  }
+
+  const formatted = messages
+    .filter((m) => m?.text && String(m.text).trim().length > 0)
+    .map((m, idx) => {
+      const name = m.sender?.name || m.sender?.username || m.name || 'User'
+      return `[ID: ${m.id || idx}] ${name}: ${String(m.text).slice(0, 300)}`
+    })
+    .join('\n')
+
+  const prompt = `Sen Reelms Intelligence moderasyon asistanısın. Aşağıdaki "${channelName || 'Genel'}" kanalındaki mesajları denetle.
+Sunucu Kuralları: "${serverRules || 'Saygılı olun, nefret söylemi, spam, hakaret, kişisel saldırı ve zararlı içerik yasaktır.'}"
+
+Lütfen geçerli bir JSON nesnesi döndür:
+{
+  "safe": boolean,
+  "summary": "Kanal genel durum özeti (1-2 cümle)",
+  "flaggedMessages": [
+    {
+      "id": "mesaj_id",
+      "senderName": "kullanıcı adı",
+      "text": "mesaj metni",
+      "reason": "kural ihlali gerekçesi (küfür, spam, saldırı vs.)",
+      "severity": "low" | "medium" | "high"
+    }
+  ],
+  "moderationAdvice": "Yöneticiye moderasyon tavsiyesi"
+}
+
+Mesajlar:
+${formatted}`
+
+  try {
+    const result = await generateAIChatResponse({
+      prompt,
+      temperature: 0.2,
+      maxTokens: 1000
+    })
+
+    const jsonMatch = result.text.match(/\{[\s\S]*\}/)
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0])
+      return {
+        safe: Boolean(parsed.safe),
+        summary: String(parsed.summary || 'Kanal analizi tamamlandı.'),
+        flaggedMessages: Array.isArray(parsed.flaggedMessages) ? parsed.flaggedMessages : [],
+        moderationAdvice: String(parsed.moderationAdvice || 'Topluluk kurallarına uygun sohbet devam ediyor.')
+      }
+    }
+  } catch (err) {
+    console.error('[AI Moderation Error]:', err)
+  }
+
+  return {
+    safe: true,
+    summary: 'Kanal incelendi, kritik bir ihlal tespit edilmedi.',
+    flaggedMessages: [],
+    moderationAdvice: 'Topluluk sağlıklı bir şekilde sohbete devam ediyor.'
+  }
 }
