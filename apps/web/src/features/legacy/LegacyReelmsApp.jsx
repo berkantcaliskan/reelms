@@ -98,6 +98,26 @@ function IntelligenceIcon({ size = 20, className = 'msg-bar-icon msg-bar-icon--i
   )
 }
 
+function SendIcon({ size = 20, className = 'msg-bar-icon', style }) {
+  return (
+    <svg
+      viewBox="0 0 360 360"
+      width={size}
+      height={size}
+      className={className}
+      style={{ display: 'block', fill: 'none', ...style }}
+      aria-hidden="true"
+    >
+      <g transform="translate(-43, 24)">
+        <path fill="currentColor" fillOpacity="0.95" d="M 350.9 73.59 L 160.67 162.94 L 92.71 123.64 L 342.09 72.05 C 345.1 71.42 348.53 72.19 350.9 73.59 Z" />
+        <path fill="currentColor" fillOpacity="0.75" d="M 350.9 73.59 L 196.54 183.63 L 264.14 222.71 L 353.56 78.69 C 354.68 76.95 353.35 74.99 350.9 73.59 Z" />
+        <path fill="currentColor" fillOpacity="1" d="M 350.9 73.59 L 196.32 183.63 L 178.36 240.75 L 160.46 162.94 Z" />
+        <path fill="currentColor" fillOpacity="0.55" d="M 324.89 99.8 L 178.36 240.75 L 178.98 174.05 L 324.89 89.81 Z" />
+      </g>
+    </svg>
+  )
+}
+
 // Audit Log components
 function AuditLogView({ reelmId }) {
   const [logs, setLogs] = useState([])
@@ -1345,12 +1365,28 @@ const THEMES = [
   {
     id: 'default',
     name: 'Warm, Default',
-    accent: '#e8d8cc',
-    accentRgb: '232,216,204',
+    // 1. Birincil (Primary / Base)
+    primary: '#2c2522',
+    primaryRgb: '44,37,34',
     base: '#2c2522',
     baseRgb: '44,37,34',
+    // 2. İkincil (Secondary / Accent)
+    secondary: '#e8d8cc',
+    secondaryRgb: '232,216,204',
+    accent: '#e8d8cc',
+    accentRgb: '232,216,204',
+    // 3. Üçüncül (Tertiary / Menus, Inputs & Bars)
+    tertiary: '#181416',
+    tertiaryRgb: '14,12,18',
+    tertiaryGlass: 'rgba(14, 12, 18, 0.62)',
     surfacePrimary: '#362e2a',
+    // 4. Dördüncül (Quaternary)
+    quaternary: '#413732',
+    quaternaryRgb: '65,55,50',
     surfaceElevated: '#413732',
+    // 5. Beşincil (Quinary)
+    quinary: '#4c413b',
+    quinaryRgb: '76,65,59',
     surfaceHover: '#4c413b',
     borderSubtle: 'rgba(255,255,255,0.08)',
     borderStrong: 'rgba(255,255,255,0.14)',
@@ -1361,12 +1397,28 @@ const THEMES = [
   {
     id: 'daylight',
     name: 'Daylight',
-    accent: '#2c2522',
-    accentRgb: '44,37,34',
+    // 1. Birincil
+    primary: '#f4ede6',
+    primaryRgb: '244,237,230',
     base: '#f4ede6',
     baseRgb: '244,237,230',
+    // 2. İkincil
+    secondary: '#2c2522',
+    secondaryRgb: '44,37,34',
+    accent: '#2c2522',
+    accentRgb: '44,37,34',
+    // 3. Üçüncül
+    tertiary: '#e8dfd7',
+    tertiaryRgb: '232,223,215',
+    tertiaryGlass: 'rgba(232, 223, 215, 0.72)',
     surfacePrimary: '#ece3db',
+    // 4. Dördüncül
+    quaternary: '#e2d7ce',
+    quaternaryRgb: '226,215,206',
     surfaceElevated: '#e2d7ce',
+    // 5. Beşincil
+    quinary: '#d8ccc2',
+    quinaryRgb: '216,204,194',
     surfaceHover: '#d8ccc2',
     borderSubtle: 'rgba(0,0,0,0.08)',
     borderStrong: 'rgba(0,0,0,0.16)',
@@ -1377,12 +1429,28 @@ const THEMES = [
   {
     id: 'gece',
     name: 'Night',
-    accent: '#e8d8cc',
-    accentRgb: '232,216,204',
+    // 1. Birincil
+    primary: '#1e1c1a',
+    primaryRgb: '30,28,26',
     base: '#1e1c1a',
     baseRgb: '30,28,26',
+    // 2. İkincil
+    secondary: '#e8d8cc',
+    secondaryRgb: '232,216,204',
+    accent: '#e8d8cc',
+    accentRgb: '232,216,204',
+    // 3. Üçüncül
+    tertiary: '#141312',
+    tertiaryRgb: '20,19,18',
+    tertiaryGlass: 'rgba(14, 13, 12, 0.65)',
     surfacePrimary: '#262421',
+    // 4. Dördüncül
+    quaternary: '#302d29',
+    quaternaryRgb: '48,45,41',
     surfaceElevated: '#302d29',
+    // 5. Beşincil
+    quinary: '#3b3732',
+    quinaryRgb: '59,55,50',
     surfaceHover: '#3b3732',
     borderSubtle: 'rgba(255,255,255,0.08)',
     borderStrong: 'rgba(255,255,255,0.14)',
@@ -1394,12 +1462,28 @@ const THEMES = [
   {
     id: 'charcoal',
     name: 'Very Dark',
-    accent: '#e4d6cb',
-    accentRgb: '228,214,203',
+    // 1. Birincil
+    primary: '#121315',
+    primaryRgb: '18,19,21',
     base: '#121315',
     baseRgb: '18,19,21',
+    // 2. İkincil
+    secondary: '#e4d6cb',
+    secondaryRgb: '228,214,203',
+    accent: '#e4d6cb',
+    accentRgb: '228,214,203',
+    // 3. Üçüncül
+    tertiary: '#0c0d0f',
+    tertiaryRgb: '12,13,15',
+    tertiaryGlass: 'rgba(10, 11, 13, 0.65)',
     surfacePrimary: '#181A1D',
+    // 4. Dördüncül
+    quaternary: '#1E2024',
+    quaternaryRgb: '30,32,36',
     surfaceElevated: '#1E2024',
+    // 5. Beşincil
+    quinary: '#24262B',
+    quinaryRgb: '36,38,43',
     surfaceHover: '#24262B',
     borderSubtle: 'rgba(255,255,255,0.06)',
     borderStrong: 'rgba(255,255,255,0.10)',
@@ -1410,12 +1494,28 @@ const THEMES = [
   {
     id: 'sunlight',
     name: 'Sunlight',
-    accent: '#d97706',
-    accentRgb: '217,119,6',
+    // 1. Birincil
+    primary: '#fdfbf7',
+    primaryRgb: '253,251,247',
     base: '#fdfbf7',
     baseRgb: '253,251,247',
+    // 2. İkincil
+    secondary: '#d97706',
+    secondaryRgb: '217,119,6',
+    accent: '#d97706',
+    accentRgb: '217,119,6',
+    // 3. Üçüncül
+    tertiary: '#f3ede2',
+    tertiaryRgb: '243,237,226',
+    tertiaryGlass: 'rgba(243, 237, 226, 0.75)',
     surfacePrimary: '#f6ede0',
+    // 4. Dördüncül
+    quaternary: '#ede0ce',
+    quaternaryRgb: '237,224,206',
     surfaceElevated: '#ede0ce',
+    // 5. Beşincil
+    quinary: '#e3d3bd',
+    quinaryRgb: '227,211,189',
     surfaceHover: '#e3d3bd',
     borderSubtle: 'rgba(0,0,0,0.08)',
     borderStrong: 'rgba(0,0,0,0.14)',
@@ -1427,12 +1527,28 @@ const THEMES = [
   {
     id: 'midnight',
     name: 'Midnight',
-    accent: '#9070c0',
-    accentRgb: '144,112,192',
+    // 1. Birincil
+    primary: '#0c0c20',
+    primaryRgb: '12,12,32',
     base: '#0c0c20',
     baseRgb: '12,12,32',
+    // 2. İkincil
+    secondary: '#9070c0',
+    secondaryRgb: '144,112,192',
+    accent: '#9070c0',
+    accentRgb: '144,112,192',
+    // 3. Üçüncül
+    tertiary: '#080816',
+    tertiaryRgb: '8,8,22',
+    tertiaryGlass: 'rgba(8, 8, 22, 0.65)',
     surfacePrimary: '#141430',
+    // 4. Dördüncül
+    quaternary: '#1b1b3e',
+    quaternaryRgb: '27,27,62',
     surfaceElevated: '#1b1b3e',
+    // 5. Beşincil
+    quinary: '#23234d',
+    quinaryRgb: '35,35,77',
     surfaceHover: '#23234d',
     borderSubtle: 'rgba(255,255,255,0.08)',
     borderStrong: 'rgba(255,255,255,0.14)',
@@ -1444,12 +1560,28 @@ const THEMES = [
   {
     id: 'classic',
     name: 'Midnight Purple',
-    accent: '#c084fc',
-    accentRgb: '192,132,252',
+    // 1. Birincil
+    primary: '#0f0a1c',
+    primaryRgb: '15,10,28',
     base: '#0f0a1c',
     baseRgb: '15,10,28',
+    // 2. İkincil
+    secondary: '#c084fc',
+    secondaryRgb: '192,132,252',
+    accent: '#c084fc',
+    accentRgb: '192,132,252',
+    // 3. Üçüncül
+    tertiary: '#0a0614',
+    tertiaryRgb: '10,6,20',
+    tertiaryGlass: 'rgba(10, 6, 20, 0.65)',
     surfacePrimary: '#1a1130',
+    // 4. Dördüncül
+    quaternary: '#241842',
+    quaternaryRgb: '36,24,66',
     surfaceElevated: '#241842',
+    // 5. Beşincil
+    quinary: '#2e1f54',
+    quinaryRgb: '46,31,84',
     surfaceHover: '#2e1f54',
     borderSubtle: 'rgba(255,255,255,0.08)',
     borderStrong: 'rgba(255,255,255,0.14)',
@@ -3961,7 +4093,7 @@ function CachedProfileImage({ src, alt = '', className = '', style, fallback = n
     return () => { alive = false }
   }, [src])
   if (!resolvedSrc || failed) return fallback
-  return <img {...props} src={resolvedSrc} alt={alt} className={className} style={style} onError={(e) => { setFailed(true); props.onError?.(e) }} />
+  return <img {...props} src={resolvedSrc} alt={alt} className={`${className} cached-profile-img`.trim()} style={style} onError={(e) => { setFailed(true); props.onError?.(e) }} />
 }
 
 function CachedProfileCover({ src, className = '', style = {}, ...props }) {
@@ -5982,7 +6114,7 @@ function getMemberRoleIdsClient(member) {
     ? member.roleIds
     : Array.isArray(member.roles)
       ? member.roles.map(r => typeof r === 'object' ? r?.id : r)
-      : []
+      : (member.roleId ? [member.roleId] : (member.role ? [typeof member.role === 'object' ? member.role?.id : member.role] : []))
   return Array.from(new Set(ids.map(String).filter(Boolean)))
 }
 
@@ -6014,6 +6146,7 @@ function canActOnReelmMemberClient(reelm, actorUid, targetMember, permission = '
 function buildReelmMemberGroupsClient({ reelm, members, presence, currentUser, uid, profileStatus, getPresenceForUser }) {
   const orderedRoles = getOrderedReelmRolesClient(reelm)
   const managerRole = orderedRoles.find(isManagerRoleClient) || orderedRoles[0] || null
+  const defaultMemberRole = orderedRoles.find(r => !isManagerRoleClient(r) && (String(r.id).includes('citizen') || String(r.id).includes('member') || String(r.name).toLowerCase().includes('member') || String(r.name).toLowerCase().includes('üye') || String(r.name).toLowerCase().includes('citizen'))) || (orderedRoles.length > 1 ? orderedRoles[orderedRoles.length - 1] : orderedRoles[0]) || null
   const ownerId = String(reelm?.ownerId || '')
   const assigned = new Set()
 
@@ -6038,12 +6171,16 @@ function buildReelmMemberGroupsClient({ reelm, members, presence, currentUser, u
     return an.localeCompare(bn)
   })
 
-  // Normalize members list so userId is always set and owner gets top manager role if no role is explicitly assigned
+  // Normalize members list so userId is always set and properly mapped to server roles
   const normalizedMemberList = (members || []).map(m => {
     const mid = getUid(m)
     let roleIds = getMemberRoleIdsClient(m)
     if (mid && mid === ownerId && managerRole?.id && !roleIds.length) {
       roleIds = [String(managerRole.id)]
+    }
+    // If server has roles, automatically map unassigned member to default server role
+    if (!roleIds.length && defaultMemberRole?.id && !m.isBot) {
+      roleIds = [String(defaultMemberRole.id)]
     }
     return { ...m, userId: mid, roleIds }
   })
@@ -6068,7 +6205,20 @@ function buildReelmMemberGroupsClient({ reelm, members, presence, currentUser, u
   })
   const botMembers = sortMembers(unassigned.filter(m => m.isBot))
   const noRoleMembers = sortMembers(unassigned.filter(m => !m.isBot))
-  if (noRoleMembers.length) groups.push({ role: { id: '__no_role__', name: 'No role', color: '#94a3b8' }, members: noRoleMembers, noRole: true })
+  
+  if (noRoleMembers.length) {
+    if (orderedRoles.length > 0) {
+      const targetRole = defaultMemberRole || orderedRoles[orderedRoles.length - 1]
+      const existingGroup = groups.find(g => String(g.role?.id) === String(targetRole.id))
+      if (existingGroup) {
+        existingGroup.members = sortMembers([...existingGroup.members, ...noRoleMembers])
+      } else {
+        groups.push({ role: targetRole, members: noRoleMembers })
+      }
+    } else {
+      groups.push({ role: { id: '__members__', name: 'Üyeler', color: '#94a3b8' }, members: noRoleMembers })
+    }
+  }
   if (botMembers.length) groups.push({ role: { id: '__bots__', name: 'bots_group_label', color: '#7c8fa6' }, members: botMembers, isBotsGroup: true })
   return { groups, orderedRoles, getMemberPresence, getMemberStatus }
 }
@@ -10473,11 +10623,17 @@ function buildProfileThemeStyle(person) {
   const theme = THEMES.find(th => th.id === cfg.themeId) || THEMES[0]
   const accent = typeof cfg.customAccent === 'string' && cfg.customAccent ? cfg.customAccent : (theme.accent || '#fdfcfb')
   const base = typeof cfg.customBase === 'string' && cfg.customBase ? cfg.customBase : (theme.base || '#2c2522')
+  const tertiary = theme.tertiary || '#181416'
+  const tertiaryRgb = theme.tertiaryRgb || '14,12,18'
+  const tertiaryGlass = theme.tertiaryGlass || `rgba(${tertiaryRgb}, 0.62)`
   return {
     '--fpp-theme-accent': accent,
     '--fpp-theme-accent-rgb': rgbCssValue(accent, rgbCssValue(theme.accentRgb, '185,152,135')),
     '--fpp-theme-base': base,
     '--fpp-theme-base-rgb': rgbCssValue(base, rgbCssValue(theme.baseRgb, '44,37,34')),
+    '--fpp-theme-tertiary': tertiary,
+    '--fpp-theme-tertiary-rgb': tertiaryRgb,
+    '--fpp-theme-tertiary-glass': tertiaryGlass,
   }
 }
 
@@ -10907,14 +11063,46 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     } else {
       root.classList.remove('theme-light')
     }
-    root.style.setProperty('--ta', effectiveAccent)
-    root.style.setProperty('--ta-rgb', effectiveAccentRgb)
+
+    // 1. Birincil Renk (Primary / Base Background)
+    root.style.setProperty('--theme-primary', effectiveBase)
+    root.style.setProperty('--theme-primary-rgb', effectiveBaseRgb)
     root.style.setProperty('--tb', effectiveBase)
     root.style.setProperty('--tb-rgb', effectiveBaseRgb)
+
+    // 2. İkincil Renk (Secondary / Accent / Vurgu)
+    root.style.setProperty('--theme-secondary', effectiveAccent)
+    root.style.setProperty('--theme-secondary-rgb', effectiveAccentRgb)
+    root.style.setProperty('--ta', effectiveAccent)
+    root.style.setProperty('--ta-rgb', effectiveAccentRgb)
+
+    // 3. Üçüncül Renk (Tertiary / Menus, Inputs & Bars)
+    const effectiveTertiary = activeTheme.tertiary || '#181416'
+    const effectiveTertiaryRgb = activeTheme.tertiaryRgb || '14,12,18'
+    const effectiveTertiaryGlass = activeTheme.tertiaryGlass || `rgba(${effectiveTertiaryRgb}, 0.62)`
+    root.style.setProperty('--theme-tertiary', effectiveTertiary)
+    root.style.setProperty('--theme-tertiary-rgb', effectiveTertiaryRgb)
+    root.style.setProperty('--theme-tertiary-glass', effectiveTertiaryGlass)
+    root.style.setProperty('--tt', effectiveTertiary)
+    root.style.setProperty('--tt-rgb', effectiveTertiaryRgb)
+    root.style.setProperty('--tt-glass', effectiveTertiaryGlass)
+    root.style.setProperty('--surface-primary', activeTheme.surfacePrimary || effectiveTertiary)
+
+    // 4. Dördüncül Renk (Quaternary)
+    const effectiveQuaternary = activeTheme.quaternary || activeTheme.surfaceElevated || '#413732'
+    const effectiveQuaternaryRgb = activeTheme.quaternaryRgb || '65,55,50'
+    root.style.setProperty('--theme-quaternary', effectiveQuaternary)
+    root.style.setProperty('--theme-quaternary-rgb', effectiveQuaternaryRgb)
+    root.style.setProperty('--surface-elevated', effectiveQuaternary)
+
+    // 5. Beşincil Renk (Quinary)
+    const effectiveQuinary = activeTheme.quinary || activeTheme.surfaceHover || '#4c413b'
+    const effectiveQuinaryRgb = activeTheme.quinaryRgb || '76,65,59'
+    root.style.setProperty('--theme-quinary', effectiveQuinary)
+    root.style.setProperty('--theme-quinary-rgb', effectiveQuinaryRgb)
+    root.style.setProperty('--surface-hover', effectiveQuinary)
+
     root.style.setProperty('--text-fg', effectiveTextColor)
-    root.style.setProperty('--surface-primary', activeTheme.surfacePrimary || 'rgba(24, 26, 29, 0.85)')
-    root.style.setProperty('--surface-elevated', activeTheme.surfaceElevated || '#1E2024')
-    root.style.setProperty('--surface-hover', activeTheme.surfaceHover || '#24262B')
     root.style.setProperty('--border-subtle', activeTheme.borderSubtle || 'rgba(255, 255, 255, 0.06)')
     root.style.setProperty('--border-strong', activeTheme.borderStrong || 'rgba(255, 255, 255, 0.10)')
     if (activeTheme.grainOpacity != null) {
@@ -10924,14 +11112,28 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     }
     return () => {
       root.classList.remove('theme-light')
-      root.style.removeProperty('--ta')
-      root.style.removeProperty('--ta-rgb')
+      root.style.removeProperty('--theme-primary')
+      root.style.removeProperty('--theme-primary-rgb')
       root.style.removeProperty('--tb')
       root.style.removeProperty('--tb-rgb')
-      root.style.removeProperty('--text-fg')
+      root.style.removeProperty('--theme-secondary')
+      root.style.removeProperty('--theme-secondary-rgb')
+      root.style.removeProperty('--ta')
+      root.style.removeProperty('--ta-rgb')
+      root.style.removeProperty('--theme-tertiary')
+      root.style.removeProperty('--theme-tertiary-rgb')
+      root.style.removeProperty('--theme-tertiary-glass')
+      root.style.removeProperty('--tt')
+      root.style.removeProperty('--tt-rgb')
+      root.style.removeProperty('--tt-glass')
       root.style.removeProperty('--surface-primary')
+      root.style.removeProperty('--theme-quaternary')
+      root.style.removeProperty('--theme-quaternary-rgb')
       root.style.removeProperty('--surface-elevated')
+      root.style.removeProperty('--theme-quinary')
+      root.style.removeProperty('--theme-quinary-rgb')
       root.style.removeProperty('--surface-hover')
+      root.style.removeProperty('--text-fg')
       root.style.removeProperty('--border-subtle')
       root.style.removeProperty('--border-strong')
       root.style.removeProperty('--grain-opacity')
@@ -17898,7 +18100,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               <div className="ai-copilot-modal" onClick={e => e.stopPropagation()}>
                 <div className="ai-copilot-header">
                   <div className="ai-copilot-title-row">
-                    <div className="ai-copilot-icon-badge">✨</div>
+                    <div className="ai-copilot-icon-badge">
+                      <IntelligenceIcon size={22} />
+                    </div>
                     <div>
                       <div className="ai-copilot-title">Reelms Intelligence Copilot</div>
                       <div className="ai-copilot-subtitle">OpenRouter • nvidia/nemotron-3.5-lightning:free</div>
@@ -17915,38 +18119,34 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     className={`ai-copilot-tab-btn${aiCopilotTab === 'chat' ? ' active' : ''}`}
                     onClick={() => setAiCopilotTab('chat')}
                   >
-                    💬 Sohbet <span className="ai-tier-tag ai-tier-tag--pro">PRO</span>
+                    💬 Sohbet
                   </button>
                   <button
                     type="button"
                     className={`ai-copilot-tab-btn${aiCopilotTab === 'summarize' ? ' active' : ''}`}
                     onClick={() => setAiCopilotTab('summarize')}
                   >
-                    📝 Kanal Özeti <span className="ai-tier-tag ai-tier-tag--free">FREE</span>
+                    📝 Kanal Özeti
                   </button>
                   <button
                     type="button"
                     className={`ai-copilot-tab-btn${aiCopilotTab === 'moderate' ? ' active' : ''}`}
                     onClick={() => setAiCopilotTab('moderate')}
                   >
-                    🛡️ Moderasyon <span className="ai-tier-tag ai-tier-tag--free">FREE</span>
+                    🛡️ Moderasyon
                   </button>
                   <button
                     type="button"
                     className={`ai-copilot-tab-btn${aiCopilotTab === 'generate' ? ' active' : ''}`}
                     onClick={() => setAiCopilotTab('generate')}
                   >
-                    💡 Araçlar <span className="ai-tier-tag ai-tier-tag--pro">PRO</span>
+                    💡 Araçlar
                   </button>
                 </div>
 
                 <div className="ai-copilot-body">
                   {aiCopilotTab === 'chat' && (
                     <div className="ai-copilot-chat-view">
-                      <div className="ai-tier-banner ai-tier-banner--pro">
-                        <span>💎 <strong>Chat Modu (Premium)</strong> — Yapay zeka ile birebir akıllı sohbet. Beta boyunca herkese ücretsiz!</span>
-                      </div>
-
                       <div className="ai-copilot-chat-history">
                         {aiCopilotMessages.map((msg, i) => (
                           <div key={i} className={`ai-copilot-msg-bubble ${msg.role}`}>
@@ -18049,10 +18249,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
                   {aiCopilotTab === 'summarize' && (
                     <div className="ai-copilot-summarize-view">
-                      <div className="ai-tier-banner ai-tier-banner--free">
-                        <span>✨ <strong>Mesaj Özeti (Ücretsiz)</strong> — Kanalın tamamını veya seçtiğiniz aralıktaki tüm mesajları okuyup özetler.</span>
-                      </div>
-
                       <div className="ai-copilot-summary-header">
                         <div style={{ flex: 1 }}>
                           <div className="ai-copilot-summary-title">
@@ -18145,10 +18341,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
                   {aiCopilotTab === 'moderate' && (
                     <div className="ai-copilot-moderate-view">
-                      <div className="ai-tier-banner ai-tier-banner--free">
-                        <span>🛡️ <strong>Kanal Moderasyonu (Ücretsiz)</strong> — Kanaldaki mesajları kurallara, spam ve toksisiteye karşı denetler.</span>
-                      </div>
-
                       <div className="ai-copilot-summary-header">
                         <div>
                           <div className="ai-copilot-summary-title">
@@ -18211,10 +18403,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
                   {aiCopilotTab === 'generate' && (
                     <div className="ai-copilot-generate-view">
-                      <div className="ai-tier-banner ai-tier-banner--pro">
-                        <span>💡 <strong>Yaratıcı Üretim Araçları (Premium)</strong> — Beta süresince ücretsiz açık!</span>
-                      </div>
-
                       <div className="ai-copilot-form-group">
                         <label className="ai-copilot-form-label">Üretim Türü</label>
                         <select
@@ -18883,7 +19071,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           document.body
                         )}
                         {showReelmMenu && ReactDOM.createPortal(
-                          <div className="reelm-name-menu" style={{ top: showReelmMenu.y, left: showReelmMenu.x, minWidth: 220 }} onClick={e => e.stopPropagation()}>
+                          <div className="reelm-name-menu" style={{ top: showReelmMenu.y, left: showReelmMenu.x, minWidth: 260 }} onClick={e => e.stopPropagation()}>
                             {((!isDefaultCommunity(selectedReelm) && hasReelmPermissionClient(selectedReelm, uid, 'manageOverview')) || canManageReelmClient(selectedReelm, uid)) && (
                               <button
                                 type="button"
@@ -19606,7 +19794,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             document.body
                           )}
                           {showReelmMenu && ReactDOM.createPortal(
-                            <div className="reelm-name-menu" style={{ top: showReelmMenu.y, left: showReelmMenu.x, minWidth: 220 }} onClick={e => e.stopPropagation()}>
+                            <div className="reelm-name-menu" style={{ top: showReelmMenu.y, left: showReelmMenu.x, minWidth: 260 }} onClick={e => e.stopPropagation()}>
                               {((!isDefaultCommunity(selectedReelm) && hasReelmPermissionClient(selectedReelm, uid, 'manageOverview')) || canManageReelmClient(selectedReelm, uid)) && (
                                 <button
                                   type="button"
@@ -20555,15 +20743,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               {channelTitle}
                               {selectedChannel?.isFlyingRoom && <span className="channel-header-flying">✦ {flyingRoomTick >= 0 && formatTimeLeft(selectedChannel.expiresAt)}</span>}
                             </span>
-                            <button
-                              type="button"
-                              className={`channel-ai-copilot-btn${showAICopilot ? ' active' : ''}`}
-                              title="Reelms Intelligence Copilot (OpenRouter)"
-                              onClick={() => setShowAICopilot(v => !v)}
-                            >
-                              <span className="channel-ai-copilot-sparkle">✨</span>
-                              <span className="channel-ai-copilot-label">Intelligence</span>
-                            </button>
                           </div>
                         )}
                         {pinnedMessages[msgKey] && (
@@ -20648,15 +20827,32 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           const tMsgKey = selectedChat ? selectedChat.id : composeReelmMsgKey(selectedReelm, selectedChannel)
                           const typers = tMsgKey ? (typingUsers[tMsgKey] || []) : []
                           if (!typers.length) return null
-                          const isDM = selectedChat?.type === 'dm'
                           return (
                             <div className="typing-indicator-row">
-                              {!isDM && typers[0]?.photo ? (
-                                <img className="typing-indicator-avatar" src={typers[0].photo} alt="" />
-                              ) : !isDM && typers[0]?.name ? (
-                                <div className="typing-indicator-avatar typing-indicator-avatar--text">{typers[0].name.charAt(0).toUpperCase()}</div>
-                              ) : null}
-                              <div className="typing-dots">
+                              <div className="typing-avatars-stack">
+                                {typers.slice(0, 4).map((typer, idx) => (
+                                  <div
+                                    key={typer.uid || idx}
+                                    className="typing-avatar-item"
+                                    style={{ zIndex: typers.length - idx }}
+                                    title={typer.name || ''}
+                                  >
+                                    {typer.photo ? (
+                                      <CachedProfileImage
+                                        src={typer.photo}
+                                        alt=""
+                                        className="typing-indicator-avatar"
+                                        fallback={<div className="typing-indicator-avatar typing-indicator-avatar--text">{(typer.name || '?').charAt(0).toUpperCase()}</div>}
+                                      />
+                                    ) : (
+                                      <div className="typing-indicator-avatar typing-indicator-avatar--text">
+                                        {(typer.name || '?').charAt(0).toUpperCase()}
+                                      </div>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="typing-dots" aria-label="Typing indicator">
                                 <span className="typing-dot" />
                                 <span className="typing-dot" />
                                 <span className="typing-dot" />
@@ -20924,7 +21120,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             <div className="msg-actions-toolbar">
                               {/* 1. Gönder (Send) */}
                               <button className="msg-bar-btn msg-bar-btn--send" onClick={sendMessage} disabled={!canPost} title="Gönder">
-                                <img src={sendIcon} alt="Send" className="msg-bar-icon" />
+                                <SendIcon size={20} />
                               </button>
 
                               {/* 1.1 Reelms Intelligence */}
