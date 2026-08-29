@@ -16080,10 +16080,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       } else {
         let cleanPrompt = userText
         if (cleanPrompt.startsWith('/ai')) cleanPrompt = cleanPrompt.replace(/^\/ai\s*/, '')
-        cleanPrompt = cleanPrompt.replace(/@(?:reelms\s*intelligence|reelmsintelligence|reelms-intelligence|reelmsai|intelligence)\b/gi, '').trim()
+        cleanPrompt = cleanPrompt.replace(/@(?:reelms\s*intelligence|reelmsintelligence|reelms-intelligence|reelmsai|intelligence|ai)\b/gi, '').trim()
         if (!cleanPrompt) {
           if (userMsg?.replyTo) {
-            cleanPrompt = `Yanıt verilen mesaj: "${userMsg.replyTo.text || ''}". Bu mesaja ne dersin?`
+            cleanPrompt = `Yanıt verilen mesaj: "${userMsg.replyTo.text || ''}". Bu mesaja samimi bir arkadaş gibi yanıt ver.`
           } else {
             cleanPrompt = 'Selam! Neler yapıyorsunuz, sohbet nasıl gidiyor?'
           }
@@ -16095,7 +16095,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           content: `${m.sender?.name || m.sender?.username || 'Kullanıcı'}: ${m.text || ''}`
         }))
         const res = await aiChat({ prompt: cleanPrompt, messages: history })
-        aiResultText = res?.text || 'Yanıt alınamadı.'
+        aiResultText = res?.text || 'Buradayım! Nasıl yardımcı olabilirim?'
       }
 
       if (aiResultText) {
@@ -16307,7 +16307,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
     // Then send text
     if (text) {
-      const isAIMention = /@(?:reelms\s*intelligence|reelmsintelligence|reelms-intelligence|reelmsai|intelligence)\b/i.test(outgoingText) || (replySnap && String(replySnap.senderId) === 'reelms-ai-bot')
+      const isAIMention = /@(?:reelms\s*intelligence|reelmsintelligence|reelms-intelligence|reelmsai|intelligence|ai)\b/i.test(outgoingText) || (replySnap && (String(replySnap.senderId) === 'reelms-ai-bot' || String(replySnap.senderName || '').toLowerCase().includes('intelligence')))
       const isAICommand = outgoingText.startsWith('/ai ') || outgoingText === '/ai' || outgoingText.startsWith('/summarize') || outgoingText.startsWith('/ai-help') || isAIMention
 
       if (outgoingText.startsWith('/shrug')) {
