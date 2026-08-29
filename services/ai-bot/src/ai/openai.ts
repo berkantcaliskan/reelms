@@ -11,22 +11,15 @@ Kullanıcının yazdığı dilde yanıt ver (Türkçe ise Türkçe, İngilizce i
 Asla robotik veya kurumsal olma. Samimi, akıcı ve kafa dengi bir kullanıcı gibi konuş. Markdown ve uygun emojiler kullanabilirsin.`
 
 function getAIConfig(forSummarize = false) {
-  const isOpenRouter = !!config.OPENROUTER_API_KEY
-  const apiKey = config.OPENROUTER_API_KEY || config.OPENAI_API_KEY || ''
-  const endpoint = isOpenRouter
-    ? `${config.OPENROUTER_BASE_URL.replace(/\/+$/, '')}/chat/completions`
-    : 'https://api.openai.com/v1/chat/completions'
-  const model = isOpenRouter
-    ? (forSummarize ? config.OPENROUTER_SUMMARIZE_MODEL : config.OPENROUTER_MODEL)
-    : (forSummarize ? config.OPENAI_SUMMARIZE_MODEL : config.OPENAI_MODEL)
+  const apiKey = config.OPENROUTER_API_KEY || ''
+  const endpoint = `${(config.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/+$/, '')}/chat/completions`
+  const model = forSummarize ? (config.OPENROUTER_SUMMARIZE_MODEL || 'nvidia/nemotron-3.5-lightning:free') : (config.OPENROUTER_MODEL || 'nvidia/nemotron-3.5-lightning:free')
   
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${apiKey}`
-  }
-  if (isOpenRouter) {
-    headers['HTTP-Referer'] = 'https://reelms.app'
-    headers['X-Title'] = 'Reelms'
+    Authorization: `Bearer ${apiKey}`,
+    'HTTP-Referer': 'https://reelms.io',
+    'X-Title': 'Reelms Intelligence'
   }
   return { endpoint, apiKey, model, headers }
 }

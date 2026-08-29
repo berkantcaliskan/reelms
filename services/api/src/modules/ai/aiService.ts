@@ -6,26 +6,21 @@ export interface ChatMessage {
 }
 
 export function getAIConfig(customModel?: string) {
-  const isOpenRouter = !!env.OPENROUTER_API_KEY
-  const apiKey = env.OPENROUTER_API_KEY || env.OPENAI_API_KEY || ''
-  const endpoint = isOpenRouter
-    ? `${env.OPENROUTER_BASE_URL.replace(/\/+$/, '')}/chat/completions`
-    : 'https://api.openai.com/v1/chat/completions'
-  const model = customModel || (isOpenRouter ? env.OPENROUTER_MODEL : 'gpt-4o-mini')
+  const apiKey = env.OPENROUTER_API_KEY || ''
+  const endpoint = `${(env.OPENROUTER_BASE_URL || 'https://openrouter.ai/api/v1').replace(/\/+$/, '')}/chat/completions`
+  const model = customModel || env.OPENROUTER_MODEL || 'nvidia/nemotron-3.5-lightning:free'
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${apiKey}`
+    Authorization: `Bearer ${apiKey}`,
+    'HTTP-Referer': env.OPENROUTER_SITE_URL || 'https://reelms.io',
+    'X-Title': env.OPENROUTER_SITE_NAME || 'Reelms Intelligence'
   }
-  if (isOpenRouter) {
-    headers['HTTP-Referer'] = env.OPENROUTER_SITE_URL || 'https://reelms.app'
-    headers['X-Title'] = env.OPENROUTER_SITE_NAME || 'Reelms'
-  }
-  return { isOpenRouter, apiKey, endpoint, model, headers }
+  return { isOpenRouter: true, apiKey, endpoint, model, headers }
 }
 
 export function isAIConfigured(): boolean {
-  return Boolean(env.OPENROUTER_API_KEY || env.OPENAI_API_KEY)
+  return Boolean(env.OPENROUTER_API_KEY)
 }
 
 const DEFAULT_SYSTEM_PROMPT = `Sen "Reelms Intelligence" adında, Reelms topluluğunda sohbet eden samimi, zeki, esprili ve doğal bir kullanıcısın (arkadaşsın).

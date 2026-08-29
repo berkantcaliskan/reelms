@@ -38,13 +38,13 @@ export function createAIBotRouter(io: Server) {
   const router = Router()
 
   // AI Service Status & Feature Tier Info
-  router.get('/api/v1/ai/status', (_req, res) => {
+  router.get(['/api/v1/ai/status', '/ai/status'], (_req, res) => {
     const configured = isAIConfigured()
     res.json({
       ok: true,
       configured,
-      provider: env.OPENROUTER_API_KEY ? 'openrouter' : env.OPENAI_API_KEY ? 'openai' : 'none',
-      model: env.OPENROUTER_API_KEY ? env.OPENROUTER_MODEL : 'gpt-4o-mini',
+      provider: 'openrouter',
+      model: env.OPENROUTER_MODEL || 'nvidia/nemotron-3.5-lightning:free',
       botUsername: AI_BOT_USERNAME,
       botName: AI_BOT_NAME,
       features: {
@@ -61,7 +61,7 @@ export function createAIBotRouter(io: Server) {
   })
 
   // Direct AI Chat Endpoint (Premium Feature - currently unlocked in Beta)
-  router.post('/api/v1/ai/chat', authenticate, async (req, res) => {
+  router.post(['/api/v1/ai/chat', '/ai/chat'], authenticate, async (req, res) => {
     try {
       if (!isAIConfigured()) {
         return res.status(503).json({ error: 'ai_not_configured', message: 'OpenRouter AI API key is not configured.' })
@@ -86,7 +86,7 @@ export function createAIBotRouter(io: Server) {
   })
 
   // Direct AI Summarize Endpoint (FREE Feature: can read all messages or specific range)
-  router.post('/api/v1/ai/summarize', authenticate, async (req, res) => {
+  router.post(['/api/v1/ai/summarize', '/ai/summarize'], authenticate, async (req, res) => {
     try {
       if (!isAIConfigured()) {
         return res.status(503).json({ error: 'ai_not_configured', message: 'OpenRouter AI API key is not configured.' })
@@ -130,7 +130,7 @@ export function createAIBotRouter(io: Server) {
   })
 
   // Direct AI Channel Moderation Endpoint (FREE Feature)
-  router.post('/api/v1/ai/moderate', authenticate, async (req, res) => {
+  router.post(['/api/v1/ai/moderate', '/ai/moderate'], authenticate, async (req, res) => {
     try {
       if (!isAIConfigured()) {
         return res.status(503).json({ error: 'ai_not_configured' })
@@ -158,7 +158,7 @@ export function createAIBotRouter(io: Server) {
   })
 
   // Direct AI Generation Helper (bio, rules, topic, welcome)
-  router.post('/api/v1/ai/generate', authenticate, async (req, res) => {
+  router.post(['/api/v1/ai/generate', '/ai/generate'], authenticate, async (req, res) => {
     try {
       if (!isAIConfigured()) {
         return res.status(503).json({ error: 'ai_not_configured' })

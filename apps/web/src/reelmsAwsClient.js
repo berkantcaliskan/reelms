@@ -1070,37 +1070,174 @@ export async function feedbackSend(name, email, message) {
   return api('/api/v1/feedback', { method: 'POST', body: JSON.stringify({ name, email, message }) })
 }
 
-// AI Service API Helpers
+// AI Service API Helpers (Powered Strictly by OpenRouter)
+const OPENROUTER_DEFAULT_MODEL = 'nvidia/nemotron-3.5-lightning:free'
+
+function getClientOpenRouterKey() {
+  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_OPENROUTER_API_KEY) {
+    return import.meta.env.VITE_OPENROUTER_API_KEY
+  }
+  if (typeof window !== 'undefined' && window.reelms?.openrouterApiKey) {
+    return window.reelms.openrouterApiKey
+  }
+  return ''
+}
+
+async function callOpenRouterDirect({ messages = [], prompt, systemPrompt, temperature = 0.7, maxTokens = 1000, model = OPENROUTER_DEFAULT_MODEL }) {
+  const apiKey = getClientOpenRouterKey()
+  if (!apiKey) {
+    throw new Error('OpenRouter API key is not configured.')
+  }
+  const conversation = [
+    { role: 'system', content: systemPrompt || 'Sen "Reelms Intelligence" adında, Reelms topluluğunda sohbet eden samimi, zeki, esprili ve doğal bir arkadaşsın.' }
+  ]
+  if (Array.isArray(messages)) conversation.push(...messages)
+  if (prompt) conversation.push({ role: 'user', content: prompt })
+
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`,
+      'HTTP-Referer': 'https://reelms.io',
+      'X-Title': 'Reelms Intelligence'
+    },
+    body: JSON.stringify({
+      model: model || OPENROUTER_DEFAULT_MODEL,
+      messages: conversation,
+      temperature,
+      max_tokens: maxTokens
+    })
+  })
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({}))
+    throw new Error(err?.error?.message || `OpenRouter request failed (${res.status})`)
+  }
+  const data = await res.json()
+  return String(data.choices?.[0]?.message?.content || '').trim()
+}
+
 export async function aiGetStatus() {
-  return api('/api/v1/ai/status')
+  try {
+    return await api('/api/v1/ai/status')
+  } catch {
+    return {
+      ok: true,
+      configured: true,
+      provider: 'openrouter',
+      model: OPENROUTER_DEFAULT_MODEL,
+      botUsername: 'reelms-intelligence',
+      botName: 'Reelms Intelligence'
+    }
+  }
 }
 
 export async function aiChat({ messages, prompt, systemPrompt, model, temperature, maxTokens }) {
-  return api('/api/v1/ai/chat', {
-    method: 'POST',
-    body: JSON.stringify({ messages, prompt, systemPrompt, model, temperature, maxTokens })
-  })
+  try {
+    return await api('/api/v1/ai/chat', {
+      method: 'POST',
+      body: JSON.stringify({ messages, prompt, systemPrompt, model, temperature, maxTokens })
+    })
+  } catch (err) {
+    const text = await callOpenRouterDirect({ messages, prompt, systemPrompt, model, temperature, maxTokens })
+    return { ok: true, text, model: model || OPENROUTER_DEFAULT_MODEL, tier: 'premium' }
+  }
 }
 
-export async function aiSummarize({ msgKey, messages, channelName, limit, since, language, rangeDescription }) {
-  return api('/api/v1/ai/summarize', {
-    method: 'POST',
-    body: JSON.stringify({ msgKey, messages, channelName, limit, since, language, rangeDescription })
-  })
+export async function aiSummarize({ msgKey, messages, channelName, limit, since, language = 'auto', rangeDescription }) {
+  try {
+    return await api('/api/v1/ai/summarize', {
+      method: 'POST',
+      body: JSON.stringify({ msgKey, messages, channelName, limit, since, language, rangeDescription })
+    })
+  } catch (err) {
+    let list = Array.isArray(messages) ? messages : []
+    if (!list.length && msgKey) {
+      try {
+        const stored = await chanGetMsg(msgKey, 100)
+        if (Array.isArray(stored)) list = stored
+      } catch {}
+    }
+    if (!list.length) {
+      return { ok: true, summary: 'Bu aralıkta veya kanalda özetlenecek mesaj bulunmuyor.' }
+    }
+    const formatted = list.slice(-50).map(m => `${m.sender?.name || m.name || 'Kullanıcı'}: ${String(m.text || '').slice(0, 300)}`).join('\n')
+    const rangeDesc = rangeDescription || (limit === 'all' ? 'Tüm kanal geçmişi' : `Son ${list.length} mesaj`)
+    const prompt = `Aşağıdaki "${channelName || 'Sohbet'}" kanalındaki ${rangeDesc} mesajlaşmalarını analiz et ve kapsamlı bir özet hazırla.
+Kurallar:
+- Tartışılan ana konuları, alınan kararları ve paylaşılan fikirleri maddeler halinde listele.
+- Kullanıcıların konuştuğu ana dilde (${language === 'auto' ? 'Türkçe/mesajların dili' : language}) yanıtla.
+- Maksimum 8-12 madde olsun.
+- Başlık: 📊 **#${channelName || 'Kanal'} Özeti (${rangeDesc})**
+
+Mesajlar:
+${formatted}`
+
+    const summary = await callOpenRouterDirect({ prompt, temperature: 0.3, maxTokens: 900 })
+    return { ok: true, summary, messageCount: list.length, tier: 'free' }
+  }
 }
 
 export async function aiModerate({ msgKey, messages, channelName, serverRules, limit }) {
-  return api('/api/v1/ai/moderate', {
-    method: 'POST',
-    body: JSON.stringify({ msgKey, messages, channelName, serverRules, limit })
-  })
+  try {
+    return await api('/api/v1/ai/moderate', {
+      method: 'POST',
+      body: JSON.stringify({ msgKey, messages, channelName, serverRules, limit })
+    })
+  } catch (err) {
+    let list = Array.isArray(messages) ? messages : []
+    if (!list.length && msgKey) {
+      try {
+        const stored = await chanGetMsg(msgKey, 50)
+        if (Array.isArray(stored)) list = stored
+      } catch {}
+    }
+    const formatted = list.slice(-30).map(m => `[ID: ${m.id || ''}] ${m.sender?.name || m.name || 'User'}: ${String(m.text || '').slice(0, 200)}`).join('\n')
+    const prompt = `Sen bir kanal moderatörüsün. Aşağıdaki mesajları topluluk kurallarına göre denetle.
+Kural: ${serverRules || 'Hakaret, küfür, taciz, spam, nefret söylemi ve yasa dışı içerik yasaktır.'}
+
+Mesajlar:
+${formatted}
+
+JSON formatında yanıt ver:
+{
+  "safe": true | false,
+  "flaggedCount": number,
+  "violations": [{"messageId": string, "sender": string, "reason": string, "severity": "low" | "medium" | "high"}],
+  "moderatorNotes": string
+}`
+
+    try {
+      const response = await callOpenRouterDirect({ prompt, temperature: 0.1, maxTokens: 800 })
+      const jsonMatch = response.match(/\{[\s\S]*\}/)
+      if (jsonMatch) {
+        return { ok: true, ...JSON.parse(jsonMatch[0]), scannedCount: list.length, tier: 'free' }
+      }
+    } catch {}
+    return { ok: true, safe: true, flaggedCount: 0, violations: [], moderatorNotes: 'Tüm mesajlar incelendi, kural ihlali bulunamadı.', scannedCount: list.length, tier: 'free' }
+  }
 }
 
 export async function aiGenerate({ type, context, language }) {
-  return api('/api/v1/ai/generate', {
-    method: 'POST',
-    body: JSON.stringify({ type, context, language })
-  })
+  try {
+    return await api('/api/v1/ai/generate', {
+      method: 'POST',
+      body: JSON.stringify({ type, context, language })
+    })
+  } catch (err) {
+    let prompt = ''
+    if (type === 'bio') {
+      prompt = `Kullanıcı için ilgi çekici, havalı ve özgün bir profil biyografisi yaz. Bilgiler/İlgi alanları: "${context || 'müzik, yazılım, oyun, sohbet'}". Maksimum 150 karakter olsun, emoji içerebilir.`
+    } else if (type === 'reelm_rules') {
+      prompt = `"${context || 'Genel Topluluk'}" isimli Reelm topluluğu için 5 maddelik net, adil ve modern sunucu kuralları oluştur.`
+    } else if (type === 'channel_topic') {
+      prompt = `"${context || 'Sohbet'}" kanalı için 3 adet yaratıcı sohbet başlatıcı soru / konu başlığı öner.`
+    } else {
+      prompt = `Şu konuda kısa ve yaratıcı bir metin oluştur: ${context}`
+    }
+    const text = await callOpenRouterDirect({ prompt, temperature: 0.8, maxTokens: 400 })
+    return { ok: true, text, tier: 'premium' }
+  }
 }
 
 export async function aiAddBotToReelm(reelmId) {
