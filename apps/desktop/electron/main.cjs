@@ -213,6 +213,10 @@ function setupProtocolHandler() {
 }
 
 function setupIpcHandlers() {
+  ipcMain.on('app:get-api-url-sync', (event) => {
+    event.returnValue = apiUrl
+  })
+
   ipcMain.handle('app:get-info', () => ({
     version: app.getVersion(),
     isPackaged: app.isPackaged,

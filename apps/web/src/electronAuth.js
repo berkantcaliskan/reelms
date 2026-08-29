@@ -1,7 +1,9 @@
 // Electron auth compatibility shim. Web beta keeps isElectron=false, but this stays ready for desktop reuse.
 import { getApiBaseUrl } from './config/api'
 
-const BACKEND = getApiBaseUrl()
+function backendUrl() {
+  return getApiBaseUrl()
+}
 
 export const isElectron = typeof window !== 'undefined' && Boolean(window.electronAPI || window.reelms)
 
@@ -41,7 +43,7 @@ export function getElectronClientId() {
 
 async function claimElectronClient(raw = _raw) {
   if (!raw?.token) return null
-  return fetch(`${BACKEND}/auth/client/claim`, {
+  return fetch(`${backendUrl()}/auth/client/claim`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${raw.token}`, 'X-Reelms-Client-Id': ELECTRON_CLIENT_ID },
     body: JSON.stringify({ clientId: ELECTRON_CLIENT_ID, platform: 'electron' }),
@@ -58,7 +60,7 @@ export function electronOnAuthStateChanged(cb) {
 }
 
 export async function electronSignIn(identifier, password) {
-  const res = await fetch(`${BACKEND}/auth/login`, {
+  const res = await fetch(`${backendUrl()}/auth/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Reelms-Client-Id': ELECTRON_CLIENT_ID },
     body: JSON.stringify({ identifier, password, clientId: ELECTRON_CLIENT_ID, platform: 'electron' }),
@@ -78,7 +80,7 @@ export async function electronSignIn(identifier, password) {
 }
 
 export async function electronRegister(email, password, profile = {}) {
-  const res = await fetch(`${BACKEND}/auth/register`, {
+  const res = await fetch(`${backendUrl()}/auth/register`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Reelms-Client-Id': ELECTRON_CLIENT_ID },
     body: JSON.stringify({ email, password, username: profile.username, displayName: profile.displayName || profile.name, clientId: ELECTRON_CLIENT_ID, platform: 'electron' }),

@@ -6,8 +6,14 @@ function on(channel, callback) {
   return () => ipcRenderer.removeListener(channel, listener)
 }
 
-const isDev = process.env.NODE_ENV === 'development'
-const apiUrl = process.env.REELMS_API_URL || (isDev ? 'http://127.0.0.1:5000' : 'https://api.reelms.io')
+let apiUrl = process.env.REELMS_API_URL || ''
+try {
+  const syncUrl = ipcRenderer.sendSync('app:get-api-url-sync')
+  if (syncUrl) apiUrl = syncUrl
+} catch {}
+if (!apiUrl) {
+  apiUrl = 'http://127.0.0.1:5000'
+}
 
 const reelmsBridge = {
   platform: process.platform,

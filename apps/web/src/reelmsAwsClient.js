@@ -4,7 +4,9 @@ import { getWebToken, getWebClientId, claimWebClient } from './webAuth'
 import { getApiBaseUrl } from './config/api'
 import { getCachedMessages, saveCachedMessages, isAppOnline } from './features/offline/offlineQueue.js'
 
-const BASE = getApiBaseUrl()
+function endpointUrl(path = '') {
+  return `${getApiBaseUrl()}${path}`
+}
 
 export const REELM_CACHE = {}
 
@@ -135,7 +137,7 @@ async function api(path, opts = {}) {
   const run = (async () => {
     let attempt = 0
     while (true) {
-      const r = await fetch(`${BASE}${path}`, {
+      const r = await fetch(endpointUrl(path), {
         ...opts,
         method,
         headers: {
@@ -172,7 +174,7 @@ async function api(path, opts = {}) {
 }
 
 async function publicApi(path, opts = {}) {
-  const r = await fetch(`${BASE}${path}`, {
+  const r = await fetch(endpointUrl(path), {
     ...opts,
     headers: { 'Content-Type': 'application/json', ...(opts.headers || {}) },
   })
@@ -186,10 +188,7 @@ async function publicApi(path, opts = {}) {
     err.details = payload?.details || payload?.issues || null
     throw err
   }
-  if (r.status === 204) return null
-  const ct = r.headers.get('content-type')
-  if (!ct || !ct.includes('application/json')) return null
-  return r.json()
+  return parseApiResponse(r)
 }
 
 export async function userBootstrap() {
@@ -204,13 +203,30 @@ export async function userGetDoc(sk) {
   const key = String(sk || '')
   const cached = userDocCache.get(key)
   if (cached && Date.now() - cached.at < userDocCacheTtl(key)) return cached.data
-  const j = await api(`/api/v1/user/doc/${encodeURIComponent(key)}`)
-  rememberUserDoc(key, j.data)
-  return j.data
+  try {
+    const j = await api(`/api/v1/user/doc/${encodeURIComponent(key)}`)
+    rememberUserDoc(key, j.data)
+    try { localStorage.setItem(`reelms:doc:${key}`, stableJson(j.data)) } catch {}
+    return j.data
+  } catch (err) {
+    if (cached?.data !== undefined) return cached.data
+    try {
+      const local = localStorage.getItem(`reelms:doc:${key}`)
+      if (local) {
+        const parsed = JSON.parse(local)
+        rememberUserDoc(key, parsed)
+        return parsed
+      }
+    } catch {}
+    throw err
+  }
 }
 
 export async function userPutDoc(sk, data) {
   const key = String(sk || '')
+  try {
+    localStorage.setItem(`reelms:doc:${key}`, stableJson(data))
+  } catch {}
   await api(`/api/v1/user/doc/${encodeURIComponent(key)}`, {
     method: 'PUT',
     body: JSON.stringify({ data }),
@@ -339,6 +355,7 @@ export function scheduleUserPersist(sk, data, ms = 650) {
     return
   }
   const nextJson = stableJson(data)
+  try { localStorage.setItem(`reelms:doc:${key}`, nextJson) } catch {}
   if (userPersistLastJson.get(key) === nextJson || userPersistPendingJson.get(key) === nextJson) return
   userPersistPendingJson.set(key, nextJson)
   clearTimeout(userTimers[key])
@@ -413,7 +430,7 @@ export function connectReelmsSocket(handlers) {
       socket.disconnect()
       socket = null
     }
-    socket = io(BASE, {
+    socket = io(getApiBaseUrl(), {
       path: '/socket.io',
       auth: { token, clientId: getClientId() },
       transports: ['polling', 'websocket'],
