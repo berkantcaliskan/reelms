@@ -9420,7 +9420,7 @@ h6 {
   align-items: flex-start;
   gap: 12px;
   padding: 0 16px 10px;
-  margin-top: -24px;
+  margin-top: -32px;
 }
 .fpp-avatar {
   width: 58px;
@@ -9448,7 +9448,7 @@ h6 {
   border-radius: 50%;
   background: var(--fpp-theme-base, var(--tb, #1b1822));
 }
-.fpp-names { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding-top: 26px; }
+.fpp-names { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding-top: 32px; }
 .fpp-name { font-family: 'Karla', sans-serif !important; font-size: 1.2rem; font-weight: 800 !important; color: var(--ta); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; letter-spacing: -0.015em; }
 .fpp-username { font-size: 0.76rem; color: rgba(var(--ta-rgb), 0.55); }
 .fpp-activity-wrap { margin-top: 3px; }
