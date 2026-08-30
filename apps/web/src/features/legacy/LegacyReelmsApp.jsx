@@ -4192,7 +4192,7 @@ const STATUS_OPTIONS_LIST = [
   { key: 'invisible', label: 'Invisible', color: '#9ca3af' },
 ]
 
-function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBlock, onUnblock, onAddFriend, onNudge, onMention, isFriend = true, isBlocked = false, isPending = false, nickname, onNicknameChange, canShare, onMessage, onCreateGroup, onRequestRemoteControl, voiceContext = null, moderationContext = null, roleContext = null, isSelf = false, embedded = false, canEditNickname = true, onViewFullProfile, rightPanelWidth = 0, isMutedUser = false, onToggleMuteUser = null }) {
+function FriendProfilePopup({ friend, anchorRect = null, serverContext = null, onClose, onRemove, onBlock, onUnblock, onAddFriend, onNudge, onMention, isFriend = true, isBlocked = false, isPending = false, nickname, onNicknameChange, canShare, onMessage, onCreateGroup, onRequestRemoteControl, voiceContext = null, moderationContext = null, roleContext = null, isSelf = false, embedded = false, canEditNickname = true, onViewFullProfile, rightPanelWidth = 0, isMutedUser = false, onToggleMuteUser = null }) {
   const t = useT()
   const popupRef = useRef(null)
   const safeFriend = normalizeFriendProfileTarget(friend || {})
@@ -4207,7 +4207,7 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
   useEffect(() => {
     if (embedded) return undefined
     const handler = (e) => {
-      if (e.target.closest('.rp-member-card, .discover-result-row, .hpopup-row, .chat-msg-avatar, .chat-msg-author, .msg-avatar, .msg-name, .bubble-avatar, .bubble-sender-name')) return
+      if (e.target.closest('.rp-member-card, .discover-result-row, .hpopup-row, .chat-msg-avatar, .chat-msg-author, .msg-avatar, .msg-name, .bubble-avatar, .bubble-sender-name, .msg-reply-quote')) return
       if (popupRef.current && !popupRef.current.contains(e.target)) {
         onClose()
       }
@@ -4217,6 +4217,9 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
   }, [onClose, embedded])
 
   const popupW = 320
+  const defaultHeight = 420
+  const isFromChat = !serverContext && !embedded
+
   const friendCover = safeFriend.cover || safeFriend.coverImage || safeFriend.coverUrl || null
   const friendStatusKey = safeFriend.status || friend?.status || 'online'
   const friendStatus = STATUS_OPTIONS_LIST.find(s => s.key === friendStatusKey) || STATUS_OPTIONS_LIST[0]
@@ -4224,35 +4227,58 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
   const safeFriendSpotify = safeFriend.spotifyNowPlaying || safeFriend.spotify || friend?.spotifyNowPlaying || friend?.spotify || null
   const safeRect = anchorRect || { top: 96, bottom: 112, left: Math.max(8, window.innerWidth - popupW - 18), right: window.innerWidth - 18 }
 
-  // Sit directly on the left side of the members panel (.rp-members-panel)
-  const membersPanelEl = !embedded ? document.querySelector('.rp-members-panel') : null
-  const panelLeftEdge = membersPanelEl
-    ? membersPanelEl.getBoundingClientRect().left
-    : (rightPanelWidth > 0 ? window.innerWidth - rightPanelWidth : safeRect.left)
-  let left = panelLeftEdge - popupW - 8
-  if (left < 8) left = Math.max(8, (safeRect.left || safeRect.right) - popupW - 8)
-  if (left < 8) left = 8
-
-  // Vertical positioning:
   const msgBarEl = !embedded ? document.querySelector('.msg-bar-wrap') : null
-  const screenBottom = msgBarEl ? msgBarEl.getBoundingClientRect().top - 6 : window.innerHeight - 72
-  const screenTop = 8
+  const screenBottom = msgBarEl ? msgBarEl.getBoundingClientRect().top - 8 : window.innerHeight - 72
+  const screenTop = 10
 
-  const defaultHeight = 440
-  const spaceBelow = screenBottom - safeRect.top
-  const spaceAbove = safeRect.bottom - screenTop
-
+  let left = 8
   let top = safeRect.top
   let maxHeight = Math.min(520, screenBottom - screenTop)
 
-  if (spaceBelow < 340 && spaceAbove > spaceBelow) {
-    const availableUpHeight = Math.min(520, safeRect.bottom - screenTop)
-    top = Math.max(screenTop, safeRect.bottom - defaultHeight)
-    maxHeight = availableUpHeight
+  if (isFromChat) {
+    // ── Chat Message Positioning ──
+    // Horizontal: aligned with the avatar/author start
+    left = safeRect.left
+    if (left + popupW > window.innerWidth - 12) left = window.innerWidth - popupW - 12
+    if (left < 12) left = 12
+
+    // Vertical: above or below depending on available space
+    const spaceBelow = screenBottom - safeRect.bottom
+    const spaceAbove = safeRect.top - screenTop
+
+    if (spaceBelow >= 360 || spaceBelow >= spaceAbove) {
+      // Open BELOW the message header/avatar
+      top = safeRect.bottom + 6
+      maxHeight = Math.min(480, screenBottom - top)
+    } else {
+      // Open ABOVE the message header/avatar
+      const availableUpHeight = Math.min(480, spaceAbove)
+      top = Math.max(screenTop, safeRect.top - Math.min(defaultHeight, availableUpHeight) - 6)
+      maxHeight = availableUpHeight
+    }
   } else {
-    top = safeRect.top
-    maxHeight = Math.min(520, spaceBelow)
+    // ── Members Panel / Sidebar Positioning ──
+    const membersPanelEl = !embedded ? document.querySelector('.rp-members-panel') : null
+    const panelLeftEdge = membersPanelEl
+      ? membersPanelEl.getBoundingClientRect().left
+      : (rightPanelWidth > 0 ? window.innerWidth - rightPanelWidth : safeRect.left)
+    left = panelLeftEdge - popupW - 8
+    if (left < 8) left = Math.max(8, (safeRect.left || safeRect.right) - popupW - 8)
+    if (left < 8) left = 8
+
+    const spaceBelow = screenBottom - safeRect.top
+    const spaceAbove = safeRect.bottom - screenTop
+
+    if (spaceBelow < 340 && spaceAbove > spaceBelow) {
+      const availableUpHeight = Math.min(520, safeRect.bottom - screenTop)
+      top = Math.max(screenTop, safeRect.bottom - defaultHeight)
+      maxHeight = availableUpHeight
+    } else {
+      top = safeRect.top
+      maxHeight = Math.min(520, spaceBelow)
+    }
   }
+
   if (top < screenTop) top = screenTop
 
   const profileNode = (
@@ -13297,17 +13323,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       return
     }
     const rect = e?.currentTarget?.getBoundingClientRect?.() || { top: 96, bottom: 112, left: Math.max(8, window.innerWidth - 338), right: window.innerWidth - 18 }
-    const inServerSurface = !!(opts.serverContext || e?.currentTarget?.closest?.('.rp-members-panel, .reelm-channel-voice-users, .voice-participants, .voice-bar-participants'))
     const cached = profileLookupCacheRef.current.get(fid)
     const cachedProfile = cached && (Date.now() - Number(cached.at || 0) < PROFILE_LOOKUP_CACHE_TTL_MS) ? cached.profile : null
     const target = { friend: cachedProfile ? { ...friend, ...cachedProfile } : friend, anchorRect: rect, serverContext: inServerSurface ? 'reelm' : null }
     setShowProfilePopup(false)
-    setFriendProfileTarget(prev => {
-      if (prev?.friend && String(prev.friend.id || prev.friend.uid || '') === fid) {
-        return null
-      }
-      return target
-    })
+    setFriendProfileTarget(target)
     userProfileGetById(fid).then(data => {
       if (!data) return
       const merged = { ...friend, ...data, id: fid }
@@ -16928,6 +16948,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       <FriendProfilePopup
         friend={f}
         anchorRect={friendProfileTarget.anchorRect}
+        serverContext={friendProfileTarget.serverContext}
         onClose={() => setFriendProfileTarget(null)}
         onRemove={removeFriend}
         onBlock={blockUserFn}
