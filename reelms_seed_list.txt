@@ -1,0 +1,275 @@
+================================================================================
+                           REELMS SEED PLATFORM DIRECTORY
+================================================================================
+Generated: 2026-08-30
+Total Reelms: 32 (10 Official Reelms + 22 Community Reelms)
+Access: All Reelms are Public (joinMode: open / isPublic: true)
+================================================================================
+
+--------------------------------------------------------------------------------
+[1] OFFICIAL REELMS (Reelms Official Hubs) - Featured on Discover
+--------------------------------------------------------------------------------
+
+1. Reelms Gaming
+   - ID: reelms-gaming
+   - Category: gaming
+   - Featured in Discover: YES
+   - Members: 1,420
+   - Description: The official Reelms gaming hub. Find teammates, share clips, discuss releases, and organize tournaments across all platforms.
+   - Tags: gaming, esports, pc, console, tournaments, co-op
+
+2. Reelms Music
+   - ID: reelms-music
+   - Category: music
+   - Featured in Discover: YES
+   - Members: 980
+   - Description: Official music realm for artists, producers, audio enthusiasts, and listeners. Share tracks, feedback, and discover new sounds.
+   - Tags: music, production, beats, live, instruments, audio
+
+3. Reelms Professionals
+   - ID: reelms-professionals
+   - Category: community
+   - Featured in Discover: YES
+   - Members: 760
+   - Description: Connect with entrepreneurs, executives, founders, and industry leaders. Career advice, networking, and business discussions.
+   - Tags: professional, business, career, founders, networking
+
+4. Reelms Developers
+   - ID: reelms-devs
+   - Category: tech
+   - Featured in Discover: YES
+   - Members: 1,150
+   - Description: Official developers realm. Web, mobile, systems, open source, AI engineering, code reviews, and architecture discussions.
+   - Tags: tech, programming, coding, webdev, opensource, ai
+
+5. Reelms Creators
+   - ID: reelms-creators
+   - Category: art
+   - Featured in Discover: YES
+   - Members: 890
+   - Description: The official home for digital artists, designers, illustrators, video editors, and 3D creators. Showcase and collaborate.
+   - Tags: art, design, creative, illustration, 3d, video
+
+6. Reelms Cinema & TV
+   - ID: reelms-cinema
+   - Category: community
+   - Featured in Discover: YES
+   - Members: 640
+   - Description: Official hub for cinephiles, filmmakers, and TV buffs. Movie nights, reviews, film analysis, and industry discussions.
+   - Tags: cinema, movies, tv, film, reviews, streaming
+
+7. Reelms Books & Literature
+   - ID: reelms-books
+   - Category: community
+   - Featured in Discover: YES
+   - Members: 520
+   - Description: Official book club and writer's sanctuary. Monthly reads, literary discussions, creative writing workshops, and poetry.
+   - Tags: books, literature, writing, reading, poetry, author
+
+8. Reelms Fitness & Wellness
+   - ID: reelms-fitness
+   - Category: community
+   - Featured in Discover: YES
+   - Members: 830
+   - Description: Official fitness, wellness, and healthy living community. Workouts, nutrition, mindfulness, and habit tracking.
+   - Tags: fitness, wellness, gym, health, nutrition, workout
+
+9. Reelms Science & Space
+   - ID: reelms-science
+   - Category: tech
+   - Featured in Discover: YES
+   - Members: 710
+   - Description: Official hub for space exploration, astronomy, quantum physics, biology, and scientific breakthroughs.
+   - Tags: science, space, astronomy, physics, research, cosmos
+
+10. Reelms Global Community
+    - ID: reelms-community-hub
+    - Category: community
+    - Featured in Discover: YES
+    - Members: 2,350
+    - Description: The worldwide crossroads of Reelms. Meet members from every continent, practice languages, and share stories.
+    - Tags: global, community, international, languages, culture
+
+--------------------------------------------------------------------------------
+[2] AUTHENTIC COMMUNITY & USER REELMS
+--------------------------------------------------------------------------------
+
+11. Indie Game Devs
+    - ID: indie-gamedev
+    - Category: gaming
+    - Featured in Discover: YES
+    - Members: 610
+    - Description: Independent game developers sharing devlogs, shader tricks, Godot & Unity workflows, and playtests.
+    - Tags: gamedev, indie, unity, godot, pixelart
+
+12. Lo-Fi Chill Zone
+    - ID: lofi-chill-zone
+    - Category: music
+    - Featured in Discover: YES
+    - Members: 870
+    - Description: Relaxed study sessions, ambient beats, 24/7 listening rooms, and cozy conversation.
+    - Tags: lofi, chill, study, relax, ambient
+
+13. AI & Prompt Craft
+    - ID: ai-prompt-craft
+    - Category: tech
+    - Featured in Discover: YES
+    - Members: 940
+    - Description: Exploring LLMs, multimodal models, automation workflows, open-source models, and agent architectures.
+    - Tags: ai, prompt, llm, ml, agents, automation
+
+14. Cyberpunk & Synthwave
+    - ID: cyberpunk-synthwave
+    - Category: art
+    - Featured in Discover: YES
+    - Members: 430
+    - Description: Neon aesthetics, retro-futurism, synthwave music, and dystopian sci-fi worldbuilding.
+    - Tags: cyberpunk, synthwave, retro, neon, scifi
+
+15. UI/UX Craft & Systems
+    - ID: ui-ux-craft
+    - Category: tech
+    - Featured in Discover: NO (Searchable)
+    - Members: 580
+    - Description: Product design, Figma systems, micro-interactions, accessibility, and user research critiques.
+    - Tags: ui, ux, figma, designsystems, product
+
+16. Electronic Music Lab
+    - ID: electronic-music-lab
+    - Category: music
+    - Featured in Discover: NO (Searchable)
+    - Members: 490
+    - Description: Synth patches, modular setups, Ableton & FL Studio workflows, sound design, and live jams.
+    - Tags: edm, synths, modular, ableton, flstudio
+
+17. Turkish Tech & Startups
+    - ID: tr-tech-startups
+    - Category: community
+    - Featured in Discover: NO (Searchable)
+    - Members: 720
+    - Description: Türkiye ve global teknoloji ekosistemi, startup deneyimleri, yazılım ve kariyer sohbetleri.
+    - Tags: startup, turkiye, yazilim, teknoloji, girisimcilik
+
+18. Blender & 3D Artistry
+    - ID: blender-3d-art
+    - Category: art
+    - Featured in Discover: NO (Searchable)
+    - Members: 510
+    - Description: 3D modeling, sculpting, procedural materials, geometry nodes, and render showcases.
+    - Tags: blender, 3d, render, sculpting, vfx
+
+19. Mechanical Keyboards Club
+    - ID: mech-keyboards
+    - Category: tech
+    - Featured in Discover: NO (Searchable)
+    - Members: 390
+    - Description: Custom builds, switches, lubing guides, keycaps, sound tests, and group buys.
+    - Tags: keyboards, switches, keycaps, mechanical, hardware
+
+20. Anime & Manga Lounge
+    - ID: anime-manga-lounge
+    - Category: art
+    - Featured in Discover: NO (Searchable)
+    - Members: 850
+    - Description: Seasonal anime discussions, manga recommendations, cosplay, and Japanese pop culture.
+    - Tags: anime, manga, japan, cosplay, otaku
+
+21. Coffee & Deep Work
+    - ID: coffee-deep-work
+    - Category: community
+    - Featured in Discover: NO (Searchable)
+    - Members: 340
+    - Description: Daily pomodoro co-working sessions, coffee brewing methods, and productivity systems.
+    - Tags: coffee, deepwork, productivity, pomodoro, focus
+
+22. Board Game Tabletop
+    - ID: boardgames-tabletop
+    - Category: gaming
+    - Featured in Discover: NO (Searchable)
+    - Members: 290
+    - Description: Strategy board games, D&D campaigns, tabletop RPGs, and miniature painting.
+    - Tags: tabletop, dnd, boardgames, rpg, miniatures
+
+23. Street & Film Photography
+    - ID: street-film-photo
+    - Category: art
+    - Featured in Discover: NO (Searchable)
+    - Members: 460
+    - Description: Analog film cameras, 35mm & medium format, street photography, and darkroom techniques.
+    - Tags: photography, 35mm, film, analog, street
+
+24. Web3 & Decentralized Protocols
+    - ID: web3-protocols
+    - Category: tech
+    - Featured in Discover: NO (Searchable)
+    - Members: 380
+    - Description: Smart contract development, cryptographic protocols, decentralized compute, and security.
+    - Tags: web3, crypto, blockchain, smartcontracts, p2p
+
+25. Filmmakers & Editors Room
+    - ID: filmmakers-editors
+    - Category: community
+    - Featured in Discover: NO (Searchable)
+    - Members: 310
+    - Description: Cinematography, color grading in DaVinci, sound design, lighting setups, and short films.
+    - Tags: filmmaking, davinci, editing, cinema, camera
+
+26. Bookworms & Fiction Writers
+    - ID: bookworms-writers
+    - Category: community
+    - Featured in Discover: NO (Searchable)
+    - Members: 275
+    - Description: Creative writing prompts, worldbuilding, character design, and honest manuscript feedback.
+    - Tags: fiction, writing, authors, novels, manuscript
+
+27. Calisthenics & Movement
+    - ID: calisthenics-movement
+    - Category: community
+    - Featured in Discover: NO (Searchable)
+    - Members: 420
+    - Description: Bodyweight training, handstands, mobility work, rings routines, and progression tracking.
+    - Tags: calisthenics, bodyweight, workout, fitness, mobility
+
+28. Sound Designers Workshop
+    - ID: sound-design-workshop
+    - Category: music
+    - Featured in Discover: NO (Searchable)
+    - Members: 230
+    - Description: Foley recording, synthesis, game audio implementation with FMOD/Wwise, and field recording.
+    - Tags: sounddesign, foley, fmod, wwise, gameaudio
+
+29. Minimalist Architecture & Spaces
+    - ID: minimalist-architecture
+    - Category: art
+    - Featured in Discover: NO (Searchable)
+    - Members: 360
+    - Description: Interior design, brutalism, modern architecture, lighting studies, and thoughtful spaces.
+    - Tags: architecture, minimalism, interior, design, brutalism
+
+30. Retro Computing & 90s Web
+    - ID: retro-computing
+    - Category: tech
+    - Featured in Discover: NO (Searchable)
+    - Members: 280
+    - Description: Vintage hardware, CRT monitors, retro OS customization, demoscene, and nostalgic software.
+    - Tags: retro, vintage, 90s, crt, demoscene, dos
+
+31. Astronomy & Night Sky
+    - ID: astronomy-night-sky
+    - Category: tech
+    - Featured in Discover: NO (Searchable)
+    - Members: 340
+    - Description: Astrophotography, stargazing equipment, deep-sky objects, eclipses, and planetary science.
+    - Tags: astronomy, astrophotography, telescopes, stars, planets
+
+32. Speedrunning Hub
+    - ID: speedrunning-hub
+    - Category: gaming
+    - Featured in Discover: NO (Searchable)
+    - Members: 410
+    - Description: Game mechanics analysis, routing, world record attempts, and leaderboard discussions.
+    - Tags: speedrun, gaming, wr, routing, glitches
+
+================================================================================
+End of Directory. All Reelms are loaded into Discover and fully searchable.
+================================================================================

@@ -12,6 +12,7 @@ import { recordReelmAuditLog, getReelmAuditLogs } from '../../modules/reelms/aud
 import { createReelmWebhook, deleteReelmWebhook, getReelmWebhooks, getWebhooksForChannel, findWebhookByIdAndToken, parseGitHubWebhookEvent } from '../../modules/reelms/webhooks.js'
 import { getReelmCommunityInsights, exportInsightsToCsv } from '../../modules/reelms/insights.js'
 import { autoJoinDefaultReelm, DEFAULT_REELM_ID, hasLeftDefaultReelm, setDefaultReelmLeft } from '../../modules/reelms/defaultReelm.js'
+import { SEED_REELMS } from '../../modules/reelms/seedReelms.js'
 import { isCommunityAdminUid, isSystemAdminUid, resolveCommunityAdminUids } from '../../modules/reelms/communityAdmins.js'
 import { buildUserUploadKey, getObjectStorage } from '../../modules/storage/objectStorage.js'
 
@@ -161,10 +162,14 @@ export function createReelmsDataRouter(io: Server) {
     const q = String(rawQuery || '').trim().toLowerCase()
     if (q && q.length < 2) return []
     const metas = await getSearchReelmMetas()
+    const allMetas = [
+      ...metas,
+      ...SEED_REELMS.filter((seed) => !metas.some((m: any) => String(m.id) === String(seed.id)))
+    ]
     const mine = ((await getFastUserDoc(uid, 'reelms', [], 650).catch(() => [])) || []).map((reelm: any) => String(reelm?.id || ''))
     const mineSet = new Set(mine)
     const terms = q.split(/\s+/).map((value: string) => value.trim()).filter(Boolean).slice(0, 4)
-    const candidates = metas
+    const candidates = allMetas
       .filter((meta: any) => {
         const id = String(meta.id || '')
         if (!id) return false
@@ -172,7 +177,7 @@ export function createReelmsDataRouter(io: Server) {
         return meta.showInDiscover === true || meta.ownerId === uid
       })
       .map((meta: any) => {
-        const hayParts = [meta.id, meta.name, meta.code, meta.description].filter(Boolean).map((value: any) => String(value).toLowerCase())
+        const hayParts = [meta.id, meta.name, meta.code, meta.description, meta.category, ...(Array.isArray(meta.tags) ? meta.tags : [])].filter(Boolean).map((value: any) => String(value).toLowerCase())
         const score = scoreSearchText(q, terms, hayParts, [String(meta.code || '').toLowerCase(), String(meta.name || '').toLowerCase()])
         return { meta, score }
       })
@@ -190,6 +195,10 @@ export function createReelmsDataRouter(io: Server) {
         id: meta.id,
         name: meta.name,
         code: meta.code,
+        category: meta.category || 'community',
+        description: meta.description || '',
+        membersCount: meta.membersCount || (id === DEFAULT_REELM_ID ? 2450 : 1),
+        tags: Array.isArray(meta.tags) ? meta.tags : [],
         ownerId: meta.ownerId || null,
         image: meta.image || null,
         joinMode: id === DEFAULT_REELM_ID ? 'open' : (meta.joinMode || 'request'),

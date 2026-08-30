@@ -549,6 +549,8 @@ const isReelmsSystemChat = (chat) => {
     || String(chat.name || chat.displayName || '').toLowerCase() === 'reelms system'
 }
 
+import { SEED_REELMS } from './seedReelms.js'
+
 // Module-level drag tracker — outside React so it's never stale in any closure
 let _barDragId = null
 
@@ -7744,6 +7746,59 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
                 </select>
               </div>
 
+              {canManageOverview && (
+                <>
+                  <div className="cust-toggle-row" style={{ marginTop: '18px' }}>
+                    <div>
+                      <span className="cust-toggle-label">{t('public_reelm') || 'Public Reelm'}</span>
+                      <p className="accs-note">{t('public_reelm_desc') || 'Allow anyone to discover and join this Reelm.'}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className={`cust-toggle${(reelm.isPublic ?? (reelm.showInDiscover || joinMode === 'open')) ? ' cust-toggle-on' : ''}`}
+                      onClick={() => {
+                        const next = !(reelm.isPublic ?? (reelm.showInDiscover || joinMode === 'open'))
+                        onUpdate({ ...reelm, roles, members, isPublic: next, showInDiscover: next, joinMode: next ? 'open' : 'request' })
+                      }}
+                    ><span className="cust-toggle-knob" /></button>
+                  </div>
+
+                  <div className="cust-toggle-row" style={{ marginTop: '18px' }}>
+                    <div>
+                      <span className="cust-toggle-label">{t('show_in_discover') || 'Show in Discover'}</span>
+                      <p className="accs-note">{t('show_in_discover_desc') || 'Feature this Reelm on the Discover screen so others can find and join it.'}</p>
+                    </div>
+                    <button
+                      type="button"
+                      className={`cust-toggle${showInDiscover ? ' cust-toggle-on' : ''}`}
+                      onClick={() => {
+                        const next = !showInDiscover
+                        setShowInDiscover(next)
+                        onUpdate({ ...reelm, roles, members, showInDiscover: next })
+                      }}
+                    ><span className="cust-toggle-knob" /></button>
+                  </div>
+
+                  {canSetAgeRating && (
+                    <div className="cust-toggle-row" style={{ marginTop: '18px' }}>
+                      <div>
+                        <span className="cust-toggle-label">{t('adults_only') || 'Adults only'}</span>
+                        <p className="accs-note">{t('adults_only_desc') || 'Requires members to be 18 or older to join and view content in this reelm.'}</p>
+                      </div>
+                      <button
+                        type="button"
+                        className={`cust-toggle${ageRating === 'adults' ? ' cust-toggle-on' : ''}`}
+                        onClick={() => {
+                          const next = ageRating === 'adults' ? 'under18' : 'adults'
+                          setAgeRating(next)
+                          onUpdate({ ...reelm, roles, members, showInDiscover, autoJoinOnInvite, memberInvitesEnabled, memberInviteMode, joinMode, ageRating: next })
+                        }}
+                      ><span className="cust-toggle-knob" /></button>
+                    </div>
+                  )}
+                </>
+              )}
+
               {/* Danger Zone: Close Reelm */}
               {canManageFullRoles && !reelm.isDefault && (
                 <div className="rs-danger-box">
@@ -7850,8 +7905,8 @@ function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, onClose
               {canSetAgeRating && (
                 <div className="cust-toggle-row" style={{ marginTop: '18px' }}>
                   <div>
-                    <span className="cust-toggle-label">18+ (Age restricted)</span>
-                    <p className="accs-note">Requires members to be 18 or older to join and view content in this reelm.</p>
+                    <span className="cust-toggle-label">{t('adults_only') || 'Adults only'}</span>
+                    <p className="accs-note">{t('adults_only_desc') || 'Requires members to be 18 or older to join and view content in this reelm.'}</p>
                   </div>
                   <button
                     className={`cust-toggle${ageRating === 'adults' ? ' cust-toggle-on' : ''}`}
@@ -22005,13 +22060,37 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                 {(() => {
                   const q = discoverQuery.trim().toLowerCase()
                   const joinedReelmIds = new Set((reelms || []).map(r => String(r.id)))
-                  const publicReelms = (discoverReelmsList || []).filter(r => !joinedReelmIds.has(String(r.id)))
+
+                  // Merge backend discoverReelmsList with SEED_REELMS
+                  const combinedDiscoverMap = new Map()
+                  for (const sr of SEED_REELMS) {
+                    combinedDiscoverMap.set(String(sr.id), { ...sr })
+                  }
+                  for (const br of (discoverReelmsList || [])) {
+                    if (br && br.id) {
+                      combinedDiscoverMap.set(String(br.id), { ...combinedDiscoverMap.get(String(br.id)), ...br })
+                    }
+                  }
+
+                  const allDiscoverableReelms = Array.from(combinedDiscoverMap.values())
+                    .filter(r => !joinedReelmIds.has(String(r.id)))
+
+                  const featuredDiscoverReelms = allDiscoverableReelms.filter(r => r.showInDiscover === true)
+
                   const filteredPublicReelms = discoverCategory === 'all'
-                    ? publicReelms
-                    : publicReelms.filter(r => (r.category || '').toLowerCase() === discoverCategory || (r.tags || []).some(t => t.toLowerCase() === discoverCategory))
+                    ? (q ? allDiscoverableReelms : featuredDiscoverReelms)
+                    : allDiscoverableReelms.filter(r => (r.category || '').toLowerCase() === discoverCategory || (r.tags || []).some(t => t.toLowerCase() === discoverCategory))
+
                   const results = q ? [
                     ...reelms.filter(r => r.name?.toLowerCase().includes(q)).map(r => ({ ...r, _type: 'reelm', joined: true })),
-                    ...publicReelms.filter(r => r.name?.toLowerCase().includes(q) || (r.description && r.description.toLowerCase().includes(q))).map(r => ({ ...r, _type: 'reelm', joined: false })),
+                    ...allDiscoverableReelms.filter(r => {
+                      const matchName = r.name?.toLowerCase().includes(q)
+                      const matchDesc = r.description?.toLowerCase().includes(q)
+                      const matchCategory = r.category?.toLowerCase().includes(q)
+                      const matchTags = (r.tags || []).some(t => t.toLowerCase().includes(q))
+                      const matchCode = r.code?.toLowerCase().includes(q)
+                      return matchName || matchDesc || matchCategory || matchTags || matchCode
+                    }).map(r => ({ ...r, _type: 'reelm', joined: false })),
                     ...chats.filter(c => c.name?.toLowerCase().includes(q)).map(c => ({ ...c, _type: 'chat' })),
                     ...discoverUsers.map(u => ({ ...u, _type: 'user' })),
                   ] : filteredPublicReelms.map(r => ({ ...r, _type: 'reelm', joined: false }))
