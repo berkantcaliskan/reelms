@@ -11828,6 +11828,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [isDiscoverSearchActive, setIsDiscoverSearchActive] = useState(false)
   const [discoverUsers, setDiscoverUsers] = useState([])
   const [discoverReelmsList, setDiscoverReelmsList] = useState([])
+  const [discoverPreviewReelm, setDiscoverPreviewReelm] = useState(null)
   const [pendingReelmJoinIds, setPendingReelmJoinIds] = useState([])
   const [showFriendsPopup, setShowFriendsPopup] = useState(false)
   const [showNotificationsPopup, setShowNotificationsPopup] = useState(false)
@@ -22008,13 +22009,15 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   const filteredPublicReelms = discoverCategory === 'all'
                     ? publicReelms
                     : publicReelms.filter(r => (r.category || '').toLowerCase() === discoverCategory || (r.tags || []).some(t => t.toLowerCase() === discoverCategory))
-
                   const results = q ? [
                     ...reelms.filter(r => r.name?.toLowerCase().includes(q)).map(r => ({ ...r, _type: 'reelm', joined: true })),
                     ...publicReelms.filter(r => r.name?.toLowerCase().includes(q) || (r.description && r.description.toLowerCase().includes(q))).map(r => ({ ...r, _type: 'reelm', joined: false })),
                     ...chats.filter(c => c.name?.toLowerCase().includes(q)).map(c => ({ ...c, _type: 'chat' })),
                     ...discoverUsers.map(u => ({ ...u, _type: 'user' })),
                   ] : filteredPublicReelms.map(r => ({ ...r, _type: 'reelm', joined: false }))
+
+                  const reelmResults = results.filter(item => item._type === 'reelm')
+                  const otherResults = results.filter(item => item._type !== 'reelm')
 
                   return (
                     <>
@@ -22091,52 +22094,160 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         {Boolean(q) && results.length === 0 && (
                           <p className="discover-empty">No results found.</p>
                         )}
-                        {results.map((item, i) => (
-                          <div key={i} className="discover-result-row" onClick={() => {
-                            if (item._type === 'reelm' && item.joined !== false) { handleSelectReelm(item) }
-                            else if (item._type === 'chat') { setSelectedChat(item); setSelectedChannel(null); setSelectedReelm(null); setShowDiscover(false); setShowSettings(false) }
-                          }}>
-                            <div className="discover-result-avatar">
-                              {item.image
-                                ? <img src={item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: item._type === 'reelm' ? '12px' : '50%' }} />
-                                : (item.name || item.contact || '?').charAt(0).toUpperCase()
-                              }
-                            </div>
-                            <div className="discover-result-info">
-                              <span className="discover-result-name">{item.name || item.contact}</span>
-                              <span className="discover-result-type">
-                                {item._type === 'reelm' ? (item.description || (item.membersCount ? `${item.membersCount} members` : 'Reelm')) : item._type === 'chat' ? 'Chat' : 'User'}
-                              </span>
-                            </div>
-                            {item._type === 'reelm' && item.joined === false && (
-                              <div onClick={e => e.stopPropagation()} style={{display:'flex', gap:6, alignItems:'center'}}>
-                                {(item.pending || pendingReelmJoinIds.includes(String(item.id))) ? (
-                                  <span className="friend-badge-label friend-badge-pending">Requested</span>
-                                ) : (
-                                  <button className="friend-add-btn" onClick={() => requestJoinDiscoverReelm(item)}>{item.joinMode === 'open' ? 'Join' : 'Request'}</button>
-                                )}
-                              </div>
-                            )}
-                            {item._type === 'user' && String(item.id) !== String(uid) && (
-                              <div onClick={e => e.stopPropagation()} style={{display:'flex', gap:6, alignItems:'center', flexShrink:0}}>
-                                {isBlocked(item.id) ? (
-                                  <button className="friend-add-btn" onClick={() => unblockUserFn(item.id)}>Unblock</button>
-                                ) : (
-                                  <>
-                                    <button className="friend-add-btn" onClick={() => setFullProfileTarget({ isSelf: false, user: item })}>See Profile</button>
-                                    {isFriend(item.id)
-                                      ? <button className="friend-add-btn" onClick={() => startDM(item)}>Message</button>
-                                      : hasSentRequest(item.id)
-                                        ? <span className="friend-badge-label friend-badge-pending">Pending</span>
-                                        : <button className="friend-add-btn" onClick={() => sendFriendRequest(item)}>Add Friend</button>
-                                    }
-                                  </>
-                                )}
-                              </div>
-                            )}
+
+                        {reelmResults.length > 0 && (
+                          <div className="discover-reelms-grid">
+                            {reelmResults.map((item, i) => (
+                              <button
+                                key={`reelm-${item.id || i}`}
+                                type="button"
+                                className="discover-reelm-card"
+                                onClick={() => setDiscoverPreviewReelm(item)}
+                              >
+                                <div className="discover-reelm-icon-wrap">
+                                  {item.image ? (
+                                    <img src={item.image} alt={item.name} className="discover-reelm-icon-img" />
+                                  ) : (
+                                    <span className="discover-reelm-icon-fallback">
+                                      {(item.name || '?').charAt(0).toUpperCase()}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="discover-reelm-card-name" title={item.name}>
+                                  {item.name}
+                                </span>
+                              </button>
+                            ))}
                           </div>
-                        ))}
+                        )}
+
+                        {otherResults.length > 0 && (
+                          <div className="discover-other-results">
+                            {otherResults.map((item, i) => (
+                              <div key={`other-${item.id || i}`} className="discover-result-row" onClick={() => {
+                                if (item._type === 'chat') {
+                                  setSelectedChat(item); setSelectedChannel(null); setSelectedReelm(null); setShowDiscover(false); setShowSettings(false)
+                                }
+                              }}>
+                                <div className="discover-result-avatar">
+                                  {item.image
+                                    ? <img src={item.image} alt={item.name} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                                    : (item.name || item.contact || '?').charAt(0).toUpperCase()
+                                  }
+                                </div>
+                                <div className="discover-result-info">
+                                  <span className="discover-result-name">{item.name || item.contact}</span>
+                                  <span className="discover-result-type">
+                                    {item._type === 'chat' ? 'Chat' : 'User'}
+                                  </span>
+                                </div>
+                                {item._type === 'user' && String(item.id) !== String(uid) && (
+                                  <div onClick={e => e.stopPropagation()} style={{display:'flex', gap:6, alignItems:'center', flexShrink:0}}>
+                                    {isBlocked(item.id) ? (
+                                      <button className="friend-add-btn" onClick={() => unblockUserFn(item.id)}>Unblock</button>
+                                    ) : (
+                                      <>
+                                        <button className="friend-add-btn" onClick={() => setFullProfileTarget({ isSelf: false, user: item })}>See Profile</button>
+                                        {isFriend(item.id)
+                                          ? <button className="friend-add-btn" onClick={() => startDM(item)}>Message</button>
+                                          : hasSentRequest(item.id)
+                                            ? <span className="friend-badge-label friend-badge-pending">Pending</span>
+                                            : <button className="friend-add-btn" onClick={() => sendFriendRequest(item)}>Add Friend</button>
+                                        }
+                                      </>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
+
+                      {discoverPreviewReelm && (
+                        <div className="menu-backdrop menu-backdrop--new-actions" onClick={() => setDiscoverPreviewReelm(null)}>
+                          <div className="new-modal-panel discover-preview-modal" onClick={e => e.stopPropagation()}>
+                            <div className="new-modal-header">
+                              <button
+                                type="button"
+                                className="new-modal-back-btn"
+                                onClick={() => setDiscoverPreviewReelm(null)}
+                                title="Close"
+                              >
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                                  <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                                </svg>
+                              </button>
+                              <h3 className="new-modal-title">Reelm Info</h3>
+                            </div>
+
+                            <div className="discover-preview-avatar-wrap">
+                              {discoverPreviewReelm.image ? (
+                                <img src={discoverPreviewReelm.image} alt={discoverPreviewReelm.name} className="discover-preview-avatar-img" />
+                              ) : (
+                                <div className="discover-preview-avatar-fallback">
+                                  {(discoverPreviewReelm.name || '?').charAt(0).toUpperCase()}
+                                </div>
+                              )}
+                            </div>
+
+                            <h2 className="discover-preview-title">{discoverPreviewReelm.name}</h2>
+
+                            {discoverPreviewReelm.category && (
+                              <span className="discover-preview-category-tag">
+                                {discoverPreviewReelm.category}
+                              </span>
+                            )}
+
+                            <p className="discover-preview-description">
+                              {discoverPreviewReelm.description || 'Welcome to this reelm! Join to connect with members and participate in channels.'}
+                            </p>
+
+                            {discoverPreviewReelm.membersCount ? (
+                              <div className="discover-preview-stats">
+                                <span>👥 {discoverPreviewReelm.membersCount} members</span>
+                              </div>
+                            ) : null}
+
+                            <div className="new-modal-btn-row" style={{ marginTop: '16px' }}>
+                              {reelms.some(r => String(r.id) === String(discoverPreviewReelm.id)) ? (
+                                <button
+                                  type="button"
+                                  className="pill-action-btn"
+                                  onClick={() => {
+                                    const matched = reelms.find(r => String(r.id) === String(discoverPreviewReelm.id))
+                                    handleSelectReelm(matched || discoverPreviewReelm)
+                                    setShowDiscover(false)
+                                    setDiscoverPreviewReelm(null)
+                                  }}
+                                >
+                                  Open Reelm
+                                </button>
+                              ) : (discoverPreviewReelm.pending || pendingReelmJoinIds.includes(String(discoverPreviewReelm.id))) ? (
+                                <button
+                                  type="button"
+                                  className="pill-action-btn"
+                                  disabled
+                                  style={{ opacity: 0.65, cursor: 'default' }}
+                                >
+                                  Requested
+                                </button>
+                              ) : (
+                                <button
+                                  type="button"
+                                  className="pill-action-btn"
+                                  onClick={async () => {
+                                    await requestJoinDiscoverReelm(discoverPreviewReelm)
+                                    setDiscoverPreviewReelm(null)
+                                  }}
+                                >
+                                  {discoverPreviewReelm.joinMode === 'open' ? 'Join Reelm' : 'Request to Join'}
+                                </button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </>
                   )
                 })()}
