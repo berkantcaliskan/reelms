@@ -4158,6 +4158,13 @@ function normalizeFriendProfileTarget(profile = {}) {
 
 const BOT_BIO_KEY = { 'reelmradio': 'bot_radio_bio', 'reelms-intelligence': 'bot_intelligence_bio' }
 
+const STATUS_OPTIONS_LIST = [
+  { key: 'online', label: 'Online', color: '#4ade80' },
+  { key: 'idle', label: 'Idle', color: '#fbbf24' },
+  { key: 'busy', label: 'Busy', color: '#f87171' },
+  { key: 'invisible', label: 'Invisible', color: '#9ca3af' },
+]
+
 function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBlock, onUnblock, onAddFriend, onNudge, onMention, isFriend = true, isBlocked = false, isPending = false, nickname, onNicknameChange, canShare, onMessage, onCreateGroup, onRequestRemoteControl, voiceContext = null, moderationContext = null, roleContext = null, isSelf = false, embedded = false, canEditNickname = true, onViewFullProfile, rightPanelWidth = 0, isMutedUser = false, onToggleMuteUser = null }) {
   const t = useT()
   const popupRef = useRef(null)
@@ -4181,6 +4188,10 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
 
   const popupW = 340
   const friendCover = safeFriend.cover || safeFriend.coverImage || safeFriend.coverUrl || null
+  const friendStatusKey = safeFriend.status || friend?.status || 'online'
+  const friendStatus = STATUS_OPTIONS_LIST.find(s => s.key === friendStatusKey) || STATUS_OPTIONS_LIST[0]
+  const safeFriendBio = safeFriend.isBot ? t(BOT_BIO_KEY[safeFriend.username] || 'bot_radio_bio') : (safeFriend.bio || friend?.bio || '')
+  const safeFriendSpotify = safeFriend.spotifyNowPlaying || safeFriend.spotify || friend?.spotifyNowPlaying || friend?.spotify || null
   const safeRect = anchorRect || { top: 96, bottom: 112, left: Math.max(8, window.innerWidth - popupW - 18), right: window.innerWidth - 18 }
 
   // Sit directly on the left side of the members panel (.rp-members-panel)
@@ -4193,8 +4204,6 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
   if (left < 8) left = 8
 
   // Vertical positioning:
-  // Starts at the top of the clicked row; if in lower part of the screen,
-  // opens upwards aligning its bottom with the bottom of the clicked row.
   const msgBarEl = !embedded ? document.querySelector('.msg-bar-wrap') : null
   const screenBottom = msgBarEl ? msgBarEl.getBoundingClientRect().top - 6 : window.innerHeight - 72
   const screenTop = 8
@@ -4207,12 +4216,10 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
   let maxHeight = Math.min(520, screenBottom - screenTop)
 
   if (spaceBelow < 340 && spaceAbove > spaceBelow) {
-    // Open upwards: bottom of popup aligns with bottom of clicked user row
     const availableUpHeight = Math.min(520, safeRect.bottom - screenTop)
     top = Math.max(screenTop, safeRect.bottom - defaultHeight)
     maxHeight = availableUpHeight
   } else {
-    // Open downwards: top of popup aligns with top of clicked user row
     top = safeRect.top
     maxHeight = Math.min(520, spaceBelow)
   }
@@ -4227,105 +4234,138 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
         </div>
       )}
       <div className="fpp-scroll-inner">
-      <CachedProfileCover src={friendCover} className={`fpp-cover${friendCover ? ' fpp-cover--has-image' : ''}`} />
-      {embedded && <button type="button" className="fpp-embedded-close" onClick={onClose} aria-label="Close profile">×</button>}
-      <div className="fpp-identity">
-        <div className="fpp-avatar">
-          {getPersonPhoto(safeFriend)
-            ? <CachedProfileImage src={getPersonPhoto(safeFriend)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-            : <span>{(safeFriend.name || '?').charAt(0).toUpperCase()}</span>
-          }
+        <CachedProfileCover src={friendCover} className={`fpp-cover${friendCover ? ' fpp-cover--has-image' : ''}`} />
+        {embedded && <button type="button" className="fpp-embedded-close" onClick={onClose} aria-label="Close profile">×</button>}
+
+        {/* 1. Identity: Avatar + Names + Status */}
+        <div className="fpp-identity">
+          <div className="fpp-avatar">
+            {getPersonPhoto(safeFriend)
+              ? <CachedProfileImage src={getPersonPhoto(safeFriend)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+              : <span>{(safeFriend.name || '?').charAt(0).toUpperCase()}</span>
+            }
+          </div>
+          <div className="fpp-names">
+            <span className="fpp-name">{safeFriend.name}</span>
+            {safeFriend.username && <span className="fpp-username">{'@' + (safeFriend.username.startsWith('@') ? safeFriend.username.slice(1) : safeFriend.username)}</span>}
+          </div>
+          <div className="fpp-status-wrap">
+            <div className="fpp-status-pill">
+              <span className="pp-status-dot" style={{ background: friendStatus.color }} />
+              <span>{friendStatus.label || 'Online'}</span>
+            </div>
+          </div>
         </div>
-        <div className="fpp-names">
-          <span className="fpp-name">{nickname || safeFriend.name}</span>
-          {safeFriend.username && <span className="fpp-username">{'@' + (safeFriend.username.startsWith('@') ? safeFriend.username.slice(1) : safeFriend.username)}</span>}
-          {safeFriend.activity?.name && (
-            <div className="fpp-activity-wrap">
-              <ActivityBadge activity={safeFriend.activity} />
+
+        <div className="fpp-body">
+          {/* 2. Bio */}
+          {safeFriendBio && (
+            <div className="fpp-bio-section">
+              <p className="fpp-bio-text">{safeFriendBio}</p>
             </div>
           )}
-        </div>
-      </div>
-      {!isSelf && (
-        <div className="fpp-quick-actions">
-          <button
-            type="button"
-            className="fpp-quick-btn"
-            onClick={() => {
-              onMessage?.()
-              onClose?.()
-            }}
-            title="Direct Message"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
-            <span>{t('send_message_btn', 'Message')}</span>
-          </button>
 
-          {onMention && (
-            <button
-              type="button"
-              className="fpp-quick-btn"
-              onClick={() => {
-                onMention?.(safeFriend.username || safeFriend.name)
-                onClose?.()
-              }}
-              title="Mention in chat"
-            >
-              <span style={{ fontWeight: 800, fontSize: '0.85rem' }}>@</span>
-              <span>Mention</span>
-            </button>
-          )}
-
-          {voiceContext ? (
-            <button
-              type="button"
-              className={`fpp-quick-btn${voiceContext.isMuted ? ' fpp-quick-btn--active' : ''}`}
-              onClick={() => voiceContext.onToggleMute?.()}
-              title={voiceContext.isMuted ? 'Unmute User' : 'Mute User'}
-            >
-              {voiceContext.isMuted ? (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="1" y1="1" x2="23" y2="23"/>
-                  <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/>
-                  <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>
-                  <line x1="12" y1="19" x2="12" y2="23"/>
-                  <line x1="8" y1="23" x2="16" y2="23"/>
-                </svg>
-              ) : (
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
-                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
-                  <line x1="12" y1="19" x2="12" y2="23"/>
-                  <line x1="8" y1="23" x2="16" y2="23"/>
-                </svg>
+          {/* 3. Activity: Game first, then Spotify if playing */}
+          {(safeFriend.activity?.name || safeFriendSpotify) && (
+            <div className="fpp-activities-section">
+              {safeFriend.activity?.name && (
+                <div className="fpp-activity-item">
+                  <ActivityBadge activity={safeFriend.activity} />
+                </div>
               )}
-              <span>{voiceContext.isMuted ? 'Unmute' : 'Mute'}</span>
-            </button>
-          ) : (
-            <button
-              type="button"
-              className={`fpp-quick-btn${isMutedUser ? ' fpp-quick-btn--active' : ''}`}
-              onClick={() => onToggleMuteUser?.(safeFriend.id)}
-              title={isMutedUser ? 'Unmute User' : 'Mute User'}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M11 5L6 9H2v6h4l5 4V5z"/>
-                {isMutedUser ? <line x1="23" y1="9" x2="17" y2="15" strokeWidth="2" /> : <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />}
-              </svg>
-              <span>{isMutedUser ? 'Unmute' : 'Mute'}</span>
-            </button>
+              {safeFriendSpotify && (
+                <div className="pp-spotify-playing pp-spotify-pill fpp-spotify-pill">
+                  {safeFriendSpotify.albumArt && (
+                    <img src={safeFriendSpotify.albumArt} alt="album" className="pp-spotify-art" />
+                  )}
+                  <div className="pp-spotify-track">
+                    <a className="pp-spotify-track-name" href={safeFriendSpotify.url} target="_blank" rel="noreferrer">
+                      {safeFriendSpotify.name}
+                    </a>
+                    <span className="pp-spotify-track-artist">{safeFriendSpotify.artist}</span>
+                  </div>
+                  <span className="pp-spotify-pill-icon pp-spotify-icon-active">
+                    <SpotifyIcon size={16} />
+                  </span>
+                </div>
+              )}
+            </div>
           )}
-        </div>
-      )}
-      {(safeFriend.isBot ? t(BOT_BIO_KEY[safeFriend.username] || 'bot_radio_bio') : safeFriend.bio) && (
-        <p className="fpp-bio">{safeFriend.isBot ? t(BOT_BIO_KEY[safeFriend.username] || 'bot_radio_bio') : safeFriend.bio}</p>
-      )}
-      {voiceContext && !isSelf && (
-        <div className="fpp-voice-section">
-          {voiceContext.userRoom ? (
-            <>
+
+          {/* 4. Reelm Roles (if viewed in a reelm) */}
+          {roleContext && (roleContext.roles?.length > 0 || (roleContext.canManageRoles && roleContext.allRoles?.length > 0)) && (
+            <div className="fpp-roles-section">
+              <div className="fpp-roles-header">
+                <span className="fpp-section-label">REELM ROLES</span>
+                {roleContext.canManageRoles && (
+                  <span className="fpp-roles-manage-hint">Click to assign</span>
+                )}
+              </div>
+              {roleContext.canManageRoles && roleContext.allRoles?.length > 0 ? (
+                <div className="fpp-role-badges fpp-role-badges--interactive">
+                  {roleContext.allRoles.map(role => {
+                    const hasRole = (roleContext.memberRoleIds || []).map(String).includes(String(role.id))
+                    return (
+                      <button
+                        key={role.id}
+                        type="button"
+                        className={`fpp-role-chip${hasRole ? ' fpp-role-chip--assigned' : ''}`}
+                        style={{ '--chip-color': role.color || '#94a3b8' }}
+                        onClick={() => roleContext.onToggleRole?.(role.id)}
+                        title={hasRole ? `Remove ${role.name}` : `Assign ${role.name}`}
+                      >
+                        <span className="fpp-role-chip-indicator">{hasRole ? '✓' : '+'}</span>
+                        <span className="fpp-role-chip-name">{role.name}</span>
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : (
+                <div className="fpp-role-badges">
+                  {roleContext.roles.slice(0, roleContext.expanded ? 12 : 3).map(role => (
+                    <span key={role.id} className="rp-role-badge" style={{ color: role.color, borderColor: role.color + '55', background: role.color + '18' }}>{role.name}</span>
+                  ))}
+                  {roleContext.roles.length > 3 && (
+                    <button type="button" className="fpp-mini-link" onClick={roleContext.onToggleExpanded}>
+                      {roleContext.expanded ? 'Show less' : `+${roleContext.roles.length - 3} more`}
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 5. Nickname (below Reelm roles) */}
+          {(canEditNickname || nickname) && (
+            <div className="fpp-nickname-section">
+              <span className="fpp-section-label">NICKNAME</span>
+              {editingNickname ? (
+                <div className="fpp-nickname-edit">
+                  <input
+                    className="fpp-nickname-input"
+                    value={nicknameInput}
+                    onChange={e => setNicknameInput(e.target.value)}
+                    placeholder={safeFriend.name}
+                    autoFocus
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') { onNicknameChange?.(nicknameInput.trim()); setEditingNickname(false) }
+                      if (e.key === 'Escape') { setNicknameInput(nickname || ''); setEditingNickname(false) }
+                    }}
+                  />
+                  <button className="fpp-nickname-save" onClick={() => { onNicknameChange?.(nicknameInput.trim()); setEditingNickname(false) }}>Save</button>
+                  {nickname && <button className="fpp-nickname-clear" onClick={() => { onNicknameChange?.(''); setNicknameInput(''); setEditingNickname(false) }}>Clear</button>}
+                </div>
+              ) : (
+                <button className="fpp-nickname-btn" onClick={() => canEditNickname && setEditingNickname(true)}>
+                  {nickname ? <span>{nickname}</span> : <span className="fpp-nickname-empty">Add nickname...</span>}
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Voice room status if applicable */}
+          {voiceContext && !isSelf && voiceContext.userRoom && (
+            <div className="fpp-voice-section">
               <span className="fpp-section-label">VOICE</span>
               <div className="fpp-voice-row">
                 <span>{safeFriend.name || 'Member'} is in <strong>{voiceContext.userRoom.channelName}</strong></span>
@@ -4333,164 +4373,144 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
                   <button className="fpp-action-btn fpp-action-btn--mini" onClick={() => { voiceContext.onJoinRoom?.(voiceContext.userRoom); onClose() }}>Join</button>
                 )}
               </div>
-            </>
-          ) : voiceContext.canInviteToCurrentRoom ? (
-            <button className="fpp-action-btn" onClick={() => { voiceContext.onInviteToCurrentRoom?.(); onClose() }}>
-              Invite to {voiceContext.currentRoomName || 'voice'}
-            </button>
-          ) : null}
-        </div>
-      )}
-      {roleContext && (
-        <div className="fpp-roles-section">
-          <div className="fpp-roles-header" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-            <span className="fpp-section-label">REELM ROLES</span>
-            {roleContext.canManageRoles && (
-              <span style={{ fontSize: '0.66rem', color: 'rgba(var(--ta-rgb), 0.4)' }}>Click to assign</span>
-            )}
-          </div>
-          {roleContext.canManageRoles && roleContext.allRoles?.length > 0 ? (
-            <div className="fpp-role-badges fpp-role-badges--interactive" style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-              {roleContext.allRoles.map(role => {
-                const hasRole = (roleContext.memberRoleIds || []).map(String).includes(String(role.id))
-                return (
-                  <button
-                    key={role.id}
-                    type="button"
-                    className={`fpp-role-chip${hasRole ? ' fpp-role-chip--assigned' : ''}`}
-                    style={{
-                      '--chip-color': role.color || '#94a3b8',
-                    }}
-                    onClick={() => roleContext.onToggleRole?.(role.id)}
-                    title={hasRole ? `Remove ${role.name}` : `Assign ${role.name}`}
-                  >
-                    <span className="fpp-role-chip-indicator">{hasRole ? '✓' : '+'}</span>
-                    <span className="fpp-role-chip-name">{role.name}</span>
-                  </button>
-                )
-              })}
             </div>
-          ) : roleContext.roles?.length > 0 ? (
-            <div className="fpp-role-badges">
-              {roleContext.roles.slice(0, roleContext.expanded ? 12 : 3).map(role => (
-                <span key={role.id} className="rp-role-badge" style={{ color: role.color, borderColor: role.color + '55', background: role.color + '18' }}>{role.name}</span>
-              ))}
-              {roleContext.roles.length > 3 && (
-                <button type="button" className="fpp-mini-link" onClick={roleContext.onToggleExpanded}>
-                  {roleContext.expanded ? 'Show less' : `+${roleContext.roles.length - 3} more`}
+          )}
+
+          {/* Moderation actions if moderator */}
+          {moderationContext?.canShow && !isSelf && (
+            <div className="fpp-mod-section">
+              <span className="fpp-section-label">REELM ACTIONS</span>
+              <div className="fpp-mod-list">
+                {moderationContext.voiceRoom && (
+                  <button type="button" className="fpp-list-action" onClick={() => { moderationContext.onJoinVoice?.(); onClose() }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 11.39 19a19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                    Join {moderationContext.voiceRoom.channelName || 'room'}
+                  </button>
+                )}
+                {moderationContext.canTimeout && (
+                  <button type="button" className="fpp-list-action" onClick={() => { moderationContext.onTimeout?.(); onClose() }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><polyline points="12 6 12 12 16 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                    Timeout…
+                  </button>
+                )}
+                {moderationContext.canRemove && (
+                  <button type="button" className="fpp-list-action fpp-list-action--danger" onClick={() => { moderationContext.onRemove?.(); onClose() }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.8"/><line x1="22" y1="11" x2="16" y2="11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                    Kick from Reelm…
+                  </button>
+                )}
+                {moderationContext.canBan && (
+                  <button type="button" className="fpp-list-action fpp-list-action--danger" onClick={() => { moderationContext.onBan?.(); onClose() }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
+                    Ban from Reelm…
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 6. Profile Action Icons: message, share, mention, mute, add friend */}
+          {!isSelf && (
+            <div className="fpp-icon-actions">
+              {/* 1. Message */}
+              {!isBlocked && onMessage && (
+                <button
+                  type="button"
+                  className="fpp-icon-btn"
+                  onClick={() => { onMessage(); onClose?.() }}
+                  title={t('send_message_btn', 'Message')}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  </svg>
+                </button>
+              )}
+
+              {/* 2. Share */}
+              {canShare !== false && (
+                <button
+                  type="button"
+                  className="fpp-icon-btn"
+                  onClick={() => {
+                    navigator.clipboard?.writeText(`${safeFriend.name} (@${safeFriend.username || safeFriend.id})`)
+                    onClose?.()
+                  }}
+                  title="Share Profile"
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                  </svg>
+                </button>
+              )}
+
+              {/* 3. Mention */}
+              {onMention && (
+                <button
+                  type="button"
+                  className="fpp-icon-btn"
+                  onClick={() => { onMention(safeFriend.username || safeFriend.name); onClose?.() }}
+                  title="Mention in chat"
+                >
+                  <span style={{ fontSize: '1.05rem', fontWeight: 800, lineHeight: 1 }}>@</span>
+                </button>
+              )}
+
+              {/* 4. Mute */}
+              <button
+                type="button"
+                className={`fpp-icon-btn${(isMutedUser || voiceContext?.isMuted) ? ' fpp-icon-btn--active' : ''}`}
+                onClick={() => {
+                  if (voiceContext) voiceContext.onToggleMute?.()
+                  else onToggleMuteUser?.(safeFriend.id)
+                }}
+                title={(isMutedUser || voiceContext?.isMuted) ? 'Unmute' : 'Mute'}
+              >
+                {(isMutedUser || voiceContext?.isMuted) ? (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="1" y1="1" x2="23" y2="23"/>
+                    <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/>
+                    <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>
+                  </svg>
+                ) : (
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                  </svg>
+                )}
+              </button>
+
+              {/* 5. Add Friend (if not friend and not pending) */}
+              {!isFriend && !isBlocked && onAddFriend && (
+                <button
+                  type="button"
+                  className="fpp-icon-btn fpp-icon-btn--add"
+                  disabled={isPending}
+                  onClick={() => { onAddFriend(friend); onClose?.() }}
+                  title={isPending ? 'Friend request sent' : 'Add Friend'}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
+                  </svg>
                 </button>
               )}
             </div>
-          ) : (
-            <p style={{ fontSize: '0.74rem', color: 'rgba(var(--ta-rgb), 0.4)', margin: '4px 0 0' }}>No roles assigned</p>
           )}
-        </div>
-      )}
-      {moderationContext?.canShow && !isSelf && (
-        <div className="fpp-mod-section">
-          <span className="fpp-section-label">REELM ACTIONS</span>
-          <div className="fpp-mod-list">
-            {moderationContext.voiceRoom && (
-              <button type="button" className="fpp-list-action" onClick={() => { moderationContext.onJoinVoice?.(); onClose() }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 11.39 19a19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-                Join {moderationContext.voiceRoom.channelName || 'room'}
-              </button>
-            )}
-            {moderationContext.canInviteVoice && (
-              <button type="button" className="fpp-list-action" onClick={() => { moderationContext.onInviteVoice?.(); onClose() }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M22 16.92v3a2 2 0 0 1-2.18 2A19.79 19.79 0 0 1 11.39 19a19.5 19.5 0 0 1-6-6A19.79 19.79 0 0 1 2.12 4.18 2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.91.34 1.85.57 2.81.7A2 2 0 0 1 22 16.92z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-                Invite to {moderationContext.currentRoomName || 'your room'}
-              </button>
-            )}
-            {moderationContext.canTimeout && (
-              <button type="button" className="fpp-list-action" onClick={() => { moderationContext.onTimeout?.(); onClose() }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><polyline points="12 6 12 12 16 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-                Timeout…
-              </button>
-            )}
-            {moderationContext.canRemove && (
-              <button type="button" className="fpp-list-action fpp-list-action--danger" onClick={() => { moderationContext.onRemove?.(); onClose() }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.8"/><line x1="22" y1="11" x2="16" y2="11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-                Kick from Reelm…
-              </button>
-            )}
-            {moderationContext.canBan && (
-              <button type="button" className="fpp-list-action fpp-list-action--danger" onClick={() => { moderationContext.onBan?.(); onClose() }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-                Ban from Reelm…
-              </button>
-            )}
-          </div>
-        </div>
-      )}
-      {canEditNickname && (
-        <div className="fpp-nickname-section">
-          <span className="fpp-section-label">NICKNAME</span>
-          {editingNickname ? (
-            <div className="fpp-nickname-edit">
-              <input
-                className="fpp-nickname-input"
-                value={nicknameInput}
-                onChange={e => setNicknameInput(e.target.value)}
-                placeholder={safeFriend.name}
-                autoFocus
-                onKeyDown={e => {
-                  if (e.key === 'Enter') { onNicknameChange(nicknameInput.trim()); setEditingNickname(false) }
-                  if (e.key === 'Escape') { setNicknameInput(nickname || ''); setEditingNickname(false) }
-                }}
-              />
-              <button className="fpp-nickname-save" onClick={() => { onNicknameChange(nicknameInput.trim()); setEditingNickname(false) }}>Save</button>
-              {nickname && <button className="fpp-nickname-clear" onClick={() => { onNicknameChange(''); setNicknameInput(''); setEditingNickname(false) }}>Clear</button>}
-            </div>
-          ) : (
-            <button className="fpp-nickname-btn" onClick={() => setEditingNickname(true)}>
-              {nickname ? <span>{nickname}</span> : <span className="fpp-nickname-empty">Add nickname...</span>}
+
+          {/* 7. See full profile */}
+          {onViewFullProfile && (
+            <button
+              type="button"
+              className="profile-view-full-btn"
+              onClick={() => { onClose(); setTimeout(() => onViewFullProfile?.(friend), 50) }}
+            >
+              <span>{t('see_full_profile')}</span>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="9 18 15 12 9 6" />
+              </svg>
             </button>
           )}
         </div>
-      )}
-      <div className="fpp-actions">
-        {!isSelf && !isBlocked && (
-          <button className="fpp-action-btn" onClick={() => { onMessage?.(); onClose() }}>
-            <img src={newdmIcon} width="13" height="13" alt="" />
-            Message
-          </button>
-        )}
-        {!isSelf && !isBlocked && isFriend && onNudge && (
-          <button className="fpp-action-btn" onClick={() => { onNudge(friend.id, friend.name); onClose() }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M18 8h1a4 4 0 0 1 0 8h-1" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round"/><line x1="6" y1="1" x2="6" y2="4" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/><line x1="10" y1="1" x2="10" y2="4" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/><line x1="14" y1="1" x2="14" y2="4" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/></svg>
-            Nudge
-          </button>
-        )}
-        {!isSelf && !isBlocked && isFriend && onCreateGroup && (
-          <button className="fpp-action-btn" onClick={() => { onCreateGroup(friend); onClose() }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.9"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/></svg>
-            Create group
-          </button>
-        )}
-        {!isSelf && !isBlocked && isFriend && onRequestRemoteControl && (
-          <button className="fpp-action-btn" onClick={() => { onRequestRemoteControl(friend); onClose() }}>
-            <img src={channelLiveactionIcon} width="13" height="13" alt="" style={{ filter: 'brightness(0.85)' }} />
-            Remote control
-          </button>
-        )}
-        {canShare && (
-          <button className="fpp-action-btn" onClick={() => { navigator.clipboard?.writeText(`${safeFriend.name} (@${safeFriend.username || friend.id})`); onClose() }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><circle cx="18" cy="5" r="3" stroke="currentColor" strokeWidth="1.9"/><circle cx="6" cy="12" r="3" stroke="currentColor" strokeWidth="1.9"/><circle cx="18" cy="19" r="3" stroke="currentColor" strokeWidth="1.9"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/></svg>
-            Share Profile
-          </button>
-        )}
-        {!isSelf && !isBlocked && !isFriend && onAddFriend && (isPending
-          ? <button className="fpp-action-btn" disabled>Friend request sent</button>
-          : (
-            <button className="fpp-action-btn" onClick={() => { onAddFriend(friend); onClose() }}>
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.9"/><line x1="19" y1="8" x2="19" y2="14" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/><line x1="22" y1="11" x2="16" y2="11" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round"/></svg>
-              Add Friend
-            </button>
-          )
-        )}
-      </div>
-      <button className="fpp-view-full-btn" onClick={() => { onClose(); setTimeout(() => onViewFullProfile?.(friend), 50) }}>{t('see_full_profile')} →</button>
       </div>
     </div>
   )
