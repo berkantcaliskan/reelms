@@ -22312,7 +22312,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               activePlatforms={fullProfileTarget.isSelf ? profileActivePlatforms : undefined}
               lastSeenLabel={fullProfileTarget.isSelf ? null : getLastSeenLabel(fullProfileTarget.user?.id)}
               profileStatus={profileStatus}
-              onStatusChange={setProfileStatus}
+              onStatusChange={updateProfileStatus}
             />
           )}
           {isMobile && !selectedReelm && !selectedChat && (
