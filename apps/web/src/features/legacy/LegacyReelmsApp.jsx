@@ -3645,6 +3645,7 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
       if (e.target.closest('.pp-social-ctx-menu')) return
       if (e.target.closest('.pp-social-add-menu')) return
       if (e.target.closest('.profile-card')) return
+      if (e.target.closest('.msg-avatar, .msg-name, .bubble-avatar, .bubble-sender-name, .rp-member-card')) return
       setSocialCtxMenu(null)
       if (popupRef.current && !popupRef.current.contains(e.target)) {
         onClose()
@@ -4206,7 +4207,7 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
   useEffect(() => {
     if (embedded) return undefined
     const handler = (e) => {
-      if (e.target.closest('.rp-member-card, .discover-result-row, .hpopup-row, .chat-msg-avatar, .chat-msg-author')) return
+      if (e.target.closest('.rp-member-card, .discover-result-row, .hpopup-row, .chat-msg-avatar, .chat-msg-author, .msg-avatar, .msg-name, .bubble-avatar, .bubble-sender-name')) return
       if (popupRef.current && !popupRef.current.contains(e.target)) {
         onClose()
       }
@@ -13273,8 +13274,21 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (e?.stopPropagation) e.stopPropagation()
     if (!friend?.id) return
     const fid = String(friend.id)
+    const isSelfUser = String(fid) === String(uid)
+
+    // If clicking own avatar or name in chat messages, member list, etc:
+    if (isSelfUser) {
+      setFriendProfileTarget(null)
+      if (isMobile) {
+        setFullProfileTarget({ isSelf: true, user: currentUser })
+      } else {
+        setShowProfilePopup(prev => !prev)
+      }
+      return
+    }
+
     if (isMobile) {
-      setFullProfileTarget({ isSelf: String(fid) === String(uid), user: friend })
+      setFullProfileTarget({ isSelf: false, user: friend })
       userProfileGetById(fid).then(data => {
         if (!data) return
         const merged = { ...friend, ...data, id: fid }
@@ -13287,6 +13301,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     const cached = profileLookupCacheRef.current.get(fid)
     const cachedProfile = cached && (Date.now() - Number(cached.at || 0) < PROFILE_LOOKUP_CACHE_TTL_MS) ? cached.profile : null
     const target = { friend: cachedProfile ? { ...friend, ...cachedProfile } : friend, anchorRect: rect, serverContext: inServerSurface ? 'reelm' : null }
+    setShowProfilePopup(false)
     setFriendProfileTarget(prev => {
       if (prev?.friend && String(prev.friend.id || prev.friend.uid || '') === fid) {
         return null
