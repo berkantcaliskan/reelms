@@ -61,6 +61,7 @@ import { ReelmsInsights } from '../insights/ReelmsInsights.jsx'
 import { getCachedMessages, saveCachedMessages, enqueueOutboxMessage, flushOutbox, isAppOnline } from '../offline/offlineQueue.js'
 
 const BACKEND_URL = getApiBaseUrl()
+const PROFILE_LOOKUP_CACHE_TTL_MS = 60_000
 
 function IntelligenceIcon({ size = 20, className = 'msg-bar-icon msg-bar-icon--intelligence', style }) {
   return (
