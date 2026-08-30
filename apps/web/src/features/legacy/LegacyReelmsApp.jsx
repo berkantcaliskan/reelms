@@ -4446,9 +4446,7 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
                   onClick={() => { onMessage(); onClose?.() }}
                   title={t('send_message_btn', 'Message')}
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-                  </svg>
+                  <MaskIcon src={messagesIcon} alt="Message" style={{ width: '18px', height: '18px', display: 'block' }} />
                 </button>
               )}
 
@@ -4464,9 +4462,9 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
                   title="Share Profile"
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
-                    <polyline points="16 6 12 2 8 6"/>
-                    <line x1="12" y1="2" x2="12" y2="15"/>
+                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8" />
+                    <polyline points="16 6 12 2 8 6" />
+                    <line x1="12" y1="2" x2="12" y2="15" />
                   </svg>
                 </button>
               )}
@@ -4479,10 +4477,7 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
                   onClick={() => { onMention(safeFriend.username || safeFriend.name); onClose?.() }}
                   title="Mention in chat"
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="4"/>
-                    <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/>
-                  </svg>
+                  <span style={{ fontSize: '1.05rem', fontWeight: 300, fontFamily: 'system-ui, -apple-system, sans-serif', lineHeight: 1 }}>@</span>
                 </button>
               )}
 
@@ -4498,19 +4493,19 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
               >
                 {(isMutedUser || voiceContext?.isMuted) ? (
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="1" y1="1" x2="23" y2="23"/>
-                    <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/>
-                    <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>
+                    <line x1="1" y1="1" x2="23" y2="23" />
+                    <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6" />
+                    <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23" />
                   </svg>
                 ) : (
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
-                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
+                    <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                    <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07" />
                   </svg>
                 )}
               </button>
 
-              {/* 5. Add Friend (Friends silueti + +) */}
+              {/* 5. Add Friend (Mevcut friends ikonu + +) */}
               {!isFriend && !isBlocked && onAddFriend && (
                 <button
                   type="button"
@@ -4519,12 +4514,10 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
                   onClick={() => { onAddFriend(friend); onClose?.() }}
                   title={isPending ? 'Friend request sent' : 'Add Friend'}
                 >
-                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                    <circle cx="8.5" cy="7" r="4"/>
-                    <line x1="19" y1="8" x2="19" y2="14"/>
-                    <line x1="22" y1="11" x2="16" y2="11"/>
-                  </svg>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', position: 'relative' }}>
+                    <MaskIcon src={friendsIcon} alt="Friends" style={{ width: '18px', height: '18px', display: 'block' }} />
+                    <span style={{ position: 'absolute', top: -4, right: -6, fontSize: '11px', fontWeight: 800, color: '#4ade80', lineHeight: 1 }}>+</span>
+                  </div>
                 </button>
               )}
             </div>
