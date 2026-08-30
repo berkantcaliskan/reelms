@@ -9446,7 +9446,7 @@ h6 {
   position: fixed;
   background: var(--fpp-theme-tertiary, var(--theme-tertiary, #181416));
   border: 1px solid rgba(var(--fpp-theme-accent-rgb, var(--ta-rgb)), 0.2);
-  border-radius: 18px;
+  border-radius: 22px;
   overflow: hidden;
   max-height: calc(100vh - 24px);
   z-index: 900;
@@ -9458,16 +9458,18 @@ h6 {
   overflow-y: auto;
   overflow-x: hidden;
   max-height: inherit;
+  border-radius: inherit;
 }
 .fpp-cover {
   width: 100%;
   height: 110px;
   min-height: 110px;
-  border-radius: 22px 22px 0 0;
+  border-radius: 21px 21px 0 0;
   position: relative;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+  flex-shrink: 0;
 }
 .fpp-cover:not(.fpp-cover--has-image) {
   background: linear-gradient(
