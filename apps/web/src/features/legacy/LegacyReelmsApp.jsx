@@ -4207,13 +4207,17 @@ function FriendProfilePopup({ friend, anchorRect = null, serverContext = null, o
   useEffect(() => {
     if (embedded) return undefined
     const handler = (e) => {
-      if (e.target.closest('.rp-member-card, .discover-result-row, .hpopup-row, .chat-msg-avatar, .chat-msg-author, .msg-avatar, .msg-name, .bubble-avatar, .bubble-sender-name, .msg-reply-quote')) return
-      if (popupRef.current && !popupRef.current.contains(e.target)) {
-        onClose()
-      }
+      if (popupRef.current && popupRef.current.contains(e.target)) return
+      if (e.target.closest('.rp-member-card, .discover-result-row, .hpopup-row, .chat-msg-avatar, .chat-msg-author, .msg-avatar, .msg-name, .bubble-avatar, .bubble-sender-name, .msg-reply-quote, .profile-card')) return
+      onClose()
     }
-    document.addEventListener('mousedown', handler)
-    return () => document.removeEventListener('mousedown', handler)
+    const timer = setTimeout(() => {
+      document.addEventListener('mousedown', handler)
+    }, 10)
+    return () => {
+      clearTimeout(timer)
+      document.removeEventListener('mousedown', handler)
+    }
   }, [onClose, embedded])
 
   const popupW = 320
@@ -13322,7 +13326,15 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       }).catch(() => {})
       return
     }
-    const rect = e?.currentTarget?.getBoundingClientRect?.() || { top: 96, bottom: 112, left: Math.max(8, window.innerWidth - 338), right: window.innerWidth - 18 }
+    const domRect = e?.currentTarget?.getBoundingClientRect?.() || e?.target?.getBoundingClientRect?.()
+    const rect = domRect ? {
+      top: domRect.top,
+      bottom: domRect.bottom,
+      left: domRect.left,
+      right: domRect.right,
+      width: domRect.width,
+      height: domRect.height,
+    } : { top: 96, bottom: 112, left: Math.max(8, window.innerWidth - 338), right: window.innerWidth - 18, width: 32, height: 32 }
     const inServerSurface = !!(opts.serverContext || e?.currentTarget?.closest?.('.rp-members-panel, .reelm-channel-voice-users, .voice-participants, .voice-bar-participants'))
     const cached = profileLookupCacheRef.current.get(fid)
     const cachedProfile = cached && (Date.now() - Number(cached.at || 0) < PROFILE_LOOKUP_CACHE_TTL_MS) ? cached.profile : null
