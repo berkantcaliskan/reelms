@@ -4611,19 +4611,24 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
     }
   }, [])
 
-  const norm = normalizeFriendProfileTarget(user || {})
-  const cover = getPersonCover(user)
-  const photo = getPersonPhoto(user)
+  const safeUser = user || {}
+  const norm = normalizeFriendProfileTarget(safeUser)
+  const cover = getPersonCover(safeUser)
+  const photo = getPersonPhoto(safeUser)
+  const displayName = safeUser.name || norm.name || safeUser.username || norm.username || 'Member'
+  const displayUsername = norm.username || (safeUser.username ? String(safeUser.username).replace(/^@+/, '') : '')
+  const targetUid = safeUser.id || norm.id || safeUser.uid || norm.uid || ''
+
   const SOCIAL_ICONS = { instagram: InstagramIcon, x: XIcon, tiktok: TikTokIcon, linkedin: LinkedInIcon, whatsapp: WhatsAppIcon, discord: DiscordSocialIcon, snapchat: SnapchatIcon, custom: CustomLinkIcon }
 
   const statusOptions = STATUS_OPTIONS_LIST
-  const currentStatusKey = isSelf ? (profileStatus || 'online') : (user.status || norm.status || 'online')
+  const currentStatusKey = isSelf ? (profileStatus || 'online') : (safeUser.status || norm.status || 'online')
   const currentStatus = statusOptions.find(s => s.key === currentStatusKey) || statusOptions[0]
 
-  const displayBio = isSelf ? (profileBio || '') : norm.bio
-  const displayPlatforms = isSelf ? (activePlatforms || []) : (norm.activePlatforms || [])
-  const displayLinks = isSelf ? (socialLinks || {}) : (norm.socialLinks || {})
-  const hasSocials = displayPlatforms.some(k => displayLinks[k])
+  const displayBio = isSelf ? (profileBio || '') : (norm.bio || safeUser.bio || '')
+  const displayPlatforms = isSelf ? (activePlatforms || []) : (Array.isArray(norm.activePlatforms) ? norm.activePlatforms : [])
+  const displayLinks = isSelf ? (socialLinks || {}) : (norm.socialLinks || safeUser.socialLinks || {})
+  const hasSocials = Array.isArray(displayPlatforms) && displayPlatforms.some(k => displayLinks?.[k])
 
   const handleClose = () => { setVisible(false); setTimeout(onClose, 320) }
 
@@ -4749,13 +4754,13 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
                   ) : (
                     <h1
                       className={`fp-name${isSelf && editMode ? ' fp-name--editable' : ''}`}
-                      onClick={() => { if (isSelf && editMode) { setNameInput(user.name || ''); setEditingName(true) } }}
-                    >{user.name}</h1>
+                      onClick={() => { if (isSelf && editMode) { setNameInput(displayName || ''); setEditingName(true) } }}
+                    >{displayName}</h1>
                   )}
                 </div>
 
                 <div className="fp-username-row">
-                  {user.username && <span className="fp-username">@{user.username.startsWith('@') ? user.username.slice(1) : user.username}</span>}
+                  {displayUsername && <span className="fp-username">@{displayUsername}</span>}
                   <div className="fp-username-actions">
                     {isSelf ? (
                       <>
@@ -4862,7 +4867,7 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
                   </div>
                 ) : (
                   <div className="fp-socials-row">
-                    {displayPlatforms.filter(k => displayLinks[k]).map(k => {
+                    {displayPlatforms.filter(k => displayLinks?.[k]).map(k => {
                       const Icon = SOCIAL_ICONS[k]
                       const handle = displayLinks[k]
                       return Icon ? (
@@ -4879,11 +4884,11 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
             {!isSelf && (
               <div className="fp-actions">
                 {!isBlocked && onMessage && <button className="fp-action-btn fp-action-btn--primary" onClick={() => { onMessage(); handleClose() }}>{t('send_message')}</button>}
-                {!isBlocked && !isFriend && !isPending && onAddFriend && <button className="fp-action-btn" onClick={() => { onAddFriend(user); handleClose() }}>{t('add_friend')}</button>}
+                {!isBlocked && !isFriend && !isPending && onAddFriend && <button className="fp-action-btn" onClick={() => { onAddFriend(safeUser); handleClose() }}>{t('add_friend')}</button>}
                 {!isBlocked && !isFriend && isPending && <button className="fp-action-btn" disabled>{t('request_sent')}</button>}
-                {!isBlocked && isFriend && onRemove && <button className="fp-action-btn fp-action-danger" onClick={() => { onRemove(user.id); handleClose() }}>{t('remove_friend')}</button>}
-                {isBlocked && onUnblock && <button className="fp-action-btn" onClick={() => { onUnblock(user.id); handleClose() }}>{t('unblock')}</button>}
-                {!isBlocked && onBlock && <button className="fp-action-btn fp-action-danger" onClick={() => { onBlock(user); handleClose() }}>{t('block')}</button>}
+                {!isBlocked && isFriend && onRemove && <button className="fp-action-btn fp-action-danger" onClick={() => { onRemove(targetUid); handleClose() }}>{t('remove_friend')}</button>}
+                {isBlocked && onUnblock && <button className="fp-action-btn" onClick={() => { onUnblock(targetUid); handleClose() }}>{t('unblock')}</button>}
+                {!isBlocked && onBlock && <button className="fp-action-btn fp-action-danger" onClick={() => { onBlock(safeUser); handleClose() }}>{t('block')}</button>}
               </div>
             )}
           </div>
@@ -4942,8 +4947,8 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
             <div className="fp-sidebar-card">
               <span className="fp-section-label">{t('activity').toUpperCase()}</span>
               <div className="fp-activity-log">
-                {user.activity?.name
-                  ? <div className="fp-activity-item"><ActivityBadge activity={user.activity} /></div>
+                {(safeUser.activity?.name || norm.activity?.name)
+                  ? <div className="fp-activity-item"><ActivityBadge activity={safeUser.activity || norm.activity} /></div>
                   : <span className="fp-activity-empty">{t('no_active_activity')}</span>}
               </div>
             </div>
