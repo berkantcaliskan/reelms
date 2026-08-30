@@ -18379,8 +18379,8 @@ button, input, select, textarea,
 }
 .fpp-roles-section,
 .fpp-mod-section {
-  margin: 6px 0 0;
-  padding: 6px 14px;
+  margin: 0;
+  padding: 0;
 }
 .fpp-role-badges {
   display: flex;

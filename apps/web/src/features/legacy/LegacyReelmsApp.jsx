@@ -4301,10 +4301,13 @@ function FriendProfilePopup({ friend, anchorRect = null, serverContext = null, o
         {/* 1. Identity: Avatar + Names + Status */}
         <div className="fpp-identity">
           <div className="fpp-avatar">
-            {getPersonPhoto(safeFriend)
-              ? <CachedProfileImage src={getPersonPhoto(safeFriend)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-              : <span>{(safeFriend.name || '?').charAt(0).toUpperCase()}</span>
-            }
+            <CachedProfileImage
+              src={getPersonPhoto(safeFriend)}
+              alt="Avatar"
+              className="fpp-avatar-img"
+              style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
+              fallback={<img src={avatarUIcon} alt="Avatar" className="fpp-avatar-img" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />}
+            />
           </div>
           <div className="fpp-names-col">
             <span className="fpp-name">{safeFriend.name}</span>
@@ -4693,8 +4696,11 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
                   className={`fp-avatar-wrap${editMode ? ' fp-avatar-wrap--edit' : ''}`}
                   onClick={e => { if (!editMode) return; e.stopPropagation(); fpPhotoRef.current?.click() }}
                 >
-                  <CachedProfileImage src={photo} alt="" className="fp-avatar"
-                    fallback={<div className="fp-avatar fp-avatar--text">{(user.name || '?').charAt(0).toUpperCase()}</div>}
+                  <CachedProfileImage
+                    src={photo}
+                    alt="Avatar"
+                    className="fp-avatar"
+                    fallback={<img src={avatarUIcon} alt="Avatar" className="fp-avatar" />}
                   />
                   {editMode && (
                     <div className="fp-media-edit-overlay">
@@ -5493,7 +5499,18 @@ function VirtualMessageList({
         const prevDateLabel = prevMsg ? formatDateLabel(prevMsg.time) : null
         const showDateSep = msgDateLabel !== prevDateLabel
 
-        const sender = (msg.sender && typeof msg.sender === 'object') ? msg.sender : { id: '', name: '?', photo: null, image: null }
+        const senderId = String(msg.sender?.id || msg.sender?.uid || msg.sender?.userId || msg.senderId || msg.userId || msg.authorId || '')
+        const senderName = msg.sender?.name || msg.sender?.displayName || msg.sender?.userName || msg.senderName || msg.authorName || '?'
+        const senderPhoto = msg.sender?.photo || msg.sender?.image || msg.sender?.avatar || msg.sender?.photoURL || msg.senderPhoto || msg.userPhoto || msg.authorPhoto || null
+        const senderUsername = msg.sender?.username || msg.sender?.userName || msg.senderUsername || null
+        const sender = {
+          id: senderId,
+          name: senderName,
+          photo: senderPhoto,
+          image: senderPhoto,
+          username: senderUsername,
+        }
+        
         const isOwn = String(sender.id || '') === String(uid)
         const canDeleteMsg = Boolean(selectedChat) || isMod || isOwn || (selectedReelm && hasReelmPermissionClient(selectedReelm, uid, 'manageModeration'))
         const isPinned = Boolean(pinnedMessage && (!pinnedMessage.expiresAt || Date.now() < pinnedMessage.expiresAt) && String(pinnedMessage.id) === String(msg.id))
@@ -5603,7 +5620,13 @@ function VirtualMessageList({
                 >
                 <div
                   className="msg-avatar msg-avatar--clickable"
-                  onClick={e => sender.id && openFriendProfile({ id: sender.id, name: sender.name, photo: sender.photo || sender.image || null, username: sender.username || null }, e)}
+                  onClick={e => {
+                    e.stopPropagation()
+                    const targetUid = sender.id || msg.senderId || msg.userId
+                    if (targetUid) {
+                      openFriendProfile({ id: targetUid, name: sender.name, photo: sender.photo || sender.image || null, username: sender.username || null }, e)
+                    }
+                  }}
                   title={sender.name}
                 >
                   {(sender.photo || sender.image)
@@ -5615,7 +5638,13 @@ function VirtualMessageList({
                   <div className="msg-header">
                     <span
                       className="msg-name msg-name--clickable"
-                      onClick={e => sender.id && openFriendProfile({ id: sender.id, name: sender.name, photo: sender.photo || sender.image || null, username: sender.username || null }, e)}
+                      onClick={e => {
+                        e.stopPropagation()
+                        const targetUid = sender.id || msg.senderId || msg.userId
+                        if (targetUid) {
+                          openFriendProfile({ id: targetUid, name: sender.name, photo: sender.photo || sender.image || null, username: sender.username || null }, e)
+                        }
+                      }}
                       title={sender.name}
                     >
                       {sender.name}
@@ -5793,7 +5822,13 @@ function VirtualMessageList({
                 >
                   <div
                     className="bubble-avatar bubble-avatar--clickable"
-                    onClick={e => sender.id && openFriendProfile({ id: sender.id, name: sender.name, photo: sender.photo || sender.image || null, username: sender.username || null }, e)}
+                    onClick={e => {
+                      e.stopPropagation()
+                      const targetUid = sender.id || msg.senderId || msg.userId
+                      if (targetUid) {
+                        openFriendProfile({ id: targetUid, name: sender.name, photo: sender.photo || sender.image || null, username: sender.username || null }, e)
+                      }
+                    }}
                     title={sender.name}
                   >
                     {(sender.photo || sender.image)
@@ -5802,15 +5837,19 @@ function VirtualMessageList({
                     }
                   </div>
                   <div className="bubble-content">
-                    {selectedChat?.type === 'group' && (
-                      <span
-                        className="bubble-sender-name bubble-sender-name--clickable"
-                        onClick={e => sender.id && openFriendProfile({ id: sender.id, name: sender.name, photo: sender.photo || sender.image || null, username: sender.username || null }, e)}
-                        title={sender.name}
-                      >
-                        {sender.name}
-                      </span>
-                    )}
+                    <span
+                      className="bubble-sender-name bubble-sender-name--clickable"
+                      onClick={e => {
+                        e.stopPropagation()
+                        const targetUid = sender.id || msg.senderId || msg.userId
+                        if (targetUid) {
+                          openFriendProfile({ id: targetUid, name: sender.name, photo: sender.photo || sender.image || null, username: sender.username || null }, e)
+                        }
+                      }}
+                      title={sender.name}
+                    >
+                      {sender.name}
+                    </span>
                     <div className="bubble-and-time">
                       {msg.mediaUrl && (msg.mediaType === 'gif' || msg.mediaType === 'sticker') && !msg.text ? (
                         <img src={msg.mediaUrl} alt="" className={msg.mediaType === 'sticker' ? 'msg-sticker-img' : 'msg-gif-img'} />
