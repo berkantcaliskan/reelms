@@ -22640,14 +22640,14 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       </button>
-                      <h3 className="new-modal-title">Name your Reelm</h3>
+                      <h3 className="new-modal-title">Name your reelm</h3>
                     </div>
                     <input
                       className="new-modal-input"
                       value={reelmNameInput}
                       onChange={e => setReelmNameInput(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter' && reelmNameInput.trim()) handleCreateReelm() }}
-                      placeholder="Name your Reelm"
+                      placeholder="Name your reelm"
                       autoFocus
                       maxLength={50}
                     />
