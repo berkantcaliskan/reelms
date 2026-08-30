@@ -13717,6 +13717,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       setSelectedReelm(null)
       setShowFriendSelector(false)
       setShowMenu(false)
+      setCreateReelmStep(null)
       clearUnread(convId)
       return
     }
@@ -13734,6 +13735,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setSelectedReelm(null)
     setShowFriendSelector(false)
     setShowMenu(false)
+    setCreateReelmStep(null)
   }
 
   const createGroup = () => {
@@ -13765,6 +13767,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setGroupNameInput('')
     setGroupPhotoInput(null)
     setShowMenu(false)
+    setCreateReelmStep(null)
   }
 
   const [selectedChat, setSelectedChat] = useState(null)
@@ -16274,17 +16277,15 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       return
     }
     if (action === 'startChat') {
-      setShowMenu(false)
-      setShowFriendSelector(true)
+      setCreateReelmStep('startChat')
       setFriendSelectorQuery('')
       return
     }
     if (action === 'startGroupChat') {
-      setShowGroupCreator('friends')
+      setCreateReelmStep('group_friends')
       setGroupSelectedFriends([])
       setGroupNameInput('')
       setGroupPhotoInput(null)
-      setShowMenu(false)
       return
     }
     setShowMenu(false)
@@ -22651,11 +22652,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       maxLength={50}
                     />
                     {activeTemplate ? (
-                      <div className="new-modal-template-row">
-                        <div className="new-modal-template-selected-info">
-                          <span>{activeTemplate.emoji}</span>
-                          <span>{activeTemplate.name}</span>
-                        </div>
+                      <div className="new-modal-template-selected-row">
+                        <span>{activeTemplate.emoji}</span>
+                        <span>{activeTemplate.name}</span>
                         <button
                           type="button"
                           className="new-modal-template-change-btn"
@@ -22667,13 +22666,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     ) : (
                       <button
                         type="button"
-                        className="new-modal-template-row new-modal-template-row--btn"
+                        className="new-modal-template-link"
                         onClick={() => setCreateReelmStep('templates')}
                       >
                         <span>✦ Start from a template</span>
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                          <path d="M9 18l6-6-6-6"/>
-                        </svg>
                       </button>
                     )}
                     <div className="new-modal-btn-row">
@@ -22740,6 +22736,184 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         disabled={!joinCodeInput.trim() || joining}
                       >
                         {joining ? 'Joining…' : 'Join Reelm'}
+                      </button>
+                    </div>
+                  </div>
+                ) : createReelmStep === 'startChat' ? (
+                  <div className="new-modal-panel">
+                    <div className="new-modal-header">
+                      <button className="new-modal-back-btn" onClick={() => setCreateReelmStep(null)}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                          <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                      <h3 className="new-modal-title">Start a chat</h3>
+                    </div>
+                    <input
+                      className="new-modal-input"
+                      type="text"
+                      placeholder="Search friends..."
+                      value={friendSelectorQuery}
+                      onChange={e => setFriendSelectorQuery(e.target.value)}
+                      autoFocus
+                    />
+                    <div className="new-modal-friends-section-title">
+                      {friendSelectorQuery ? 'Search Results' : 'Suggested'}
+                    </div>
+                    <div className="new-modal-friends-list">
+                      {friends
+                        .filter(f => !friendSelectorQuery || f.name?.toLowerCase().includes(friendSelectorQuery.toLowerCase()) || f.username?.toLowerCase().includes(friendSelectorQuery.toLowerCase()))
+                        .slice(0, friendSelectorQuery ? 25 : 8)
+                        .map((f, i) => (
+                          <button key={i} className="new-modal-friend-item" onClick={() => startDM(f)}>
+                            <div className="new-modal-friend-avatar">
+                              {f.photo
+                                ? <img src={f.photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                                : (f.name || '?').charAt(0).toUpperCase()
+                              }
+                            </div>
+                            <div className="new-modal-friend-info">
+                              <span className="new-modal-friend-name">{nicknames[f.id] || f.name}</span>
+                              {f.username && <span className="new-modal-friend-username">@{f.username}</span>}
+                            </div>
+                          </button>
+                        ))
+                      }
+                      {friends.length === 0 && <p className="friend-selector-empty">No friends yet.</p>}
+                    </div>
+                  </div>
+                ) : createReelmStep === 'group_friends' ? (
+                  <div className="new-modal-panel">
+                    <div className="new-modal-header">
+                      <button className="new-modal-back-btn" onClick={() => setCreateReelmStep(null)}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                          <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                      <h3 className="new-modal-title">Add people</h3>
+                    </div>
+                    <input
+                      className="new-modal-input"
+                      type="text"
+                      placeholder="Search friends..."
+                      value={friendSelectorQuery}
+                      onChange={e => setFriendSelectorQuery(e.target.value)}
+                      autoFocus
+                    />
+                    <div className="new-modal-friends-section-title">
+                      {friendSelectorQuery ? 'Search Results' : 'Suggested'}
+                    </div>
+                    <div className="new-modal-friends-list">
+                      {friends
+                        .filter(f => !friendSelectorQuery || f.name?.toLowerCase().includes(friendSelectorQuery.toLowerCase()) || f.username?.toLowerCase().includes(friendSelectorQuery.toLowerCase()))
+                        .slice(0, friendSelectorQuery ? 25 : 10)
+                        .map((f, i) => {
+                          const selected = groupSelectedFriends.some(s => s.id === f.id)
+                          return (
+                            <button key={i} className={`new-modal-friend-item${selected ? ' new-modal-friend-item--selected' : ''}`} onClick={() => {
+                              setGroupSelectedFriends(prev => selected ? prev.filter(s => s.id !== f.id) : [...prev, f])
+                            }}>
+                              <div className="new-modal-friend-avatar">
+                                {f.photo
+                                  ? <img src={f.photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                                  : (f.name || '?').charAt(0).toUpperCase()
+                                }
+                              </div>
+                              <div className="new-modal-friend-info">
+                                <span className="new-modal-friend-name">{nicknames[f.id] || f.name}</span>
+                                {f.username && <span className="new-modal-friend-username">@{f.username}</span>}
+                              </div>
+                              <div className={`new-modal-checkbox${selected ? ' new-modal-checkbox--checked' : ''}`}>
+                                {selected && (
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                                    <polyline points="20 6 9 17 4 12" />
+                                  </svg>
+                                )}
+                              </div>
+                            </button>
+                          )
+                        })
+                      }
+                      {friends.length === 0 && <p className="friend-selector-empty">No friends yet.</p>}
+                    </div>
+                    <div className="new-modal-btn-row">
+                      <button
+                        type="button"
+                        className="pill-action-btn"
+                        disabled={groupSelectedFriends.length === 0}
+                        onClick={() => setCreateReelmStep('group_setup')}
+                      >
+                        Next ({groupSelectedFriends.length}) →
+                      </button>
+                    </div>
+                  </div>
+                ) : createReelmStep === 'group_setup' ? (
+                  <div className="new-modal-panel">
+                    <div className="new-modal-header">
+                      <button className="new-modal-back-btn" onClick={() => setCreateReelmStep('group_friends')}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                          <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                      <h3 className="new-modal-title">New group</h3>
+                    </div>
+                    <div className="new-modal-group-setup-row">
+                      <div className="new-modal-group-avatar-btn" onClick={() => groupPhotoInputRef.current?.click()} title="Select group photo">
+                        {groupPhotoInput
+                          ? <img src={groupPhotoInput} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                          : <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                        }
+                      </div>
+                      <input
+                        ref={groupPhotoInputRef}
+                        type="file"
+                        accept="image/*"
+                        style={{ display: 'none' }}
+                        onChange={e => {
+                          const file = e.target.files[0]
+                          if (!file) return
+                          const reader = new FileReader()
+                          reader.onload = ev => {
+                            const img = new Image()
+                            img.onload = () => {
+                              const MAX = 256
+                              const scale = Math.min(1, MAX / Math.max(img.width, img.height))
+                              const canvas = document.createElement('canvas')
+                              canvas.width = Math.round(img.width * scale)
+                              canvas.height = Math.round(img.height * scale)
+                              canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+                              setGroupPhotoInput(canvas.toDataURL('image/webp', 0.85))
+                            }
+                            img.src = ev.target.result
+                          }
+                          reader.readAsDataURL(file)
+                          e.target.value = ''
+                        }}
+                      />
+                      <input
+                        className="new-modal-input"
+                        style={{ marginBottom: 0, flex: 1 }}
+                        placeholder="Group name (optional)"
+                        value={groupNameInput}
+                        onChange={e => setGroupNameInput(e.target.value)}
+                        autoFocus
+                      />
+                    </div>
+                    <div className="new-modal-group-chips">
+                      {groupSelectedFriends.map(f => (
+                        <span key={f.id} className="new-modal-group-chip">
+                          <span>{nicknames[f.id] || f.name}</span>
+                          <button type="button" onClick={() => setGroupSelectedFriends(prev => prev.filter(s => s.id !== f.id))}>×</button>
+                        </span>
+                      ))}
+                    </div>
+                    <div className="new-modal-btn-row">
+                      <button
+                        type="button"
+                        className="pill-action-btn"
+                        onClick={createGroup}
+                      >
+                        {groupNameInput.trim() || groupPhotoInput ? 'Create Group' : 'Skip & Create'}
                       </button>
                     </div>
                   </div>
