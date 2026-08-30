@@ -4583,7 +4583,7 @@ function FriendProfilePopup({ friend, anchorRect = null, serverContext = null, o
   return ReactDOM.createPortal(profileNode, document.body)
 }
 
-function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onMessage, onAddFriend, onRemove, onBlock, onUnblock, isFriend, isBlocked, isPending, onOpenFriend, spotifyNowPlaying, spotifyConnected, onPhotoChange, onCoverChange, onBioChange, onNameChange, onSocialLinksChange, profileBio, socialLinks, activePlatforms, lastSeenLabel }) {
+function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onMessage, onAddFriend, onRemove, onBlock, onUnblock, isFriend, isBlocked, isPending, onOpenFriend, spotifyNowPlaying, spotifyConnected, onPhotoChange, onCoverChange, onBioChange, onNameChange, onSocialLinksChange, profileBio, socialLinks, activePlatforms, lastSeenLabel, profileStatus = 'online', onStatusChange = null }) {
   const t = useT()
   const [visible, setVisible] = useState(false)
   const [editMode, setEditMode] = useState(false)
@@ -4594,6 +4594,7 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
   const [editingSocial, setEditingSocial] = useState(null)
   const [socialInput, setSocialInput] = useState('')
   const [mediaSaving, setMediaSaving] = useState(null)
+  const [statusOpen, setStatusOpen] = useState(false)
   const fpPhotoRef = useRef(null)
   const fpCoverRef = useRef(null)
   const fpTouchRef = useRef(null)
@@ -4614,6 +4615,10 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
   const cover = getPersonCover(user)
   const photo = getPersonPhoto(user)
   const SOCIAL_ICONS = { instagram: InstagramIcon, x: XIcon, tiktok: TikTokIcon, linkedin: LinkedInIcon, whatsapp: WhatsAppIcon, discord: DiscordSocialIcon, snapchat: SnapchatIcon, custom: CustomLinkIcon }
+
+  const statusOptions = STATUS_OPTIONS_LIST
+  const currentStatusKey = isSelf ? (profileStatus || 'online') : (user.status || norm.status || 'online')
+  const currentStatus = statusOptions.find(s => s.key === currentStatusKey) || statusOptions[0]
 
   const displayBio = isSelf ? (profileBio || '') : norm.bio
   const displayPlatforms = isSelf ? (activePlatforms || []) : (norm.activePlatforms || [])
@@ -4691,27 +4696,7 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
             )}
             <div className={`fp-cover-zone${editMode ? ' fp-cover-zone--edit' : ''}`}
               onClick={() => { if (editMode) fpCoverRef.current?.click() }}>
-              <CachedProfileCover src={cover} className="fp-cover">
-                <div
-                  className={`fp-avatar-wrap${editMode ? ' fp-avatar-wrap--edit' : ''}`}
-                  onClick={e => { if (!editMode) return; e.stopPropagation(); fpPhotoRef.current?.click() }}
-                >
-                  <CachedProfileImage
-                    src={photo}
-                    alt="Avatar"
-                    className="fp-avatar"
-                    fallback={<img src={avatarUIcon} alt="Avatar" className="fp-avatar" />}
-                  />
-                  {editMode && (
-                    <div className="fp-media-edit-overlay">
-                      {mediaSaving === 'photo'
-                        ? <span className="fp-edit-saving-dot" />
-                        : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-                      }
-                    </div>
-                  )}
-                </div>
-              </CachedProfileCover>
+              <CachedProfileCover src={cover} className="fp-cover" />
               {editMode && (
                 <div className="fp-cover-edit-hint">
                   {mediaSaving === 'cover'
@@ -4724,38 +4709,96 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
             </div>
 
             <div className="fp-identity">
-              <div className="fp-identity-names">
-                {isSelf && editingName ? (
-                  <div className="fp-name-edit">
-                    <input
-                      className="fp-name-input"
-                      value={nameInput}
-                      autoFocus
-                      maxLength={50}
-                      onChange={e => setNameInput(e.target.value)}
-                      onKeyDown={e => {
-                        if (e.key === 'Enter') { const t = nameInput.trim(); if (t) { onNameChange?.(t); } setEditingName(false) }
-                        if (e.key === 'Escape') setEditingName(false)
-                      }}
-                      onBlur={() => { const t = nameInput.trim(); if (t) { onNameChange?.(t); } setEditingName(false) }}
-                    />
+              <div
+                className={`fp-avatar-wrap${isSelf && editMode ? ' fp-avatar-wrap--edit' : ''}`}
+                onClick={e => { if (!isSelf || !editMode) return; e.stopPropagation(); fpPhotoRef.current?.click() }}
+              >
+                <CachedProfileImage
+                  src={photo}
+                  alt="Avatar"
+                  className="fp-avatar"
+                  fallback={<img src={avatarUIcon} alt="Avatar" className="fp-avatar" />}
+                />
+                {isSelf && editMode && (
+                  <div className="fp-media-edit-overlay">
+                    {mediaSaving === 'photo'
+                      ? <span className="fp-edit-saving-dot" />
+                      : <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                    }
                   </div>
-                ) : (
-                  <h1
-                    className={`fp-name${isSelf && editMode ? ' fp-name--editable' : ''}`}
-                    onClick={() => { if (isSelf && editMode) { setNameInput(user.name || ''); setEditingName(true) } }}
-                  >{user.name}</h1>
-                )}
-                {user.username && <span className="fp-username">@{user.username.startsWith('@') ? user.username.slice(1) : user.username}</span>}
-                {!isSelf && lastSeenLabel && <span className="fp-lastseen">{lastSeenLabel}</span>}
-                {isSelf && (
-                  <button
-                    className={`fp-edit-profile-btn${editMode ? ' fp-edit-profile-btn--done' : ''}`}
-                    onClick={() => { setEditMode(v => !v); setEditingBio(false); setEditingSocial(null); setEditingName(false) }}
-                  >{editMode ? t('done') : t('edit_profile')}</button>
                 )}
               </div>
-              {user.activity?.name && <div className="fp-activity"><ActivityBadge activity={user.activity} /></div>}
+
+              <div className="fp-names-col">
+                <div className="fp-name-row">
+                  {isSelf && editingName ? (
+                    <div className="fp-name-edit">
+                      <input
+                        className="fp-name-input"
+                        value={nameInput}
+                        autoFocus
+                        maxLength={50}
+                        onChange={e => setNameInput(e.target.value)}
+                        onKeyDown={e => {
+                          if (e.key === 'Enter') { const t = nameInput.trim(); if (t) { onNameChange?.(t); } setEditingName(false) }
+                          if (e.key === 'Escape') setEditingName(false)
+                        }}
+                        onBlur={() => { const t = nameInput.trim(); if (t) { onNameChange?.(t); } setEditingName(false) }}
+                      />
+                    </div>
+                  ) : (
+                    <h1
+                      className={`fp-name${isSelf && editMode ? ' fp-name--editable' : ''}`}
+                      onClick={() => { if (isSelf && editMode) { setNameInput(user.name || ''); setEditingName(true) } }}
+                    >{user.name}</h1>
+                  )}
+                </div>
+
+                <div className="fp-username-row">
+                  {user.username && <span className="fp-username">@{user.username.startsWith('@') ? user.username.slice(1) : user.username}</span>}
+                  <div className="fp-username-actions">
+                    {isSelf ? (
+                      <>
+                        <div className="pp-status-wrap">
+                          <button className="pp-status-btn" onClick={() => setStatusOpen(v => !v)}>
+                            <span className="pp-status-dot" style={{ background: currentStatus.color }} />
+                            <span>{currentStatus.label || 'Status'}</span>
+                            <svg width="10" height="6" viewBox="0 0 10 6" fill="none">
+                              <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                            </svg>
+                          </button>
+                          {statusOpen && (
+                            <div className="pp-status-menu">
+                              {statusOptions.map(opt => (
+                                <button
+                                  key={opt.key}
+                                  className={'pp-status-option' + (currentStatusKey === opt.key ? ' active' : '')}
+                                  onClick={() => { onStatusChange?.(opt.key); setStatusOpen(false) }}
+                                >
+                                  <span className="pp-status-dot" style={{ background: opt.color }} />
+                                  <span>{opt.label}</span>
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <button
+                          className={`fp-edit-profile-btn${editMode ? ' fp-edit-profile-btn--done' : ''}`}
+                          onClick={() => { setEditMode(v => !v); setEditingBio(false); setEditingSocial(null); setEditingName(false) }}
+                        >{editMode ? t('done') : t('edit_profile')}</button>
+                      </>
+                    ) : (
+                      <>
+                        <div className="fpp-status-pill">
+                          <span className="pp-status-dot" style={{ background: currentStatus.color }} />
+                          <span>{currentStatus.label || 'Online'}</span>
+                        </div>
+                        {lastSeenLabel && <span className="fp-lastseen">{lastSeenLabel}</span>}
+                      </>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
 
             {(displayBio || (isSelf && editMode)) && (
@@ -22263,6 +22306,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               socialLinks={fullProfileTarget.isSelf ? profileSocialLinks : undefined}
               activePlatforms={fullProfileTarget.isSelf ? profileActivePlatforms : undefined}
               lastSeenLabel={fullProfileTarget.isSelf ? null : getLastSeenLabel(fullProfileTarget.user?.id)}
+              profileStatus={profileStatus}
+              onStatusChange={setProfileStatus}
             />
           )}
           {isMobile && !selectedReelm && !selectedChat && (
