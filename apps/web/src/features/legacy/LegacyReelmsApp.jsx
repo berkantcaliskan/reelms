@@ -16239,6 +16239,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       return
     }
     if (action === 'startChat') {
+      setShowMenu(false)
       setShowFriendSelector(true)
       setFriendSelectorQuery('')
       return
@@ -22594,87 +22595,116 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         {showMenu && (
           <div className="menu-backdrop menu-backdrop--new-actions" onClick={() => { setShowMenu(false); setCreateReelmStep(null); setSelectedTemplateId(null) }}>
             {createReelmStep ? (
-              <div className="menu-card-border" onClick={(e) => e.stopPropagation()}>
-                <div className="menu-card">
-                  {createReelmStep === 'naming' ? (
-                    <div className="create-reelm-form">
-                      <button className="create-reelm-back" onClick={() => { setCreateReelmStep(null); setSelectedTemplateId(null) }}>
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                          <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+              <div onClick={e => e.stopPropagation()} style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+                {createReelmStep === 'naming' ? (
+                  <div className="new-modal-panel">
+                    <div className="new-modal-header">
+                      <button className="new-modal-back-btn" onClick={() => { setCreateReelmStep(null); setSelectedTemplateId(null) }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                          <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       </button>
-                      <span className="create-reelm-title">Name your Reelm</span>
-                      <input
-                        className="create-reelm-input"
-                        value={reelmNameInput}
-                        onChange={e => setReelmNameInput(e.target.value)}
-                        onKeyDown={e => e.key === 'Enter' && handleCreateReelm()}
-                        placeholder="My Reelm"
-                        autoFocus
-                        maxLength={50}
-                      />
+                      <h3 className="new-modal-title">Name your Reelm</h3>
+                    </div>
+                    <input
+                      className="new-modal-input"
+                      value={reelmNameInput}
+                      onChange={e => setReelmNameInput(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter' && reelmNameInput.trim()) handleCreateReelm() }}
+                      placeholder="Name your Reelm"
+                      autoFocus
+                      maxLength={50}
+                    />
+                    {activeTemplate ? (
+                      <div className="new-modal-template-row">
+                        <div className="new-modal-template-selected-info">
+                          <span>{activeTemplate.emoji}</span>
+                          <span>{activeTemplate.name}</span>
+                        </div>
+                        <button
+                          type="button"
+                          className="new-modal-template-change-btn"
+                          onClick={() => setCreateReelmStep('templates')}
+                        >
+                          {t('change') || 'Değiştir'}
+                        </button>
+                      </div>
+                    ) : (
                       <button
-                        className={`create-reelm-template-trigger${activeTemplate ? ' has-template' : ''}`}
+                        type="button"
+                        className="new-modal-template-row new-modal-template-row--btn"
                         onClick={() => setCreateReelmStep('templates')}
                       >
-                        {activeTemplate
-                          ? <>{activeTemplate.emoji} <strong>{activeTemplate.name}</strong> · <span style={{ opacity: 0.6 }}>Change</span></>
-                          : '✦ Start from a template'}
-                      </button>
-                      <button
-                        className="create-reelm-btn"
-                        onClick={handleCreateReelm}
-                        disabled={!reelmNameInput.trim()}
-                      >Create</button>
-                    </div>
-                  ) : createReelmStep === 'templates' ? (
-                    <div className="create-reelm-form create-reelm-templates-form">
-                      <button className="create-reelm-back" onClick={() => setCreateReelmStep('naming')}>
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                          <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                        <span>✦ Start from a template</span>
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                          <path d="M9 18l6-6-6-6"/>
                         </svg>
                       </button>
-                      <span className="create-reelm-title">Choose a template</span>
-                      <div className="reelm-template-grid">
-                        {reelmTemplates.map(tpl => (
-                          <button
-                            key={tpl.id}
-                            className={`reelm-template-card${selectedTemplateId === tpl.id ? ' reelm-template-card--active' : ''}`}
-                            onClick={() => { setSelectedTemplateId(tpl.id); setCreateReelmStep('naming') }}
-                          >
-                            <div className="reelm-template-icon">{tpl.emoji}</div>
-                            <div className="reelm-template-name">{tpl.name}</div>
-                            <div className="reelm-template-desc">{tpl.desc}</div>
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : createReelmStep === 'joining' ? (
-                    <div className="create-reelm-form">
-                      <button className="create-reelm-back" onClick={() => { setCreateReelmStep(null); setJoinError('') }}>
-                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-                          <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
+                    )}
+                    <button
+                      type="button"
+                      className="pill-rainbow-btn"
+                      onClick={handleCreateReelm}
+                      disabled={!reelmNameInput.trim()}
+                    >
+                      <span className="pill-rainbow-btn-inner">Create Reelm</span>
+                    </button>
+                  </div>
+                ) : createReelmStep === 'templates' ? (
+                  <div className="new-modal-panel new-modal-panel--wide">
+                    <div className="new-modal-header">
+                      <button className="new-modal-back-btn" onClick={() => setCreateReelmStep('naming')}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                          <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
                         </svg>
                       </button>
-                      <span className="create-reelm-title">Join a Reelm</span>
-                      <input
-                        className="create-reelm-input"
-                        value={joinCodeInput}
-                        onChange={e => setJoinCodeInput(e.target.value.toUpperCase())}
-                        onKeyDown={e => { if (e.key === 'Enter' && !joining) handleJoinReelm() }}
-                        placeholder="Enter reelm code"
-                        maxLength={12}
-                        autoFocus
-                      />
-                      {joinError && <p className="create-reelm-error">{joinError}</p>}
-                      <button
-                        className="create-reelm-btn"
-                        onClick={handleJoinReelm}
-                        disabled={!joinCodeInput.trim() || joining}
-                      >{joining ? 'Joining…' : 'Join'}</button>
+                      <h3 className="new-modal-title">Choose a template</h3>
                     </div>
-                  ) : null}
-                </div>
+                    <div className="new-modal-template-grid">
+                      {reelmTemplates.map(tpl => (
+                        <button
+                          key={tpl.id}
+                          type="button"
+                          className={`new-modal-template-card${selectedTemplateId === tpl.id ? ' new-modal-template-card--selected' : ''}`}
+                          onClick={() => { setSelectedTemplateId(tpl.id); setCreateReelmStep('naming') }}
+                        >
+                          <div className="new-modal-template-emoji">{tpl.emoji}</div>
+                          <div className="new-modal-template-name">{tpl.name}</div>
+                          <p className="new-modal-template-desc">{tpl.desc}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : createReelmStep === 'joining' ? (
+                  <div className="new-modal-panel">
+                    <div className="new-modal-header">
+                      <button className="new-modal-back-btn" onClick={() => { setCreateReelmStep(null); setJoinError('') }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                          <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                      <h3 className="new-modal-title">Join a Reelm</h3>
+                    </div>
+                    <input
+                      className="new-modal-input"
+                      value={joinCodeInput}
+                      onChange={e => setJoinCodeInput(e.target.value.toUpperCase())}
+                      onKeyDown={e => { if (e.key === 'Enter' && !joining && joinCodeInput.trim()) handleJoinReelm() }}
+                      placeholder="Enter Reelm code or link"
+                      maxLength={32}
+                      autoFocus
+                    />
+                    {joinError && <p className="create-reelm-error" style={{ margin: '0 0 10px 0', fontSize: '0.82rem', color: '#f87171' }}>{joinError}</p>}
+                    <button
+                      type="button"
+                      className="pill-rainbow-btn"
+                      onClick={handleJoinReelm}
+                      disabled={!joinCodeInput.trim() || joining}
+                    >
+                      <span className="pill-rainbow-btn-inner">{joining ? 'Joining…' : 'Join Reelm'}</span>
+                    </button>
+                  </div>
+                ) : null}
               </div>
             ) : (
               <div className="new-actions-strip" onClick={(e) => e.stopPropagation()}>
@@ -22723,146 +22753,183 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         )}
         {showGroupCreator === 'friends' && (
           <div className="menu-backdrop" onClick={() => setShowGroupCreator(null)}>
-            <div className="menu-card-border friend-selector-panel" onClick={e => e.stopPropagation()}>
-              <div className="menu-card">
-                <span className="friend-selector-title">Add people</span>
-                <input
-                  className="friend-selector-search"
-                  type="text"
-                  placeholder="Search friends..."
-                  value={friendSelectorQuery}
-                  onChange={e => setFriendSelectorQuery(e.target.value)}
-                  autoFocus
-                />
-                <div className="friend-selector-list">
-                  {friends
-                    .filter(f => !friendSelectorQuery || f.name?.toLowerCase().includes(friendSelectorQuery.toLowerCase()) || f.username?.toLowerCase().includes(friendSelectorQuery.toLowerCase()))
-                    .map((f, i) => {
-                      const selected = groupSelectedFriends.some(s => s.id === f.id)
-                      return (
-                        <button key={i} className={`friend-selector-item${selected ? ' friend-selector-item--selected' : ''}`} onClick={() => {
-                          setGroupSelectedFriends(prev => selected ? prev.filter(s => s.id !== f.id) : [...prev, f])
-                        }}>
-                          <div className="friend-selector-avatar">
-                            {f.photo
-                              ? <img src={f.photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-                              : (f.name || '?').charAt(0).toUpperCase()
-                            }
-                          </div>
-                          <div className="friend-selector-info">
-                            <span className="friend-selector-name">{nicknames[f.id] || f.name}</span>
-                            {f.username && <span className="friend-selector-username">@{f.username}</span>}
-                          </div>
-                          {selected && <span className="friend-selector-check">✓</span>}
-                        </button>
-                      )
-                    })
-                  }
-                  {friends.length === 0 && <p className="friend-selector-empty">No friends yet.</p>}
-                </div>
-                <button
-                  className="friend-selector-next-btn"
-                  disabled={groupSelectedFriends.length === 0}
-                  onClick={() => setShowGroupCreator('setup')}
-                >Next →</button>
+            <div className="new-modal-panel" onClick={e => e.stopPropagation()}>
+              <div className="new-modal-header">
+                <button className="new-modal-back-btn" onClick={() => { setShowGroupCreator(null); setShowMenu(true) }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                <h3 className="new-modal-title">Add people</h3>
               </div>
-            </div>
-          </div>
-        )}
-        {showGroupCreator === 'setup' && (
-          <div className="menu-backdrop" onClick={() => setShowGroupCreator(null)}>
-            <div className="menu-card-border friend-selector-panel" onClick={e => e.stopPropagation()}>
-              <div className="menu-card">
-                <span className="friend-selector-title">New group</span>
-                <div className="group-setup-photo-row">
-                  <div className="group-setup-avatar" onClick={() => groupPhotoInputRef.current?.click()}>
-                    {groupPhotoInput
-                      ? <img src={groupPhotoInput} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-                      : <span style={{ fontSize: 22, color: 'rgba(185,152,135,0.5)' }}>+</span>
-                    }
-                  </div>
-                  <input
-                    ref={groupPhotoInputRef}
-                    type="file"
-                    accept="image/*"
-                    style={{ display: 'none' }}
-                    onChange={e => {
-                      const file = e.target.files[0]
-                      if (!file) return
-                      const reader = new FileReader()
-                      reader.onload = ev => {
-                        const img = new Image()
-                        img.onload = () => {
-                          const MAX = 128
-                          const scale = Math.min(1, MAX / Math.max(img.width, img.height))
-                          const canvas = document.createElement('canvas')
-                          canvas.width = Math.round(img.width * scale)
-                          canvas.height = Math.round(img.height * scale)
-                          canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
-                          setGroupPhotoInput(canvas.toDataURL('image/jpeg', 0.7))
-                        }
-                        img.src = ev.target.result
-                      }
-                      reader.readAsDataURL(file)
-                      e.target.value = ''
-                    }}
-                  />
-                  <input
-                    className="group-name-input"
-                    placeholder={groupSelectedFriends.map(f => nicknames[f.id] || f.name).concat(['you']).join(', ')}
-                    value={groupNameInput}
-                    onChange={e => setGroupNameInput(e.target.value)}
-                  />
-                </div>
-                <div className="group-setup-members">
-                  {groupSelectedFriends.map(f => (
-                    <span key={f.id} className="group-setup-member-chip">
-                      {nicknames[f.id] || f.name}
-                      <button onClick={() => setGroupSelectedFriends(prev => prev.filter(s => s.id !== f.id))}>×</button>
-                    </span>
-                  ))}
-                </div>
-                <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-                  <button className="friend-selector-next-btn" style={{ flex: 1, background: 'none', border: '1px solid rgba(185,152,135,0.25)' }} onClick={() => setShowGroupCreator('friends')}>← Back</button>
-                  <button className="friend-selector-next-btn" style={{ flex: 2 }} onClick={createGroup}>Create group</button>
-                </div>
+              <input
+                className="new-modal-input"
+                type="text"
+                placeholder="Search friends..."
+                value={friendSelectorQuery}
+                onChange={e => setFriendSelectorQuery(e.target.value)}
+                autoFocus
+              />
+              <div className="new-modal-friends-section-title">
+                {friendSelectorQuery ? 'Search Results' : 'Suggested'}
               </div>
-            </div>
-          </div>
-        )}
-        {showFriendSelector && (
-          <div className="menu-backdrop" onClick={() => { setShowFriendSelector(false); setShowMenu(false) }}>
-            <div className="menu-card-border friend-selector-panel" onClick={e => e.stopPropagation()}>
-              <div className="menu-card">
-                <span className="friend-selector-title">Start a chat</span>
-                <input
-                  className="friend-selector-search"
-                  type="text"
-                  placeholder="Search friends..."
-                  value={friendSelectorQuery}
-                  onChange={e => setFriendSelectorQuery(e.target.value)}
-                  autoFocus
-                />
-                <div className="friend-selector-list">
-                  {friends
-                    .filter(f => !friendSelectorQuery || f.name?.toLowerCase().includes(friendSelectorQuery.toLowerCase()) || f.username?.toLowerCase().includes(friendSelectorQuery.toLowerCase()))
-                    .map((f, i) => (
-                      <button key={i} className="friend-selector-item" onClick={() => startDM(f)}>
-                        <div className="friend-selector-avatar">
+              <div className="new-modal-friends-list">
+                {friends
+                  .filter(f => !friendSelectorQuery || f.name?.toLowerCase().includes(friendSelectorQuery.toLowerCase()) || f.username?.toLowerCase().includes(friendSelectorQuery.toLowerCase()))
+                  .slice(0, friendSelectorQuery ? 25 : 10)
+                  .map((f, i) => {
+                    const selected = groupSelectedFriends.some(s => s.id === f.id)
+                    return (
+                      <button key={i} className={`new-modal-friend-item${selected ? ' new-modal-friend-item--selected' : ''}`} onClick={() => {
+                        setGroupSelectedFriends(prev => selected ? prev.filter(s => s.id !== f.id) : [...prev, f])
+                      }}>
+                        <div className="new-modal-friend-avatar">
                           {f.photo
                             ? <img src={f.photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
                             : (f.name || '?').charAt(0).toUpperCase()
                           }
                         </div>
-                        <div className="friend-selector-info">
-                          <span className="friend-selector-name">{nicknames[f.id] || f.name}</span>
-                          {f.username && <span className="friend-selector-username">@{f.username}</span>}
+                        <div className="new-modal-friend-info">
+                          <span className="new-modal-friend-name">{nicknames[f.id] || f.name}</span>
+                          {f.username && <span className="new-modal-friend-username">@{f.username}</span>}
+                        </div>
+                        <div className={`new-modal-checkbox${selected ? ' new-modal-checkbox--checked' : ''}`}>
+                          {selected && (
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                          )}
                         </div>
                       </button>
-                    ))
+                    )
+                  })
+                }
+                {friends.length === 0 && <p className="friend-selector-empty">No friends yet.</p>}
+              </div>
+              <button
+                type="button"
+                className="pill-rainbow-btn"
+                disabled={groupSelectedFriends.length === 0}
+                onClick={() => setShowGroupCreator('setup')}
+              >
+                <span className="pill-rainbow-btn-inner">Next ({groupSelectedFriends.length}) →</span>
+              </button>
+            </div>
+          </div>
+        )}
+        {showGroupCreator === 'setup' && (
+          <div className="menu-backdrop" onClick={() => setShowGroupCreator(null)}>
+            <div className="new-modal-panel" onClick={e => e.stopPropagation()}>
+              <div className="new-modal-header">
+                <button className="new-modal-back-btn" onClick={() => setShowGroupCreator('friends')}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                <h3 className="new-modal-title">New group</h3>
+              </div>
+              <div className="new-modal-group-setup-row">
+                <div className="new-modal-group-avatar-btn" onClick={() => groupPhotoInputRef.current?.click()} title="Select group photo">
+                  {groupPhotoInput
+                    ? <img src={groupPhotoInput} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                    : <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
                   }
-                  {friends.length === 0 && <p className="friend-selector-empty">No friends yet.</p>}
                 </div>
+                <input
+                  ref={groupPhotoInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={e => {
+                    const file = e.target.files[0]
+                    if (!file) return
+                    const reader = new FileReader()
+                    reader.onload = ev => {
+                      const img = new Image()
+                      img.onload = () => {
+                        const MAX = 256
+                        const scale = Math.min(1, MAX / Math.max(img.width, img.height))
+                        const canvas = document.createElement('canvas')
+                        canvas.width = Math.round(img.width * scale)
+                        canvas.height = Math.round(img.height * scale)
+                        canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height)
+                        setGroupPhotoInput(canvas.toDataURL('image/webp', 0.85))
+                      }
+                      img.src = ev.target.result
+                    }
+                    reader.readAsDataURL(file)
+                    e.target.value = ''
+                  }}
+                />
+                <input
+                  className="new-modal-input"
+                  style={{ marginBottom: 0, flex: 1 }}
+                  placeholder="Group name (optional)"
+                  value={groupNameInput}
+                  onChange={e => setGroupNameInput(e.target.value)}
+                  autoFocus
+                />
+              </div>
+              <div className="new-modal-group-chips">
+                {groupSelectedFriends.map(f => (
+                  <span key={f.id} className="new-modal-group-chip">
+                    <span>{nicknames[f.id] || f.name}</span>
+                    <button type="button" onClick={() => setGroupSelectedFriends(prev => prev.filter(s => s.id !== f.id))}>×</button>
+                  </span>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="pill-rainbow-btn"
+                onClick={createGroup}
+              >
+                <span className="pill-rainbow-btn-inner">{groupNameInput.trim() || groupPhotoInput ? 'Create Group' : 'Skip & Create'}</span>
+              </button>
+            </div>
+          </div>
+        )}
+        {showFriendSelector && (
+          <div className="menu-backdrop" onClick={() => { setShowFriendSelector(false); setShowMenu(false) }}>
+            <div className="new-modal-panel" onClick={e => e.stopPropagation()}>
+              <div className="new-modal-header">
+                <button className="new-modal-back-btn" onClick={() => { setShowFriendSelector(false); setShowMenu(true) }}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M15 18l-6-6 6-6" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
+                  </svg>
+                </button>
+                <h3 className="new-modal-title">Start a chat</h3>
+              </div>
+              <input
+                className="new-modal-input"
+                type="text"
+                placeholder="Search friends..."
+                value={friendSelectorQuery}
+                onChange={e => setFriendSelectorQuery(e.target.value)}
+                autoFocus
+              />
+              <div className="new-modal-friends-section-title">
+                {friendSelectorQuery ? 'Search Results' : 'Suggested'}
+              </div>
+              <div className="new-modal-friends-list">
+                {friends
+                  .filter(f => !friendSelectorQuery || f.name?.toLowerCase().includes(friendSelectorQuery.toLowerCase()) || f.username?.toLowerCase().includes(friendSelectorQuery.toLowerCase()))
+                  .slice(0, friendSelectorQuery ? 25 : 8)
+                  .map((f, i) => (
+                    <button key={i} className="new-modal-friend-item" onClick={() => startDM(f)}>
+                      <div className="new-modal-friend-avatar">
+                        {f.photo
+                          ? <img src={f.photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                          : (f.name || '?').charAt(0).toUpperCase()
+                        }
+                      </div>
+                      <div className="new-modal-friend-info">
+                        <span className="new-modal-friend-name">{nicknames[f.id] || f.name}</span>
+                        {f.username && <span className="new-modal-friend-username">@{f.username}</span>}
+                      </div>
+                    </button>
+                  ))
+                }
+                {friends.length === 0 && <p className="friend-selector-empty">No friends yet.</p>}
               </div>
             </div>
           </div>
