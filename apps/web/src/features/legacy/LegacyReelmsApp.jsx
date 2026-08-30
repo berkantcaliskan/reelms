@@ -22791,7 +22791,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           </div>
         )}
         {showGroupCreator === 'friends' && (
-          <div className="menu-backdrop" onClick={() => setShowGroupCreator(null)}>
+          <div className="menu-backdrop menu-backdrop--new-actions" onClick={() => setShowGroupCreator(null)}>
             <div className="new-modal-panel" onClick={e => e.stopPropagation()}>
               <div className="new-modal-header">
                 <button className="new-modal-back-btn" onClick={() => { setShowGroupCreator(null); setShowMenu(true) }}>
@@ -22859,7 +22859,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           </div>
         )}
         {showGroupCreator === 'setup' && (
-          <div className="menu-backdrop" onClick={() => setShowGroupCreator(null)}>
+          <div className="menu-backdrop menu-backdrop--new-actions" onClick={() => setShowGroupCreator(null)}>
             <div className="new-modal-panel" onClick={e => e.stopPropagation()}>
               <div className="new-modal-header">
                 <button className="new-modal-back-btn" onClick={() => setShowGroupCreator('friends')}>
@@ -22932,7 +22932,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           </div>
         )}
         {showFriendSelector && (
-          <div className="menu-backdrop" onClick={() => { setShowFriendSelector(false); setShowMenu(false) }}>
+          <div className="menu-backdrop menu-backdrop--new-actions" onClick={() => { setShowFriendSelector(false); setShowMenu(false) }}>
             <div className="new-modal-panel" onClick={e => e.stopPropagation()}>
               <div className="new-modal-header">
                 <button className="new-modal-back-btn" onClick={() => { setShowFriendSelector(false); setShowMenu(true) }}>
