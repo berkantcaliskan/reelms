@@ -2178,13 +2178,13 @@ h6 {
    ========================================================================== */
 .new-modal-panel {
   position: relative;
-  background: var(--tb, #1b1822);
-  border: 1px solid rgba(var(--ta-rgb), 0.16);
-  border-radius: 24px;
-  padding: 24px;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 0;
   width: 100%;
-  max-width: 420px;
-  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  max-width: 360px;
+  box-shadow: none;
   display: flex;
   flex-direction: column;
   box-sizing: border-box;
@@ -2192,7 +2192,7 @@ h6 {
 }
 
 .new-modal-panel--wide {
-  max-width: 720px;
+  max-width: 680px;
 }
 
 .new-modal-header {
@@ -2200,35 +2200,35 @@ h6 {
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 20px;
+  margin-bottom: 22px;
   width: 100%;
 }
 
 .new-modal-back-btn {
   position: absolute;
-  left: -4px;
+  left: 0;
   top: 50%;
   transform: translateY(-50%);
   background: none;
   border: none;
-  color: rgba(var(--ta-rgb), 0.7);
+  color: rgba(var(--ta-rgb), 0.75);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 6px;
-  border-radius: 8px;
+  border-radius: 50%;
   transition: color 0.15s, background 0.15s;
 }
 
 .new-modal-back-btn:hover {
   color: var(--ta);
-  background: rgba(var(--ta-rgb), 0.08);
+  background: rgba(var(--ta-rgb), 0.1);
 }
 
 .new-modal-title {
   font-family: 'Karla', sans-serif !important;
-  font-size: 1.15rem;
+  font-size: 1.22rem;
   font-weight: 800 !important;
   color: var(--ta);
   text-align: center;
@@ -2238,22 +2238,28 @@ h6 {
 
 .new-modal-input {
   width: 100%;
+  height: 52px;
   box-sizing: border-box;
-  background: rgba(var(--ta-rgb), 0.06);
-  border: 1.5px solid rgba(var(--ta-rgb), 0.16);
-  border-radius: 14px;
-  padding: 12px 16px;
+  background: transparent;
+  border: 1px solid rgba(var(--ta-rgb), 0.28);
+  box-shadow: 0 0 0 1px rgba(var(--ta-rgb), 0.04);
+  border-radius: 28px;
+  padding: 0 20px;
   font-family: inherit;
-  font-size: 0.95rem;
+  font-size: 0.92rem;
   color: var(--ta);
   outline: none;
-  transition: border-color 0.2s, background 0.2s;
-  margin-bottom: 14px;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  margin-bottom: 12px;
 }
 
 .new-modal-input:focus {
-  border-color: rgba(var(--ta-rgb), 0.45);
-  background: rgba(var(--ta-rgb), 0.09);
+  border-color: rgba(var(--ta-rgb), 0.55);
+  box-shadow: 0 0 16px rgba(var(--ta-rgb), 0.12);
+}
+
+.new-modal-input::placeholder {
+  color: rgba(var(--ta-rgb), 0.42);
 }
 
 .new-modal-template-row {
@@ -2261,12 +2267,13 @@ h6 {
   align-items: center;
   justify-content: space-between;
   width: 100%;
-  padding: 12px 16px;
+  height: 50px;
+  padding: 0 20px;
   box-sizing: border-box;
-  background: rgba(var(--ta-rgb), 0.04);
-  border: 1px dashed rgba(var(--ta-rgb), 0.2);
-  border-radius: 14px;
-  margin-bottom: 16px;
+  background: transparent;
+  border: 1px solid rgba(var(--ta-rgb), 0.24);
+  border-radius: 28px;
+  margin-bottom: 18px;
   transition: background 0.15s, border-color 0.15s;
 }
 
@@ -2279,7 +2286,7 @@ h6 {
 
 .new-modal-template-row--btn:hover {
   background: rgba(var(--ta-rgb), 0.08);
-  border-color: rgba(var(--ta-rgb), 0.4);
+  border-color: rgba(var(--ta-rgb), 0.45);
   color: var(--ta);
 }
 
@@ -2327,9 +2334,9 @@ h6 {
   align-items: center;
   text-align: center;
   padding: 16px 12px;
-  border-radius: 16px;
+  border-radius: 18px;
   background: rgba(var(--ta-rgb), 0.05);
-  border: 1px solid rgba(var(--ta-rgb), 0.12);
+  border: 1px solid rgba(var(--ta-rgb), 0.14);
   cursor: pointer;
   transition: all 0.2s cubic-bezier(0.22, 1, 0.36, 1);
   box-sizing: border-box;
@@ -2338,7 +2345,7 @@ h6 {
 
 .new-modal-template-card:hover {
   background: rgba(var(--ta-rgb), 0.1);
-  border-color: rgba(var(--ta-rgb), 0.3);
+  border-color: rgba(var(--ta-rgb), 0.35);
   transform: translateY(-2px);
 }
 
@@ -2374,65 +2381,45 @@ h6 {
   overflow: hidden;
 }
 
-.pill-rainbow-btn {
-  position: relative;
-  border-radius: 999px;
-  padding: 2px;
-  overflow: hidden;
-  cursor: pointer;
-  background: transparent;
-  border: none;
-  display: block;
-  width: 100%;
-  margin-top: 6px;
-  transition: transform 0.15s ease, opacity 0.15s ease;
-  box-sizing: border-box;
-}
-
-.pill-rainbow-btn:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-
-.pill-rainbow-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-}
-
-.pill-rainbow-btn::before {
-  content: '';
-  position: absolute;
-  inset: -100%;
-  background: conic-gradient(
-    from 0deg,
-    var(--ta, #b99887),
-    #e07535,
-    #68c586,
-    #3ecfb8,
-    #9b5de5,
-    var(--ta, #b99887)
-  );
-  animation: spin-border 5s linear infinite;
-}
-
-.pill-rainbow-btn-inner {
-  position: relative;
-  z-index: 1;
-  background: var(--tb, #1b1822);
-  border-radius: 999px;
-  padding: 12px 24px;
-  font-family: 'Karla', sans-serif !important;
-  font-size: 0.95rem;
-  font-weight: 800 !important;
-  color: var(--ta);
+.new-modal-btn-row {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  transition: background 0.2s;
+  width: 100%;
+  margin-top: 6px;
 }
 
-.pill-rainbow-btn:hover:not(:disabled) .pill-rainbow-btn-inner {
-  background: rgba(35, 30, 42, 0.96);
+.pill-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 34px;
+  border-radius: 28px;
+  background: var(--ta, #b99887);
+  color: var(--tb, #1b1822);
+  border: none;
+  font-family: 'Karla', sans-serif !important;
+  font-size: 0.94rem;
+  font-weight: 800 !important;
+  cursor: pointer;
+  transition: transform 0.15s ease, opacity 0.15s ease, filter 0.15s ease;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.32);
+}
+
+.pill-action-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.08);
+}
+
+.pill-action-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.pill-action-btn:disabled {
+  opacity: 0.38;
+  cursor: not-allowed;
+  transform: none;
 }
 
 .new-modal-friends-section-title {

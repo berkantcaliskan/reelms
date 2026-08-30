@@ -22676,14 +22676,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         </svg>
                       </button>
                     )}
-                    <button
-                      type="button"
-                      className="pill-rainbow-btn"
-                      onClick={handleCreateReelm}
-                      disabled={!reelmNameInput.trim()}
-                    >
-                      <span className="pill-rainbow-btn-inner">Create Reelm</span>
-                    </button>
+                    <div className="new-modal-btn-row">
+                      <button
+                        type="button"
+                        className="pill-action-btn"
+                        onClick={handleCreateReelm}
+                        disabled={!reelmNameInput.trim()}
+                      >
+                        Create Reelm
+                      </button>
+                    </div>
                   </div>
                 ) : createReelmStep === 'templates' ? (
                   <div className="new-modal-panel new-modal-panel--wide">
@@ -22730,14 +22732,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       autoFocus
                     />
                     {joinError && <p className="create-reelm-error" style={{ margin: '0 0 10px 0', fontSize: '0.82rem', color: '#f87171' }}>{joinError}</p>}
-                    <button
-                      type="button"
-                      className="pill-rainbow-btn"
-                      onClick={handleJoinReelm}
-                      disabled={!joinCodeInput.trim() || joining}
-                    >
-                      <span className="pill-rainbow-btn-inner">{joining ? 'Joining…' : 'Join Reelm'}</span>
-                    </button>
+                    <div className="new-modal-btn-row">
+                      <button
+                        type="button"
+                        className="pill-action-btn"
+                        onClick={handleJoinReelm}
+                        disabled={!joinCodeInput.trim() || joining}
+                      >
+                        {joining ? 'Joining…' : 'Join Reelm'}
+                      </button>
+                    </div>
                   </div>
                 ) : null}
               </div>
@@ -22841,14 +22845,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                 }
                 {friends.length === 0 && <p className="friend-selector-empty">No friends yet.</p>}
               </div>
-              <button
-                type="button"
-                className="pill-rainbow-btn"
-                disabled={groupSelectedFriends.length === 0}
-                onClick={() => setShowGroupCreator('setup')}
-              >
-                <span className="pill-rainbow-btn-inner">Next ({groupSelectedFriends.length}) →</span>
-              </button>
+              <div className="new-modal-btn-row">
+                <button
+                  type="button"
+                  className="pill-action-btn"
+                  disabled={groupSelectedFriends.length === 0}
+                  onClick={() => setShowGroupCreator('setup')}
+                >
+                  Next ({groupSelectedFriends.length}) →
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -22913,13 +22919,15 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   </span>
                 ))}
               </div>
-              <button
-                type="button"
-                className="pill-rainbow-btn"
-                onClick={createGroup}
-              >
-                <span className="pill-rainbow-btn-inner">{groupNameInput.trim() || groupPhotoInput ? 'Create Group' : 'Skip & Create'}</span>
-              </button>
+              <div className="new-modal-btn-row">
+                <button
+                  type="button"
+                  className="pill-action-btn"
+                  onClick={createGroup}
+                >
+                  {groupNameInput.trim() || groupPhotoInput ? 'Create Group' : 'Skip & Create'}
+                </button>
+              </div>
             </div>
           </div>
         )}
