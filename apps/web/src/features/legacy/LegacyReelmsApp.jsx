@@ -4236,14 +4236,14 @@ function FriendProfilePopup({ friend, anchorRect = null, serverContext = null, o
   const screenBottom = msgBarEl ? msgBarEl.getBoundingClientRect().top - 8 : window.innerHeight - 72
   const screenTop = 10
 
-  let left = 8
-  let top = safeRect.top
-  let maxHeight = Math.min(520, screenBottom - screenTop)
+  let stylePos = {}
 
-  if (isFromChat) {
+  if (embedded) {
+    stylePos = {}
+  } else if (isFromChat) {
     // ── Chat Message Positioning ──
     // Horizontal: aligned with the avatar/author start
-    left = safeRect.left
+    let left = safeRect.left
     if (left + popupW > window.innerWidth - 12) left = window.innerWidth - popupW - 12
     if (left < 12) left = 12
 
@@ -4253,13 +4253,14 @@ function FriendProfilePopup({ friend, anchorRect = null, serverContext = null, o
 
     if (spaceBelow >= 360 || spaceBelow >= spaceAbove) {
       // Open BELOW the message header/avatar
-      top = safeRect.bottom + 6
-      maxHeight = Math.min(480, screenBottom - top)
+      const top = Math.max(screenTop, safeRect.bottom + 6)
+      const maxHeight = Math.min(480, screenBottom - top)
+      stylePos = { top, left, width: popupW, maxHeight }
     } else {
-      // Open ABOVE the message header/avatar
-      const availableUpHeight = Math.min(480, spaceAbove)
-      top = Math.max(screenTop, safeRect.top - Math.min(defaultHeight, availableUpHeight) - 6)
-      maxHeight = availableUpHeight
+      // Open ABOVE the message header/avatar (anchored directly above message)
+      const bottom = Math.max(8, window.innerHeight - safeRect.top + 6)
+      const maxHeight = Math.min(480, safeRect.top - screenTop - 6)
+      stylePos = { bottom, left, width: popupW, maxHeight }
     }
   } else {
     // ── Members Panel / Sidebar Positioning ──
@@ -4267,7 +4268,7 @@ function FriendProfilePopup({ friend, anchorRect = null, serverContext = null, o
     const panelLeftEdge = membersPanelEl
       ? membersPanelEl.getBoundingClientRect().left
       : (rightPanelWidth > 0 ? window.innerWidth - rightPanelWidth : safeRect.left)
-    left = panelLeftEdge - popupW - 8
+    let left = panelLeftEdge - popupW - 8
     if (left < 8) left = Math.max(8, (safeRect.left || safeRect.right) - popupW - 8)
     if (left < 8) left = 8
 
@@ -4275,19 +4276,18 @@ function FriendProfilePopup({ friend, anchorRect = null, serverContext = null, o
     const spaceAbove = safeRect.bottom - screenTop
 
     if (spaceBelow < 340 && spaceAbove > spaceBelow) {
-      const availableUpHeight = Math.min(520, safeRect.bottom - screenTop)
-      top = Math.max(screenTop, safeRect.bottom - defaultHeight)
-      maxHeight = availableUpHeight
+      const bottom = Math.max(8, window.innerHeight - safeRect.bottom + 6)
+      const maxHeight = Math.min(520, safeRect.bottom - screenTop)
+      stylePos = { bottom, left, width: popupW, maxHeight }
     } else {
-      top = safeRect.top
-      maxHeight = Math.min(520, spaceBelow)
+      const top = Math.max(screenTop, safeRect.top)
+      const maxHeight = Math.min(520, spaceBelow)
+      stylePos = { top, left, width: popupW, maxHeight }
     }
   }
 
-  if (top < screenTop) top = screenTop
-
   const profileNode = (
-    <div className={`friend-profile-popup${embedded ? ' friend-profile-popup--embedded' : ''}${friendCover ? ' friend-profile-popup--has-cover' : ''}`} style={{ ...(buildProfileThemeStyle(safeFriend) || {}), ...(embedded ? {} : { top, left, width: popupW, maxHeight }) }} ref={popupRef}>
+    <div className={`friend-profile-popup${embedded ? ' friend-profile-popup--embedded' : ''}${friendCover ? ' friend-profile-popup--has-cover' : ''}`} style={{ ...(buildProfileThemeStyle(safeFriend) || {}), ...stylePos }} ref={popupRef}>
       {friendCover && (
         <div className="profile-popup-ambient">
           <div className="profile-popup-ambient-bg" style={{ backgroundImage: `url(${normalizeMediaUrl(friendCover)})` }} />
