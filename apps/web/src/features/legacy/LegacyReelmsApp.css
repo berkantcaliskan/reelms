@@ -3597,6 +3597,215 @@ h6 {
 }
 
 /* Ambient 100% Blurred Header Adaptation for Card Body */
+/* ==========================================================================
+   Profile Media Crop Modal (Avatar & Header Cover)
+   ========================================================================== */
+.profile-crop-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100050;
+  background: rgba(8, 6, 12, 0.76);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  animation: fp-fade-in 0.2s ease-out;
+}
+
+.profile-crop-modal {
+  background: var(--tb, #1b1822);
+  border: 1px solid rgba(var(--ta-rgb), 0.16);
+  border-radius: 20px;
+  padding: 24px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.65), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  box-sizing: border-box;
+  animation: fp-slide-up 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.profile-crop-header {
+  text-align: center;
+  margin-bottom: 18px;
+  width: 100%;
+}
+
+.profile-crop-title {
+  display: block;
+  font-family: 'Karla', sans-serif !important;
+  font-size: 1.15rem;
+  font-weight: 800 !important;
+  color: var(--ta);
+  letter-spacing: -0.015em;
+  margin-bottom: 4px;
+}
+
+.profile-crop-hint {
+  margin: 0;
+  font-size: 0.82rem;
+  color: rgba(var(--ta-rgb), 0.6);
+  line-height: 1.35;
+}
+
+.profile-crop-viewport-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 18px;
+  width: 100%;
+}
+
+.profile-crop-viewport {
+  position: relative;
+  overflow: hidden;
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  background: #0d0b10;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.profile-crop-viewport:active {
+  cursor: grabbing;
+}
+
+.profile-crop-viewport--photo {
+  border-radius: 50%;
+  border: 2px solid rgba(var(--ta-rgb), 0.4);
+}
+
+.profile-crop-viewport--cover {
+  border-radius: 14px;
+  border: 2px solid rgba(var(--ta-rgb), 0.4);
+}
+
+.profile-crop-canvas {
+  display: block;
+  pointer-events: none;
+}
+
+.profile-crop-mask {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.15);
+}
+
+.profile-crop-mask--photo {
+  border-radius: 50%;
+}
+
+.profile-crop-mask--cover {
+  border-radius: 12px;
+}
+
+.profile-crop-zoom-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  max-width: 320px;
+  margin-bottom: 22px;
+}
+
+.profile-crop-zoom-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: rgba(var(--ta-rgb), 0.08);
+  border: 1px solid rgba(var(--ta-rgb), 0.15);
+  color: var(--ta);
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.profile-crop-zoom-btn:hover {
+  background: rgba(var(--ta-rgb), 0.18);
+  color: #fff;
+}
+
+.profile-crop-slider {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  accent-color: var(--fpp-theme-accent, #b99887);
+  background: rgba(var(--ta-rgb), 0.15);
+  outline: none;
+  cursor: pointer;
+}
+
+.profile-crop-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+}
+
+.profile-crop-btn {
+  padding: 9px 18px;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  outline: none;
+}
+
+.profile-crop-btn--cancel {
+  background: rgba(var(--ta-rgb), 0.08);
+  border: 1px solid rgba(var(--ta-rgb), 0.16);
+  color: rgba(var(--ta-rgb), 0.75);
+}
+
+.profile-crop-btn--cancel:hover {
+  background: rgba(var(--ta-rgb), 0.15);
+  color: var(--ta);
+}
+
+.profile-crop-btn--change {
+  background: rgba(var(--ta-rgb), 0.08);
+  border: 1px solid rgba(var(--ta-rgb), 0.16);
+  color: rgba(var(--ta-rgb), 0.9);
+}
+
+.profile-crop-btn--change:hover {
+  background: rgba(var(--ta-rgb), 0.18);
+  color: #fff;
+}
+
+.profile-crop-btn--apply {
+  flex: 1;
+  background: var(--fpp-theme-accent, #b99887);
+  color: #141118;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
+}
+
+.profile-crop-btn--apply:hover:not(:disabled) {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+.profile-crop-btn--apply:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
 .profile-popup-ambient {
   position: absolute;
   inset: 0;
