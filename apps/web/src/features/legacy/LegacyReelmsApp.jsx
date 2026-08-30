@@ -13323,6 +13323,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       return
     }
     const rect = e?.currentTarget?.getBoundingClientRect?.() || { top: 96, bottom: 112, left: Math.max(8, window.innerWidth - 338), right: window.innerWidth - 18 }
+    const inServerSurface = !!(opts.serverContext || e?.currentTarget?.closest?.('.rp-members-panel, .reelm-channel-voice-users, .voice-participants, .voice-bar-participants'))
     const cached = profileLookupCacheRef.current.get(fid)
     const cachedProfile = cached && (Date.now() - Number(cached.at || 0) < PROFILE_LOOKUP_CACHE_TTL_MS) ? cached.profile : null
     const target = { friend: cachedProfile ? { ...friend, ...cachedProfile } : friend, anchorRect: rect, serverContext: inServerSurface ? 'reelm' : null }
