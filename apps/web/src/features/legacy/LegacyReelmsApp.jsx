@@ -3653,6 +3653,12 @@ function ProfileMediaCropModal({ file, kind = 'photo', onApply, onCancel, onChan
     isDraggingRef.current = false
   }
 
+  const handleWheel = (e) => {
+    e.preventDefault()
+    const delta = e.deltaY * -0.002
+    setScale(s => Math.min(3, Math.max(1, +(s + delta).toFixed(2))))
+  }
+
   const handleApply = async () => {
     if (!imgElement || isProcessing) return
     setIsProcessing(true)
@@ -3725,6 +3731,7 @@ function ProfileMediaCropModal({ file, kind = 'photo', onApply, onCancel, onChan
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
+            onWheel={handleWheel}
           >
             <canvas
               ref={canvasRef}
@@ -3825,7 +3832,9 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
 
   useEffect(() => {
     const handler = (e) => {
+      if (cropTarget) return
       if (e.target.closest('.profile-crop-overlay')) return
+      if (e.target.closest('.profile-crop-modal')) return
       if (e.target.closest('.pp-social-ctx-menu')) return
       if (e.target.closest('.pp-social-add-menu')) return
       if (e.target.closest('.profile-card')) return
@@ -3837,7 +3846,7 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [onClose])
+  }, [onClose, cropTarget])
 
   const handleCropApply = async (croppedFile) => {
     if (!cropTarget) return
@@ -3864,7 +3873,17 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
           <div className="profile-popup-ambient-scrim" />
         </div>
       )}
-      <CachedProfileCover src={cover} className={`pp-cover${cover ? ' pp-cover--has-image' : ''}`} style={{ backgroundSize: 'cover', backgroundPosition: 'center' }}>
+      <CachedProfileCover
+        src={cover}
+        className={`pp-cover${cover ? ' pp-cover--has-image' : ''}`}
+        style={{ backgroundSize: 'cover', backgroundPosition: 'center', cursor: 'pointer' }}
+        onClick={() => ppCoverInputRef.current?.click()}
+        title="Kapak Fotoğrafını Değiştir"
+      >
+        <div className="pp-cover-edit-hint">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          <span>Edit cover</span>
+        </div>
         <input
           type="file"
           accept="image/*"
@@ -3891,12 +3910,24 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
       {mediaSaving && <div className="pp-media-saving">Uploading {mediaSaving}…</div>}
 
       <div className="pp-identity">
-        <CachedProfileImage
-          src={getPersonPhoto(user)}
-          alt="Avatar"
-          className="pp-avatar"
-          fallback={<img src={avatarUIcon} alt="Avatar" className="pp-avatar" />}
-        />
+        <div
+          className="pp-avatar-wrap"
+          onClick={() => ppPhotoInputRef.current?.click()}
+          title="Profil Fotoğrafını Değiştir"
+        >
+          <CachedProfileImage
+            src={getPersonPhoto(user)}
+            alt="Avatar"
+            className="pp-avatar"
+            fallback={<img src={avatarUIcon} alt="Avatar" className="pp-avatar" />}
+          />
+          <div className="pp-avatar-edit-overlay">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+              <circle cx="12" cy="13" r="4"/>
+            </svg>
+          </div>
+        </div>
         <div className="pp-names-col">
           <span className="pp-name">{user.name}</span>
           <div className="pp-username-row">
@@ -4839,7 +4870,8 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
     <div
       className={`fp-overlay${visible ? ' fp-overlay--in' : ''}`}
       onClick={e => {
-        if (e.target.closest('.profile-crop-overlay')) return
+        if (cropTarget) return
+        if (e.target.closest('.profile-crop-overlay') || e.target.closest('.profile-crop-modal')) return
         if (
           !e.target.closest('.fp-main') &&
           !e.target.closest('.fp-sidebar') &&
@@ -4891,10 +4923,12 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
                 <div className="profile-popup-ambient-scrim" />
               </div>
             )}
-            <div className={`fp-cover-zone${editMode ? ' fp-cover-zone--edit' : ''}`}
-              onClick={() => { if (editMode) fpCoverRef.current?.click() }}>
+            <div className={`fp-cover-zone${isSelf ? ' fp-cover-zone--edit' : ''}`}
+              onClick={() => { if (isSelf) fpCoverRef.current?.click() }}
+              style={{ cursor: isSelf ? 'pointer' : 'default' }}
+            >
               <CachedProfileCover src={cover} className="fp-cover" />
-              {editMode && (
+              {isSelf && (
                 <div className="fp-cover-edit-hint">
                   {mediaSaving === 'cover'
                     ? <span className="fp-edit-saving-dot" />
@@ -4907,8 +4941,9 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
 
             <div className="fp-identity">
               <div
-                className={`fp-avatar-wrap${isSelf && editMode ? ' fp-avatar-wrap--edit' : ''}`}
-                onClick={e => { if (!isSelf || !editMode) return; e.stopPropagation(); fpPhotoRef.current?.click() }}
+                className={`fp-avatar-wrap${isSelf ? ' fp-avatar-wrap--edit' : ''}`}
+                onClick={e => { if (!isSelf) return; e.stopPropagation(); fpPhotoRef.current?.click() }}
+                style={{ cursor: isSelf ? 'pointer' : 'default' }}
               >
                 <CachedProfileImage
                   src={photo}
@@ -4916,7 +4951,7 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
                   className="fp-avatar"
                   fallback={<img src={avatarUIcon} alt="Avatar" className="fp-avatar" />}
                 />
-                {isSelf && editMode && (
+                {isSelf && (
                   <div className="fp-media-edit-overlay">
                     {mediaSaving === 'photo'
                       ? <span className="fp-edit-saving-dot" />
