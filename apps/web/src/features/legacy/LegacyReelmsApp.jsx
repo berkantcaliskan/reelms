@@ -4619,6 +4619,10 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
   const displayUsername = norm.username || (safeUser.username ? String(safeUser.username).replace(/^@+/, '') : '')
   const targetUid = safeUser.id || norm.id || safeUser.uid || norm.uid || ''
 
+  const userActivity = safeUser.activity || norm.activity || null
+  const userSpotify = isSelf ? spotifyNowPlaying : (safeUser.spotify || norm.spotify || safeUser.spotifyNowPlaying || null)
+  const isSpotifyConnected = isSelf ? spotifyConnected : Boolean(userSpotify || safeUser.spotifyConnected || norm.spotifyConnected)
+
   const SOCIAL_ICONS = { instagram: InstagramIcon, x: XIcon, tiktok: TikTokIcon, linkedin: LinkedInIcon, whatsapp: WhatsAppIcon, discord: DiscordSocialIcon, snapchat: SnapchatIcon, custom: CustomLinkIcon }
 
   const statusOptions = STATUS_OPTIONS_LIST
@@ -4806,6 +4810,7 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
               </div>
             </div>
 
+            {/* 1. Bio */}
             {(displayBio || (isSelf && editMode)) && (
               <div className={`fp-section${editMode ? ' fp-section--editable' : ''}`}>
                 {editingBio ? (
@@ -4832,6 +4837,36 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
               </div>
             )}
 
+            {/* 2. Activity */}
+            {userActivity?.name && (
+              <div className="fp-section">
+                <span className="fp-section-label">{t('activity').toUpperCase()}</span>
+                <div className="fp-activity-item">
+                  <ActivityBadge activity={userActivity} />
+                </div>
+              </div>
+            )}
+
+            {/* 3. Spotify / Connections */}
+            {(isSpotifyConnected || userSpotify) && (
+              <div className="fp-section">
+                <span className="fp-section-label">SPOTIFY</span>
+                {userSpotify ? (
+                  <div className="fp-spotify-row">
+                    {userSpotify.albumArt && <img src={userSpotify.albumArt} alt="album" className="fp-spotify-art" />}
+                    <div className="fp-spotify-track">
+                      <a className="fp-spotify-track-name" href={userSpotify.url} target="_blank" rel="noreferrer">{userSpotify.name}</a>
+                      <span className="fp-spotify-track-artist">{userSpotify.artist}</span>
+                    </div>
+                    <SpotifyIcon size={16} />
+                  </div>
+                ) : (
+                  <div className="fp-spotify-idle"><SpotifyIcon size={16} /><span>{t('connected')}</span></div>
+                )}
+              </div>
+            )}
+
+            {/* 4. Socials */}
             {(hasSocials || (isSelf && editMode)) && (
               <div className={`fp-section${editMode ? ' fp-section--editable' : ''}`}>
                 <div className="fp-editable-row">
@@ -4881,6 +4916,7 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
               </div>
             )}
 
+            {/* 5. Actions (if other user) */}
             {!isSelf && (
               <div className="fp-actions">
                 {!isBlocked && onMessage && <button className="fp-action-btn fp-action-btn--primary" onClick={() => { onMessage(); handleClose() }}>{t('send_message')}</button>}
@@ -4927,31 +4963,6 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
                 </div>
               </div>
             )}
-            {isSelf && spotifyConnected && (
-              <div className="fp-sidebar-card">
-                <span className="fp-section-label">SPOTIFY</span>
-                {spotifyNowPlaying ? (
-                  <div className="fp-spotify-row">
-                    {spotifyNowPlaying.albumArt && <img src={spotifyNowPlaying.albumArt} alt="album" className="fp-spotify-art" />}
-                    <div className="fp-spotify-track">
-                      <a className="fp-spotify-track-name" href={spotifyNowPlaying.url} target="_blank" rel="noreferrer">{spotifyNowPlaying.name}</a>
-                      <span className="fp-spotify-track-artist">{spotifyNowPlaying.artist}</span>
-                    </div>
-                    <SpotifyIcon size={16} />
-                  </div>
-                ) : (
-                  <div className="fp-spotify-idle"><SpotifyIcon size={16} /><span>{t('connected')}</span></div>
-                )}
-              </div>
-            )}
-            <div className="fp-sidebar-card">
-              <span className="fp-section-label">{t('activity').toUpperCase()}</span>
-              <div className="fp-activity-log">
-                {(safeUser.activity?.name || norm.activity?.name)
-                  ? <div className="fp-activity-item"><ActivityBadge activity={safeUser.activity || norm.activity} /></div>
-                  : <span className="fp-activity-empty">{t('no_active_activity')}</span>}
-              </div>
-            </div>
           </div>
         </div>
       </div>
