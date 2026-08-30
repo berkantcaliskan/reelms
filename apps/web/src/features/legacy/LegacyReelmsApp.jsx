@@ -4206,7 +4206,10 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
   useEffect(() => {
     if (embedded) return undefined
     const handler = (e) => {
-      if (popupRef.current && !popupRef.current.contains(e.target)) onClose()
+      if (e.target.closest('.rp-member-card, .discover-result-row, .hpopup-row, .chat-msg-avatar, .chat-msg-author')) return
+      if (popupRef.current && !popupRef.current.contains(e.target)) {
+        onClose()
+      }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
@@ -13267,6 +13270,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }
 
   const openFriendProfile = (friend, e, opts = {}) => {
+    if (e?.stopPropagation) e.stopPropagation()
     if (!friend?.id) return
     const fid = String(friend.id)
     if (isMobile) {
@@ -13278,13 +13282,17 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       }).catch(() => {})
       return
     }
-    const rect = e.currentTarget.getBoundingClientRect()
-    const inServerSurface = !!(opts.serverContext || e.currentTarget.closest?.('.rp-members-panel, .reelm-channel-voice-users, .voice-participants, .voice-bar-participants'))
+    const rect = e?.currentTarget?.getBoundingClientRect?.() || { top: 96, bottom: 112, left: Math.max(8, window.innerWidth - 338), right: window.innerWidth - 18 }
+    const inServerSurface = !!(opts.serverContext || e?.currentTarget?.closest?.('.rp-members-panel, .reelm-channel-voice-users, .voice-participants, .voice-bar-participants'))
     const cached = profileLookupCacheRef.current.get(fid)
     const cachedProfile = cached && (Date.now() - Number(cached.at || 0) < PROFILE_LOOKUP_CACHE_TTL_MS) ? cached.profile : null
     const target = { friend: cachedProfile ? { ...friend, ...cachedProfile } : friend, anchorRect: rect, serverContext: inServerSurface ? 'reelm' : null }
-    setFriendProfileTarget(target)
-    if (cachedProfile) return
+    setFriendProfileTarget(prev => {
+      if (prev?.friend && String(prev.friend.id || prev.friend.uid || '') === fid) {
+        return null
+      }
+      return target
+    })
     userProfileGetById(fid).then(data => {
       if (!data) return
       const merged = { ...friend, ...data, id: fid }
