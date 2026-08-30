@@ -3656,8 +3656,14 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
 
   return (
     <>
-    <div className="profile-popup" style={{ width }} ref={popupRef}>
-      <CachedProfileCover src={cover} className="pp-cover" style={{ backgroundSize: 'cover', backgroundPosition: 'center' }}>
+    <div className={`profile-popup${cover ? ' profile-popup--has-cover' : ''}`} style={{ width }} ref={popupRef}>
+      {cover && (
+        <div className="profile-popup-ambient">
+          <div className="profile-popup-ambient-bg" style={{ backgroundImage: `url(${normalizeMediaUrl(cover)})` }} />
+          <div className="profile-popup-ambient-scrim" />
+        </div>
+      )}
+      <CachedProfileCover src={cover} className={`pp-cover${cover ? ' pp-cover--has-image' : ''}`} style={{ backgroundSize: 'cover', backgroundPosition: 'center' }}>
         <input
           type="file"
           accept="image/*"
@@ -3741,23 +3747,6 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
         </div>
       </div>
 
-      <div className="pp-activity-row">
-        {activity?.name
-          ? <ActivityBadge activity={activity} />
-          : <span className="pp-activity-empty">No activity set</span>}
-        <button className="pp-activity-btn" onClick={() => setShowActivitySetter(true)}>
-          {activity?.name ? 'Change' : 'Set Activity'}
-        </button>
-        {activity?.name && <button className="pp-activity-clear-btn" onClick={() => onActivityChange(null)}>✕</button>}
-      </div>
-      {showActivitySetter && (
-        <ActivitySetterModal
-          current={activity}
-          onSet={onActivityChange}
-          onClose={() => setShowActivitySetter(false)}
-        />
-      )}
-
       <div className="pp-body">
         <div className="pp-bio-section">
           {editingBio ? (
@@ -3784,6 +3773,23 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
             </p>
           )}
         </div>
+
+        <div className="pp-activity-row">
+          {activity?.name
+            ? <ActivityBadge activity={activity} />
+            : <span className="pp-activity-empty">No activity set</span>}
+          <button className="pp-activity-btn" onClick={() => setShowActivitySetter(true)}>
+            {activity?.name ? 'Change' : 'Set Activity'}
+          </button>
+          {activity?.name && <button className="pp-activity-clear-btn" onClick={() => onActivityChange(null)}>✕</button>}
+        </div>
+        {showActivitySetter && (
+          <ActivitySetterModal
+            current={activity}
+            onSet={onActivityChange}
+            onClose={() => setShowActivitySetter(false)}
+          />
+        )}
 
         <div className="pp-socials-section">
           <span className="pp-socials-label">SOCIALS</span>
@@ -4213,7 +4219,13 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
   if (top < screenTop) top = screenTop
 
   const profileNode = (
-    <div className={`friend-profile-popup${embedded ? ' friend-profile-popup--embedded' : ''}`} style={{ ...(buildProfileThemeStyle(safeFriend) || {}), ...(embedded ? {} : { top, left, width: popupW, maxHeight }) }} ref={popupRef}>
+    <div className={`friend-profile-popup${embedded ? ' friend-profile-popup--embedded' : ''}${friendCover ? ' friend-profile-popup--has-cover' : ''}`} style={{ ...(buildProfileThemeStyle(safeFriend) || {}), ...(embedded ? {} : { top, left, width: popupW, maxHeight }) }} ref={popupRef}>
+      {friendCover && (
+        <div className="profile-popup-ambient">
+          <div className="profile-popup-ambient-bg" style={{ backgroundImage: `url(${normalizeMediaUrl(friendCover)})` }} />
+          <div className="profile-popup-ambient-scrim" />
+        </div>
+      )}
       <div className="fpp-scroll-inner">
       <CachedProfileCover src={friendCover} className={`fpp-cover${friendCover ? ' fpp-cover--has-image' : ''}`} />
       {embedded && <button type="button" className="fpp-embedded-close" onClick={onClose} aria-label="Close profile">×</button>}
@@ -4586,8 +4598,13 @@ function FullProfilePage({ user, isSelf, reelms = [], friends = [], onClose, onM
         )}
 
         <div className="fp-layout">
-          <div className="fp-main">
-
+          <div className={`fp-main${cover ? ' fp-main--has-cover' : ''}`}>
+            {cover && (
+              <div className="profile-popup-ambient">
+                <div className="profile-popup-ambient-bg" style={{ backgroundImage: `url(${normalizeMediaUrl(cover)})` }} />
+                <div className="profile-popup-ambient-scrim" />
+              </div>
+            )}
             <div className={`fp-cover-zone${editMode ? ' fp-cover-zone--edit' : ''}`}
               onClick={() => { if (editMode) fpCoverRef.current?.click() }}>
               <CachedProfileCover src={cover} className="fp-cover">

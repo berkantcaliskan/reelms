@@ -3583,12 +3583,10 @@ h6 {
   top: 6px;
   max-height: calc(100% - 28px);
   z-index: 20;
-  border-radius: 18px;
-  background: var(--theme-tertiary-glass, rgba(14, 12, 18, 0.62));
-  -webkit-backdrop-filter: blur(52px) saturate(2.4);
-  backdrop-filter: blur(52px) saturate(2.4);
+  border-radius: 22px;
+  background: var(--theme-tertiary, #181416);
   border: 1px solid rgba(var(--ta-rgb), 0.2);
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(var(--ta-rgb), 0.08);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(var(--ta-rgb), 0.08);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -3598,13 +3596,56 @@ h6 {
   will-change: transform, opacity;
 }
 
+/* Ambient 100% Blurred Header Adaptation for Card Body */
+.profile-popup-ambient {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: inherit;
+}
+.profile-popup-ambient-bg {
+  position: absolute;
+  inset: -30px;
+  background-size: cover;
+  background-position: center;
+  filter: blur(52px) saturate(2.4);
+  transform: scale(1.35);
+  opacity: 0.65;
+}
+.profile-popup-ambient-scrim {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    to bottom,
+    rgba(14, 12, 18, 0.20) 0%,
+    rgba(14, 12, 18, 0.70) 35%,
+    rgba(14, 12, 18, 0.94) 100%
+  );
+}
+
+.profile-popup > *:not(.profile-popup-ambient),
+.friend-profile-popup > *:not(.profile-popup-ambient),
+.fpp-scroll-inner > *:not(.profile-popup-ambient),
+.fp-main > *:not(.profile-popup-ambient) {
+  position: relative;
+  z-index: 1;
+}
+
 .pp-cover {
   width: 100%;
   height: 110px;
   flex-shrink: 0;
-  background: linear-gradient(135deg, rgba(var(--ta-rgb), 0.35) 0%, rgba(100, 80, 120, 0.25) 100%);
-  border-radius: 18px 18px 0 0;
+  border-radius: 22px 22px 0 0;
   position: relative;
+}
+.pp-cover:not(.pp-cover--has-image) {
+  background: linear-gradient(
+    135deg,
+    rgba(var(--ta-rgb, 185, 152, 135), 0.28) 0%,
+    rgba(var(--tb-rgb, 44, 37, 34), 0.70) 100%
+  ) !important;
 }
 
 .pp-cover-edit-btn {
@@ -3656,35 +3697,35 @@ h6 {
 
 .pp-identity {
   display: flex;
-  align-items: flex-end;
-  gap: 10px;
-  padding: 0 16px 12px 14px;
-  margin-top: -16px;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 0 16px 8px 16px;
+  margin-top: 0;
   flex-shrink: 0;
   position: relative;
 }
 
 .pp-avatar {
-  width: 64px;
-  height: 64px;
+  width: 72px;
+  height: 72px;
   border-radius: 50%;
-  border: 3.5px solid var(--tb, #1b1822);
+  border: none;
   background: var(--tb, #1b1822);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.55);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
   flex-shrink: 0;
   object-fit: cover;
   position: relative;
   z-index: 4;
+  margin-top: -24px;
 }
 
 .pp-names {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding-bottom: 4px;
+  gap: 1px;
   min-width: 0;
-  align-self: flex-start;
-  margin-top: 18px;
+  margin-top: 6px;
+  padding-bottom: 0;
 }
 
 .pp-name {
@@ -3696,22 +3737,23 @@ h6 {
   overflow: hidden;
   text-overflow: ellipsis;
   letter-spacing: -0.015em;
+  line-height: 1.2;
 }
 
 .pp-username {
   font-size: 0.75rem;
   color: rgba(var(--ta-rgb), 0.5);
   white-space: nowrap;
-  margin-top: -4px;
+  line-height: 1.2;
+  margin-top: 0;
 }
 
 .pp-status-wrap {
   margin-left: auto;
   flex-shrink: 0;
   position: relative;
-  padding-bottom: 4px;
-  align-self: flex-start;
-  margin-top: 18px;
+  margin-top: 24px;
+  padding-bottom: 0;
 }
 
 .pp-status-btn {
@@ -3719,7 +3761,7 @@ h6 {
   align-items: center;
   gap: 5px;
   background: rgba(var(--ta-rgb), 0.08);
-  border: 1px solid rgba(var(--ta-rgb), 0.2);
+  border: none;
   border-radius: 20px;
   padding: 5px 10px;
   cursor: pointer;
@@ -3774,7 +3816,7 @@ h6 {
   flex: 1;
   overflow-y: auto;
   min-height: 0;
-  padding: 6px 14px 10px;
+  padding: 6px 16px 10px;
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -3792,9 +3834,9 @@ h6 {
   color: #c4a898;
   line-height: 1.5;
   cursor: pointer;
-  border-radius: 999px;
-  padding: 5px 10px;
-  margin: -5px -10px;
+  border-radius: 8px;
+  padding: 4px 6px;
+  margin: -4px -6px;
   transition: background 0.15s ease;
 }
 .pp-bio-text:hover { background: rgba(var(--ta-rgb), 0.07); }
@@ -4242,9 +4284,9 @@ h6 {
 
 /* ── Profile Popup: Spotify Connect ── */
 .pp-spotify-section {
-  padding: 10px 0 4px;
-  border-top: 1px solid rgba(var(--ta-rgb), 0.08);
-  margin-top: 4px;
+  padding: 4px 0 2px;
+  border-top: none;
+  margin-top: 0;
 }
 
 .pp-spotify-pill-label {
@@ -9396,16 +9438,15 @@ h6 {
 /* ── Friend Profile Popup ── */
 .friend-profile-popup {
   position: fixed;
-  background: var(--fpp-theme-tertiary-glass, var(--theme-tertiary-glass, rgba(14, 12, 18, 0.62)));
-  -webkit-backdrop-filter: blur(52px) saturate(2.4);
-  backdrop-filter: blur(52px) saturate(2.4);
+  background: var(--fpp-theme-tertiary, var(--theme-tertiary, #181416));
   border: 1px solid rgba(var(--fpp-theme-accent-rgb, var(--ta-rgb)), 0.2);
   border-radius: 18px;
   overflow: hidden;
   max-height: calc(100vh - 24px);
   z-index: 900;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(var(--fpp-theme-accent-rgb, var(--ta-rgb)), 0.08);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(var(--fpp-theme-accent-rgb, var(--ta-rgb)), 0.08);
   font-family: var(--body-font);
+  isolation: isolate;
 }
 .fpp-scroll-inner {
   overflow-y: auto;
@@ -9415,10 +9456,16 @@ h6 {
 .fpp-cover {
   height: 88px;
   min-height: 88px;
-  background: linear-gradient(135deg, rgba(var(--ta-rgb), 0.25), rgba(var(--ta-rgb), 0.08));
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+}
+.fpp-cover:not(.fpp-cover--has-image) {
+  background: linear-gradient(
+    135deg,
+    rgba(var(--fpp-theme-accent-rgb, var(--ta-rgb)), 0.28) 0%,
+    rgba(var(--fpp-theme-base-rgb, var(--tb-rgb)), 0.70) 100%
+  ) !important;
 }
 .fpp-identity {
   display: flex;
@@ -16803,10 +16850,10 @@ h6 {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 16px;
-  border-top: 1px solid rgba(var(--ta-rgb), 0.07);
-  border-bottom: 1px solid rgba(var(--ta-rgb), 0.07);
-  min-height: 36px;
+  padding: 2px 0;
+  border-top: none;
+  border-bottom: none;
+  min-height: 32px;
 }
 .pp-activity-empty {
   font-size: 11px;
