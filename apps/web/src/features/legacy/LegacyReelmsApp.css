@@ -2209,7 +2209,7 @@ h6 {
   left: 0;
   top: 50%;
   transform: translateY(-50%);
-  background: none;
+  background: transparent;
   border: none;
   color: rgba(var(--ta-rgb), 0.75);
   cursor: pointer;
@@ -2218,12 +2218,18 @@ h6 {
   justify-content: center;
   padding: 6px;
   border-radius: 50%;
-  transition: color 0.15s, background 0.15s;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), color 0.15s ease;
 }
 
 .new-modal-back-btn:hover {
   color: var(--ta);
-  background: rgba(var(--ta-rgb), 0.1);
+  background: transparent;
+  transform: translateY(-50%) scale(1.18);
+}
+
+.new-modal-back-btn:active {
+  background: transparent;
+  transform: translateY(-50%) scale(1.06);
 }
 
 .new-modal-title {
@@ -2426,7 +2432,7 @@ h6 {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   color: rgba(var(--ta-rgb), 0.5);
-  margin-bottom: 10px;
+  margin: 16px auto 10px auto;
   text-align: center;
   width: 100%;
 }
