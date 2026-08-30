@@ -3718,32 +3718,34 @@ function ProfilePopup({ user, width, onClose, onPhotoChange, cover, onCoverChang
           className="pp-avatar"
           fallback={<img src={avatarUIcon} alt="Avatar" className="pp-avatar" />}
         />
-        <div className="pp-names">
+        <div className="pp-names-col">
           <span className="pp-name">{user.name}</span>
-          <span className="pp-username">{'@' + (user.username || 'username')}</span>
-        </div>
-        <div className="pp-status-wrap">
-          <button className="pp-status-btn" onClick={() => setStatusOpen(v => !v)}>
-            <span className="pp-status-dot" style={{ background: currentStatus.color }} />
-            <span>Status</span>
-            <svg width="10" height="6" viewBox="0 0 10 6" fill="none">
-              <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-            </svg>
-          </button>
-          {statusOpen && (
-            <div className="pp-status-menu">
-              {statusOptions.map(opt => (
-                <button
-                  key={opt.key}
-                  className={'pp-status-option' + (status === opt.key ? ' active' : '')}
-                  onClick={() => { onStatusChange(opt.key); setStatusOpen(false) }}
-                >
-                  <span className="pp-status-dot" style={{ background: opt.color }} />
-                  <span>{opt.label}</span>
-                </button>
-              ))}
+          <div className="pp-username-row">
+            <span className="pp-username">{'@' + (user.username || 'username')}</span>
+            <div className="pp-status-wrap">
+              <button className="pp-status-btn" onClick={() => setStatusOpen(v => !v)}>
+                <span className="pp-status-dot" style={{ background: currentStatus.color }} />
+                <span>Status</span>
+                <svg width="10" height="6" viewBox="0 0 10 6" fill="none">
+                  <path d="M1 1l4 4 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+              </button>
+              {statusOpen && (
+                <div className="pp-status-menu">
+                  {statusOptions.map(opt => (
+                    <button
+                      key={opt.key}
+                      className={'pp-status-option' + (status === opt.key ? ' active' : '')}
+                      onClick={() => { onStatusChange(opt.key); setStatusOpen(false) }}
+                    >
+                      <span className="pp-status-dot" style={{ background: opt.color }} />
+                      <span>{opt.label}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
+          </div>
         </div>
       </div>
 
@@ -3980,23 +3982,17 @@ const ACTIVITY_TYPES = [
   { key: 'watching', icon: '📺', label: 'Watching' },
   { key: 'custom', icon: '✨', label: 'Custom' },
 ]
-const ACTIVITY_SUGGESTIONS = {
-  playing: ['Valorant', 'CS2', 'Minecraft', 'Fortnite', 'League of Legends', 'GTA V', 'Elden Ring', 'Roblox'],
-  using: ['VS Code', 'Figma', 'Photoshop', 'Notion', 'Spotify', 'YouTube', 'Chrome'],
-  watching: ['Netflix', 'YouTube', 'Twitch', 'Disney+', 'Prime Video'],
-  custom: [],
-}
 
 function ActivityBadge({ activity }) {
-  if (!activity || !activity.name) return null
-  const t = ACTIVITY_TYPES.find(a => a.key === activity.type) || ACTIVITY_TYPES[3]
+  const meta = ACTIVITY_TYPES.find(t => t.key === activity?.type) || ACTIVITY_TYPES[3]
   return (
     <div className="activity-badge">
-      <span className="activity-badge-icon">{t.icon}</span>
+      <span className="activity-badge-icon">{activity?.icon || meta.icon}</span>
       <span className="activity-badge-text">
-        {t.key !== 'custom' && <span className="activity-badge-label">{t.label} </span>}
-        <span className="activity-badge-name">{activity.name}</span>
-        {activity.detail && <span className="activity-badge-detail"> · {activity.detail}</span>}
+        <span className="activity-badge-action">{meta.label}</span>
+        {' '}
+        <span className="activity-badge-name">{activity?.name}</span>
+        {activity?.details && <span className="activity-badge-detail"> · {activity.details}</span>}
       </span>
     </div>
   )
@@ -4005,146 +4001,88 @@ function ActivityBadge({ activity }) {
 function ActivitySetterModal({ current, onSet, onClose }) {
   const [type, setType] = useState(current?.type || 'playing')
   const [name, setName] = useState(current?.name || '')
-  const [detail, setDetail] = useState(current?.detail || '')
-  const handleSet = () => {
+  const [details, setDetails] = useState(current?.details || '')
+  const [icon, setIcon] = useState(current?.icon || '')
+
+  const currentMeta = ACTIVITY_TYPES.find(t => t.key === type) || ACTIVITY_TYPES[0]
+
+  const handleSave = () => {
     if (!name.trim()) return
-    onSet({ type, name: name.trim(), detail: detail.trim() || undefined, since: Date.now() })
+    onSet({
+      type,
+      name: name.trim(),
+      details: details.trim() || undefined,
+      icon: icon.trim() || currentMeta.icon,
+      startedAt: current?.startedAt || Date.now(),
+    })
     onClose()
   }
+
   return (
     <div className="activity-setter-overlay" onClick={onClose}>
       <div className="activity-setter-modal" onClick={e => e.stopPropagation()}>
-        <div className="activity-setter-title">Set Activity</div>
-        <div className="activity-setter-types">
+        <div className="activity-setter-header">
+          <span>Set Activity</span>
+          <button className="activity-setter-close" onClick={onClose}>✕</button>
+        </div>
+        <div className="activity-type-tabs">
           {ACTIVITY_TYPES.map(t => (
-            <button key={t.key} className={`activity-type-btn${type === t.key ? ' active' : ''}`}
-              onClick={() => { setType(t.key); setName(''); setDetail('') }}>
-              <span>{t.icon}</span><span>{t.label}</span>
+            <button
+              key={t.key}
+              className={'activity-type-tab' + (type === t.key ? ' active' : '')}
+              onClick={() => { setType(t.key); if (!icon) setIcon(t.icon) }}
+            >
+              <span>{t.icon}</span>
+              <span>{t.label}</span>
             </button>
           ))}
         </div>
-        <input className="activity-setter-input" autoFocus
-          placeholder={`${ACTIVITY_TYPES.find(t => t.key === type)?.label || ''}${type !== 'custom' ? ' what?' : ' status...'}`}
-          value={name} onChange={e => setName(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSet()} />
-        {ACTIVITY_SUGGESTIONS[type]?.length > 0 && (
-          <div className="activity-suggestions">
-            {ACTIVITY_SUGGESTIONS[type].map(s => (
-              <button key={s} className={`activity-suggestion-btn${name === s ? ' active' : ''}`}
-                onClick={() => setName(s)}>{s}</button>
-            ))}
-          </div>
-        )}
-        <input className="activity-setter-input" placeholder="Details (optional)"
-          value={detail} onChange={e => setDetail(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleSet()} />
+        <div className="activity-setter-fields">
+          <input
+            className="activity-setter-input"
+            value={name}
+            onChange={e => setName(e.target.value)}
+            placeholder={type === 'playing' ? 'Game name (e.g. Minecraft)' : type === 'using' ? 'App name (e.g. VS Code)' : type === 'watching' ? 'Show/Movie name' : 'What are you doing?'}
+            autoFocus
+            onKeyDown={e => { if (e.key === 'Enter') handleSave() }}
+          />
+          <input
+            className="activity-setter-input"
+            value={details}
+            onChange={e => setDetails(e.target.value)}
+            placeholder="Details / status message (optional)"
+            onKeyDown={e => { if (e.key === 'Enter') handleSave() }}
+          />
+          <input
+            className="activity-setter-input"
+            value={icon}
+            onChange={e => setIcon(e.target.value)}
+            placeholder={'Custom emoji (default: ' + currentMeta.icon + ')'}
+            maxLength={4}
+          />
+        </div>
         <div className="activity-setter-actions">
-          {current && <button className="activity-clear-btn" onClick={() => { onSet(null); onClose() }}>Clear</button>}
-          <button className="activity-set-btn" onClick={handleSet} disabled={!name.trim()}>Set Activity</button>
+          {current?.name && (
+            <button className="activity-setter-clear" onClick={() => { onSet(null); onClose() }}>
+              Clear Activity
+            </button>
+          )}
+          <button className="activity-setter-cancel" onClick={onClose}>Cancel</button>
+          <button className="activity-setter-save" onClick={handleSave} disabled={!name.trim()}>Save</button>
         </div>
       </div>
     </div>
   )
 }
 
-
-const PROFILE_LOOKUP_CACHE_TTL_MS = 5 * 60 * 1000
-const PROFILE_MEDIA_CACHE_NAME = 'reelms-profile-media-v2'
-const profileMediaObjectUrlCache = new Map()
-
-function canCacheProfileMedia(src) {
-  const value = String(src || '')
-  return /^https?:\/\//i.test(value) && !value.startsWith('blob:') && !value.startsWith('data:') && !isGoogleDefaultAvatarUrl(value)
-}
-
-async function resolveCachedProfileMedia(src) {
-  const value = String(src || '')
-  if (!canCacheProfileMedia(value)) return value
-  if (profileMediaObjectUrlCache.has(value)) return profileMediaObjectUrlCache.get(value)
-  if (typeof window === 'undefined' || !window.caches || typeof fetch !== 'function') return value
-  try {
-    const cache = await window.caches.open(PROFILE_MEDIA_CACHE_NAME)
-    const request = new Request(value, { mode: 'cors', credentials: 'omit' })
-    let response = await cache.match(request).catch(() => null)
-    if (!response) {
-      const fresh = await fetch(request, { cache: 'force-cache' })
-      if (fresh?.ok) {
-        await cache.put(request, fresh.clone()).catch(() => {})
-        response = fresh
-      }
-    }
-    if (response?.ok) {
-      const blob = await response.blob()
-      const objectUrl = URL.createObjectURL(blob)
-      profileMediaObjectUrlCache.set(value, objectUrl)
-      return objectUrl
-    }
-  } catch {}
-  return value
-}
-
-function CachedProfileImage({ src, alt = '', className = '', style, fallback = null, ...props }) {
-  const safeSrc = normalizeMediaUrl(src)
-  const [resolvedSrc, setResolvedSrc] = useState(safeSrc || '')
-  const [failed, setFailed] = useState(false)
-  useEffect(() => {
-    let alive = true
-    const next = normalizeMediaUrl(src) || ''
-    setFailed(false)
-    setResolvedSrc(next)
-    if (!next) return () => { alive = false }
-    resolveCachedProfileMedia(next)
-      .then((nextSrc) => { if (alive) setResolvedSrc(normalizeMediaUrl(nextSrc) || next) })
-      .catch(() => { if (alive) setResolvedSrc(next) })
-    return () => { alive = false }
-  }, [src])
-  if (!resolvedSrc || failed) return fallback
-  return <img {...props} src={resolvedSrc} alt={alt} className={`${className} cached-profile-img`.trim()} style={style} onError={(e) => { setFailed(true); props.onError?.(e) }} />
-}
-
-function CachedProfileCover({ src, className = '', style = {}, ...props }) {
-  const safeSrc = normalizeMediaUrl(src)
-  const [resolvedSrc, setResolvedSrc] = useState(safeSrc || '')
-  const [failed, setFailed] = useState(false)
-  useEffect(() => {
-    let alive = true
-    const next = normalizeMediaUrl(src) || ''
-    setFailed(false)
-    setResolvedSrc(next)
-    if (!next) return () => { alive = false }
-    resolveCachedProfileMedia(next)
-      .then((nextSrc) => { if (alive) setResolvedSrc(normalizeMediaUrl(nextSrc) || next) })
-      .catch(() => { if (alive) setResolvedSrc(next) })
-    return () => { alive = false }
-  }, [src])
-  const backgroundStyle = resolvedSrc && !failed ? { backgroundImage: `url("${String(resolvedSrc).replace(/"/g, '\\"')}")` } : {}
-  return <div {...props} className={className} style={{ ...style, ...backgroundStyle }} onError={() => setFailed(true)} />
-}
-
-function normalizeFriendProfileTarget(profile = {}) {
-  const raw = profile && typeof profile === 'object' ? profile : {}
-  const id = String(raw.id || raw.uid || raw.userId || raw.friendId || '')
-  const username = String(raw.username || raw.userName || '').replace(/^@+/, '')
-  const name = String(raw.name || raw.displayName || raw.userName || username || 'Member')
-  const photo = getPersonPhoto(raw)
-  const cover = getPersonCover(raw)
-  const socialLinks = raw.socialLinks && typeof raw.socialLinks === 'object' ? raw.socialLinks : (raw.sociallinks && typeof raw.sociallinks === 'object' ? raw.sociallinks : {})
-  const activePlatforms = Array.isArray(raw.activePlatforms) ? raw.activePlatforms : (Array.isArray(raw.socialorder) ? raw.socialorder : Object.keys(socialLinks || {}).filter(k => socialLinks[k]))
+function normalizeFriendProfileTarget(raw = {}) {
+  const cover = raw.cover || raw.coverImage || raw.coverUrl || raw.headerImage || raw.banner || null
+  const socialLinks = raw.socialLinks && typeof raw.socialLinks === 'object' ? raw.socialLinks : {}
+  const activePlatforms = Array.isArray(raw.activePlatforms) && raw.activePlatforms.length > 0
+    ? raw.activePlatforms
+    : Object.keys(socialLinks)
   return {
     ...raw,
-    id,
-    uid: String(raw.uid || id),
-    userId: String(raw.userId || id),
-    name,
-    displayName: String(raw.displayName || name),
-    username,
-    photo,
-    profilePhoto: photo,
-    photoURL: photo,
-    avatar: photo,
-    image: photo,
-    imageUrl: photo,
-    userPhoto: photo,
     cover,
     coverImage: cover,
     coverUrl: cover,
@@ -4186,7 +4124,7 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
     return () => document.removeEventListener('mousedown', handler)
   }, [onClose, embedded])
 
-  const popupW = 340
+  const popupW = 320
   const friendCover = safeFriend.cover || safeFriend.coverImage || safeFriend.coverUrl || null
   const friendStatusKey = safeFriend.status || friend?.status || 'online'
   const friendStatus = STATUS_OPTIONS_LIST.find(s => s.key === friendStatusKey) || STATUS_OPTIONS_LIST[0]
@@ -4245,14 +4183,14 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
               : <span>{(safeFriend.name || '?').charAt(0).toUpperCase()}</span>
             }
           </div>
-          <div className="fpp-names">
+          <div className="fpp-names-col">
             <span className="fpp-name">{safeFriend.name}</span>
-            {safeFriend.username && <span className="fpp-username">{'@' + (safeFriend.username.startsWith('@') ? safeFriend.username.slice(1) : safeFriend.username)}</span>}
-          </div>
-          <div className="fpp-status-wrap">
-            <div className="fpp-status-pill">
-              <span className="pp-status-dot" style={{ background: friendStatus.color }} />
-              <span>{friendStatus.label || 'Online'}</span>
+            <div className="fpp-username-row">
+              {safeFriend.username && <span className="fpp-username">{'@' + (safeFriend.username.startsWith('@') ? safeFriend.username.slice(1) : safeFriend.username)}</span>}
+              <div className="fpp-status-pill">
+                <span className="pp-status-dot" style={{ background: friendStatus.color }} />
+                <span>{friendStatus.label || 'Online'}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -4420,13 +4358,13 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
                   onClick={() => { onMessage(); onClose?.() }}
                   title={t('send_message_btn', 'Message')}
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
                   </svg>
                 </button>
               )}
 
-              {/* 2. Share */}
+              {/* 2. Share (Yukarı oklu paylaşım ikonu) */}
               {canShare !== false && (
                 <button
                   type="button"
@@ -4437,14 +4375,15 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
                   }}
                   title="Share Profile"
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                    <polyline points="16 6 12 2 8 6"/>
+                    <line x1="12" y1="2" x2="12" y2="15"/>
                   </svg>
                 </button>
               )}
 
-              {/* 3. Mention */}
+              {/* 3. Mention (İnce @) */}
               {onMention && (
                 <button
                   type="button"
@@ -4452,7 +4391,10 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
                   onClick={() => { onMention(safeFriend.username || safeFriend.name); onClose?.() }}
                   title="Mention in chat"
                 >
-                  <span style={{ fontSize: '1.05rem', fontWeight: 800, lineHeight: 1 }}>@</span>
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+                    <circle cx="12" cy="12" r="4"/>
+                    <path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/>
+                  </svg>
                 </button>
               )}
 
@@ -4467,20 +4409,20 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
                 title={(isMutedUser || voiceContext?.isMuted) ? 'Unmute' : 'Mute'}
               >
                 {(isMutedUser || voiceContext?.isMuted) ? (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <line x1="1" y1="1" x2="23" y2="23"/>
                     <path d="M9 9v3a3 3 0 0 0 5.12 2.12M15 9.34V4a3 3 0 0 0-5.94-.6"/>
                     <path d="M17 16.95A7 7 0 0 1 5 12v-2m14 0v2a7 7 0 0 1-.11 1.23"/>
                   </svg>
                 ) : (
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
                     <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/>
                     <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/>
                   </svg>
                 )}
               </button>
 
-              {/* 5. Add Friend (if not friend and not pending) */}
+              {/* 5. Add Friend (Friends silueti + +) */}
               {!isFriend && !isBlocked && onAddFriend && (
                 <button
                   type="button"
@@ -4489,8 +4431,11 @@ function FriendProfilePopup({ friend, anchorRect = null, onClose, onRemove, onBl
                   onClick={() => { onAddFriend(friend); onClose?.() }}
                   title={isPending ? 'Friend request sent' : 'Add Friend'}
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/>
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                    <circle cx="8.5" cy="7" r="4"/>
+                    <line x1="19" y1="8" x2="19" y2="14"/>
+                    <line x1="22" y1="11" x2="16" y2="11"/>
                   </svg>
                 </button>
               )}

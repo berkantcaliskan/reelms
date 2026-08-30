@@ -3706,8 +3706,8 @@ h6 {
 }
 
 .pp-avatar {
-  width: 72px;
-  height: 72px;
+  width: 68px;
+  height: 68px;
   border-radius: 50%;
   border: none;
   background: var(--tb, #1b1822);
@@ -3716,16 +3716,16 @@ h6 {
   object-fit: cover;
   position: relative;
   z-index: 4;
-  margin-top: -24px;
+  margin-top: -22px;
 }
 
-.pp-names {
+.pp-names-col {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
+  flex: 1;
   min-width: 0;
-  margin-top: 6px;
-  padding-bottom: 0;
+  margin-top: 4px;
 }
 
 .pp-name {
@@ -3740,6 +3740,14 @@ h6 {
   line-height: 1.2;
 }
 
+.pp-username-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
+
 .pp-username {
   font-size: 0.75rem;
   color: rgba(var(--ta-rgb), 0.5);
@@ -3752,8 +3760,6 @@ h6 {
   margin-left: auto;
   flex-shrink: 0;
   position: relative;
-  margin-top: 24px;
-  padding-bottom: 0;
 }
 
 .pp-status-btn {
@@ -9482,23 +9488,23 @@ h6 {
 }
 
 .fpp-avatar {
-  width: 72px;
-  height: 72px;
-  border-radius: 50%;
-  border: none;
+  width: 68px !important;
+  height: 68px !important;
+  border-radius: 50% !important;
+  border: none !important;
   background: var(--tb, #1b1822) !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35) !important;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.3rem;
+  font-size: 1.25rem;
   font-weight: 700;
   color: var(--fpp-theme-accent, var(--ta));
   flex-shrink: 0;
   overflow: hidden;
   position: relative;
   z-index: 4;
-  margin-top: -24px;
+  margin-top: -22px !important;
 }
 .fpp-avatar img,
 .fpp-avatar .cached-profile-img {
@@ -9510,13 +9516,13 @@ h6 {
   background: var(--fpp-theme-base, var(--tb, #1b1822));
 }
 
-.fpp-names {
+.fpp-names-col {
   display: flex;
   flex-direction: column;
-  gap: 1px;
+  gap: 2px;
+  flex: 1;
   min-width: 0;
-  margin-top: 6px;
-  padding-bottom: 0;
+  margin-top: 4px;
 }
 .fpp-name {
   font-family: 'Karla', sans-serif !important;
@@ -9530,6 +9536,13 @@ h6 {
   line-height: 1.2;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7);
 }
+.fpp-username-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+}
 .fpp-username {
   font-size: 0.75rem;
   color: rgba(255, 255, 255, 0.75) !important;
@@ -9539,13 +9552,6 @@ h6 {
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
 }
 
-.fpp-status-wrap {
-  margin-left: auto;
-  flex-shrink: 0;
-  position: relative;
-  margin-top: 24px;
-  padding-bottom: 0;
-}
 .fpp-status-pill {
   display: flex;
   align-items: center;
@@ -9553,11 +9559,12 @@ h6 {
   background: rgba(var(--ta-rgb), 0.08);
   border: none;
   border-radius: 20px;
-  padding: 5px 10px;
+  padding: 4px 10px;
   color: var(--ta);
   font-size: 0.75rem;
   font-family: inherit;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .fpp-body {
@@ -9591,31 +9598,59 @@ h6 {
   align-items: center;
 }
 
+.fpp-roles-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 2px 0;
+}
+.fpp-roles-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.fpp-role-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.fpp-role-badges .rp-role-badge {
+  display: inline-flex;
+  align-items: center;
+  font-size: 0.75rem;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-weight: 600;
+  border: 1px solid;
+}
+
 .fpp-icon-actions {
   display: flex;
   align-items: center;
+  justify-content: space-between;
+  width: 100%;
   gap: 8px;
-  margin: 4px 0 2px;
-  justify-content: flex-start;
+  margin: 6px 0 2px 0;
 }
 .fpp-icon-btn {
-  width: 36px;
-  height: 36px;
+  flex: 1;
+  height: 38px;
   border-radius: 12px;
   background: rgba(var(--ta-rgb), 0.08);
-  border: 1px solid rgba(var(--ta-rgb), 0.14);
+  border: 1px solid rgba(var(--ta-rgb), 0.12);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   color: var(--ta);
   cursor: pointer;
   transition: all 0.15s ease;
-  flex-shrink: 0;
 }
 .fpp-icon-btn:hover {
   background: rgba(var(--ta-rgb), 0.18);
   transform: translateY(-1px);
   color: #fff;
+  border-color: rgba(var(--ta-rgb), 0.25);
 }
 .fpp-icon-btn--active {
   background: rgba(239, 68, 68, 0.15);
