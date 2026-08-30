@@ -48,6 +48,7 @@
     "directories": {
       "output": "dist-electron-build"
     },
+    "compression": "normal",
     "files": [
       "dist/**/*",
       "electron/**/*",
@@ -76,7 +77,8 @@
     },
     "portable": {
       "artifactName": "Reelms.${ext}",
-      "requestExecutionLevel": "user"
+      "requestExecutionLevel": "user",
+      "useZip": true
     },
     "publish": [
       {
