@@ -18866,29 +18866,6 @@ button, input, select, textarea,
   --fpp-theme-accent-rgb: var(--ta-rgb);
   --fpp-theme-base: var(--tb);
   --fpp-theme-base-rgb: var(--tb-rgb);
-  border-color: rgba(var(--fpp-theme-accent-rgb), 0.22);
-  box-shadow: 0 16px 46px rgba(0,0,0,0.36), 0 0 0 1px rgba(var(--fpp-theme-accent-rgb), 0.08);
-}
-.friend-profile-popup .fpp-cover:not(.fpp-cover--has-image) {
-  background: linear-gradient(135deg, rgba(var(--fpp-theme-accent-rgb), 0.35), rgba(var(--fpp-theme-base-rgb), 0.38));
-}
-.friend-profile-popup .fpp-cover--has-image {
-  background-size: cover;
-  background-position: center 42%;
-  background-repeat: no-repeat;
-}
-.friend-profile-popup .fpp-avatar {
-  background: var(--fpp-theme-base, #1b1822) !important;
-  box-shadow: 0 0 0 3.5px var(--fpp-theme-base, #1b1822), 0 3px 12px rgba(0, 0, 0, 0.45);
-  color: var(--fpp-theme-accent);
-}
-.friend-profile-popup .fpp-name,
-.friend-profile-popup .fpp-section-label {
-  color: color-mix(in srgb, var(--fpp-theme-accent) 82%, #f4e7df 18%);
-}
-.friend-profile-popup .fpp-action-btn:hover,
-.friend-profile-popup .fpp-list-action:hover {
-  background: rgba(var(--fpp-theme-accent-rgb), 0.10);
 }
 
 .rp-member-card {
