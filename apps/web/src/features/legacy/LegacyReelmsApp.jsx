@@ -11825,6 +11825,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [isShaking, setIsShaking] = useState(false)
   const [showDiscover, setShowDiscover] = useState(false)
   const [discoverQuery, setDiscoverQuery] = useState('')
+  const [isDiscoverSearchActive, setIsDiscoverSearchActive] = useState(false)
   const [discoverUsers, setDiscoverUsers] = useState([])
   const [discoverReelmsList, setDiscoverReelmsList] = useState([])
   const [pendingReelmJoinIds, setPendingReelmJoinIds] = useState([])
@@ -12889,17 +12890,34 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }, [showReelmSettings, selectedReelm?.id])
 
 
-  // Discover: fetch public reelms + users from backend on query change.
-  // Debounced and min 2 characters so typing does not flood the API/rate limiter.
+  // Discover: fetch public reelms on open and search on query change.
   useEffect(() => {
+    if (!showDiscover) return undefined
+
     const q = discoverQuery.trim()
-    if (!q || q.length < 2) {
+    let cancelled = false
+
+    if (!q) {
       setDiscoverUsers([])
-      setDiscoverReelmsList([])
+      discoverReelms('').then(publicReelms => {
+        if (cancelled) return
+        const safeReelms = Array.isArray(publicReelms) ? publicReelms : []
+        setDiscoverReelmsList(safeReelms)
+        const pendingIds = safeReelms.filter(r => r?.pending).map(r => String(r.id)).filter(Boolean)
+        if (pendingIds.length) {
+          setPendingReelmJoinIds(prev => Array.from(new Set([...prev.map(String), ...pendingIds])))
+        }
+      }).catch(() => {
+        if (!cancelled) setDiscoverReelmsList([])
+      })
+      return () => { cancelled = true }
+    }
+
+    if (q.length < 2) {
+      setDiscoverUsers([])
       return undefined
     }
 
-    let cancelled = false
     const timer = window.setTimeout(() => {
       Promise.all([
         usersList(q).catch(() => []),
@@ -12920,13 +12938,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           setDiscoverReelmsList([])
         }
       })
-    }, 350)
+    }, 300)
 
     return () => {
       cancelled = true
       window.clearTimeout(timer)
     }
-  }, [discoverQuery])
+  }, [showDiscover, discoverQuery])
 
   const toggleFriendsPopup = () => { setShowFriendsPopup(v => !v); setShowNotificationsPopup(false) }
   const toggleNotifPopup = () => {
@@ -22005,7 +22023,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       </button>
                       <div className="discover-header">
                         <h2 className="discover-title">Discover</h2>
-                        <div className="discover-search-wrap">
+                        <div
+                          className="discover-search-wrap"
+                          onClick={() => setIsDiscoverSearchActive(true)}
+                        >
                           <svg className="discover-search-icon" viewBox="0 0 20 20" fill="none" width="16" height="16">
                             <circle cx="8.5" cy="8.5" r="5.5" stroke="rgba(185,152,135,0.6)" strokeWidth="1.6"/>
                             <path d="M13 13l3.5 3.5" stroke="rgba(185,152,135,0.6)" strokeWidth="1.6" strokeLinecap="round"/>
@@ -22015,17 +22036,34 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             type="text"
                             placeholder="Search reelms, people..."
                             value={discoverQuery}
-                            onChange={e => setDiscoverQuery(e.target.value)}
+                            onFocus={() => setIsDiscoverSearchActive(true)}
+                            onBlur={() => {
+                              setTimeout(() => {
+                                if (!discoverQuery.trim() && discoverCategory === 'all') {
+                                  setIsDiscoverSearchActive(false)
+                                }
+                              }, 200)
+                            }}
+                            onChange={e => {
+                              setDiscoverQuery(e.target.value)
+                              if (!isDiscoverSearchActive) setIsDiscoverSearchActive(true)
+                            }}
                           />
                           {discoverQuery && (
-                            <button className="discover-clear-btn" onClick={() => setDiscoverQuery('')}>
+                            <button
+                              className="discover-clear-btn"
+                              onClick={() => {
+                                setDiscoverQuery('')
+                                setDiscoverCategory('all')
+                              }}
+                            >
                               <svg viewBox="0 0 16 16" width="12" height="12" fill="none">
                                 <path d="M3 3l10 10M13 3L3 13" stroke="rgba(185,152,135,0.7)" strokeWidth="1.6" strokeLinecap="round"/>
                               </svg>
                             </button>
                           )}
                         </div>
-                        <div className="discover-chips-row">
+                        <div className={`discover-chips-row${(isDiscoverSearchActive || discoverQuery || discoverCategory !== 'all') ? ' discover-chips-row--visible' : ''}`}>
                           {[
                             { id: 'all', label: 'All' },
                             { id: 'gaming', label: '🎮 Gaming' },
@@ -22038,7 +22076,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               key={chip.id}
                               type="button"
                               className={`discover-chip${discoverCategory === chip.id ? ' discover-chip--active' : ''}`}
-                              onClick={() => setDiscoverCategory(chip.id)}
+                              onMouseDown={e => e.preventDefault()}
+                              onClick={() => {
+                                setDiscoverCategory(chip.id)
+                                setIsDiscoverSearchActive(true)
+                              }}
                             >
                               {chip.label}
                             </button>
@@ -22046,7 +22088,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         </div>
                       </div>
                       <div className="discover-results">
-                        {results.length === 0 && (
+                        {Boolean(q) && results.length === 0 && (
                           <p className="discover-empty">No results found.</p>
                         )}
                         {results.map((item, i) => (
@@ -22063,7 +22105,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             <div className="discover-result-info">
                               <span className="discover-result-name">{item.name || item.contact}</span>
                               <span className="discover-result-type">
-                                {item._type === 'reelm' ? 'Reelm' : item._type === 'chat' ? 'Chat' : 'User'}
+                                {item._type === 'reelm' ? (item.description || (item.membersCount ? `${item.membersCount} members` : 'Reelm')) : item._type === 'chat' ? 'Chat' : 'User'}
                               </span>
                             </div>
                             {item._type === 'reelm' && item.joined === false && (
