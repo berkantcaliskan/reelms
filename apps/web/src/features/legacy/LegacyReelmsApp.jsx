@@ -22257,7 +22257,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                   <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"/>
                                 </svg>
                               </button>
-                              <h3 className="new-modal-title">Reelm Info</h3>
+                              <h3 className="new-modal-title">{discoverPreviewReelm.name}</h3>
                             </div>
 
                             <div className="discover-preview-avatar-wrap">
@@ -22270,23 +22270,17 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               )}
                             </div>
 
-                            <h2 className="discover-preview-title">{discoverPreviewReelm.name}</h2>
-
-                            {discoverPreviewReelm.category && (
-                              <span className="discover-preview-category-tag">
-                                {discoverPreviewReelm.category}
-                              </span>
-                            )}
+                            <span className="discover-preview-category-tag">
+                              {discoverPreviewReelm.category ? (discoverPreviewReelm.category.charAt(0).toUpperCase() + discoverPreviewReelm.category.slice(1)) : 'Community'}
+                            </span>
 
                             <p className="discover-preview-description">
                               {discoverPreviewReelm.description || 'Welcome to this reelm! Join to connect with members and participate in channels.'}
                             </p>
 
-                            {discoverPreviewReelm.membersCount ? (
-                              <div className="discover-preview-stats">
-                                <span>👥 {discoverPreviewReelm.membersCount} members</span>
-                              </div>
-                            ) : null}
+                            <div className="discover-preview-stats">
+                              <span>👥 {discoverPreviewReelm.membersCount || 1} members</span>
+                            </div>
 
                             <div className="new-modal-btn-row" style={{ marginTop: '16px' }}>
                               {reelms.some(r => String(r.id) === String(discoverPreviewReelm.id)) ? (
