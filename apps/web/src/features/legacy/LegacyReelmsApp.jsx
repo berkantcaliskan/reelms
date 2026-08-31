@@ -625,7 +625,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
   const [customization, setCustomization] = useState(() => ({ ...DEFAULT_CUSTOMIZATION }))
   useEffect(() => {
-    if (!uid || uid === 'guest') return
+    if (!uid || uid === 'guest') return undefined
     let cancel = false
     try {
       const cached = localStorage.getItem(`reelms:customization:${uid}`)
@@ -638,10 +638,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       .then(([cust, bg, bf]) => {
         if (cancel) return
         const base = cust && typeof cust === 'object' ? cust : {}
+        const resolvedBg = (typeof bg === 'string' && bg) ? bg : null
         const nextCustomization = {
           ...DEFAULT_CUSTOMIZATION,
           ...base,
-          bgImage: typeof bg === 'string' ? bg : (base.bgImage ?? null),
+          bgImage: resolvedBg,
         }
         setCustomization(prev => sameDocValue(prev, nextCustomization) ? prev : nextCustomization)
         try { localStorage.setItem(`reelms:customization:${uid}`, JSON.stringify(nextCustomization)) } catch {}
@@ -684,18 +685,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     setCustomization(prev => {
       const updated = { ...prev, ...updates }
       const { bgImage: _b, ...toSave } = updated
+      toSave.bgImage = null
       try { if (uid && uid !== 'guest') localStorage.setItem(`reelms:customization:${uid}`, JSON.stringify(updated)) } catch {}
       scheduleUserPersist('customization', toSave)
       // Keep account customization durable even if the app is closed shortly after a change.
       userPutDoc('customization', toSave).catch(() => {})
       userProfilePatch({ profileTheme: toSave }).catch(() => {})
       if ('bgImage' in updates) {
-        if (updates.bgImage) {
-          scheduleUserPersist('bg_image', updates.bgImage)
-          userPutDoc('bg_image', updates.bgImage).catch(() => {})
-        } else {
-          userPutDoc('bg_image', null).catch(() => {})
-        }
+        const bgVal = (typeof updates.bgImage === 'string' && updates.bgImage) ? updates.bgImage : null
+        scheduleUserPersist('bg_image', bgVal)
+        userPutDoc('bg_image', bgVal).catch(() => {})
       }
       return updated
     })
