@@ -1,21 +1,100 @@
-export const MIDNIGHT_ACCENTS = [
-  { id: 'purple_nightlight', name: 'Purple Nightlight', color: '#9070c0' },
-  { id: 'rose',              name: 'Rose',              color: '#e8a4b8' },
-  { id: 'pink_in_red',       name: 'Pink in Red',       color: '#d46e82' },
-  { id: 'green_light',       name: 'Green Light',       color: '#68c586' },
-  { id: 'earth_sky',         name: 'Earth Sky',         color: '#7fc8e8' },
-  { id: 'ocean',             name: 'Ocean',             color: '#4a96be' },
-  { id: 'sunbathe',          name: 'Sunbathe',          color: '#F3B38B' },
-]
+export const THEME_ACCENTS = {
+  default: [
+    { id: 'warm_beige', name: 'Warm Beige', color: '#e8d8cc' },
+    { id: 'sand_gold', name: 'Sand Gold', color: '#d4a373' },
+    { id: 'terracotta', name: 'Terracotta', color: '#c87a5b' },
+    { id: 'hazel_brown', name: 'Hazel Brown', color: '#8d6346' },
+    { id: 'deep_espresso', name: 'Deep Espresso', color: '#4a3728' },
+    { id: 'slate_rose', name: 'Slate Rose', color: '#a87b7b' },
+    { id: 'forest_sage', name: 'Forest Sage', color: '#7a9a83' },
+    { id: 'charcoal_pitch', name: 'Charcoal Pitch', color: '#1e1a18' }
+  ],
+  daylight: [
+    { id: 'dark_walnut', name: 'Dark Walnut', color: '#2c2522' },
+    { id: 'warm_umber', name: 'Warm Umber', color: '#5a4638' },
+    { id: 'espresso', name: 'Espresso', color: '#1f1b18' },
+    { id: 'burnt_sienna', name: 'Burnt Sienna', color: '#a0522d' },
+    { id: 'muted_amber', name: 'Muted Amber', color: '#b45309' },
+    { id: 'deep_bronze', name: 'Deep Bronze', color: '#6b4423' },
+    { id: 'forest_moss', name: 'Forest Moss', color: '#2d4a3e' },
+    { id: 'jet_black', name: 'Jet Black', color: '#111111' }
+  ],
+  gece: [
+    { id: 'warm_ivory', name: 'Warm Ivory', color: '#e8d8cc' },
+    { id: 'golden_sand', name: 'Golden Sand', color: '#dfb892' },
+    { id: 'cinnamon', name: 'Cinnamon', color: '#b97753' },
+    { id: 'amber_rose', name: 'Amber Rose', color: '#cf8572' },
+    { id: 'sage_mint', name: 'Sage Mint', color: '#88b795' },
+    { id: 'sky_cyan', name: 'Sky Cyan', color: '#78b5c9' },
+    { id: 'soft_lilac', name: 'Soft Lilac', color: '#b39bc8' },
+    { id: 'silver_mist', name: 'Silver Mist', color: '#c4c4c4' }
+  ],
+  charcoal: [
+    { id: 'platinum_warm', name: 'Platinum Warm', color: '#e4d6cb' },
+    { id: 'titanium_silver', name: 'Titanium Silver', color: '#d1d5db' },
+    { id: 'cyber_gold', name: 'Cyber Gold', color: '#e0a96d' },
+    { id: 'ruby_pulse', name: 'Ruby Pulse', color: '#e11d48' },
+    { id: 'emerald_glow', name: 'Emerald Glow', color: '#10b981' },
+    { id: 'cobalt_blue', name: 'Cobalt Blue', color: '#3b82f6' },
+    { id: 'neon_violet', name: 'Neon Violet', color: '#a855f7' },
+    { id: 'onyx_black', name: 'Onyx Black', color: '#0a0a0c' }
+  ],
+  sunlight: [
+    { id: 'gold', name: 'Sun Gold', color: '#ca8a04' },
+    { id: 'amber', name: 'Amber', color: '#d97706' },
+    { id: 'tangerine', name: 'Tangerine', color: '#ea580c' },
+    { id: 'emerald', name: 'Green Sun', color: '#059669' },
+    { id: 'sky', name: 'Sky Blue', color: '#0284c7' },
+    { id: 'rose', name: 'Sun Rose', color: '#e11d48' },
+    { id: 'rich_cocoa', name: 'Rich Cocoa', color: '#6c4428' },
+    { id: 'deep_charcoal', name: 'Deep Charcoal', color: '#221f1d' }
+  ],
+  midnight: [
+    { id: 'purple_nightlight', name: 'Purple Nightlight', color: '#9070c0' },
+    { id: 'rose', name: 'Rose', color: '#e8a4b8' },
+    { id: 'pink_in_red', name: 'Pink in Red', color: '#d46e82' },
+    { id: 'green_light', name: 'Green Light', color: '#68c586' },
+    { id: 'earth_sky', name: 'Earth Sky', color: '#7fc8e8' },
+    { id: 'ocean', name: 'Ocean', color: '#4a96be' },
+    { id: 'sunbathe', name: 'Sunbathe', color: '#F3B38B' },
+    { id: 'midnight_void', name: 'Midnight Void', color: '#05050f' }
+  ],
+  classic: [
+    { id: 'lilac_bloom', name: 'Lilac Bloom', color: '#c084fc' },
+    { id: 'magenta_glow', name: 'Magenta Glow', color: '#e879f9' },
+    { id: 'orchid_rose', name: 'Orchid Rose', color: '#f472b6' },
+    { id: 'electric_violet', name: 'Electric Violet', color: '#8b5cf6' },
+    { id: 'deep_amethyst', name: 'Deep Amethyst', color: '#6b21a8' },
+    { id: 'warm_beige', name: 'Warm Beige', color: '#e2d5cb' },
+    { id: 'pitch_black', name: 'Pitch Black', color: '#000000' },
+    { id: 'pure_gold', name: 'Pure Gold', color: '#f59e0b' }
+  ]
+}
 
-export const SUNLIGHT_ACCENTS = [
-  { id: 'amber',     name: 'Amber',     color: '#d97706' },
-  { id: 'tangerine', name: 'Tangerine', color: '#ea580c' },
-  { id: 'gold',      name: 'Sun Gold',  color: '#ca8a04' },
-  { id: 'emerald',   name: 'Green Sun', color: '#059669' },
-  { id: 'sky',       name: 'Sky Blue',  color: '#0284c7' },
-  { id: 'rose',      name: 'Sun Rose',  color: '#e11d48' },
-  { id: 'violet',    name: 'Violet',    color: '#7c3aed' },
+export const MIDNIGHT_ACCENTS = THEME_ACCENTS.midnight
+export const SUNLIGHT_ACCENTS = THEME_ACCENTS.sunlight
+
+export const EXTENDED_PALETTE_SHADES = [
+  // Blacks & Dark Neutrals
+  '#000000', '#0a0a0c', '#121315', '#1a1b1e', '#23252a', '#2c2e35',
+  // Earthy Browns, Mochas & Espressos
+  '#2a1810', '#3d2317', '#543120', '#6e402a', '#8a5236', '#a66442',
+  // Warm Beiges, Sands & Tans
+  '#c29b7f', '#d4b297', '#e5cbaf', '#f0decd', '#faf1e6', '#e8d8cc',
+  // Golds, Ambers & Warm Yellows
+  '#b45309', '#ca8a04', '#d97706', '#eab308', '#f59e0b', '#fbbf24',
+  // Terracotta, Rust & Warm Reds
+  '#991b1b', '#c87a5b', '#dc2626', '#ea580c', '#f87171', '#fca5a5',
+  // Roses & Pinks
+  '#9d174d', '#be185d', '#d46e82', '#e11d48', '#ec4899', '#f472b6',
+  // Purples & Violets
+  '#581c87', '#6b21a8', '#7c3aed', '#8b5cf6', '#9070c0', '#c084fc',
+  // Emeralds, Sages & Forest Greens
+  '#064e3b', '#065f46', '#059669', '#10b981', '#68c586', '#86efac',
+  // Teals & Cyans
+  '#134e4a', '#0f766e', '#0d9488', '#14b8a6', '#5eead4', '#7fc8e8',
+  // Blues & Slates
+  '#1e3a8a', '#1d4ed8', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd',
 ]
 
 export const THEMES = [
@@ -135,10 +214,10 @@ export const THEMES = [
     primaryRgb: '253,251,247',
     base: '#fdfbf7',
     baseRgb: '253,251,247',
-    secondary: '#d97706',
-    secondaryRgb: '217,119,6',
-    accent: '#d97706',
-    accentRgb: '217,119,6',
+    secondary: '#ca8a04',
+    secondaryRgb: '202,138,4',
+    accent: '#ca8a04',
+    accentRgb: '202,138,4',
     tertiary: '#f3ede2',
     tertiaryRgb: '243,237,226',
     tertiaryGlass: 'rgba(243, 237, 226, 0.75)',

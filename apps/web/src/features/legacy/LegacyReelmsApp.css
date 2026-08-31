@@ -8256,6 +8256,121 @@ h6 {
   box-shadow: 0 0 0 3px rgba(var(--ta-rgb), 0.28);
 }
 
+/* ── Tooltips with ~550ms elegant delay ── */
+[data-tooltip] {
+  position: relative;
+}
+[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 7px);
+  left: 50%;
+  transform: translateX(-50%) translateY(4px) scale(0.96);
+  background: rgba(14, 12, 20, 0.94);
+  backdrop-filter: blur(14px) saturate(1.8);
+  -webkit-backdrop-filter: blur(14px) saturate(1.8);
+  color: var(--ta, #e8d8cc);
+  border: 1px solid rgba(var(--ta-rgb, 232, 216, 204), 0.16);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.45);
+  padding: 4px 8px;
+  border-radius: 7px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  z-index: 1200;
+  transition: opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1) 0.55s,
+              transform 0.18s cubic-bezier(0.16, 1, 0.3, 1) 0.55s,
+              visibility 0.18s 0.55s;
+}
+[data-tooltip]:hover::after {
+  opacity: 1;
+  visibility: visible;
+  transform: translateX(-50%) translateY(0) scale(1);
+}
+
+/* ── Theme Default Accent Badges (round swatches matching theme dots) ── */
+.cust-accent-badges-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.cust-accent-badge {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease;
+}
+
+.cust-accent-badge:hover {
+  transform: scale(1.15);
+}
+
+.cust-accent-badge--active {
+  border-color: #ffffff;
+  box-shadow: 0 0 0 2px var(--ta), 0 3px 8px rgba(0, 0, 0, 0.4);
+  transform: scale(1.08);
+}
+
+.cust-accent-badge-check {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+}
+
+/* ── Extended Color Palette (Rich Blacks, Browns, Beiges, Ambers, etc.) ── */
+.cust-palette-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(22px, 1fr));
+  gap: 8px;
+  max-width: 480px;
+  background: rgba(var(--ta-rgb), 0.03);
+  border: 1px solid rgba(var(--ta-rgb), 0.08);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.cust-palette-swatch {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  padding: 0;
+  position: relative;
+  transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.cust-palette-swatch:hover {
+  transform: scale(1.22);
+  z-index: 2;
+  border-color: rgba(255, 255, 255, 0.5);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.35);
+}
+
+.cust-palette-swatch--active {
+  border-color: #ffffff !important;
+  box-shadow: 0 0 0 2px var(--ta);
+  transform: scale(1.15);
+  z-index: 2;
+}
+
 /* ── Tayf color pickers ── */
 /* ── Tayf ── */
 .cust-tayf-row {

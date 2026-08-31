@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react'
 import { useT } from '../../../../i18n'
-import { THEMES, MIDNIGHT_ACCENTS, SUNLIGHT_ACCENTS, CLASSIC_GREETINGS } from '../../constants/themeConstants'
+import { THEMES, THEME_ACCENTS, EXTENDED_PALETTE_SHADES, CLASSIC_GREETINGS } from '../../constants/themeConstants'
 import { hslToHex } from '../../utils/colorUtils'
 import { normalizeMediaUrl, uploadProfileImageFile } from '../../utils/mediaUtils'
 
@@ -8,8 +8,12 @@ export function CustomizationPanel({ customization = {}, onChange, bodyFont, BOD
   const t = useT()
   const bgInputRef = useRef(null)
   const currentTheme = THEMES.find(th => th.id === customization.themeId) || THEMES[0]
-  const [openSpectrum, setOpenSpectrum] = useState(null)
+  const [openSpectrum, setOpenSpectrum] = useState(false)
   const [fontsExpanded, setFontsExpanded] = useState(false)
+  const [hexInput, setHexInput] = useState('')
+
+  const themeAccentPresets = THEME_ACCENTS[currentTheme.id] || THEME_ACCENTS.default || []
+  const activeAccent = (customization.customAccent || currentTheme.accent || '').toLowerCase()
 
   const pickSpectrum = (e, key) => {
     const rect = e.currentTarget.getBoundingClientRect()
@@ -143,7 +147,8 @@ export function CustomizationPanel({ customization = {}, onChange, bodyFont, BOD
                 type="button"
                 className={`cust-theme-swatch${isSelected ? ' cust-theme-swatch-active' : ''}${th.isLight ? ' cust-theme-swatch--light' : ''}`}
                 onClick={() => onChange?.({ themeId: th.id, customAccent: null })}
-                title={th.name}
+                data-tooltip={th.name}
+                aria-label={th.name}
                 style={{ background: th.base }}
               >
                 <span className="cust-theme-swatch-dot" style={{ background: isSelected && customization.customAccent ? customization.customAccent : th.accent }} />
@@ -151,69 +156,92 @@ export function CustomizationPanel({ customization = {}, onChange, bodyFont, BOD
             )
           })}
         </div>
-
-        {/* Midnight / Sunlight Selectable Accent Presets */}
-        {(customization.themeId === 'midnight' || customization.themeId === 'sunlight' || currentTheme.hasSubAccents) && (
-          <div className="cust-midnight-accents" style={{ marginTop: 14 }}>
-            <div style={{ fontSize: '0.76rem', color: 'rgba(var(--ta-rgb), 0.8)', marginBottom: 8, fontWeight: 600 }}>
-              {t('accent_color')}
-            </div>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {(customization.themeId === 'sunlight' ? SUNLIGHT_ACCENTS : MIDNIGHT_ACCENTS).map(acc => {
-                const isSelected = (customization.customAccent || currentTheme.accent).toLowerCase() === acc.color.toLowerCase()
-                return (
-                  <button
-                    key={acc.id}
-                    type="button"
-                    onClick={() => onChange?.({ customAccent: acc.color })}
-                    className={`cust-midnight-acc-btn${isSelected ? ' active' : ''}`}
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: 6,
-                      padding: '5px 12px',
-                      borderRadius: 999,
-                      background: isSelected ? 'rgba(var(--ta-rgb), 0.16)' : 'rgba(var(--ta-rgb), 0.06)',
-                      border: `1.5px solid ${isSelected ? 'var(--ta)' : 'rgba(var(--ta-rgb), 0.2)'}`,
-                      color: isSelected ? 'var(--ta)' : 'rgba(var(--ta-rgb), 0.85)',
-                      fontWeight: isSelected ? 600 : 500,
-                      fontSize: '0.75rem',
-                      cursor: 'pointer',
-                      transition: 'all 0.15s ease',
-                    }}
-                  >
-                    <span style={{ width: 10, height: 10, borderRadius: '50%', background: acc.color, flexShrink: 0, boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
-                    <span>{acc.name}</span>
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-        )}
       </div>
 
-      {/* ── Accent Color (replacing Spectrum) ── */}
+      {/* ── Accent Color (Fixed Section & Badges with Tooltips) ── */}
       <div className="accs-section">
         <div className="accs-section-title">{t('accent_color') || 'Accent color'}</div>
         <p className="accs-note" style={{ marginTop: 0, marginBottom: 12 }}>
           {t('accent_color_desc') || 'Accent color for icons, highlights, indicators and active elements.'}
         </p>
+
+        {/* Theme Default Accent Badges */}
+        <div className="cust-accent-presets-wrap" style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: '0.74rem', color: 'rgba(var(--ta-rgb), 0.7)', marginBottom: 8, fontWeight: 600 }}>
+            {currentTheme.name} {t('presets') || 'Presets'}
+          </div>
+          <div className="cust-accent-badges-row">
+            {themeAccentPresets.map(acc => {
+              const isSelected = activeAccent === acc.color.toLowerCase()
+              return (
+                <button
+                  key={acc.id}
+                  type="button"
+                  onClick={() => onChange?.({ customAccent: acc.color })}
+                  className={`cust-accent-badge${isSelected ? ' cust-accent-badge--active' : ''}`}
+                  data-tooltip={acc.name}
+                  aria-label={acc.name}
+                  style={{ background: acc.color }}
+                >
+                  {isSelected && <span className="cust-accent-badge-check" />}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Extended Color Palette (Black, Browns, Beiges, Amber, etc.) */}
+        <div className="cust-extended-palette-wrap" style={{ marginBottom: 16 }}>
+          <div style={{ fontSize: '0.74rem', color: 'rgba(var(--ta-rgb), 0.7)', marginBottom: 8, fontWeight: 600 }}>
+            {t('palette') || 'Palette'}
+          </div>
+          <div className="cust-palette-grid">
+            {EXTENDED_PALETTE_SHADES.map((colorHex, idx) => {
+              const isSelected = activeAccent === colorHex.toLowerCase()
+              return (
+                <button
+                  key={`${colorHex}_${idx}`}
+                  type="button"
+                  onClick={() => onChange?.({ customAccent: colorHex })}
+                  className={`cust-palette-swatch${isSelected ? ' cust-palette-swatch--active' : ''}`}
+                  data-tooltip={colorHex.toUpperCase()}
+                  aria-label={colorHex}
+                  style={{ background: colorHex }}
+                />
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Custom Picker & Spectrum */}
         <div className="cust-tayf-row">
           <div className="cust-tayf-picker">
             <div className="cust-tayf-item">
               <div
-                className={`cust-tayf-swatch${openSpectrum === 'customAccent' ? ' active' : ''}`}
+                className={`cust-tayf-swatch${openSpectrum ? ' active' : ''}`}
                 style={{ background: customization.customAccent || currentTheme.accent }}
-                onClick={() => setOpenSpectrum(openSpectrum === 'customAccent' ? null : 'customAccent')}
+                onClick={() => setOpenSpectrum(v => !v)}
+                data-tooltip={customization.customAccent ? `${customization.customAccent.toUpperCase()} (Custom)` : `${currentTheme.accent.toUpperCase()} (Default)`}
               >
                 {customization.customAccent && (
-                  <button type="button" className="cust-tayf-reset" onClick={e => { e.stopPropagation(); onChange?.({ customAccent: null }); if (openSpectrum === 'customAccent') setOpenSpectrum(null) }}>×</button>
+                  <button
+                    type="button"
+                    className="cust-tayf-reset"
+                    title={t('reset') || 'Reset to default'}
+                    onClick={e => {
+                      e.stopPropagation()
+                      onChange?.({ customAccent: null })
+                      setOpenSpectrum(false)
+                    }}
+                  >
+                    ×
+                  </button>
                 )}
               </div>
-              <span className="cust-tayf-label">{t('accent_color') || 'Accent'}</span>
+              <span className="cust-tayf-label">{t('custom_color') || 'Custom'}</span>
             </div>
             <div
-              className={`cust-tayf-strip${openSpectrum === 'customAccent' ? ' open' : ''}`}
+              className={`cust-tayf-strip${openSpectrum ? ' open' : ''}`}
               onClick={e => pickSpectrum(e, 'customAccent')}
               role="presentation"
             />
