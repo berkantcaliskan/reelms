@@ -4524,8 +4524,8 @@ function FriendProfilePopup({ friend, anchorRect = null, serverContext = null, o
               src={getPersonPhoto(safeFriend)}
               alt="Avatar"
               className="fpp-avatar-img"
-              style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }}
-              fallback={<img src={avatarUIcon} alt="Avatar" className="fpp-avatar-img" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />}
+              style={{ width: 78, height: 78, objectFit: 'cover', borderRadius: '50%' }}
+              fallback={<img src={avatarUIcon} alt="Avatar" className="fpp-avatar-img" style={{ width: 78, height: 78, objectFit: 'cover', borderRadius: '50%' }} />}
             />
           </div>
           <div className="fpp-names-col">

@@ -4368,14 +4368,28 @@ h6 {
 }
 
 .pp-avatar-wrap .pp-avatar {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 78px;
+  height: 78px;
+  border-radius: 50%;
+  border: none;
+  background: var(--tb, #1b1822);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4);
+  object-fit: cover;
+  display: block;
   margin-top: 0;
-  width: 100%;
-  height: 100%;
 }
 
 .pp-avatar-edit-overlay {
   position: absolute;
-  inset: 0;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 78px;
+  height: 78px;
   border-radius: 50%;
   background: rgba(0, 0, 0, 0.45);
   backdrop-filter: blur(2px);
@@ -4386,6 +4400,7 @@ h6 {
   opacity: 0;
   transition: opacity 0.18s ease;
   pointer-events: none;
+  z-index: 5;
 }
 
 .pp-avatar-wrap:hover .pp-avatar-edit-overlay {
@@ -10452,28 +10467,33 @@ h6 {
   height: 68px !important;
   border-radius: 50% !important;
   border: none !important;
-  background: var(--tb, #1b1822) !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35) !important;
+  background: transparent !important;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 1.25rem;
+  font-size: 1.35rem;
   font-weight: 700;
   color: var(--fpp-theme-accent, var(--ta));
   flex-shrink: 0;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
   z-index: 4;
   margin-top: -22px !important;
 }
 .fpp-avatar img,
 .fpp-avatar .cached-profile-img {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 78px !important;
+  height: 78px !important;
+  max-width: none;
   object-fit: cover;
   display: block;
   border-radius: 50%;
   background: var(--fpp-theme-base, var(--tb, #1b1822));
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4) !important;
 }
 
 .fpp-names-col {
