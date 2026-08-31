@@ -8762,7 +8762,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           <div className="accs-section-title" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                             Reelms
                             <span style={{ fontSize: '0.72rem', fontWeight: 400, color: 'rgba(var(--ta-rgb), 0.4)', background: 'rgba(var(--ta-rgb), 0.07)', borderRadius: 8, padding: '2px 8px' }}>
-                              2/25082026
+                              Beta 2.1/1092026
                             </span>
                           </div>
                           {updateAvailable ? (

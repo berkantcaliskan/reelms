@@ -1,6 +1,33 @@
 {
-  "current": "2",
+  "current": "2.1",
   "releases": [
+    {
+      "version": "2.1",
+      "label": "Beta 2.1/1092026",
+      "title": "Reelms Beta 2.1",
+      "date": "01/09/2026",
+      "highlights": "Modular Architecture, Mobile Redesign, Media Gallery & Accordion Notes",
+      "description": "Beta 2.1 brings 100% modular architecture, an overhauled mobile navigation experience, an all-new media gallery engine, accordion release notes, and extensive polish across the app.",
+      "description_tr": "Beta 2.1; %100 modüler mimari geçişi, yenilenen mobil navigasyon deneyimi, güçlendirilmiş medya galerisi motoru, akordeon sürüm notları ve kapsamlı görsel/performans iyileştirmeleri sunar.",
+      "notes": [
+        "100% Modular Architecture — Transformed core app modules into modular feature packages (Chat, Feed, Articles, Profile, Settings, and Reelm management).",
+        "Mobile Navigation Overhaul — Relocated live notifications to the top header, centered the stylized '+' creation button in the bottom bar, and introduced unlayered floating action items.",
+        "Accordion Release Notes — Previous release notes are now displayed in a clean expandable accordion list for easier browsing.",
+        "Robust Media Gallery — Completely overhauled attachment extraction and media panel with crash-proof parsing for photos, videos, voice notes, links, and documents.",
+        "Permanent Wallpaper Persistence — Fixed background removal cache synchronization to ensure wallpaper reset stays permanently applied.",
+        "Precision Header Alignment — Equalized spacing and unified dimensions for Notifications, Settings, and Friends action buttons across desktop and mobile.",
+        "Layout & Profile Refinements — Fixed DM sidebar back button alignment, friend profile popup dimensions, and Reelm creation auto-navigation."
+      ],
+      "notes_tr": [
+        "%100 Modüler Mimari — Uygulama çekirdeği modüler alt paketlere (Sohbet, Akış/Feed, Makaleler, Profil, Ayarlar ve Reelm yönetimi) dönüştürüldü.",
+        "Yenilenen Mobil Navigasyon — Bildirimler üst başlığa taşındı, alt bara merkez stilize '+' butonu eklendi ve katmansız süzülen işlem menüsü getirildi.",
+        "Akordeon Sürüm Notları — Geçmiş sürüm notları artık daha rahat okunabilen, başlık bazlı açılır-kapanır akordeon yapısına kavuştu.",
+        "Güçlendirilmiş Medya Galerisi — Fotoğraf, video, sesli mesaj, bağlantı ve belgeleri hatasız listeleyen çökmeye karşı dayanıklı medya motoru geliştirildi.",
+        "Kalıcı Arka Plan Yönetimi — Arka plan kaldırıldığında eski önbellekten geri yüklenmesini engelleyen kalıcı senkronizasyon düzeltmesi yapıldı.",
+        "Başlık Butonları ve Boşluk Düzeni — Masaüstü ve mobilde Bildirim, Ayarlar ve Arkadaşlar butonlarının boyut ve aralıkları piksel hassasiyetinde eşitlendi.",
+        "Arayüz & Profil İyileştirmeleri — DM geri butonu hizalaması, arkadaş profil penceresi boyutları ve yeni Reelm oluşturulduğunda doğrudan kanala geçiş sağlandı."
+      ]
+    },
     {
       "version": "2",
       "label": "2/25082026",
