@@ -3184,12 +3184,53 @@ h6 {
   border-color: rgba(var(--ta-rgb), 0.16);
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
 }
+.about-release--prev {
+  margin-top: 0;
+  padding: 10px 14px;
+  background: rgba(var(--ta-rgb), 0.03);
+  border-radius: 12px;
+  transition: all 0.18s ease;
+}
+.about-release--prev:hover {
+  background: rgba(var(--ta-rgb), 0.06);
+  border-color: rgba(var(--ta-rgb), 0.16);
+}
+.about-release--prev.about-release--expanded {
+  background: rgba(var(--ta-rgb), 0.05);
+  border-color: rgba(var(--ta-rgb), 0.18);
+  padding: 14px 16px;
+}
 .about-release-header {
   display: flex;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
   margin-bottom: 12px;
+}
+.about-release-header--btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: transparent;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+.about-release-header-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.about-release-body {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(var(--ta-rgb), 0.08);
+  animation: fp-slide-up 0.2s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 .about-release-version {
   font-size: 0.88rem;

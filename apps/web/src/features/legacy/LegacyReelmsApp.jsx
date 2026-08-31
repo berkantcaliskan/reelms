@@ -1122,6 +1122,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const reelmSearchInputRef = useRef(null)
   const [changelog, setChangelog] = useState([])
   const [showPrevVersions, setShowPrevVersions] = useState(false)
+  const [expandedReleaseVersions, setExpandedReleaseVersions] = useState([])
   const [, setCurrentVersion] = useState(null)
   const [showMenu, setShowMenu] = useState(false)
   const [showFeed, setShowFeed] = useState(false)
@@ -8859,19 +8860,56 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                     </button>
 
                                     {showPrevVersions && (
-                                      <div className="about-prev-list" style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
-                                        {prevReleases.map(release => (
-                                          <div key={release.version} className="about-release about-release--prev">
-                                            <div className="about-release-header">
-                                              <span className="about-release-version">{release.label || `v${release.version}`}</span>
-                                              {!release.label && <span className="about-release-date">{release.date}</span>}
-                                              {release.highlights && (
-                                                <span className="about-release-highlight">{release.highlights}</span>
+                                      <div className="about-prev-list" style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 12 }}>
+                                        {prevReleases.map(release => {
+                                          const isExpanded = expandedReleaseVersions.includes(release.version)
+                                          return (
+                                            <div key={release.version} className={`about-release about-release--prev${isExpanded ? ' about-release--expanded' : ''}`}>
+                                              <button
+                                                type="button"
+                                                className="about-release-header about-release-header--btn"
+                                                onClick={() => {
+                                                  setExpandedReleaseVersions(prev =>
+                                                    prev.includes(release.version)
+                                                      ? prev.filter(v => v !== release.version)
+                                                      : [...prev, release.version]
+                                                  )
+                                                }}
+                                              >
+                                                <div className="about-release-header-left">
+                                                  <span className="about-release-version">{release.label || `v${release.version}`}</span>
+                                                  {!release.label && <span className="about-release-date">{release.date}</span>}
+                                                  {release.highlights && (
+                                                    <span className="about-release-highlight">{release.highlights}</span>
+                                                  )}
+                                                </div>
+                                                <svg
+                                                  width="14"
+                                                  height="14"
+                                                  viewBox="0 0 24 24"
+                                                  fill="none"
+                                                  stroke="currentColor"
+                                                  strokeWidth="2"
+                                                  strokeLinecap="round"
+                                                  strokeLinejoin="round"
+                                                  style={{
+                                                    transform: isExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                                                    transition: 'transform 0.2s ease',
+                                                    color: 'rgba(var(--ta-rgb), 0.55)',
+                                                    flexShrink: 0
+                                                  }}
+                                                >
+                                                  <polyline points="6 9 12 15 18 9"/>
+                                                </svg>
+                                              </button>
+                                              {isExpanded && (
+                                                <div className="about-release-body">
+                                                  {renderReleaseContent(release)}
+                                                </div>
                                               )}
                                             </div>
-                                            {renderReleaseContent(release)}
-                                          </div>
-                                        ))}
+                                          )
+                                        })}
                                       </div>
                                     )}
                                   </div>
