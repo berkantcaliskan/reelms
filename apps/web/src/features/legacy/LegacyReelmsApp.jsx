@@ -6373,7 +6373,7 @@ function ModInboxPanel({ onClose }) {
 }
 
 const ROLE_PALETTE = [
-  '#f87171','#fb923c','#fbbf24','#a3e635',
+  '#b99887','#f87171','#fb923c','#fbbf24','#a3e635',
   '#34d399','#22d3ee','#60a5fa','#818cf8',
   '#c084fc','#f472b6','#e0c9bc','#94a3b8',
 ]
