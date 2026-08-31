@@ -8447,10 +8447,10 @@ h6 {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 16px;
+  gap: 14px;
   width: 100%;
-  max-width: 520px;
-  margin-bottom: 20px;
+  max-width: 580px;
+  margin-bottom: 16px;
   flex-shrink: 0;
 }
 
@@ -8523,7 +8523,7 @@ h6 {
   display: flex;
   align-items: center;
   width: 100%;
-  max-width: 400px;
+  max-width: 480px;
   height: 48px;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(var(--ta-rgb), 0.22);
@@ -8670,40 +8670,66 @@ h6 {
 /* Discover Preview Modal */
 .discover-preview-modal {
   max-width: 380px !important;
+  width: 100%;
+  margin: auto;
   text-align: center;
   align-items: center;
+  justify-content: center;
   display: flex;
   flex-direction: column;
 }
 
 .discover-preview-modal .new-modal-header {
   position: relative;
-  display: inline-flex;
+  display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  width: auto;
-  max-width: 100%;
-  margin-bottom: 16px;
+  text-align: center;
+  width: 100%;
+  padding: 0 48px;
+  margin: 0 auto 16px auto;
+  box-sizing: border-box;
 }
 
 .discover-preview-modal .new-modal-back-btn {
-  position: static;
-  transform: none;
-  padding: 2px 4px;
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 6px;
   margin: 0;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: transparent !important;
+  border: none;
+  cursor: pointer;
+  color: rgba(var(--ta-rgb), 0.75);
+  transition: color 0.15s ease, transform 0.15s ease;
 }
 
 .discover-preview-modal .new-modal-back-btn:hover {
-  transform: scale(1.18);
+  transform: translateY(-50%) scale(1.18);
   color: var(--ta);
 }
 
 .discover-preview-modal .new-modal-back-btn:active {
-  transform: scale(1.05);
+  transform: translateY(-50%) scale(1.05);
+}
+
+.discover-preview-modal .new-modal-title {
+  font-family: 'Karla', sans-serif !important;
+  font-size: 1.26rem;
+  font-weight: 800 !important;
+  color: var(--ta);
+  text-align: center !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  width: 100%;
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .discover-preview-avatar-wrap {
@@ -25576,16 +25602,17 @@ button, input, select, textarea,
   display: flex;
   align-items: center;
   justify-content: center;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
-  overflow: visible;
+  overflow-x: auto;
+  overflow-y: hidden;
   max-height: 0;
   opacity: 0;
   transform: translateY(-6px) scale(0.98);
   margin-top: 0;
   padding: 0;
   width: 100%;
-  max-width: 560px;
+  max-width: 540px;
   pointer-events: none;
   transition: max-height 0.28s cubic-bezier(0.16, 1, 0.3, 1),
               opacity 0.22s ease,
@@ -25595,11 +25622,11 @@ button, input, select, textarea,
 }
 
 .discover-chips-row--visible {
-  max-height: 120px;
+  max-height: 52px;
   opacity: 1;
   transform: translateY(0) scale(1);
   margin-top: 6px;
-  padding: 4px 4px 6px;
+  padding: 4px 6px 6px;
   pointer-events: auto;
 }
 
@@ -25610,7 +25637,7 @@ button, input, select, textarea,
   background: rgba(var(--ta-rgb), 0.08);
   border: 1px solid rgba(var(--ta-rgb), 0.14);
   color: rgba(var(--ta-rgb), 0.75);
-  font-size: 0.75rem;
+  font-size: 0.74rem;
   font-weight: 700;
   font-family: 'Karla', sans-serif;
   border-radius: 999px;
