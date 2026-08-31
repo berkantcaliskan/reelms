@@ -22097,6 +22097,20 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
             ) : showDiscover ? (
               <div className="panel panel-middle discover-panel">
                 {(() => {
+                  const getLocalizedReelm = (r) => {
+                    if (!r || !r.id) return r
+                    const idKey = String(r.id).replace(/-/g, '_')
+                    const nameKey = `seed_reelm_${idKey}_name`
+                    const descKey = `seed_reelm_${idKey}_desc`
+                    const localizedName = t(nameKey)
+                    const localizedDesc = t(descKey)
+                    return {
+                      ...r,
+                      name: (localizedName && localizedName !== nameKey) ? localizedName : r.name,
+                      description: (localizedDesc && localizedDesc !== descKey) ? localizedDesc : r.description
+                    }
+                  }
+
                   const q = discoverQuery.trim().toLowerCase()
                   const joinedReelmIds = new Set((reelms || []).map(r => String(r.id)))
 
@@ -22113,6 +22127,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
                   const allDiscoverableReelms = Array.from(combinedDiscoverMap.values())
                     .filter(r => !joinedReelmIds.has(String(r.id)))
+                    .map(r => getLocalizedReelm(r))
 
                   const officialReelms = allDiscoverableReelms.filter(r => String(r.id || '').startsWith('reelms-'))
                   const communityReelms = allDiscoverableReelms.filter(r => !String(r.id || '').startsWith('reelms-'))
@@ -22127,7 +22142,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       const matchName = r.name?.toLowerCase().includes(q)
                       const matchDesc = r.description?.toLowerCase().includes(q)
                       const matchCategory = r.category?.toLowerCase().includes(q)
-                      const matchTags = (r.tags || []).some(t => t.toLowerCase().includes(q))
+                      const matchTags = (r.tags || []).some(t => t.toLowerCase() === discoverCategory || t.toLowerCase().includes(q))
                       const matchCode = r.code?.toLowerCase().includes(q)
                       return matchName || matchDesc || matchCategory || matchTags || matchCode
                     }).map(r => ({ ...r, _type: 'reelm', joined: false })),
@@ -22216,7 +22231,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               className="discover-official-trigger"
                               onClick={() => setShowOfficialReelms(prev => !prev)}
                             >
-                              <span className="discover-official-title">Resmi Reelmler</span>
+                              <span className="discover-official-title">{t('official_reelms') || 'Official Reelms'}</span>
                               <svg
                                 className={`discover-official-chevron${showOfficialReelms ? ' open' : ''}`}
                                 viewBox="0 0 24 24"
