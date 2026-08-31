@@ -7376,7 +7376,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                       const name = c.itemType === 'chat' ? getChatDisplayName(c) : c.name
                                       return (
                                         <div key={c.id || i} className={`folder-mini-avatar folder-mini-avatar--diag-${i + 1}`}>
-                                          {src ? <img src={src} alt={name} draggable={false} /> : isDefaultCommunity(c) ? <ReelmsCommunityGlyph /> : (name || '?').charAt(0).toUpperCase()}
+                                          {isDefaultCommunity(c) ? <ReelmsCommunityGlyph size={14} /> : src ? <img src={src} alt={name} draggable={false} /> : (name || '?').charAt(0).toUpperCase()}
                                         </div>
                                       )
                                     })}
@@ -7388,7 +7388,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                       const name = c.itemType === 'chat' ? getChatDisplayName(c) : c.name
                                       return (
                                         <div key={c.id || i} className={`folder-mini-avatar folder-mini-avatar--tri-${i + 1}`}>
-                                          {src ? <img src={src} alt={name} draggable={false} /> : isDefaultCommunity(c) ? <ReelmsCommunityGlyph /> : (name || '?').charAt(0).toUpperCase()}
+                                          {isDefaultCommunity(c) ? <ReelmsCommunityGlyph size={14} /> : src ? <img src={src} alt={name} draggable={false} /> : (name || '?').charAt(0).toUpperCase()}
                                         </div>
                                       )
                                     })}
@@ -7403,7 +7403,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                           {i === 3 && folderChats.length > 4 ? (
                                             <span className="folder-mini-more">+{folderChats.length - 3}</span>
                                           ) : (
-                                            src ? <img src={src} alt={name} draggable={false} /> : isDefaultCommunity(c) ? <ReelmsCommunityGlyph /> : (name || '?').charAt(0).toUpperCase()
+                                            isDefaultCommunity(c) ? <ReelmsCommunityGlyph size={12} /> : src ? <img src={src} alt={name} draggable={false} /> : (name || '?').charAt(0).toUpperCase()
                                           )}
                                         </div>
                                       )
@@ -7509,11 +7509,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           <span className={`bar-item-wrap${item.id === recentlyBumpedChatId ? ' bar-item-bumped' : ''}`}>
                             <div className={`bar-item-avatar${item.itemType === 'reelm' ? ' bar-item-avatar--server' : ' bar-item-avatar--profile'}${isDefaultCommunity(item) ? ' bar-item-avatar--community' : ''}`}>
                               {(() => {
+                                if (isDefaultCommunity(item)) return <ReelmsCommunityGlyph />
                                 const avatarSrc = item.itemType === 'chat' ? getChatAvatarSrc(item) : item.image
                                 const label = item.itemType === 'chat' ? getChatDisplayName(item) : item.name
                                 return avatarSrc
                                   ? <img src={avatarSrc} alt={label} draggable={false} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '14px', pointerEvents: 'none' }} />
-                                  : isDefaultCommunity(item) ? <ReelmsCommunityGlyph /> : (label || '?').charAt(0).toUpperCase()
+                                  : (label || '?').charAt(0).toUpperCase()
                               })()}
                             </div>
                             {unreadCounts[item.id] > 0 && (
