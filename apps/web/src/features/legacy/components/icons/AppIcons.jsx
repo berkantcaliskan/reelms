@@ -202,11 +202,11 @@ export function ReelmsLogoOutlineIcon({ size = 26, width, height, className = ''
   const h = height || size
   return (
     <svg
-      viewBox="56 52 96 80"
+      viewBox="55 51 96 78"
       width={w}
       height={h}
       className={className}
-      style={{ display: 'block', fill: 'none', ...style }}
+      style={{ display: 'block', fill: 'none', margin: 'auto', ...style }}
       aria-hidden="true"
       {...props}
     >

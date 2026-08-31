@@ -19145,11 +19145,11 @@ button, input, select, textarea,
 .reelm-cover-wrap--community {
   cursor: default !important;
   background:
-    radial-gradient(circle at 24% 18%, rgba(185,152,135,0.34), transparent 28%),
-    radial-gradient(circle at 78% 28%, rgba(92,70,58,0.38), transparent 34%),
-    linear-gradient(135deg, rgba(22,16,14,0.98), rgba(47,35,30,0.94) 48%, rgba(13,10,9,0.98));
+    radial-gradient(circle at 50% 36%, rgba(var(--ta-rgb), 0.22), transparent 48%),
+    radial-gradient(circle at 80% 20%, rgba(var(--ta-rgb), 0.12), transparent 35%),
+    linear-gradient(135deg, rgba(22, 16, 14, 0.98), rgba(47, 35, 30, 0.94) 48%, rgba(13, 10, 9, 0.98));
   border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
-  border-radius: 14px;
+  border-radius: 18px !important;
   overflow: hidden;
 }
 .reelm-cover-community-art {
@@ -19158,20 +19158,16 @@ button, input, select, textarea,
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  color: rgba(244,226,214,0.94);
-  letter-spacing: .04em;
-  text-transform: uppercase;
-  font-size: 12px;
-  font-weight: 800;
   pointer-events: none;
 }
 .reelm-cover-community-art svg,
 .reelm-cover-community-art .rc-glyph,
-.reelm-cover-community-art .community-glyph {
-  width: 30px;
-  height: 30px;
-  filter: drop-shadow(0 8px 20px rgba(0,0,0,.35));
+.reelm-cover-community-art .community-glyph,
+.reelm-cover-community-art .reelm-community-glyph {
+  width: 52px !important;
+  height: 52px !important;
+  color: var(--ta, #e8d8cc);
+  filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.55));
 }
 .notif-clear-all-btn {
   border: none !important;

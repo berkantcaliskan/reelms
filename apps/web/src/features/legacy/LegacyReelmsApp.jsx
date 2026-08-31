@@ -8979,13 +8979,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         setShowReelmMenu({ x: Math.max(10, x), y: Math.max(10, y), w: menuWidth })
                       }}
                     >
-                      {selectedReelm.image
-                        ? <img src={selectedReelm.image} alt="cover" className="reelm-cover-img" />
-                        : isDefaultCommunity(selectedReelm)
-                          ? <div className="reelm-cover-community-art"><ReelmsCommunityGlyph /><span>Reelms Community</span></div>
+                      {isDefaultCommunity(selectedReelm)
+                        ? <div className="reelm-cover-community-art"><ReelmsCommunityGlyph size={52} /></div>
+                        : selectedReelm.image
+                          ? <img src={selectedReelm.image} alt="cover" className="reelm-cover-img" />
                           : <div className="reelm-cover-placeholder"></div>
                       }
-                      {selectedReelm.image && <div className="reelm-cover-blur-strip" />}
+                      {selectedReelm.image && !isDefaultCommunity(selectedReelm) && <div className="reelm-cover-blur-strip" />}
                       <div className="reelm-sidebar-name-row" onClick={e => {
                         e.stopPropagation()
                         if (showReelmInfoMenu) { setShowReelmInfoMenu(null); return }
@@ -8996,7 +8996,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         const y = Math.min((e.clientY || r.bottom) + 4, window.innerHeight - 340)
                         setShowReelmInfoMenu({ x: Math.max(10, x), y: Math.max(10, y), w: menuWidth })
                       }}>
-                        <span className="reelm-sidebar-name">{selectedReelm.name}</span>
+                        <span className="reelm-sidebar-name">{isDefaultCommunity(selectedReelm) ? (t('reelms_community') || (language === 'tr' ? 'Reelms Topluluğu' : 'Reelms Community')) : selectedReelm.name}</span>
                         {showReelmInfoMenu && ReactDOM.createPortal(
                           <ReelmInfoMenu
                             reelm={selectedReelm}
@@ -9720,13 +9720,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           setShowReelmMenu({ x: Math.max(10, x), y: Math.max(10, y), w: menuWidth })
                         }}
                       >
-                        {selectedReelm.image
-                          ? <img src={selectedReelm.image} alt="cover" className="reelm-cover-img" />
-                          : isDefaultCommunity(selectedReelm)
-                            ? <div className="reelm-cover-community-art"><ReelmsCommunityGlyph /><span>Reelms Community</span></div>
+                        {isDefaultCommunity(selectedReelm)
+                          ? <div className="reelm-cover-community-art"><ReelmsCommunityGlyph size={44} /></div>
+                          : selectedReelm.image
+                            ? <img src={selectedReelm.image} alt="cover" className="reelm-cover-img" />
                             : <div className="reelm-cover-placeholder"><span>+</span></div>
                         }
-                        {selectedReelm.image && <div className="reelm-cover-blur-strip" />}
+                        {selectedReelm.image && !isDefaultCommunity(selectedReelm) && <div className="reelm-cover-blur-strip" />}
                         <div className="reelm-sidebar-name-row" onClick={e => {
                           e.stopPropagation()
                           if (showReelmInfoMenu) { setShowReelmInfoMenu(null); return }
@@ -9737,7 +9737,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           const y = Math.min((e.clientY || r.bottom) + 4, window.innerHeight - 340)
                           setShowReelmInfoMenu({ x: Math.max(10, x), y: Math.max(10, y), w: menuWidth })
                         }}>
-                          <span className="reelm-sidebar-name">{selectedReelm.name}</span>
+                          <span className="reelm-sidebar-name">{isDefaultCommunity(selectedReelm) ? (t('reelms_community') || (language === 'tr' ? 'Reelms Topluluğu' : 'Reelms Community')) : selectedReelm.name}</span>
                           {showReelmInfoMenu && ReactDOM.createPortal(
                             <ReelmInfoMenu
                               reelm={selectedReelm}
