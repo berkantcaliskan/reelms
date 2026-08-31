@@ -11884,6 +11884,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [discoverUsers, setDiscoverUsers] = useState([])
   const [discoverReelmsList, setDiscoverReelmsList] = useState([])
   const [discoverPreviewReelm, setDiscoverPreviewReelm] = useState(null)
+  const [showOfficialReelms, setShowOfficialReelms] = useState(false)
   const [pendingReelmJoinIds, setPendingReelmJoinIds] = useState([])
   const [showFriendsPopup, setShowFriendsPopup] = useState(false)
   const [showNotificationsPopup, setShowNotificationsPopup] = useState(false)
@@ -22114,11 +22115,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   const allDiscoverableReelms = Array.from(combinedDiscoverMap.values())
                     .filter(r => !joinedReelmIds.has(String(r.id)))
 
-                  const featuredDiscoverReelms = allDiscoverableReelms.filter(r => r.showInDiscover === true)
+                  const officialReelms = allDiscoverableReelms.filter(r => String(r.id || '').startsWith('reelms-'))
+                  const communityReelms = allDiscoverableReelms.filter(r => !String(r.id || '').startsWith('reelms-'))
 
-                  const filteredPublicReelms = discoverCategory === 'all'
-                    ? (q ? allDiscoverableReelms : featuredDiscoverReelms)
-                    : allDiscoverableReelms.filter(r => (r.category || '').toLowerCase() === discoverCategory || (r.tags || []).some(t => t.toLowerCase() === discoverCategory))
+                  const filteredCommunityReelms = discoverCategory === 'all'
+                    ? (q ? communityReelms : communityReelms.filter(r => r.showInDiscover === true))
+                    : communityReelms.filter(r => (r.category || '').toLowerCase() === discoverCategory || (r.tags || []).some(t => t.toLowerCase() === discoverCategory))
 
                   const results = q ? [
                     ...reelms.filter(r => r.name?.toLowerCase().includes(q)).map(r => ({ ...r, _type: 'reelm', joined: true })),
@@ -22132,7 +22134,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     }).map(r => ({ ...r, _type: 'reelm', joined: false })),
                     ...chats.filter(c => c.name?.toLowerCase().includes(q)).map(c => ({ ...c, _type: 'chat' })),
                     ...discoverUsers.map(u => ({ ...u, _type: 'user' })),
-                  ] : filteredPublicReelms.map(r => ({ ...r, _type: 'reelm', joined: false }))
+                  ] : filteredCommunityReelms.map(r => ({ ...r, _type: 'reelm', joined: false }))
 
                   const reelmResults = results.filter(item => item._type === 'reelm')
                   const otherResults = results.filter(item => item._type !== 'reelm')
@@ -22207,6 +22209,57 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             </button>
                           ))}
                         </div>
+
+                        {!q && officialReelms.length > 0 && (
+                          <div className="discover-official-section">
+                            <button
+                              type="button"
+                              className="discover-official-trigger"
+                              onClick={() => setShowOfficialReelms(prev => !prev)}
+                            >
+                              <span className="discover-official-title">Resmi Reelmler</span>
+                              <svg
+                                className={`discover-official-chevron${showOfficialReelms ? ' open' : ''}`}
+                                viewBox="0 0 24 24"
+                                width="18"
+                                height="18"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2.4"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                              >
+                                <polyline points="6 9 12 15 18 9" />
+                              </svg>
+                            </button>
+
+                            <div className={`discover-official-accordion${showOfficialReelms ? ' open' : ''}`}>
+                              <div className="discover-reelms-grid">
+                                {officialReelms.map((item, i) => (
+                                  <button
+                                    key={`official-reelm-${item.id || i}`}
+                                    type="button"
+                                    className="discover-reelm-card"
+                                    onClick={() => setDiscoverPreviewReelm(item)}
+                                  >
+                                    <div className="discover-reelm-icon-wrap">
+                                      {item.image ? (
+                                        <img src={item.image} alt={item.name} className="discover-reelm-icon-img" />
+                                      ) : (
+                                        <span className="discover-reelm-icon-fallback">
+                                          {(item.name || '?').charAt(0).toUpperCase()}
+                                        </span>
+                                      )}
+                                    </div>
+                                    <span className="discover-reelm-card-name" title={item.name}>
+                                      {item.name}
+                                    </span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                       <div className="discover-results">
                         {Boolean(q) && results.length === 0 && (
