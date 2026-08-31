@@ -1077,8 +1077,12 @@ function getClientOpenRouterKey() {
   if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_OPENROUTER_API_KEY) {
     return import.meta.env.VITE_OPENROUTER_API_KEY
   }
-  if (typeof window !== 'undefined' && window.reelms?.openrouterApiKey) {
-    return window.reelms.openrouterApiKey
+  if (typeof window !== 'undefined') {
+    if (window.reelms?.openrouterApiKey) return window.reelms.openrouterApiKey
+    try {
+      const stored = localStorage.getItem('reelms_openrouter_key')
+      if (stored) return stored
+    } catch {}
   }
   return ''
 }
