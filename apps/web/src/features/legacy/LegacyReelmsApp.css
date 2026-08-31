@@ -10797,36 +10797,44 @@ h6 {
   transition: max-height 0.28s ease;
 }
 .dm-profile-slide--open {
-  max-height: 400px;
+  max-height: 500px;
 }
 .dm-profile-slide-inner {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px 10px;
+  align-items: stretch;
+  gap: 4px;
+  padding: 6px 0 10px;
+  width: 100%;
 }
 
 .dm-profile-inline-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 8px 0 4px;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  margin: 6px 0 2px;
 }
 .dm-profile-inline-action {
-  border: 1px solid rgba(var(--ta-rgb), 0.12);
-  background: rgba(var(--ta-rgb), 0.045);
-  color: rgba(var(--ta-rgb), 0.76);
-  border-radius: 999px;
-  padding: 5px 9px;
-  font-size: 0.68rem;
-  font-weight: 700;
+  border: none;
+  background: transparent;
+  color: rgba(var(--ta-rgb), 0.82);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 0.76rem;
+  font-weight: 600;
   font-family: var(--body-font);
   cursor: pointer;
-  line-height: 1;
+  line-height: 1.2;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  transition: background 0.15s ease, color 0.15s ease;
 }
 .dm-profile-inline-action:hover {
-  background: rgba(var(--ta-rgb), 0.11);
+  background: rgba(var(--ta-rgb), 0.08);
   color: var(--ta);
 }
 .dm-profile-inline-action:disabled {
@@ -10834,12 +10842,13 @@ h6 {
   cursor: default;
 }
 .dm-profile-inline-action--danger {
-  color: #fca5a5;
-  border-color: rgba(248,113,113,0.18);
-  background: rgba(248,113,113,0.06);
+  color: #f87171;
+  border: none;
+  background: transparent;
 }
 .dm-profile-inline-action--danger:hover {
-  background: rgba(248,113,113,0.12);
+  background: rgba(248, 113, 113, 0.1);
+  color: #ef4444;
 }
 .dm-profile-username {
   font-size: 0.72rem;

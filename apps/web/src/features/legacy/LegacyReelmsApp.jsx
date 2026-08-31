@@ -20275,23 +20275,39 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           <div className="dm-profile-slide-inner">
                             <div className="dm-profile-inline-actions">
                               {fp?.allowProfileSharing !== false && !isReelmsSystemChat(selectedChat) && (
-                                <button type="button" className="dm-profile-inline-action" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(`${getPublicWebUrl()}/u/${fp?.username || dmPeerId || fp?.id}`) }}>{t('share_profile') || 'Share Profile'}</button>
+                                <button type="button" className="dm-profile-inline-action" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(`${getPublicWebUrl()}/u/${fp?.username || dmPeerId || fp?.id}`) }}>
+                                  <span>🔗</span>
+                                  <span>{t('share_profile') || 'Share Profile'}</span>
+                                </button>
                               )}
                               {!isReelmsSystemChat(selectedChat) && (
                                 <button type="button" className="dm-profile-inline-action" onClick={() => setDmSideTab(t => t === 'vapor' ? 'profile' : 'vapor')}>
-                                  ✦ {t('vapor_chat_title') || 'Vapor Chat'}
+                                  <span>✦</span>
+                                  <span>{t('vapor_chat_title') || 'Vapor Chat'}</span>
                                 </button>
                               )}
                               {!isReelmsSystemChat(selectedChat) && !dmIsSelf && dmIsBlocked && (
-                                <button type="button" className="dm-profile-inline-action" onClick={(e) => { e.stopPropagation(); unblockUserFn(dmPeerId) }}>Unblock</button>
+                                <button type="button" className="dm-profile-inline-action" onClick={(e) => { e.stopPropagation(); unblockUserFn(dmPeerId) }}>
+                                  <span>🔓</span>
+                                  <span>Unblock</span>
+                                </button>
                               )}
                               {!isReelmsSystemChat(selectedChat) && !dmIsSelf && !dmIsBlocked && dmIsFriend && (
-                                <button type="button" className="dm-profile-inline-action dm-profile-inline-action--danger" onClick={(e) => { e.stopPropagation(); removeFriend(dmPeerId) }}>{t('remove_friend') || 'Remove Friend'}</button>
+                                <button type="button" className="dm-profile-inline-action dm-profile-inline-action--danger" onClick={(e) => { e.stopPropagation(); removeFriend(dmPeerId) }}>
+                                  <span>👤</span>
+                                  <span>{t('remove_friend') || 'Remove Friend'}</span>
+                                </button>
                               )}
                               {!isReelmsSystemChat(selectedChat) && !dmIsSelf && !dmIsBlocked && fp && (
-                                <button type="button" className="dm-profile-inline-action dm-profile-inline-action--danger" onClick={(e) => { e.stopPropagation(); blockUserFn(fp) }}>{t('block') || 'Block'}</button>
+                                <button type="button" className="dm-profile-inline-action dm-profile-inline-action--danger" onClick={(e) => { e.stopPropagation(); blockUserFn(fp) }}>
+                                  <span>🚫</span>
+                                  <span>{t('block') || 'Block'}</span>
+                                </button>
                               )}
-                              <button type="button" className="dm-profile-inline-action dm-profile-inline-action--danger" onClick={(e) => { e.stopPropagation(); deleteConversation(selectedChat.id) }}>{t('delete_conversation') || 'Delete Conversation'}</button>
+                              <button type="button" className="dm-profile-inline-action dm-profile-inline-action--danger" onClick={(e) => { e.stopPropagation(); deleteConversation(selectedChat.id) }}>
+                                <span>🗑️</span>
+                                <span>{t('delete_conversation') || 'Delete Conversation'}</span>
+                              </button>
                             </div>
 
                             {/* Vapor settings expand if enabled */}
