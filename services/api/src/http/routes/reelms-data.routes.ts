@@ -3192,14 +3192,20 @@ export function createReelmsDataRouter(io: Server) {
       const data = target.data as any
       const authorId = String(data?.userId || data?.authorId || data?.sender?.id || '')
       const isSystemAdmin = await isSystemAdminUid(uid).catch(() => false)
-      // Authorized reelm roles (manageModeration / managers) can delete any message in
+      const isSystemOrBotMsg = data?.isSystem === true
+        || data?.type === 'system'
+        || authorId === 'system'
+        || data?.sender?.id === 'system'
+        || data?.sender?.isBot === true
+        || authorId.startsWith('bot_')
+      // Authorized reelm roles (manageModeration / manageMessages / managers) can delete any message in
       // their channel; in DMs (including system inbox), recipient/participant can delete;
-      // otherwise author may delete their own message.
+      // system/bot messages can be deleted; otherwise author may delete their own message.
       const canModerateReelm = access.kind === 'reelm'
         && (await canUseReelmPermission(uid, access.reelmId, 'manageModeration').catch(() => false)
           || await canManageReelm(uid, access.reelmId).catch(() => false))
       const canDeleteInDm = access.kind === 'dm'
-      if (uid !== env.REELMS_MODERATION_UID && !isSystemAdmin && authorId !== uid && !canModerateReelm && !canDeleteInDm) {
+      if (uid !== env.REELMS_MODERATION_UID && !isSystemAdmin && authorId !== uid && !canModerateReelm && !canDeleteInDm && !isSystemOrBotMsg) {
         return res.status(403).json({ error: 'forbidden' })
       }
 

@@ -12056,6 +12056,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [showQuickSwitcher, setShowQuickSwitcher] = useState(false)
   const [showInsightsModal, setShowInsightsModal] = useState(null)
   const [showPinnedDrawer, setShowPinnedDrawer] = useState(false)
+  const [chatCtxMenu, setChatCtxMenu] = useState(null)
+  const [showMediaGallery, setShowMediaGallery] = useState(null)
+  const [groupCropModal, setGroupCropModal] = useState(null)
+  const [mediaGalleryTab, setMediaGalleryTab] = useState('all')
+  const [groupDetailsOpen, setGroupDetailsOpen] = useState(false)
 
   useEffect(() => {
     const handleGlobalKey = (e) => {
@@ -12090,6 +12095,34 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (topTickerExitTimerRef.current) clearTimeout(topTickerExitTimerRef.current)
     setTopTickerExiting(false)
   }, [])
+
+  const getCategoryDisplayName = useCallback((cat) => {
+    if (!cat) return ''
+    const rawName = String(cat.name || '').trim()
+    const lower = rawName.toLowerCase()
+    if (cat.id === 'cat-baslangic' || cat.id === 'cat_beginning' || lower === 'başlangıç' || lower === 'start' || lower === 'beginning') {
+      return (t('cat_beginning') || 'Start').toLocaleUpperCase(language === 'tr' ? 'tr-TR' : undefined)
+    }
+    if (cat.id === 'cat-text' || lower === 'metin' || lower === 'text') {
+      return (t('cat_text') || 'Text').toLocaleUpperCase(language === 'tr' ? 'tr-TR' : undefined)
+    }
+    if (cat.id === 'cat-voice' || lower === 'ses & video' || lower === 'ses & vi̇deo' || lower === 'voice & video' || lower === 'voice') {
+      return (t('cat_voice') || 'Voice & Video').toLocaleUpperCase(language === 'tr' ? 'tr-TR' : undefined)
+    }
+    if (cat.id === 'cat-live' || lower === 'canlı aksiyon' || lower === 'canli aksiyon' || lower === 'live action' || lower === 'live') {
+      return (t('cat_live') || 'Live Action').toLocaleUpperCase(language === 'tr' ? 'tr-TR' : undefined)
+    }
+    if (cat.id === 'cat-announcements' || lower === 'duyurular' || lower === 'announcements') {
+      return (t('cat_announcements') || 'Announcements').toLocaleUpperCase(language === 'tr' ? 'tr-TR' : undefined)
+    }
+    if (cat.id === 'cat-community' || lower === 'topluluk' || lower === 'community') {
+      return (t('cat_community') || 'Community').toLocaleUpperCase(language === 'tr' ? 'tr-TR' : undefined)
+    }
+    if (language === 'tr') {
+      return rawName.toLocaleUpperCase('tr-TR')
+    }
+    return rawName.toUpperCase()
+  }, [language, t])
 
   const resumeTopTickerTimer = useCallback(() => {
     if (topTickerTimerRef.current) clearTimeout(topTickerTimerRef.current)
@@ -16436,12 +16469,16 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     let snapshot = null
     setMessages(prev => {
       snapshot = prev[msgKey] || []
-      return { ...prev, [msgKey]: snapshot.filter(m => String(m.id) !== String(msgId)) }
+      const filtered = snapshot.filter(m => String(m.id) !== String(msgId))
+      saveCachedMessages(msgKey, filtered)
+      return { ...prev, [msgKey]: filtered }
     })
     messageDelete(msgKey, msgId).catch((err) => {
       // Server refused (e.g. not allowed) — roll back so the UI matches reality
-      // instead of the message silently re-appearing on the next refetch.
-      if (snapshot) setMessages(prev => ({ ...prev, [msgKey]: snapshot }))
+      if (snapshot) {
+        saveCachedMessages(msgKey, snapshot)
+        setMessages(prev => ({ ...prev, [msgKey]: snapshot }))
+      }
       setModerationWarning(err?.status === 403 ? 'You are not allowed to delete this message.' : 'Message could not be deleted.')
       setTimeout(() => setModerationWarning(''), 4000)
     })
@@ -19941,7 +19978,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               key={c.id}
                               className={`chat-list-row${selectedChat?.id === c.id ? ' chat-list-row--active' : ''}${unread > 0 ? ' chat-list-row--unread' : ''}`}
                               onClick={() => {
-                                setSelectedChat(c); setSelectedChannel(null); setSelectedReelm(null); setShowChatList(false); clearUnread(c.id)
+                                setSelectedChat(c); setSelectedChannel(null); setSelectedReelm(null); setShowChatList(false); setShowMediaGallery(null); clearUnread(c.id)
+                              }}
+                              onContextMenu={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                setChatCtxMenu({ x: e.clientX, y: e.clientY, chat: c })
                               }}
                             >
                               <div className="chat-list-avatar-wrap">
@@ -19959,13 +20001,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               {unread > 0 && (
                                 <span className="notif-badge chat-list-unread-count">{capBadge(unread)}</span>
                               )}
-                              <button
-                                className="friend-reject-btn chat-list-delete-btn chat-list-icon-btn"
-                                type="button"
-                                title="Delete conversation"
-                                aria-label="Delete conversation"
-                                onClick={(e) => { e.preventDefault(); e.stopPropagation(); deleteConversation(c.id) }}
-                              >×</button>
                             </div>
                           )})
                         })()}
@@ -19985,42 +20020,41 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       ]
                       const _isOwner = selectedChat.ownerId === uid
                       const createdDate = selectedChat.createdAt
-                        ? new Date(selectedChat.createdAt).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' })
+                        ? new Date(selectedChat.createdAt).toLocaleDateString(language === 'tr' ? 'tr-TR' : 'en-US', { day: 'numeric', month: 'long', year: 'numeric' })
                         : null
                       return (
                         <div className="dm-sidebar group-sidebar">
-                          <button className="dm-back-btn" onClick={() => { setSelectedChat(null); setShowChatList(true); setChatListFilter('all') }}>
+                          <button className="dm-back-btn" onClick={() => { setSelectedChat(null); setShowChatList(true); setChatListFilter('all'); setShowMediaGallery(null) }}>
                             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                               <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                             </svg>
                           </button>
 
-                          {/* Group avatar — click to change */}
-                          <div className="group-avatar-edit-wrap" onClick={() => groupEditPhotoInputRef.current?.click()} title="Change group photo">
-                            <div className="dm-friend-avatar" style={{ width: 54, height: 54, fontSize: '1.3rem' }}>
+                          {/* Group avatar & header with toggle drawer */}
+                          <div className="group-avatar-edit-wrap" onClick={() => setGroupDetailsOpen(v => !v)} title="Group details & settings">
+                            <div className="dm-friend-avatar" style={{ width: 56, height: 56, fontSize: '1.4rem' }}>
                               {selectedChat.photo
                                 ? <img src={selectedChat.photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
                                 : selectedChat.name?.charAt(0).toUpperCase()
                               }
                             </div>
-                            <div className="group-avatar-edit-overlay">
+                            <div className="group-avatar-edit-overlay" onClick={(e) => { e.stopPropagation(); groupEditPhotoInputRef.current?.click() }} title="Change group photo">
                               <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828a4 4 0 01-1.414.94l-3.414 1.414 1.414-3.414A4 4 0 019 13z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
                             </div>
                           </div>
-                          <input ref={groupEditPhotoInputRef} type="file" accept="image/*" style={{ display: 'none' }} onChange={e => {
-                            const file = e.target.files?.[0]
-                            if (!file) return
-                            const reader = new FileReader()
-                            reader.onload = ev => {
-                              const photo = ev.target.result
-                              setChats(prev => prev.map(c => c.id === selectedChat.id ? { ...c, photo } : c))
-                              setSelectedChat(prev => ({ ...prev, photo }))
-                            }
-                            reader.readAsDataURL(file)
-                            e.target.value = ''
-                          }} />
+                          <input
+                            ref={groupEditPhotoInputRef}
+                            type="file"
+                            accept="image/*"
+                            style={{ display: 'none' }}
+                            onChange={e => {
+                              const file = e.target.files?.[0]
+                              if (file) setGroupCropModal(file)
+                              e.target.value = ''
+                            }}
+                          />
 
-                          {/* Group name — click to edit */}
+                          {/* Group name */}
                           {groupNameEditing ? (
                             <div className="group-name-edit-row">
                               <input
@@ -20032,8 +20066,10 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                   if (e.key === 'Enter') {
                                     const name = groupNameEditValue.trim()
                                     if (name) {
-                                      setChats(prev => prev.map(c => c.id === selectedChat.id ? { ...c, name } : c))
-                                      setSelectedChat(prev => ({ ...prev, name }))
+                                      const updatedChats = chats.map(c => c.id === selectedChat.id ? { ...c, name } : c)
+                                      setChats(updatedChats)
+                                      setSelectedChat(prev => prev ? { ...prev, name } : null)
+                                      appPutDoc('chats', updatedChats).catch(() => {})
                                     }
                                     setGroupNameEditing(false)
                                   } else if (e.key === 'Escape') {
@@ -20043,43 +20079,52 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 onBlur={() => {
                                   const name = groupNameEditValue.trim()
                                   if (name) {
-                                    setChats(prev => prev.map(c => c.id === selectedChat.id ? { ...c, name } : c))
-                                    setSelectedChat(prev => ({ ...prev, name }))
+                                    const updatedChats = chats.map(c => c.id === selectedChat.id ? { ...c, name } : c)
+                                    setChats(updatedChats)
+                                    setSelectedChat(prev => prev ? { ...prev, name } : null)
+                                    appPutDoc('chats', updatedChats).catch(() => {})
                                   }
                                   setGroupNameEditing(false)
                                 }}
                               />
                             </div>
                           ) : (
-                            <div className="group-name-row" onClick={() => { setGroupNameEditValue(selectedChat.name); setGroupNameEditing(true) }} title="Edit group name">
+                            <div className="group-name-row" onClick={() => setGroupDetailsOpen(v => !v)} title="Group Details">
                               <span className="dm-friend-name">{selectedChat.name}</span>
-                              <svg className="group-name-edit-icon" width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M15.232 5.232l3.536 3.536M9 13l6.586-6.586a2 2 0 012.828 2.828L11.828 15.828a4 4 0 01-1.414.94l-3.414 1.414 1.414-3.414A4 4 0 019 13z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                              <svg className={`group-side-chevron${groupDetailsOpen ? ' group-side-chevron--open' : ''}`} width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                             </div>
                           )}
 
+                          {/* Slide-out Group Details Drawer */}
+                          <div className={`dm-profile-slide${groupDetailsOpen ? ' dm-profile-slide--open' : ''}`}>
+                            <div className="dm-profile-slide-inner">
+                              {(createdDate || selectedChat.createdByName) && (
+                                <p className="group-side-meta" style={{ textAlign: 'center', margin: '4px 0 10px' }}>
+                                  {selectedChat.createdByName ? `${selectedChat.createdByName} ${t('created_group_text') || 'created this group'}` : (t('group_created') || 'Created')}
+                                  {createdDate ? ` · ${createdDate}` : ''}
+                                </p>
+                              )}
+                              <div className="dm-profile-inline-actions">
+                                <button type="button" className="dm-profile-inline-action" onClick={() => { setShowGroupCreator('friends'); setGroupSelectedFriends([]); setGroupNameInput(selectedChat.name); setGroupPhotoInput(null); setGroupDetailsOpen(false) }}>
+                                  + {t('add_members') || 'Add Members'}
+                                </button>
+                                <button type="button" className="dm-profile-inline-action" onClick={() => { setGroupNameEditValue(selectedChat.name); setGroupNameEditing(true); setGroupDetailsOpen(false) }}>
+                                  ✏️ {t('edit_name') || 'Rename Group'}
+                                </button>
+                                <button type="button" className="dm-profile-inline-action dm-profile-inline-action--danger" onClick={() => deleteConversation(selectedChat.id)}>
+                                  🚪 {t('leave_group') || 'Leave Group'}
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+
                           <div className="group-side-divider" />
 
-                          {/* Menu items */}
+                          {/* Quick controls when menu is closed */}
                           <div className="group-side-menu">
-                            <button className="group-side-menu-item" onClick={() => { setShowGroupCreator('friends'); setGroupSelectedFriends([]); setGroupNameInput(selectedChat.name); setGroupPhotoInput(null) }}>
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 5v14M5 12h14" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
-                              {t('add_members')}
-                            </button>
-
-                            <button className={`group-side-menu-item${groupSideExpanded === 'permissions' ? ' group-side-menu-item--active' : ''}`} onClick={() => setGroupSideExpanded(v => v === 'permissions' ? null : 'permissions')}>
-                              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7z" stroke="currentColor" strokeWidth="1.8" strokeLinejoin="round"/></svg>
-                              {t('permissions_label')}
-                              <svg className={`group-side-chevron${groupSideExpanded === 'permissions' ? ' group-side-chevron--open' : ''}`} width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                            </button>
-                            {groupSideExpanded === 'permissions' && (
-                              <div className="group-side-expand">
-                                <p className="chat-side-placeholder">{t('permissions_coming_soon')}</p>
-                              </div>
-                            )}
-
                             <button className={`group-side-menu-item${groupSideExpanded === 'vapor' ? ' group-side-menu-item--active' : ''}`} onClick={() => setGroupSideExpanded(v => v === 'vapor' ? null : 'vapor')}>
                               <span style={{ fontSize: '0.8rem', width: 14, display: 'inline-flex', justifyContent: 'center', flexShrink: 0 }}>✦</span>
-                              {t('vapor_chat_title')}{vapor ? ' ·' : ''}
+                              {t('vapor_chat_title') || 'Vapor Chat'}{vapor ? ' ·' : ''}
                               {vapor && <span className="group-vapor-on-dot" />}
                               <svg className={`group-side-chevron${groupSideExpanded === 'vapor' ? ' group-side-chevron--open' : ''}`} width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                             </button>
@@ -20097,20 +20142,28 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 </div>
                               </div>
                             )}
+
+                            <button className="group-side-menu-item" onClick={() => startCall('audio')}>
+                              <span>🔊</span>
+                              {t('voice_call') || 'Voice Room / Call'}
+                            </button>
+
+                            <button className="group-side-menu-item" onClick={() => startCall('video')}>
+                              <span>📹</span>
+                              {t('video_call') || 'Video Room / Call'}
+                            </button>
                           </div>
 
                           <div style={{ flex: 1 }} />
 
-                          {/* Group info + leave */}
-                          <div className="group-side-footer">
-                            {(createdDate || selectedChat.createdByName) && (
-                              <p className="group-side-meta">
-                                {selectedChat.createdByName ? `${selectedChat.createdByName} ${t('created_group_text')}` : t('group_created')}
-                                {createdDate ? ` · ${createdDate}` : ''}
-                              </p>
-                            )}
-                            <button className="dm-profile-action-btn dm-profile-action-danger" style={{ width: '100%', textAlign: 'left' }} onClick={() => deleteConversation(selectedChat.id)}>
-                              {t('leave_group')}
+                          {/* Media Gallery button at bottom aligned with input */}
+                          <div className="dm-bottom-section">
+                            <button
+                              type="button"
+                              className="dm-media-gallery-btn"
+                              onClick={() => setShowMediaGallery({ kind: 'group', key: selectedChat.id, name: selectedChat.name })}
+                            >
+                              🖼️ {t('media_and_files') || 'Media & Files'}
                             </button>
                           </div>
                         </div>
@@ -20120,6 +20173,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                     const selectedChatPeer = selectedBlockedEntry || dmFriendProfile || getChatPeer(selectedChat)
                     const dmPeerId = String(selectedChat.friendId || selectedChatPeer?.id || '')
                     const displayName = nicknames[selectedChat.friendId] || selectedChatPeer?.name || selectedChat.name || ''
+                    const customNickname = nicknames[selectedChat.friendId]
                     const fpRaw = dmFriendProfile || selectedBlockedEntry || selectedChatPeer
                     const fp = fpRaw ? { ...fpRaw, id: fpRaw.id || dmPeerId } : (dmPeerId ? { id: dmPeerId, name: displayName } : null)
                     const dmIsSelf = dmPeerId && String(dmPeerId) === String(uid)
@@ -20141,174 +20195,154 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       : Object.keys(fp?.sociallinks || {}).filter(k => fp.sociallinks[k])
                     const friendNowPlaying = spotifyFriendsNowPlaying[selectedChat.friendId]
                     return (
-                      <div className="dm-sidebar">
-                        <button className="dm-back-btn" onClick={() => { setSelectedChat(null); setShowChatList(true); setChatListFilter('all') }}>
+                      <div className="dm-sidebar dm-sidebar-redesign">
+                        <button className="dm-back-btn" onClick={() => { setSelectedChat(null); setShowChatList(true); setChatListFilter('all'); setShowMediaGallery(null) }}>
                           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                             <path d="M10 3L5 8l5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/>
                           </svg>
                         </button>
-                        <div style={{ position: 'relative' }}>
-                          <div className={`dm-friend-card${dmProfileExpanded ? ' dm-friend-card--expanded' : ''}`} onClick={() => setDmProfileExpanded(v => !v)} style={{ cursor: 'pointer' }}>
-                            <div className="dm-friend-avatar">
-                              {selectedAvatarSrc
-                                ? <img src={selectedAvatarSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-                                : (displayName || '?').charAt(0).toUpperCase()
-                              }
-                            </div>
-                            <div className="dm-friend-info">
-                              <span className="dm-friend-name">{displayName}</span>
-                              {!dmIsSelf && getLastSeenLabel(dmPeerId) && (
-                                <span className="dm-friend-lastseen">{getLastSeenLabel(dmPeerId)}</span>
-                              )}
-                            </div>
-                            <svg className={`dm-profile-chevron${dmProfileExpanded ? ' dm-profile-chevron--open' : ''}`} width="14" height="14" viewBox="0 0 24 24" fill="none">
-                              <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
+
+                        {/* Top Clean Profile Card */}
+                        <div className="dm-avatar-card" onClick={() => setDmProfileExpanded(v => !v)} title="Click to view options">
+                          <div className="dm-friend-avatar" style={{ width: 68, height: 68, fontSize: '1.6rem' }}>
+                            {selectedAvatarSrc
+                              ? <img src={selectedAvatarSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                              : (displayName || '?').charAt(0).toUpperCase()
+                            }
                           </div>
+                          <span className="dm-display-name">{displayName}</span>
+                          {(customNickname || fp?.username) && (
+                            <span className="dm-nickname-italic">
+                              {customNickname ? `(${customNickname})` : `@${fp.username.startsWith('@') ? fp.username.slice(1) : fp.username}`}
+                            </span>
+                          )}
+                          {!dmIsSelf && getLastSeenLabel(dmPeerId) && (
+                            <span className="dm-friend-lastseen" style={{ marginTop: 3 }}>{getLastSeenLabel(dmPeerId)}</span>
+                          )}
                         </div>
-                        {isReelmsSystemChat(selectedChat) && (
-                          <div className="dm-blocked-banner">
-                            <div>
-                              <strong>Reelms System</strong>
-                              <span>Official Reelms System notifications and announcements inbox.</span>
-                            </div>
+
+                        {/* Bio & Status */}
+                        {fp?.bio && <p className="dm-bio-preview">{fp.bio}</p>}
+                        {friendNowPlaying && (
+                          <div className="dm-profile-nowplaying" style={{ marginTop: 6 }}>
+                            <SpotifyIcon size={13} />
+                            <span className="dm-profile-nowplaying-track">{friendNowPlaying.name}</span>
+                            <span className="dm-profile-nowplaying-sep"> · </span>
+                            <span className="dm-profile-nowplaying-artist">{friendNowPlaying.artist}</span>
                           </div>
                         )}
-                        {selectedBlockedEntry && (
-                          <div className="dm-blocked-banner">
-                            <div>
-                              <strong>Blocked</strong>
-                              <span>You blocked this user.</span>
-                            </div>
-                            <button type="button" onClick={() => unblockUserFn(selectedChat.friendId)}>Unblock</button>
+                        {activeSocials.length > 0 && (
+                          <div className="dm-profile-socials" style={{ marginTop: 8 }}>
+                            {activeSocials.map(key => {
+                              const platform = dmSocialPlatforms.find(p => p.key === key)
+                              if (!platform) return null
+                              const { Icon, color, baseUrl, label } = platform
+                              const handle = fp.sociallinks[key]
+                              return (
+                                <button
+                                  key={key}
+                                  className="dm-profile-social-chip"
+                                  style={{ color }}
+                                  title={`${label}: ${handle}`}
+                                  onClick={e => { e.stopPropagation(); if (baseUrl) window.open(baseUrl + handle, '_blank') }}
+                                >
+                                  <Icon />
+                                  <span>{handle}</span>
+                                </button>
+                              )
+                            })}
                           </div>
                         )}
+
+                        {/* Slide-out Menu on avatar/name click */}
                         <div className={`dm-profile-slide${dmProfileExpanded ? ' dm-profile-slide--open' : ''}`}>
                           <div className="dm-profile-slide-inner">
-                            {fp?.username && (
-                              <span className="dm-profile-username">@{fp.username.startsWith('@') ? fp.username.slice(1) : fp.username}</span>
-                            )}
                             <div className="dm-profile-inline-actions">
                               {fp?.allowProfileSharing !== false && !isReelmsSystemChat(selectedChat) && (
-                                <button type="button" className="dm-profile-inline-action" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(`${getPublicWebUrl()}/u/${fp?.username || dmPeerId || fp?.id}`) }}>{t('share_profile')}</button>
+                                <button type="button" className="dm-profile-inline-action" onClick={(e) => { e.stopPropagation(); navigator.clipboard?.writeText(`${getPublicWebUrl()}/u/${fp?.username || dmPeerId || fp?.id}`) }}>{t('share_profile') || 'Share Profile'}</button>
+                              )}
+                              {!isReelmsSystemChat(selectedChat) && (
+                                <button type="button" className="dm-profile-inline-action" onClick={() => setDmSideTab(t => t === 'vapor' ? 'profile' : 'vapor')}>
+                                  ✦ {t('vapor_chat_title') || 'Vapor Chat'}
+                                </button>
                               )}
                               {!isReelmsSystemChat(selectedChat) && !dmIsSelf && dmIsBlocked && (
                                 <button type="button" className="dm-profile-inline-action" onClick={(e) => { e.stopPropagation(); unblockUserFn(dmPeerId) }}>Unblock</button>
                               )}
                               {!isReelmsSystemChat(selectedChat) && !dmIsSelf && !dmIsBlocked && dmIsFriend && (
-                                <button type="button" className="dm-profile-inline-action dm-profile-inline-action--danger" onClick={(e) => { e.stopPropagation(); removeFriend(dmPeerId) }}>{t('remove_friend')}</button>
-                              )}
-                              {!isReelmsSystemChat(selectedChat) && !dmIsSelf && !dmIsBlocked && !dmIsFriend && (
-                                dmHasPendingRequest
-                                  ? <button type="button" className="dm-profile-inline-action" disabled>Friend request sent</button>
-                                  : <button type="button" className="dm-profile-inline-action" onClick={(e) => { e.stopPropagation(); sendFriendRequest(fp || { id: dmPeerId, name: displayName }) }}>Add Friend</button>
+                                <button type="button" className="dm-profile-inline-action dm-profile-inline-action--danger" onClick={(e) => { e.stopPropagation(); removeFriend(dmPeerId) }}>{t('remove_friend') || 'Remove Friend'}</button>
                               )}
                               {!isReelmsSystemChat(selectedChat) && !dmIsSelf && !dmIsBlocked && fp && (
-                                <button type="button" className="dm-profile-inline-action dm-profile-inline-action--danger" onClick={(e) => { e.stopPropagation(); blockUserFn(fp) }}>{t('block')}</button>
+                                <button type="button" className="dm-profile-inline-action dm-profile-inline-action--danger" onClick={(e) => { e.stopPropagation(); blockUserFn(fp) }}>{t('block') || 'Block'}</button>
                               )}
-                              <button type="button" className="dm-profile-inline-action dm-profile-inline-action--danger" onClick={(e) => { e.stopPropagation(); deleteConversation(selectedChat.id) }}>Delete conversation</button>
+                              <button type="button" className="dm-profile-inline-action dm-profile-inline-action--danger" onClick={(e) => { e.stopPropagation(); deleteConversation(selectedChat.id) }}>{t('delete_conversation') || 'Delete Conversation'}</button>
                             </div>
-                            {fp?.activity?.name && <ActivityBadge activity={fp.activity} />}
-                            {fp?.bio && <p className="dm-profile-bio">{fp.bio}</p>}
-                            {friendNowPlaying && (
-                              <div className="dm-profile-nowplaying">
-                                <SpotifyIcon size={13} />
-                                <span className="dm-profile-nowplaying-track">{friendNowPlaying.name}</span>
-                                <span className="dm-profile-nowplaying-sep"> · </span>
-                                <span className="dm-profile-nowplaying-artist">{friendNowPlaying.artist}</span>
-                              </div>
-                            )}
-                            {activeSocials.length > 0 && (
-                              <div className="dm-profile-socials">
-                                {activeSocials.map(key => {
-                                  const platform = dmSocialPlatforms.find(p => p.key === key)
-                                  if (!platform) return null
-                                  const { Icon, color, baseUrl, label } = platform
-                                  const handle = fp.sociallinks[key]
-                                  return (
-                                    <button
-                                      key={key}
-                                      className="dm-profile-social-chip"
-                                      style={{ color }}
-                                      title={`${label}: ${handle}`}
-                                      onClick={e => { e.stopPropagation(); if (baseUrl) window.open(baseUrl + handle, '_blank') }}
-                                    >
-                                      <Icon />
-                                      <span>{handle}</span>
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                            )}
+
+                            {/* Vapor settings expand if enabled */}
+                            {dmSideTab === 'vapor' && !isReelmsSystemChat(selectedChat) && (() => {
+                              const dmVapor = vaporDurations[selectedChat.id]
+                              const DM_VAPOR_OPTS = [
+                                { labelKey: 'vapor_after_read', value: 'read' },
+                                { labelKey: 'vapor_12h', value: 12 * 3600000 },
+                                { labelKey: 'vapor_24h', value: 24 * 3600000 },
+                                { labelKey: 'vapor_48h', value: 48 * 3600000 },
+                                { labelKey: 'vapor_1w', value: 7 * 86400000 },
+                                { labelKey: 'vapor_1m', value: 30 * 86400000 },
+                              ]
+                              return (
+                                <div className="chat-side-section" style={{ marginTop: 8 }}>
+                                  <div className="vapor-chat-header">
+                                    <span className="vapor-chat-title">✦ {t('vapor_chat_title')}</span>
+                                    <span className="vapor-chat-desc">{t('vapor_chat_desc')}</span>
+                                  </div>
+                                  <div className="vapor-opts">
+                                    {DM_VAPOR_OPTS.map(opt => (
+                                      <button key={opt.value} className={`vapor-pill${dmVapor === opt.value ? ' vapor-pill--active' : ''}`}
+                                        onClick={() => setVaporDurations(prev => ({ ...prev, [selectedChat.id]: dmVapor === opt.value ? null : opt.value }))}>
+                                        {t(opt.labelKey)}
+                                      </button>
+                                    ))}
+                                    {dmVapor && <button className="vapor-pill vapor-pill--off" onClick={() => setVaporDurations(prev => ({ ...prev, [selectedChat.id]: null }))}>{t('turn_off')}</button>}
+                                  </div>
+                                </div>
+                              )
+                            })()}
                           </div>
                         </div>
-                        <div className="chat-side-tabs">
-                          {(isReelmsSystemChat(selectedChat) ? ['profile'] : ['profile', 'vapor']).map(tab => (
-                            <button key={tab} className={`chat-side-tab${dmSideTab === tab ? ' chat-side-tab--active' : ''}`} onClick={() => setDmSideTab(tab)}>
-                              {tab === 'vapor' ? `✦ ${t('vapor_tab')}` : t('profile_tab')}
+
+                        {/* Bottom Actions Section */}
+                        <div className="dm-bottom-section">
+                          <button
+                            type="button"
+                            className="dm-media-gallery-btn"
+                            onClick={() => setShowMediaGallery({ kind: 'dm', key: selectedChat.id, name: displayName })}
+                          >
+                            🖼️ {t('media_and_files') || 'Media & Files'}
+                          </button>
+
+                          {!isReelmsSystemChat(selectedChat) && !dmIsSelf && !dmIsFriend && !dmIsBlocked && (
+                            dmHasPendingRequest
+                              ? <button type="button" className="dm-bottom-btn" disabled>Friend request sent</button>
+                              : <button type="button" className="dm-bottom-btn dm-bottom-btn--primary" onClick={() => sendFriendRequest(fp || { id: dmPeerId, name: displayName })}>+ {t('add_friend') || 'Add Friend'}</button>
+                          )}
+
+                          {!isReelmsSystemChat(selectedChat) && (
+                            <button
+                              type="button"
+                              className="dm-bottom-btn"
+                              onClick={() => {
+                                const friend = friends.find(f => String(f.id) === String(selectedChat.friendId)) || { id: selectedChat.friendId, name: selectedChat.name, photo: selectedChat.photo }
+                                setFullProfileTarget({ isSelf: dmIsSelf, user: friend })
+                              }}
+                            >
+                              {t('see_full_profile') || 'See Full Profile'} →
                             </button>
-                          ))}
+                          )}
                         </div>
-                        {dmSideTab === 'profile' && (
-                          <div className="dm-profile-panel">
-                            {!isReelmsSystemChat(selectedChat) && (
-                              <div className="dm-profile-nickname">
-                                <span className="fpp-section-label">{t('nickname_label')}</span>
-                                <input
-                                  className="fpp-nickname-input"
-                                  style={{ width: '100%' }}
-                                  value={nicknames[selectedChat.friendId] || ''}
-                                  onChange={e => saveNickname(selectedChat.friendId, e.target.value)}
-                                  placeholder={displayName}
-                                />
-                              </div>
-                            )}
-                            {!isReelmsSystemChat(selectedChat) && (
-                              <button
-                                className="dm-view-full-profile-btn"
-                                onClick={() => {
-                                  const friend = friends.find(f => String(f.id) === String(selectedChat.friendId)) || { id: selectedChat.friendId, name: selectedChat.name, photo: selectedChat.photo }
-                                  setFullProfileTarget({ isSelf: false, user: friend })
-                                }}
-                              >
-                                {t('see_full_profile')} →
-                              </button>
-                            )}
-                          </div>
-                        )}
-                        {!isReelmsSystemChat(selectedChat) && dmSideTab === 'vapor' && (() => {
-                          const dmVapor = vaporDurations[selectedChat.id]
-                          const DM_VAPOR_OPTS = [
-                            { labelKey: 'vapor_after_read', value: 'read' },
-                            { labelKey: 'vapor_12h', value: 12 * 3600000 },
-                            { labelKey: 'vapor_24h', value: 24 * 3600000 },
-                            { labelKey: 'vapor_48h', value: 48 * 3600000 },
-                            { labelKey: 'vapor_1w', value: 7 * 86400000 },
-                            { labelKey: 'vapor_1m', value: 30 * 86400000 },
-                          ]
-                          return (
-                            <div className="chat-side-section">
-                              <div className="vapor-chat-header">
-                                <span className="vapor-chat-title">✦ {t('vapor_chat_title')}</span>
-                                <span className="vapor-chat-desc">{t('vapor_chat_desc')}</span>
-                              </div>
-                              <div className="vapor-opts">
-                                {DM_VAPOR_OPTS.map(opt => (
-                                  <button key={opt.value} className={`vapor-pill${dmVapor === opt.value ? ' vapor-pill--active' : ''}`}
-                                    onClick={() => setVaporDurations(prev => ({ ...prev, [selectedChat.id]: dmVapor === opt.value ? null : opt.value }))}>
-                                    {t(opt.labelKey)}
-                                  </button>
-                                ))}
-                                {dmVapor && <button className="vapor-pill vapor-pill--off" onClick={() => setVaporDurations(prev => ({ ...prev, [selectedChat.id]: null }))}>{t('turn_off')}</button>}
-                              </div>
-                              {dmVapor && <p className="vapor-active-label">✦ {t('vapor_chat_on')}</p>}
-                            </div>
-                          )
-                        })()}
                       </div>
                     )
                   })()}
-                  {selectedReelm && (
+                  {!selectedChat && selectedReelm && (
                     <div className="reelm-sidebar">
                       <div
                         className={`reelm-cover-wrap${selectedReelm.image ? ' reelm-cover-wrap--has-image' : ''}${isDefaultCommunity(selectedReelm) ? ' reelm-cover-wrap--community' : ''}`}
@@ -20526,7 +20560,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 const src = { general: channelGeneralIcon, text: channelTextIcon, multimedia: channelMultimediaIcon, liveaction: channelLiveactionIcon }[key]
                                 return <span className="reelm-category-icon"><MaskIcon src={src} className="reelm-category-icon-img" style={{ width: 14, height: 14 }} /></span>
                               })()}
-                              {cat.name}
+                              {getCategoryDisplayName(cat)}
                             </span>
                           </div>
                           {!cat.collapsed && (
@@ -20796,6 +20830,120 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   onMouseDown={(e) => { e.preventDefault(); dragState.current = { side: 'left', startX: e.clientX, startWidth: leftWidth } }}
                 />
                 <div className={`panel panel-middle${isMobile && showChatList && !selectedChat && !selectedReelm ? ' panel-middle--chat-list-only' : ''}`}>
+                {showMediaGallery ? (
+                  <div className="media-gallery-panel">
+                    <div className="media-gallery-header">
+                      <button className="media-gallery-back-btn" onClick={() => setShowMediaGallery(null)} title="Back to chat">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+                      </button>
+                      <div className="media-gallery-title-wrap">
+                        <span className="media-gallery-title">{showMediaGallery.name}</span>
+                        <span className="media-gallery-sub">{t('media_and_files') || 'Media & Files'}</span>
+                      </div>
+                    </div>
+                    <div className="media-gallery-tabs">
+                      {[
+                        { id: 'all', label: t('all_filter') || 'All' },
+                        { id: 'media', label: t('photos_and_videos') || 'Photos & Videos' },
+                        { id: 'audio', label: t('audio') || 'Audio' },
+                        { id: 'links', label: t('links') || 'Links' },
+                        { id: 'docs', label: t('documents') || 'Documents' }
+                      ].map(tab => (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          className={`media-gallery-tab${mediaGalleryTab === tab.id ? ' media-gallery-tab--active' : ''}`}
+                          onClick={() => setMediaGalleryTab(tab.id)}
+                        >
+                          {tab.label}
+                        </button>
+                      ))}
+                    </div>
+                    <div className="media-gallery-content">
+                      {(() => {
+                        const msgs = messages[showMediaGallery.key] || []
+                        const extracted = []
+                        for (const m of msgs) {
+                          if (!m) continue
+                          if (m.attachment?.url) {
+                            const att = m.attachment
+                            const type = att.type || (att.url.match(/\.(png|jpg|jpeg|gif|webp|svg)/i) ? 'image' : att.url.match(/\.(mp4|webm|mov)/i) ? 'video' : att.url.match(/\.(mp3|ogg|wav|m4a)/i) ? 'audio' : 'file')
+                            extracted.push({ id: m.id, type, url: att.url, name: att.name || 'Attachment', time: m.time, text: m.text })
+                          }
+                          if (m.voiceNote?.url) {
+                            extracted.push({ id: m.id, type: 'audio', url: m.voiceNote.url, name: 'Voice Note', duration: m.voiceNote.duration, time: m.time })
+                          }
+                          const urlMatches = String(m.text || '').match(/https?:\/\/[^\s]+/g)
+                          if (urlMatches) {
+                            for (const u of urlMatches) {
+                              if (u.match(/\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i)) {
+                                extracted.push({ id: m.id, type: 'image', url: u, name: 'Image', time: m.time })
+                              } else if (u.match(/\.(mp4|webm)(\?.*)?$/i)) {
+                                extracted.push({ id: m.id, type: 'video', url: u, name: 'Video', time: m.time })
+                              } else {
+                                extracted.push({ id: m.id, type: 'link', url: u, name: u, time: m.time })
+                              }
+                            }
+                          }
+                        }
+
+                        const filtered = extracted.filter(item => {
+                          if (mediaGalleryTab === 'all') return true
+                          if (mediaGalleryTab === 'media') return item.type === 'image' || item.type === 'video'
+                          if (mediaGalleryTab === 'audio') return item.type === 'audio'
+                          if (mediaGalleryTab === 'links') return item.type === 'link'
+                          if (mediaGalleryTab === 'docs') return item.type === 'file' || item.type === 'doc'
+                          return true
+                        })
+
+                        if (filtered.length === 0) {
+                          return (
+                            <div className="media-gallery-empty">
+                              <span>{t('no_media_found') || 'No media or files shared yet.'}</span>
+                            </div>
+                          )
+                        }
+
+                        return (
+                          <div className="media-gallery-grid">
+                            {filtered.map((item, idx) => {
+                              if (item.type === 'image' || item.type === 'video') {
+                                return (
+                                  <div key={item.id + '_' + idx} className="media-gallery-item" onClick={() => setLightboxSrc(item.url)}>
+                                    {item.type === 'video' ? <video src={item.url} /> : <img src={item.url} alt="" />}
+                                  </div>
+                                )
+                              }
+                              if (item.type === 'audio') {
+                                return (
+                                  <div key={item.id + '_' + idx} className="media-gallery-item-audio">
+                                    <span>🎵</span>
+                                    <audio controls src={item.url} style={{ height: 32, flex: 1 }} />
+                                  </div>
+                                )
+                              }
+                              if (item.type === 'link') {
+                                return (
+                                  <a key={item.id + '_' + idx} href={item.url} target="_blank" rel="noreferrer" className="media-gallery-item-link">
+                                    <span>🔗</span>
+                                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.url}</span>
+                                  </a>
+                                )
+                              }
+                              return (
+                                <a key={item.id + '_' + idx} href={item.url} download target="_blank" rel="noreferrer" className="media-gallery-item-doc">
+                                  <span>📄</span>
+                                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.name || 'Document'}</span>
+                                </a>
+                              )
+                            })}
+                          </div>
+                        )
+                      })()}
+                    </div>
+                  </div>
+                ) : (
+                  <>
                 {showChatList && !selectedChat && !selectedReelm && !isMobile && (
                   <div className="chat-list-empty-middle">
                     <span>Select a conversation</span>
@@ -21970,6 +22118,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       </>
                     )
                   })()}
+                  </>
+                )}
                 </div>
                 <div
                   className="panel-divider panel-divider-draggable"
@@ -23678,11 +23828,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         document.body
       )}
       {channelCtxMenu && ReactDOM.createPortal(
-        <div className="reelm-channel-ctx-menu" style={{ top: channelCtxMenu.y, left: channelCtxMenu.x }}
+        <div className="reelm-name-menu reelm-channel-ctx-menu" style={{ top: channelCtxMenu.y, left: channelCtxMenu.x }}
           onMouseDown={e => e.stopPropagation()}>
           {channelCtxMenu.isSubchannel ? (
             <>
-              <button className="reelm-channel-ctx-item" onClick={() => {
+              <button className="reelm-name-menu-item" onClick={() => {
                 setEditingChannelId(channelCtxMenu.chId)
                 const sub = (selectedReelm?.categories || [])
                   .flatMap(c => c.channels || [])
@@ -23690,26 +23840,40 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   .find(s => s.id === channelCtxMenu.chId)
                 setEditingChannelName(sub?.name || '')
                 setChannelCtxMenu(null)
-              }}>{t('edit_name')}</button>
+              }}>✏️ {t('edit_name') || 'Edit Name'}</button>
               <button
-                className="reelm-channel-ctx-item reelm-channel-ctx-danger"
+                className="reelm-name-menu-item reelm-name-menu-item--danger"
                 onClick={() => {
                   deleteSubchannel(selectedReelm.id, channelCtxMenu.catId, channelCtxMenu.parentChId, channelCtxMenu.chId)
                   setChannelCtxMenu(null)
-                }}>{t('delete_channel') || 'Delete Subchannel'}</button>
+                }}>🗑️ {t('delete_channel') || 'Delete Subchannel'}</button>
             </>
           ) : (
             <>
-              <button className="reelm-channel-ctx-item" onClick={() => {
+              {(channelCtxMenu.chType === 'text' || channelCtxMenu.chType === 'announcement') && (
+                <button className="reelm-name-menu-item" onClick={() => {
+                  const ch = selectedReelm?.categories?.flatMap(c => c.channels || []).find(c => c.id === channelCtxMenu.chId)
+                  setShowMediaGallery({
+                    kind: 'channel',
+                    key: `${selectedReelm.id}_${channelCtxMenu.chId}`,
+                    name: `#${ch?.name || 'channel'}`
+                  })
+                  setChannelCtxMenu(null)
+                }}>
+                  <span>🖼️</span>
+                  <span>{t('channel_media') || 'Channel Media'}</span>
+                </button>
+              )}
+              <button className="reelm-name-menu-item" onClick={() => {
                 setEditingChannelId(channelCtxMenu.chId)
                 setEditingChannelName(selectedReelm.categories.flatMap(c => c.channels).find(ch => ch.id === channelCtxMenu.chId)?.name || '')
                 setChannelCtxMenu(null)
-              }}>{t('edit_name')}</button>
-              <button className="reelm-channel-ctx-item" onClick={() => {
+              }}>✏️ {t('edit_name') || 'Edit Name'}</button>
+              <button className="reelm-name-menu-item" onClick={() => {
                 createSubchannel(selectedReelm.id, channelCtxMenu.catId, channelCtxMenu.chId)
                 setChannelCtxMenu(null)
               }}>+ {t('create_subchannel') || 'Create Subchannel'}</button>
-              <button className="reelm-channel-ctx-item" onClick={() => {
+              <button className="reelm-name-menu-item" onClick={() => {
                 const ch = selectedReelm?.categories?.flatMap(c => c.channels || []).find(c => c.id === channelCtxMenu.chId)
                 setChannelPermissionsTarget({
                   reelmId: selectedReelm.id,
@@ -23719,7 +23883,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   isCategory: false
                 })
                 setChannelCtxMenu(null)
-              }}>{t('edit_permissions')}</button>
+              }}>🛡️ {t('edit_permissions') || 'Permissions'}</button>
               {channelCtxMenu.chType === 'voice' && (() => {
                 const ctxCh = selectedReelm?.categories.flatMap(c => c.channels).find(c => c.id === channelCtxMenu.chId)
                 const currentCap = ctxCh?.capacity ?? 8
@@ -23742,16 +23906,113 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                   </div>
                 )
               })()}
+              <div className="ctx-menu-divider" />
               <button
-                className={`reelm-channel-ctx-item reelm-channel-ctx-danger${channelCtxMenu.catChannelCount <= 1 ? ' reelm-channel-ctx-disabled' : ''}`}
+                className={`reelm-name-menu-item reelm-name-menu-item--danger${channelCtxMenu.catChannelCount <= 1 ? ' reelm-channel-ctx-disabled' : ''}`}
                 disabled={channelCtxMenu.catChannelCount <= 1}
                 onClick={() => {
                   if (channelCtxMenu.catChannelCount <= 1) return
                   deleteChannel(selectedReelm.id, channelCtxMenu.catId, channelCtxMenu.chId)
                   setChannelCtxMenu(null)
-                }}>{t('delete_channel')}</button>
+                }}>🗑️ {t('delete_channel') || 'Delete Channel'}</button>
             </>
           )}
+        </div>,
+        document.body
+      )}
+      {chatCtxMenu && ReactDOM.createPortal(
+        <div
+          className="reelm-name-menu chat-ctx-menu"
+          style={{ top: chatCtxMenu.y, left: chatCtxMenu.x, minWidth: 200 }}
+          onClick={e => e.stopPropagation()}
+          onMouseDown={e => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            className="reelm-name-menu-item"
+            onClick={() => {
+              if (getChatUnreadCount(chatCtxMenu.chat) > 0) {
+                clearUnread(chatCtxMenu.chat.id)
+              } else {
+                setUnreadCounts(prev => ({ ...prev, [chatCtxMenu.chat.id]: 1 }))
+              }
+              setChatCtxMenu(null)
+            }}
+          >
+            <span>{getChatUnreadCount(chatCtxMenu.chat) > 0 ? '✓' : '●'}</span>
+            <span>{getChatUnreadCount(chatCtxMenu.chat) > 0 ? (t('mark_as_read') || 'Mark as Read') : (t('mark_as_unread') || 'Mark as Unread')}</span>
+          </button>
+
+          <button
+            type="button"
+            className="reelm-name-menu-item"
+            onClick={() => {
+              toggleMuteChat?.(chatCtxMenu.chat.id)
+              setChatCtxMenu(null)
+            }}
+          >
+            <span>🔔</span>
+            <span>{t('mute_chat') || 'Mute Notifications'}</span>
+          </button>
+
+          {chatCtxMenu.chat.type === 'dm' && chatCtxMenu.chat.friendId && (
+            <button
+              type="button"
+              className="reelm-name-menu-item"
+              onClick={() => {
+                const friend = friends.find(f => String(f.id) === String(chatCtxMenu.chat.friendId)) || { id: chatCtxMenu.chat.friendId, name: chatCtxMenu.chat.name, photo: chatCtxMenu.chat.photo }
+                setFullProfileTarget({ isSelf: false, user: friend })
+                setChatCtxMenu(null)
+              }}
+            >
+              <span>👤</span>
+              <span>{t('see_full_profile') || 'View Profile'}</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="reelm-name-menu-item"
+            onClick={() => {
+              setShowMediaGallery({
+                kind: chatCtxMenu.chat.type,
+                key: chatCtxMenu.chat.id,
+                name: getChatDisplayName(chatCtxMenu.chat)
+              })
+              setChatCtxMenu(null)
+            }}
+          >
+            <span>🖼️</span>
+            <span>{t('media_and_files') || 'Media & Files'}</span>
+          </button>
+
+          <div className="ctx-menu-divider" />
+
+          {chatCtxMenu.chat.type === 'dm' && chatCtxMenu.chat.friendId && (
+            <button
+              type="button"
+              className="reelm-name-menu-item reelm-name-menu-item--danger"
+              onClick={() => {
+                blockUserFn({ id: chatCtxMenu.chat.friendId, name: chatCtxMenu.chat.name })
+                setChatCtxMenu(null)
+              }}
+            >
+              <span>🚫</span>
+              <span>{t('block') || 'Block User'}</span>
+            </button>
+          )}
+
+          <button
+            type="button"
+            className="reelm-name-menu-item reelm-name-menu-item--danger"
+            onClick={() => {
+              deleteConversation(chatCtxMenu.chat.id)
+              setChatCtxMenu(null)
+            }}
+          >
+            <span>🗑️</span>
+            <span>{t('delete_conversation') || 'Delete Conversation'}</span>
+          </button>
         </div>,
         document.body
       )}
@@ -23840,7 +24101,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         )
       })()}
       {showAllEventsModal && (() => {
-        const targetReelm = reelms.find(r => r.id === showAllEventsModal) || selectedReelm
+        const targetReelm = (selectedReelm && String(selectedReelm.id) === String(showAllEventsModal))
+          ? selectedReelm
+          : (reelms.find(r => String(r.id) === String(showAllEventsModal)) || selectedReelm)
         if (!targetReelm) return null
         const myMember = targetReelm.members?.find(m => m.userId === uid)
         const myRoles = (targetReelm.roles || []).filter(r => (myMember?.roleIds || []).includes(r.id))
@@ -23922,6 +24185,28 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           </div>
         )
       })()}
+      {groupCropModal && (
+        <ProfileMediaCropModal
+          file={groupCropModal}
+          kind="photo"
+          onApply={async (croppedFile) => {
+            setGroupCropModal(null)
+            try {
+              const photo = await uploadProfileImageFile(croppedFile, 'group-avatar')
+              if (selectedChat?.id) {
+                const updatedChats = chats.map(c => c.id === selectedChat.id ? { ...c, photo } : c)
+                setChats(updatedChats)
+                setSelectedChat(prev => prev ? { ...prev, photo } : null)
+                appPutDoc('chats', updatedChats).catch(() => {})
+              }
+            } catch (err) {
+              console.warn('Group photo upload failed:', err)
+            }
+          }}
+          onCancel={() => setGroupCropModal(null)}
+          onChangeFile={newFile => setGroupCropModal(newFile)}
+        />
+      )}
       {showBlockedModal && (
         <div className="invite-modal-overlay" onClick={() => setShowBlockedModal(false)}>
           <div className="invite-modal" style={{ maxWidth: 400 }} onClick={e => e.stopPropagation()}>
