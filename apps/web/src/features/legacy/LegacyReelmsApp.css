@@ -21118,14 +21118,15 @@ button, input, select, textarea,
   }
 
   .mobile-nav-icon--new {
-    width: 26px;
-    height: 26px;
+    width: 32px;
+    height: 32px;
+    display: block;
     transition: transform 0.16s ease, filter 0.16s ease;
   }
 
   .mobile-nav-btn--create.mobile-nav-btn--active .mobile-nav-icon--new,
   .mobile-nav-btn--create:active .mobile-nav-icon--new {
-    transform: scale(1.15);
+    transform: scale(1.12);
   }
 
   .mobile-nav-btn--profile {
