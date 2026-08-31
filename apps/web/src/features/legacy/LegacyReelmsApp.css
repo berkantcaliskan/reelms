@@ -2896,16 +2896,16 @@ h6 {
   .new-actions-strip {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 20px 16px;
-    max-width: 92vw;
+    gap: 14px 12px;
+    max-width: 300px;
     width: 100%;
-    padding: 16px 8px;
+    padding: 10px 6px;
     box-sizing: border-box;
   }
   .new-action-card {
     min-width: 0;
     max-width: 100%;
-    padding: 12px 6px;
+    padding: 8px 4px;
     background: transparent !important;
     border: none !important;
     border-radius: 0 !important;
@@ -2914,14 +2914,14 @@ h6 {
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 12px;
+    gap: 8px;
     transition: transform 0.18s ease;
   }
   .new-action-card:hover {
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
-    transform: translateY(-4px);
+    transform: translateY(-3px);
   }
   .new-action-card:active {
     background: transparent !important;
@@ -2930,22 +2930,22 @@ h6 {
     transform: scale(0.95);
   }
   .new-action-icon-circle {
-    width: 60px;
-    height: 60px;
+    width: 48px;
+    height: 48px;
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
   }
   .new-action-icon {
-    width: 52px;
-    height: 52px;
+    width: 42px;
+    height: 42px;
   }
   .new-action-title {
-    font-size: 0.9rem;
-    font-weight: 700;
+    font-size: 0.78rem;
+    font-weight: 600;
     white-space: normal;
     text-align: center;
-    line-height: 1.25;
+    line-height: 1.2;
   }
 }
 
