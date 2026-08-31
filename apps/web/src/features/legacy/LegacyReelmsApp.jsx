@@ -6897,7 +6897,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           )}
           <div className="rp-members-bottom-spacer" />
         </div>
-        <div className="rp-members-fade" />
         <div className={`rp-member-search${reelmMemberSearchOpen ? ' rp-member-search--open' : ''}`}>
           <input
             ref={reelmSearchInputRef}
