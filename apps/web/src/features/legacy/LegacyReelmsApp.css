@@ -21641,11 +21641,11 @@ button, input, select, textarea,
     align-items: center !important;
     margin: 0 !important;
     padding: 0 !important;
-    gap: 12px !important;
+    gap: 6px !important;
   }
   .header-settings-btn {
-    width: 28px !important;
-    height: 28px !important;
+    width: 26px !important;
+    height: 26px !important;
     padding: 0 !important;
     margin: 0 !important;
     display: flex !important;
