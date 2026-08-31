@@ -21058,28 +21058,21 @@ button, input, select, textarea,
   .mobile-nav-btn--create {
     flex: 1;
   }
-  .mobile-nav-create-circle {
-    width: 36px;
-    height: 36px;
-    border-radius: 12px;
-    background: rgba(var(--ta-rgb), 0.12);
-    border: 1px solid rgba(var(--ta-rgb), 0.22);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--ta);
-    transition: transform 0.16s ease, background 0.16s ease, color 0.16s ease;
-  }
-  .mobile-nav-btn--create.mobile-nav-btn--active .mobile-nav-create-circle,
-  .mobile-nav-btn--create:active .mobile-nav-create-circle {
-    background: var(--ta);
-    color: #000;
-    transform: scale(1.08);
-  }
 
   .mobile-nav-icon {
     width: 22px;
     height: 22px;
+  }
+
+  .mobile-nav-icon--new {
+    width: 26px;
+    height: 26px;
+    transition: transform 0.16s ease, filter 0.16s ease;
+  }
+
+  .mobile-nav-btn--create.mobile-nav-btn--active .mobile-nav-icon--new,
+  .mobile-nav-btn--create:active .mobile-nav-icon--new {
+    transform: scale(1.15);
   }
 
   .mobile-nav-btn--profile {
