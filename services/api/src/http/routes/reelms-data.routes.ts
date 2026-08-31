@@ -1967,16 +1967,78 @@ export function createReelmsDataRouter(io: Server) {
         return res.json({ data: { joined: true, reelm } })
       }
       const pk = reelmPk(reelmId)
-      const meta = await getDoc<any>(pk, 'meta')
-      if (!meta?.id) return res.status(404).json({ error: 'reelm_not_found' })
+      let meta = await getDoc<any>(pk, 'meta')
+      let roles = (await getDoc<any[]>(pk, 'roles').catch(() => [])) || []
+      let structure = (await getDoc<any>(pk, 'structure').catch(() => null)) || { categories: [] }
+
+      if (!meta?.id) {
+        const seed = SEED_REELMS.find((s) => String(s.id) === reelmId)
+        if (seed) {
+          const categories = [
+            {
+              id: `cat-${seed.id}-start`,
+              name: 'Welcome',
+              type: 'announcement',
+              icon: 'general',
+              collapsed: false,
+              channels: [{ id: `ch-${seed.id}-welcome`, name: 'welcome', type: 'announcement' }]
+            },
+            {
+              id: `cat-${seed.id}-general`,
+              name: 'General',
+              type: 'text',
+              icon: 'text',
+              collapsed: false,
+              channels: [{ id: `ch-${seed.id}-chat`, name: 'chat', type: 'text' }]
+            },
+            {
+              id: `cat-${seed.id}-voice`,
+              name: 'Voice & Video',
+              type: 'voice',
+              icon: 'multimedia',
+              collapsed: false,
+              channels: [{ id: `ch-${seed.id}-lounge`, name: 'Lounge', type: 'voice', capacity: 20, current: 0 }]
+            }
+          ]
+          roles = [
+            { id: `role-admin-${seed.id}`, name: 'Admin', color: '#a3e635', position: 0, permissions: { ...FULL_MANAGER_PERMISSIONS } },
+            { id: `role-member-${seed.id}`, name: 'Citizen', color: '#b99887', position: 1, permissions: {} }
+          ]
+          structure = { categories }
+          meta = {
+            id: seed.id,
+            name: seed.name,
+            code: seed.code,
+            category: seed.category,
+            description: seed.description,
+            ownerId: null,
+            createdAt: Date.now(),
+            updatedAt: Date.now(),
+            announcementChannelId: `ch-${seed.id}-welcome`,
+            image: null,
+            showInDiscover: seed.showInDiscover,
+            joinMode: 'open',
+            isPublic: true,
+            autoJoinOnInvite: true,
+            memberInvitesEnabled: true,
+            memberInviteMode: 'auto',
+            ageRating: 'under18'
+          }
+          await putDoc(pk, 'meta', meta).catch(() => {})
+          await putDoc(pk, 'roles', roles).catch(() => {})
+          await putDoc(pk, 'structure', structure).catch(() => {})
+          await putDoc(pk, 'members', []).catch(() => {})
+        } else {
+          return res.status(404).json({ error: 'reelm_not_found' })
+        }
+      }
+
       if (await isBannedFromReelm(reelmId, uid).catch(() => false)) return res.status(403).json({ error: 'reelm_banned', code: 'reelm/banned', ban: await getBanEntry(reelmId, uid).catch(() => null) })
       if (await isReelmMember(uid, reelmId)) return res.json({ data: { joined: true, pending: false } })
-      const roles = (await getDoc<any[]>(pk, 'roles').catch(() => [])) || []
-      const structure = (await getDoc<any>(pk, 'structure').catch(() => null)) || { categories: [] }
-      const joinMode = meta.joinMode || 'request'
+      const joinMode = meta.joinMode || 'open'
       const pendingInvite = await getPendingInvite(reelmId, uid).catch(() => null)
       const inviteCanAutoJoin = pendingInvite?.bypassApproval === true
-      if (joinMode === 'open' || meta.autoJoinOnInvite === true || inviteCanAutoJoin) {
+      if (joinMode === 'open' || meta.isPublic === true || meta.autoJoinOnInvite === true || inviteCanAutoJoin) {
         const memberRole = getDefaultMemberRole(roles)
         const members = await ensureMember(reelmId, uid, memberRole?.id ? [memberRole.id] : [])
         const full = toClientReelm(meta, structure, roles, members)

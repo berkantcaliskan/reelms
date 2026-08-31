@@ -8676,6 +8676,36 @@ h6 {
   flex-direction: column;
 }
 
+.discover-preview-modal .new-modal-header {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: auto;
+  max-width: 100%;
+  margin-bottom: 16px;
+}
+
+.discover-preview-modal .new-modal-back-btn {
+  position: static;
+  transform: none;
+  padding: 2px 4px;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.discover-preview-modal .new-modal-back-btn:hover {
+  transform: scale(1.18);
+  color: var(--ta);
+}
+
+.discover-preview-modal .new-modal-back-btn:active {
+  transform: scale(1.05);
+}
+
 .discover-preview-avatar-wrap {
   width: 88px;
   height: 88px;
