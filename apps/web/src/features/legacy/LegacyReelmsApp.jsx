@@ -5040,9 +5040,17 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       scheduleUserPersist('reelms', next)
       return next
     })
-    setSelectedReelm(newReelm)
     socketJoinReelm(newReelm.id)
+    const firstCh = newReelm.categories?.flatMap(c => c.channels || []).find(c => c.type === 'text' || c.type === 'announcement') || newReelm.categories?.[0]?.channels?.[0] || null
+    if (firstCh) setSelectedChannel(firstCh)
+    handleSelectReelm(newReelm)
     setSelectedChat(null)
+    setShowNotificationsPanel(false)
+    setShowFriendsPanel(false)
+    setShowDiscover(false)
+    setShowSettings(false)
+    setShowChatList(false)
+    setMobileLeftPanelOpen(false)
     setReelmNameInput('')
     setSelectedTemplateId(null)
     setCreateReelmStep(null)

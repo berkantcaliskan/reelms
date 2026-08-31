@@ -2896,40 +2896,52 @@ h6 {
   .new-actions-strip {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 16px;
+    gap: 20px 16px;
     max-width: 92vw;
     width: 100%;
-    padding: 16px 12px;
+    padding: 16px 8px;
     box-sizing: border-box;
   }
   .new-action-card {
     min-width: 0;
     max-width: 100%;
-    padding: 16px 10px;
-    background: rgba(var(--ta-rgb), 0.05) !important;
-    border: 1px solid rgba(var(--ta-rgb), 0.14) !important;
-    border-radius: 18px !important;
+    padding: 12px 6px;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
     display: flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 10px;
-    transition: all 0.18s ease;
+    gap: 12px;
+    transition: transform 0.18s ease;
+  }
+  .new-action-card:hover {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    transform: translateY(-4px);
   }
   .new-action-card:active {
-    background: rgba(var(--ta-rgb), 0.12) !important;
-    transform: scale(0.97);
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    transform: scale(0.95);
   }
   .new-action-icon-circle {
-    width: 56px;
-    height: 56px;
+    width: 60px;
+    height: 60px;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
   }
   .new-action-icon {
-    width: 48px;
-    height: 48px;
+    width: 52px;
+    height: 52px;
   }
   .new-action-title {
-    font-size: 0.88rem;
+    font-size: 0.9rem;
     font-weight: 700;
     white-space: normal;
     text-align: center;
