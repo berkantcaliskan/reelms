@@ -12100,28 +12100,26 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (!cat) return ''
     const rawName = String(cat.name || '').trim()
     const lower = rawName.toLowerCase()
-    if (cat.id === 'cat-baslangic' || cat.id === 'cat_beginning' || lower === 'başlangıç' || lower === 'start' || lower === 'beginning') {
-      return (t('cat_beginning') || 'Start').toLocaleUpperCase(language === 'tr' ? 'tr-TR' : undefined)
+    let display = rawName
+
+    if (cat.id === 'cat-baslangic' || cat.id === 'cat_beginning' || lower === 'başlangıç' || lower === 'baslangic' || lower === 'start' || lower === 'beginning') {
+      display = t('cat_beginning') || 'Beginning'
+    } else if (cat.id === 'cat-text' || lower === 'metin' || lower === 'text' || lower === 'genel' || lower === 'general') {
+      display = t('cat_text') || 'Text'
+    } else if (cat.id === 'cat-voice' || lower === 'ses & video' || lower === 'ses & vi̇deo' || lower === 'voice & video' || lower === 'voice') {
+      display = t('cat_voice') || 'Voice & Video'
+    } else if (cat.id === 'cat-live' || lower === 'canlı aksiyon' || lower === 'canli aksiyon' || lower === 'live action' || lower === 'live') {
+      display = t('cat_live') || 'Live Action'
+    } else if (cat.id === 'cat-announcements' || lower === 'duyurular' || lower === 'announcements') {
+      display = t('cat_announcements') || 'Announcements'
+    } else if (cat.id === 'cat-community' || lower === 'topluluk' || lower === 'community') {
+      display = t('cat_community') || 'Community'
     }
-    if (cat.id === 'cat-text' || lower === 'metin' || lower === 'text') {
-      return (t('cat_text') || 'Text').toLocaleUpperCase(language === 'tr' ? 'tr-TR' : undefined)
-    }
-    if (cat.id === 'cat-voice' || lower === 'ses & video' || lower === 'ses & vi̇deo' || lower === 'voice & video' || lower === 'voice') {
-      return (t('cat_voice') || 'Voice & Video').toLocaleUpperCase(language === 'tr' ? 'tr-TR' : undefined)
-    }
-    if (cat.id === 'cat-live' || lower === 'canlı aksiyon' || lower === 'canli aksiyon' || lower === 'live action' || lower === 'live') {
-      return (t('cat_live') || 'Live Action').toLocaleUpperCase(language === 'tr' ? 'tr-TR' : undefined)
-    }
-    if (cat.id === 'cat-announcements' || lower === 'duyurular' || lower === 'announcements') {
-      return (t('cat_announcements') || 'Announcements').toLocaleUpperCase(language === 'tr' ? 'tr-TR' : undefined)
-    }
-    if (cat.id === 'cat-community' || lower === 'topluluk' || lower === 'community') {
-      return (t('cat_community') || 'Community').toLocaleUpperCase(language === 'tr' ? 'tr-TR' : undefined)
-    }
+
     if (language === 'tr') {
-      return rawName.toLocaleUpperCase('tr-TR')
+      return display.toLocaleUpperCase('tr-TR')
     }
-    return rawName.toUpperCase()
+    return display.toUpperCase()
   }, [language, t])
 
   const resumeTopTickerTimer = useCallback(() => {

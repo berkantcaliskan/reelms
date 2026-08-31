@@ -5918,6 +5918,7 @@ h6 {
   font-size: 0.68rem;
   font-weight: 800;
   letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--ta);
   opacity: 0.8;
   line-height: 1;
