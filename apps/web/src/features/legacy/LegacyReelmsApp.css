@@ -21599,11 +21599,11 @@ button, input, select, textarea,
     align-items: center !important;
     margin: 0 !important;
     padding: 0 !important;
-    gap: 0 !important;
+    gap: 12px !important;
   }
   .header-settings-btn {
-    width: 26px !important;
-    height: 26px !important;
+    width: 28px !important;
+    height: 28px !important;
     padding: 0 !important;
     margin: 0 !important;
     display: flex !important;
@@ -21617,6 +21617,23 @@ button, input, select, textarea,
   .header-icon {
     width: 18px !important;
     height: 18px !important;
+  }
+  .header-settings-btn--mobile-notifs .notif-icon-wrap {
+    width: 18px !important;
+    height: 18px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    position: relative !important;
+  }
+  .header-settings-btn--mobile-notifs .notif-badge {
+    position: absolute !important;
+    top: -4px !important;
+    right: -6px !important;
+    font-size: 0.52rem !important;
+    min-width: 13px !important;
+    height: 13px !important;
+    padding: 0 2px !important;
   }
   .header-settings-btn svg,
   .header-menu-burger-icon {
