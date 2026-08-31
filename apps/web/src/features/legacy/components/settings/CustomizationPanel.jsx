@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react'
 import { useT } from '../../../../i18n'
-import { THEMES, THEME_ACCENTS, EXTENDED_PALETTE_SHADES, CLASSIC_GREETINGS } from '../../constants/themeConstants'
+import { THEMES, THEME_ACCENTS, CLASSIC_GREETINGS } from '../../constants/themeConstants'
 import { hslToHex } from '../../utils/colorUtils'
 import { normalizeMediaUrl, uploadProfileImageFile } from '../../utils/mediaUtils'
 
@@ -182,31 +182,6 @@ export function CustomizationPanel({ customization = {}, onChange, bodyFont, BOD
                   data-tooltip={acc.name}
                   aria-label={acc.name}
                   style={{ background: acc.color }}
-                >
-                  {isSelected && <span className="cust-accent-badge-check" />}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-
-        {/* Extended Color Palette (Black, Browns, Beiges, Amber, etc.) */}
-        <div className="cust-extended-palette-wrap" style={{ marginBottom: 16 }}>
-          <div style={{ fontSize: '0.74rem', color: 'rgba(var(--ta-rgb), 0.7)', marginBottom: 8, fontWeight: 600 }}>
-            {t('palette') || 'Palette'}
-          </div>
-          <div className="cust-palette-grid">
-            {EXTENDED_PALETTE_SHADES.map((colorHex, idx) => {
-              const isSelected = activeAccent === colorHex.toLowerCase()
-              return (
-                <button
-                  key={`${colorHex}_${idx}`}
-                  type="button"
-                  onClick={() => onChange?.({ customAccent: colorHex })}
-                  className={`cust-palette-swatch${isSelected ? ' cust-palette-swatch--active' : ''}`}
-                  data-tooltip={colorHex.toUpperCase()}
-                  aria-label={colorHex}
-                  style={{ background: colorHex }}
                 />
               )
             })}
@@ -238,7 +213,7 @@ export function CustomizationPanel({ customization = {}, onChange, bodyFont, BOD
                   </button>
                 )}
               </div>
-              <span className="cust-tayf-label">{t('custom_color') || 'Custom'}</span>
+              <span className="cust-tayf-label">{t('spectrum') || t('custom_color') || 'Spectrum'}</span>
             </div>
             <div
               className={`cust-tayf-strip${openSpectrum ? ' open' : ''}`}

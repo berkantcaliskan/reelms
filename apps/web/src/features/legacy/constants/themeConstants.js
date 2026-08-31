@@ -74,29 +74,6 @@ export const THEME_ACCENTS = {
 export const MIDNIGHT_ACCENTS = THEME_ACCENTS.midnight
 export const SUNLIGHT_ACCENTS = THEME_ACCENTS.sunlight
 
-export const EXTENDED_PALETTE_SHADES = [
-  // Blacks & Dark Neutrals
-  '#000000', '#0a0a0c', '#121315', '#1a1b1e', '#23252a', '#2c2e35',
-  // Earthy Browns, Mochas & Espressos
-  '#2a1810', '#3d2317', '#543120', '#6e402a', '#8a5236', '#a66442',
-  // Warm Beiges, Sands & Tans
-  '#c29b7f', '#d4b297', '#e5cbaf', '#f0decd', '#faf1e6', '#e8d8cc',
-  // Golds, Ambers & Warm Yellows
-  '#b45309', '#ca8a04', '#d97706', '#eab308', '#f59e0b', '#fbbf24',
-  // Terracotta, Rust & Warm Reds
-  '#991b1b', '#c87a5b', '#dc2626', '#ea580c', '#f87171', '#fca5a5',
-  // Roses & Pinks
-  '#9d174d', '#be185d', '#d46e82', '#e11d48', '#ec4899', '#f472b6',
-  // Purples & Violets
-  '#581c87', '#6b21a8', '#7c3aed', '#8b5cf6', '#9070c0', '#c084fc',
-  // Emeralds, Sages & Forest Greens
-  '#064e3b', '#065f46', '#059669', '#10b981', '#68c586', '#86efac',
-  // Teals & Cyans
-  '#134e4a', '#0f766e', '#0d9488', '#14b8a6', '#5eead4', '#7fc8e8',
-  // Blues & Slates
-  '#1e3a8a', '#1d4ed8', '#2563eb', '#3b82f6', '#60a5fa', '#93c5fd',
-]
-
 export const THEMES = [
   {
     id: 'default',
