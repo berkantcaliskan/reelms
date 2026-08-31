@@ -20030,7 +20030,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
                           {/* Group avatar & header with toggle drawer */}
                           <div className="group-avatar-edit-wrap" onClick={() => setGroupDetailsOpen(v => !v)} title="Group details & settings">
-                            <div className="dm-friend-avatar" style={{ width: 56, height: 56, fontSize: '1.4rem' }}>
+                            <div className="dm-friend-avatar" style={{ width: 68, height: 68, fontSize: '1.65rem' }}>
                               {selectedChat.photo
                                 ? <img src={selectedChat.photo} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
                                 : selectedChat.name?.charAt(0).toUpperCase()
@@ -20202,11 +20202,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
                         {/* Top Clean Profile Card */}
                         <div className="dm-avatar-card" onClick={() => setDmProfileExpanded(v => !v)} title="Click to view options">
-                          <div className="dm-friend-avatar" style={{ width: 68, height: 68, fontSize: '1.6rem' }}>
-                            {selectedAvatarSrc
-                              ? <img src={selectedAvatarSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
-                              : (displayName || '?').charAt(0).toUpperCase()
-                            }
+                          <div className="dm-friend-avatar-wrap">
+                            <div className="dm-friend-avatar" style={{ width: 86, height: 86, fontSize: '2rem' }}>
+                              {selectedAvatarSrc
+                                ? <img src={selectedAvatarSrc} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                                : (displayName || '?').charAt(0).toUpperCase()
+                              }
+                            </div>
                           </div>
                           <span className="dm-display-name">{displayName}</span>
                           {(customNickname || fp?.username) && (
@@ -20542,16 +20544,21 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       <div className="reelm-categories-scroll">
                       {selectedReelm.categories.map(cat => (
                         <div key={cat.id} className="reelm-category">
-                          <div className="reelm-category-header">
-                            <span className="reelm-category-name"
+                          <div
+                            className="reelm-category-header"
+                            onContextMenu={e => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              const myMember = selectedReelm.members?.find(m => m.userId === uid)
+                              const myRoles = (selectedReelm.roles || []).filter(r => (myMember?.roleIds || []).includes(r.id))
+                              const isAdmin = selectedReelm.ownerId === uid || selectedReelm.userId === uid || canManageReelmClient(selectedReelm, uid) || myRoles.some(isManagerRoleClient)
+                              const canVapor = hasReelmPermissionClient(selectedReelm, uid, 'createVaporRoom') || isAdmin
+                              setOpenCategoryMenu({ id: cat.id, x: e.clientX, y: e.clientY, isAdmin, canVapor })
+                            }}
+                          >
+                            <span
+                              className="reelm-category-name"
                               onClick={() => toggleCategory(selectedReelm.id, cat.id)}
-                              onContextMenu={e => {
-                                e.preventDefault()
-                                const isAdmin = canManageReelmClient(selectedReelm, uid)
-                                const canVapor = hasReelmPermissionClient(selectedReelm, uid, 'createVaporRoom')
-                                if (!isAdmin && !canVapor) return
-                                setOpenCategoryMenu({ id: cat.id, x: e.clientX, y: e.clientY, isAdmin, canVapor })
-                              }}
                             >
                               {(() => {
                                 const key = cat.icon || (cat.type === 'announcement' ? 'general' : cat.type === 'text' ? 'text' : cat.type === 'voice' ? 'multimedia' : 'liveaction')
@@ -23807,20 +23814,40 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         </div>
       )}
       {openCategoryMenu && ReactDOM.createPortal(
-        <div className="reelm-category-ctx-menu" style={{ top: openCategoryMenu.y, left: openCategoryMenu.x }}
+        <div className="reelm-name-menu reelm-category-ctx-menu" style={{ top: openCategoryMenu.y, left: openCategoryMenu.x }}
           onMouseDown={e => e.stopPropagation()}>
           {openCategoryMenu.isAdmin && (
-            <button className="reelm-category-menu-item" onClick={() => { addChannel(selectedReelm.id, openCategoryMenu.id); setOpenCategoryMenu(null) }}>
-              New channel
+            <button className="reelm-name-menu-item" onClick={() => { addChannel(selectedReelm.id, openCategoryMenu.id); setOpenCategoryMenu(null) }}>
+              ➕ {t('new_channel') || 'New channel'}
             </button>
           )}
-          <button className="reelm-category-menu-item reelm-category-menu-flying" onClick={() => {
-            setFlyingRoomModal({ reelmId: selectedReelm.id, catId: openCategoryMenu.id })
-            setFlyingRoomName('')
-            setFlyingRoomDuration(60 * 60 * 1000)
+          {openCategoryMenu.canVapor && (
+            <button className="reelm-name-menu-item reelm-category-menu-flying" onClick={() => {
+              setFlyingRoomModal({ reelmId: selectedReelm.id, catId: openCategoryMenu.id })
+              setFlyingRoomName('')
+              setFlyingRoomDuration(60 * 60 * 1000)
+              setOpenCategoryMenu(null)
+            }}>
+              ✦ {t('create_vapor_room') || 'Create vapor room'}
+            </button>
+          )}
+          <button className="reelm-name-menu-item" onClick={() => {
+            toggleCategory(selectedReelm.id, openCategoryMenu.id)
             setOpenCategoryMenu(null)
           }}>
-            ✦ Create a vapor room
+            {selectedReelm.categories?.find(c => c.id === openCategoryMenu.id)?.collapsed
+              ? `▼ ${t('expand_category') || 'Expand Category'}`
+              : `▲ ${t('collapse_category') || 'Collapse Category'}`
+            }
+          </button>
+          <button className="reelm-name-menu-item" onClick={() => {
+            const cat = selectedReelm.categories?.find(c => c.id === openCategoryMenu.id)
+            if (cat?.channels) {
+              cat.channels.forEach(ch => clearReelmChannelUnread(selectedReelm.id, ch.id))
+            }
+            setOpenCategoryMenu(null)
+          }}>
+            ✓ {t('mark_category_read') || 'Mark as Read'}
           </button>
         </div>,
         document.body
