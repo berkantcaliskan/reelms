@@ -14385,6 +14385,22 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }, [openCategoryMenu])
 
   useEffect(() => {
+    if (!chatCtxMenu) return
+    const handler = (e) => {
+      if (!e.target.closest('.chat-ctx-menu')) setChatCtxMenu(null)
+    }
+    const keyHandler = (e) => {
+      if (e.key === 'Escape') setChatCtxMenu(null)
+    }
+    document.addEventListener('mousedown', handler)
+    document.addEventListener('keydown', keyHandler)
+    return () => {
+      document.removeEventListener('mousedown', handler)
+      document.removeEventListener('keydown', keyHandler)
+    }
+  }, [chatCtxMenu])
+
+  useEffect(() => {
     if (!showReelmMenu && !showReelmInfoMenu) return
     const handler = (e) => {
       if (!e.target.closest('.reelm-name-menu') && !e.target.closest('.reelm-info-menu') && !e.target.closest('.reelm-sidebar-name') && !e.target.closest('.reelm-sidebar-name-row')) {
@@ -23948,7 +23964,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       {chatCtxMenu && ReactDOM.createPortal(
         <div
           className="reelm-name-menu chat-ctx-menu"
-          style={{ top: chatCtxMenu.y, left: chatCtxMenu.x, minWidth: 200 }}
+          style={{
+            top: Math.max(8, Math.min(chatCtxMenu.y, window.innerHeight - 260)),
+            left: Math.max(8, Math.min(chatCtxMenu.x, window.innerWidth - 220)),
+            minWidth: 200
+          }}
           onClick={e => e.stopPropagation()}
           onMouseDown={e => e.stopPropagation()}
         >
