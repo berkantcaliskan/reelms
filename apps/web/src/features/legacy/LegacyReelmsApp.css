@@ -4112,7 +4112,7 @@ h6 {
   position: absolute;
   right: 22px;
   top: 6px;
-  max-height: calc(100% - 28px);
+  max-height: none !important;
   z-index: 20;
   border-radius: 22px;
   background: var(--theme-tertiary, #181416);
@@ -4120,11 +4120,13 @@ h6 {
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(var(--ta-rgb), 0.08);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: visible !important;
   isolation: isolate;
   animation: profilePopupIn 0.22s cubic-bezier(0.22, 1, 0.36, 1) both;
   transform-origin: top right;
   will-change: transform, opacity;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
 }
 
 /* Ambient 100% Blurred Header Adaptation for Card Body */
@@ -4639,12 +4641,15 @@ h6 {
 
 .pp-body {
   flex: 1;
-  overflow-y: auto;
+  overflow: visible !important;
+  overflow-y: visible !important;
   min-height: 0;
   padding: 6px 16px 10px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
 }
 
 .pp-bio-section { min-height: 36px; }
@@ -10610,18 +10615,21 @@ h6 {
   background: var(--fpp-theme-tertiary, var(--theme-tertiary, #181416));
   border: 1px solid rgba(var(--fpp-theme-accent-rgb, var(--ta-rgb)), 0.2);
   border-radius: 20px;
-  overflow: hidden;
-  max-height: calc(100vh - 20px);
+  overflow: visible !important;
+  max-height: none !important;
   z-index: 900;
   box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(var(--fpp-theme-accent-rgb, var(--ta-rgb)), 0.08);
   font-family: var(--body-font);
   isolation: isolate;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
 }
 .fpp-scroll-inner {
-  overflow-y: auto;
-  overflow-x: hidden;
-  max-height: inherit;
+  overflow: visible !important;
+  max-height: none !important;
   border-radius: inherit;
+  scrollbar-width: none !important;
+  -ms-overflow-style: none !important;
 }
 .fpp-cover {
   width: 100%;
@@ -10931,6 +10939,16 @@ h6 {
 .fpp-action-btn svg, .fpp-action-btn img { flex-shrink: 0; opacity: 0.75; }
 .fpp-action-danger { color: #f87171; }
 .fpp-action-danger:hover { background: rgba(248, 113, 113, 0.1); }
+
+.profile-popup::-webkit-scrollbar,
+.friend-profile-popup::-webkit-scrollbar,
+.fpp-scroll-inner::-webkit-scrollbar,
+.pp-body::-webkit-scrollbar,
+.fpp-body::-webkit-scrollbar {
+  display: none !important;
+  width: 0 !important;
+  height: 0 !important;
+}
 
 /* ── DM Sidebar ── */
 .dm-sidebar {
