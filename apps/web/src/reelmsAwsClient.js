@@ -225,14 +225,18 @@ export async function userGetDoc(sk) {
 export async function userPutDoc(sk, data) {
   const key = String(sk || '')
   try {
-    localStorage.setItem(`reelms:doc:${key}`, stableJson(data))
+    if (data === null || typeof data === 'undefined') {
+      localStorage.removeItem(`reelms:doc:${key}`)
+    } else {
+      localStorage.setItem(`reelms:doc:${key}`, stableJson(data))
+    }
   } catch {}
   await api(`/api/v1/user/doc/${encodeURIComponent(key)}`, {
     method: 'PUT',
-    body: JSON.stringify({ data }),
+    body: JSON.stringify({ data: (data === undefined ? null : data) }),
   })
   invalidateUserResponseCache(key)
-  rememberUserDoc(key, data)
+  rememberUserDoc(key, data === undefined ? null : data)
   userPersistPendingJson.delete(key)
 }
 

@@ -1729,7 +1729,14 @@ export function createReelmsDataRouter(io: Server) {
         const current = await getDoc<any[]>(userPk(uid), 'reelms').catch(() => [])
         return res.json({ ok: true, ignored: true, data: Array.isArray(current) ? current : [] })
       }
-      await putDoc(userPk(uid), sk, req.body?.data)
+      if (typeof req.body?.data === 'undefined' || req.body?.data === null) {
+        await deleteDoc(userPk(uid), sk)
+        cacheFastUserDoc(uid, sk, null)
+      } else {
+        await putDoc(userPk(uid), sk, req.body?.data)
+        cacheFastUserDoc(uid, sk, req.body?.data)
+      }
+      fastUserDocCache.delete(`${uid}:${sk}`)
       emitUser(uid, sk)
       res.json({ ok: true })
     } catch { res.status(500).json({ error: 'put_failed' }) }
