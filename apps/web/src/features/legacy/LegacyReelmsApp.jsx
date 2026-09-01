@@ -6778,7 +6778,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     const f = friendProfileTarget.friend
     if (!f?.id) return null
     const canShare = f?.allowProfileSharing !== false
-    const profileReelm = friendProfileTarget.serverContext === 'reelm' ? selectedReelm : null
+    const profileReelm = (friendProfileTarget.serverContext === 'reelm' || selectedReelm) ? selectedReelm : null
     const memberRecord = profileReelm ? (profileReelm.members || []).find(m => String(m.userId) === String(f?.id)) : null
     const orderedRoles = profileReelm ? getOrderedReelmRolesClient(profileReelm) : []
     const memberRoles = memberRecord ? orderedRoles.filter(r => getMemberRoleIdsClient(memberRecord).includes(String(r.id))) : []
@@ -6882,13 +6882,22 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         }}
         isFriend={friends.some(fr => String(fr.id) === String(f.id))}
         isBlocked={blocked.some(b => String(b.id) === String(f.id))}
-        isPending={friendRequestsOut.map(String).includes(String(f.id))}
-        isMutedUser={mutedChatIds.map(String).includes(String(f.id))}
+        isMutedUser={(() => {
+          const targetIds = [String(f?.id || ''), String(f?.userId || '')].filter(Boolean)
+          const dmChat = (chats || []).find(c => c.type === 'dm' && (String(c.friendId) === String(f?.id) || String(c.id) === String(f?.id)))
+          if (dmChat?.id) targetIds.push(String(dmChat.id))
+          return targetIds.some(id => mutedChatIds.map(String).includes(id))
+        })()}
         onToggleMuteUser={(targetId) => {
-          const tid = String(targetId || '')
+          const tid = String(targetId || f?.id || '')
           if (!tid) return
+          const dmChat = (chats || []).find(c => c.type === 'dm' && (String(c.friendId) === tid || String(c.id) === tid))
+          const targetIds = [tid, dmChat ? String(dmChat.id) : null].filter(Boolean)
+          const isCurrentlyMuted = targetIds.some(id => mutedChatIds.map(String).includes(id))
           setMutedChatIds(prev => {
-            const next = prev.includes(tid) ? prev.filter(x => x !== tid) : [...prev, tid]
+            const next = isCurrentlyMuted
+              ? prev.filter(x => !targetIds.includes(String(x)))
+              : Array.from(new Set([...prev, ...targetIds]))
             scheduleUserPersist('muted_chats', next)
             userPutDoc('muted_chats', next).catch(() => {})
             return next
@@ -12297,8 +12306,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                 title={`${node.name}${hasUnread ? ` (${node.unread} yeni mesaj)` : ''}`}
                               >
                                 <div className={`floating-node-inner ${driftClass}`}>
-                                  <div className="floating-node-orb">
-                                    {node.image ? (
+                                  <div
+                                    className={`floating-node-orb${isDefaultCommunity(node.item) ? ' floating-node-orb--community' : ''}`}
+                                    style={isDefaultCommunity(node.item) ? { background: '#b99887', color: '#383835' } : undefined}
+                                  >
+                                    {isDefaultCommunity(node.item) ? (
+                                      <ReelmsCommunityGlyph size={pos.isCenter ? 30 : (sizeClass === 'floating-node--size-large' ? 32 : (node.isLongInactive ? 18 : 24))} />
+                                    ) : node.image ? (
                                       <img src={node.image} alt={node.name} className="floating-node-avatar-img" />
                                     ) : (
                                       <span className="floating-node-avatar-letter">

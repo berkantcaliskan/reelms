@@ -1456,6 +1456,15 @@ h6 {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25);
 }
 
+.floating-node-orb--community {
+  background: #b99887 !important;
+  color: #383835 !important;
+}
+.floating-node-orb--community .reelm-community-glyph {
+  color: #383835 !important;
+  stroke: #383835 !important;
+}
+
 .floating-node-avatar-img {
   width: 100%;
   height: 100%;
@@ -10781,41 +10790,43 @@ h6 {
   border: 1px solid;
 }
 
+.friend-profile-popup {
+  width: 356px !important;
+}
+
 .fpp-icon-actions {
   display: flex;
   align-items: center;
   justify-content: space-between;
   width: 100%;
   gap: 6px;
-  margin: 4px 0 0 0;
+  margin: 6px 0 2px 0;
 }
 .fpp-icon-btn {
   flex: 1;
-  height: 34px;
-  border-radius: 11px;
-  background: rgba(var(--ta-rgb), 0.08);
-  border: 1px solid rgba(var(--ta-rgb), 0.12);
+  height: 36px;
+  border-radius: 10px;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--ta);
+  color: rgba(var(--ta-rgb), 0.85);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 .fpp-icon-btn:hover {
-  background: rgba(var(--ta-rgb), 0.18);
+  background: rgba(var(--ta-rgb), 0.12) !important;
   transform: translateY(-1px);
   color: #fff;
-  border-color: rgba(var(--ta-rgb), 0.25);
 }
 .fpp-icon-btn--active {
-  background: rgba(239, 68, 68, 0.15);
-  border-color: rgba(239, 68, 68, 0.35);
-  color: #ef4444;
+  background: rgba(239, 68, 68, 0.15) !important;
+  color: #ef4444 !important;
 }
 .fpp-icon-btn--add {
-  color: #4ade80;
-  border-color: rgba(74, 222, 128, 0.25);
+  color: #4ade80 !important;
 }
 
 .fpp-role-chip {
@@ -10848,7 +10859,7 @@ h6 {
 }
 
 .fpp-nickname-section {
-  padding: 4px 0;
+  padding: 2px 0 4px 0;
 }
 .fpp-section-label {
   display: block;
@@ -10856,7 +10867,7 @@ h6 {
   font-weight: 700;
   letter-spacing: 0.08em;
   color: rgba(var(--ta-rgb), 0.80) !important;
-  margin-bottom: 6px;
+  margin-bottom: 2px !important;
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 .fpp-nickname-btn {
@@ -10865,7 +10876,8 @@ h6 {
   color: rgba(255, 255, 255, 0.88);
   font-size: 0.78rem;
   cursor: pointer;
-  padding: 2px 0;
+  padding: 0 !important;
+  margin: 0 !important;
   font-family: inherit;
   text-align: left;
 }
@@ -19158,7 +19170,7 @@ button, input, select, textarea,
   background: #b99887 !important;
   border-radius: 17px !important;
   pointer-events: none;
-  padding-bottom: 34px !important;
+  padding-bottom: 32px !important;
   box-sizing: border-box !important;
   overflow: hidden !important;
 }
@@ -19178,6 +19190,7 @@ button, input, select, textarea,
   color: #383835 !important;
   stroke: #383835 !important;
   filter: drop-shadow(0 2px 6px rgba(56, 56, 53, 0.2));
+  transform: translateY(1px);
 }
 .reelm-cover-wrap--community .reelm-sidebar-name {
   color: #383835 !important;

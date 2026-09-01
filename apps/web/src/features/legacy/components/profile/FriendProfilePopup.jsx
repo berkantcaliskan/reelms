@@ -4,11 +4,33 @@ import { useT } from '../../../../i18n'
 import messagesIcon from '../../../../assets/icons/messages-icon.svg'
 import friendsIcon from '../../../../assets/icons/friends-icon_reelms.svg'
 import avatarUIcon from '../../../../assets/icons/avataru-icon.svg'
-import { MaskIcon, SpotifyIcon } from '../icons/AppIcons'
+import {
+  MaskIcon,
+  SpotifyIcon,
+  InstagramIcon,
+  XIcon,
+  TikTokIcon,
+  LinkedInIcon,
+  WhatsAppIcon,
+  DiscordSocialIcon,
+  SnapchatIcon,
+  CustomLinkIcon,
+} from '../icons/AppIcons'
 import { normalizeMediaUrl, getPersonPhoto } from '../../utils/mediaUtils'
 import { normalizeFriendProfileTarget, buildProfileThemeStyle, STATUS_OPTIONS_LIST, BOT_BIO_KEY } from '../../utils/profileUtils'
 import { CachedProfileImage, CachedProfileCover } from './CachedProfileMedia'
 import { ActivityBadge } from './ActivityModal'
+
+const socialPlatforms = [
+  { key: 'instagram', label: 'Instagram', Icon: InstagramIcon, color: '#E1306C', baseUrl: 'https://www.instagram.com/' },
+  { key: 'twitter', label: 'X', Icon: XIcon, color: '#e0c9bc', baseUrl: 'https://x.com/' },
+  { key: 'tiktok', label: 'TikTok', Icon: TikTokIcon, color: '#b0b0b0', baseUrl: 'https://www.tiktok.com/@' },
+  { key: 'linkedin', label: 'LinkedIn', Icon: LinkedInIcon, color: '#0A66C2', baseUrl: 'https://www.linkedin.com/in/' },
+  { key: 'whatsapp', label: 'WhatsApp', Icon: WhatsAppIcon, color: '#25D366', baseUrl: 'https://wa.me/' },
+  { key: 'discord', label: 'Discord', Icon: DiscordSocialIcon, color: '#5865F2', baseUrl: null },
+  { key: 'snapchat', label: 'Snapchat', Icon: SnapchatIcon, color: '#FFFC00', baseUrl: 'https://www.snapchat.com/add/' },
+  { key: 'custom', label: 'Custom link', Icon: CustomLinkIcon, color: 'rgba(185,152,135,0.75)', baseUrl: null },
+]
 
 export function FriendProfilePopup({
   friend,
@@ -78,6 +100,11 @@ export function FriendProfilePopup({
   const friendStatus = STATUS_OPTIONS_LIST.find(s => s.key === friendStatusKey) || { key: friendStatusKey, label: friendStatusKey, color: '#71717a' }
   const safeFriendBio = safeFriend.isBot ? t(BOT_BIO_KEY[safeFriend.username] || 'bot_radio_bio') : (safeFriend.bio || friend?.bio || '')
   const safeFriendSpotify = safeFriend.spotifyNowPlaying || safeFriend.spotify || friend?.spotifyNowPlaying || friend?.spotify || null
+  const safeFriendLinks = safeFriend.socialLinks || friend?.socialLinks || {}
+  const safeFriendPlatforms = Array.isArray(safeFriend.activePlatforms || friend?.activePlatforms)
+    ? (safeFriend.activePlatforms || friend?.activePlatforms)
+    : Object.keys(safeFriendLinks).filter(k => !!safeFriendLinks[k])
+  const hasSocials = safeFriendPlatforms.some(k => !!safeFriendLinks[k])
   const safeRect = anchorRect || { top: 96, bottom: 112, left: Math.max(8, window.innerWidth - popupW - 18), right: window.innerWidth - 18 }
 
   const msgBarEl = !embedded ? document.querySelector('.msg-bar-wrap') : null
@@ -166,48 +193,46 @@ export function FriendProfilePopup({
         </div>
 
         <div className="fpp-body">
-          {/* 2. Bio */}
+          {/* 1. Bio */}
           {safeFriendBio && (
             <div className="fpp-bio-section">
               <p className="fpp-bio-text">{safeFriendBio}</p>
             </div>
           )}
 
-          {/* 3. Activity */}
-          {(safeFriend.activity?.name || safeFriendSpotify) && (
-            <div className="fpp-activities-section">
-              {safeFriend.activity?.name && (
-                <div className="fpp-activity-item">
-                  <ActivityBadge activity={safeFriend.activity} />
+          {/* 2. Nickname */}
+          {(canEditNickname || nickname) && (
+            <div className="fpp-nickname-section">
+              <span className="fpp-section-label">NICKNAME</span>
+              {editingNickname ? (
+                <div className="fpp-nickname-edit">
+                  <input
+                    className="fpp-nickname-input"
+                    value={nicknameInput}
+                    onChange={e => setNicknameInput(e.target.value)}
+                    placeholder={safeFriend.name}
+                    autoFocus
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') { onNicknameChange?.(nicknameInput.trim()); setEditingNickname(false) }
+                      if (e.key === 'Escape') { setNicknameInput(nickname || ''); setEditingNickname(false) }
+                    }}
+                  />
+                  <button type="button" className="fpp-nickname-save" onClick={() => { onNicknameChange?.(nicknameInput.trim()); setEditingNickname(false) }}>Save</button>
+                  {nickname && <button type="button" className="fpp-nickname-clear" onClick={() => { onNicknameChange?.(''); setNicknameInput(''); setEditingNickname(false) }}>Clear</button>}
                 </div>
-              )}
-              {safeFriendSpotify && (
-                <div className="pp-spotify-playing pp-spotify-pill fpp-spotify-pill">
-                  {safeFriendSpotify.albumArt && (
-                    <img src={safeFriendSpotify.albumArt} alt="album" className="pp-spotify-art" />
-                  )}
-                  <div className="pp-spotify-track">
-                    <a className="pp-spotify-track-name" href={safeFriendSpotify.url} target="_blank" rel="noreferrer">
-                      {safeFriendSpotify.name}
-                    </a>
-                    <span className="pp-spotify-track-artist">{safeFriendSpotify.artist}</span>
-                  </div>
-                  <span className="pp-spotify-pill-icon pp-spotify-icon-active">
-                    <SpotifyIcon size={16} />
-                  </span>
-                </div>
+              ) : (
+                <button type="button" className="fpp-nickname-btn" onClick={() => canEditNickname && setEditingNickname(true)}>
+                  {nickname ? <span>{nickname}</span> : <span className="fpp-nickname-empty">Add nickname...</span>}
+                </button>
               )}
             </div>
           )}
 
-          {/* 4. Reelm Roles */}
+          {/* 3. Roles */}
           {roleContext && (roleContext.roles?.length > 0 || (roleContext.canManageRoles && roleContext.allRoles?.length > 0)) && (
             <div className="fpp-roles-section">
               <div className="fpp-roles-header">
-                <span className="fpp-section-label">REELM ROLES</span>
-                {roleContext.canManageRoles && (
-                  <span className="fpp-roles-manage-hint">Click to assign</span>
-                )}
+                <span className="fpp-section-label">ROLES</span>
               </div>
               {roleContext.canManageRoles && roleContext.allRoles?.length > 0 ? (
                 <div className="fpp-role-badges fpp-role-badges--interactive">
@@ -243,30 +268,64 @@ export function FriendProfilePopup({
             </div>
           )}
 
-          {/* 5. Nickname */}
-          {(canEditNickname || nickname) && (
-            <div className="fpp-nickname-section">
-              <span className="fpp-section-label">NICKNAME</span>
-              {editingNickname ? (
-                <div className="fpp-nickname-edit">
-                  <input
-                    className="fpp-nickname-input"
-                    value={nicknameInput}
-                    onChange={e => setNicknameInput(e.target.value)}
-                    placeholder={safeFriend.name}
-                    autoFocus
-                    onKeyDown={e => {
-                      if (e.key === 'Enter') { onNicknameChange?.(nicknameInput.trim()); setEditingNickname(false) }
-                      if (e.key === 'Escape') { setNicknameInput(nickname || ''); setEditingNickname(false) }
-                    }}
-                  />
-                  <button type="button" className="fpp-nickname-save" onClick={() => { onNicknameChange?.(nicknameInput.trim()); setEditingNickname(false) }}>Save</button>
-                  {nickname && <button type="button" className="fpp-nickname-clear" onClick={() => { onNicknameChange?.(''); setNicknameInput(''); setEditingNickname(false) }}>Clear</button>}
+          {/* 4. Socials */}
+          {hasSocials && (
+            <div className="fpp-socials-section pp-socials-section">
+              <span className="fpp-section-label">SOCIALS</span>
+              <div className="pp-socials-row fpp-socials-row">
+                {safeFriendPlatforms.map(key => {
+                  const linkVal = safeFriendLinks[key]
+                  if (!linkVal) return null
+                  const platform = socialPlatforms.find(p => p.key === key)
+                  if (!platform) return null
+                  const { label, Icon, color, baseUrl } = platform
+                  return (
+                    <a
+                      key={key}
+                      href={key === 'custom' ? (linkVal.startsWith('http') ? linkVal : `https://${linkVal}`) : (baseUrl ? baseUrl + linkVal : '#')}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="pp-social-chip pp-social-chip-set fpp-social-chip"
+                      onClick={e => {
+                        if (!baseUrl && key !== 'custom') {
+                          e.preventDefault()
+                          navigator.clipboard?.writeText(linkVal)
+                        }
+                      }}
+                      title={label}
+                    >
+                      <span style={{ color, display: 'flex', alignItems: 'center' }}><Icon /></span>
+                      <span>{key === 'custom' ? linkVal.replace(/^https?:\/\//, '') : '@' + linkVal.replace(/^@/, '')}</span>
+                    </a>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* 5. Dinlenen Müzik & Aktivite */}
+          {(safeFriend.activity?.name || safeFriendSpotify) && (
+            <div className="fpp-activities-section">
+              {safeFriend.activity?.name && (
+                <div className="fpp-activity-item">
+                  <ActivityBadge activity={safeFriend.activity} />
                 </div>
-              ) : (
-                <button type="button" className="fpp-nickname-btn" onClick={() => canEditNickname && setEditingNickname(true)}>
-                  {nickname ? <span>{nickname}</span> : <span className="fpp-nickname-empty">Add nickname...</span>}
-                </button>
+              )}
+              {safeFriendSpotify && (
+                <div className="pp-spotify-playing pp-spotify-pill fpp-spotify-pill">
+                  {safeFriendSpotify.albumArt && (
+                    <img src={safeFriendSpotify.albumArt} alt="album" className="pp-spotify-art" />
+                  )}
+                  <div className="pp-spotify-track">
+                    <a className="pp-spotify-track-name" href={safeFriendSpotify.url} target="_blank" rel="noreferrer">
+                      {safeFriendSpotify.name}
+                    </a>
+                    <span className="pp-spotify-track-artist">{safeFriendSpotify.artist}</span>
+                  </div>
+                  <span className="pp-spotify-pill-icon pp-spotify-icon-active">
+                    <SpotifyIcon size={16} />
+                  </span>
+                </div>
               )}
             </div>
           )}
