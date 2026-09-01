@@ -10774,28 +10774,32 @@ h6 {
 .fpp-roles-section {
   display: flex;
   flex-direction: column;
-  gap: 3px;
-  padding: 1px 0;
+  gap: 2px;
+  padding: 0;
+  margin: 0;
 }
 .fpp-roles-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  margin-bottom: 0;
 }
 .fpp-role-badges {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
+  gap: 4px;
   align-items: center;
+  margin-top: 1px;
 }
 .fpp-role-badges .rp-role-badge {
   display: inline-flex;
   align-items: center;
   font-size: 0.72rem;
-  padding: 2px 9px;
+  padding: 2px 8px;
   border-radius: 999px;
   font-weight: 600;
   border: 1px solid;
+  line-height: 1.3;
 }
 
 .friend-profile-popup {
@@ -19688,8 +19692,8 @@ button, input, select, textarea,
 .fpp-role-badges {
   display: flex;
   flex-wrap: wrap;
-  gap: 5px;
-  margin-top: 6px;
+  gap: 4px;
+  margin-top: 1px;
 }
 .fpp-mini-link {
   border: 0;

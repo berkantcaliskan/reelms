@@ -439,10 +439,8 @@ function CommunityDoodlePattern() {
           </g>
 
           {/* Sparkle (top left-mid) */}
-          <g transform="translate(46, 10)">
-            <path d="M4 0 Q4 5 0 5 Q4 5 4 10 Q4 5 8 5 Q4 5 4 0Z" />
-            <circle cx="10" cy="1" r="0.8" fill="#383835" />
-          </g>
+          <path d="M47 9 Q47 15.5 41 15.5 Q47 15.5 47 22 Q47 15.5 53 15.5 Q47 15.5 47 9Z" />
+          <circle cx="56" cy="9.5" r="0.9" fill="#383835" />
 
           {/* Headphones (top left-balanced from cat) */}
           <g transform="translate(68, 12)">
@@ -458,10 +456,8 @@ function CommunityDoodlePattern() {
           </g>
 
           {/* Star sparkle (top right-mid) */}
-          <g transform="translate(186, 10)">
-            <path d="M4 0 Q4 5 0 5 Q4 5 4 10 Q4 5 8 5 Q4 5 4 0Z" />
-            <circle cx="-2" cy="1" r="0.8" fill="#383835" />
-          </g>
+          <path d="M191 9 Q191 15.5 185 15.5 Q191 15.5 191 22 Q191 15.5 197 15.5 Q191 15.5 191 9Z" />
+          <circle cx="182" cy="9.5" r="0.9" fill="#383835" />
 
           {/* Rocket (top-right) */}
           <g transform="translate(208, 10) rotate(15)">
