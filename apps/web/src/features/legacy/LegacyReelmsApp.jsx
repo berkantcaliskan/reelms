@@ -9571,7 +9571,6 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           ) : (
                             <div className="group-name-row" onClick={() => setGroupDetailsOpen(v => !v)} title="Group Details">
                               <span className="dm-friend-name">{selectedChat.name}</span>
-                              <svg className={`group-side-chevron${groupDetailsOpen ? ' group-side-chevron--open' : ''}`} width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                             </div>
                           )}
 

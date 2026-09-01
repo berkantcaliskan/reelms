@@ -16818,7 +16818,7 @@ h6 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 6px;
+  text-align: center;
   cursor: pointer;
   border-radius: 11px;
   padding: 4px 10px;
@@ -16826,12 +16826,10 @@ h6 {
   max-width: 100%;
   transition: background 0.15s;
 }
-.group-name-row .group-side-chevron {
-  margin-left: 0;
-}
 .group-name-row .dm-friend-name {
   text-align: center;
   font-size: 0.95rem;
+  margin: 0 auto;
 }
 .group-name-row:hover { background: rgba(var(--ta-rgb), 0.07); }
 .group-name-edit-icon {
