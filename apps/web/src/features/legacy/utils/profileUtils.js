@@ -8,7 +8,9 @@ export const STATUS_OPTIONS_LIST = [
   { key: 'online', label: 'Online', color: '#4ade80' },
   { key: 'idle', label: 'Idle', color: '#fbbf24' },
   { key: 'busy', label: 'Busy', color: '#f87171' },
+  { key: 'dnd', label: 'Do not disturb', color: '#f87171' },
   { key: 'invisible', label: 'Invisible', color: '#9ca3af' },
+  { key: 'offline', label: 'Offline', color: '#71717a' },
 ]
 
 export function buildProfileThemeStyle(person) {

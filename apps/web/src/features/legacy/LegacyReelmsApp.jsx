@@ -418,6 +418,145 @@ function canManageReelmClient(reelm, uid) {
   return (Array.isArray(reelm.roles) ? reelm.roles : []).some(role => roleIds.has(String(role.id)) && isManagerRoleClient(role))
 }
 
+function CommunityDoodlePattern() {
+  return (
+    <svg
+      className="reelm-community-doodles"
+      viewBox="0 0 240 100"
+      preserveAspectRatio="xMidYMid slice"
+      aria-hidden="true"
+    >
+      <g stroke="#383835" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" fill="none">
+        {/* Upper doodles (opacity ~0.52) */}
+        <g opacity="0.52">
+          {/* Game controller (top-left) */}
+          <g transform="translate(14, 12)">
+            <rect x="0" y="2" width="20" height="12" rx="4" />
+            <line x1="4" y1="8" x2="8" y2="8" />
+            <line x1="6" y1="6" x2="6" y2="10" />
+            <circle cx="14.5" cy="6.5" r="0.8" fill="#383835" />
+            <circle cx="16.5" cy="9.5" r="0.8" fill="#383835" />
+          </g>
+
+          {/* Sparkle (top left-mid) */}
+          <path d="M48 10 Q48 16 42 16 Q48 16 48 22 Q48 16 54 16 Q48 16 48 10Z" fill="none" />
+          <circle cx="58" cy="8" r="1" fill="#383835" />
+
+          {/* Headphones (top left-near cat) */}
+          <g transform="translate(74, 10)">
+            <path d="M2 12 A8 8 0 0 1 18 12" />
+            <rect x="0" y="10" width="3.5" height="6" rx="1.5" />
+            <rect x="16.5" y="10" width="3.5" height="6" rx="1.5" />
+          </g>
+
+          {/* Planet with ring (top right-near cat) */}
+          <g transform="translate(154, 8)">
+            <circle cx="8" cy="8" r="6" />
+            <ellipse cx="8" cy="8" rx="11" ry="3.5" transform="rotate(-20 8 8)" />
+          </g>
+
+          {/* Star sparkle (top right-mid) */}
+          <path d="M192 10 Q192 16 186 16 Q192 16 192 22 Q192 16 198 16 Q192 16 192 10Z" fill="none" />
+          <circle cx="182" cy="8" r="1" fill="#383835" />
+
+          {/* Rocket (top-right) */}
+          <g transform="translate(208, 10) rotate(15)">
+            <path d="M8 0 C12 4 14 10 14 14 L2 14 C2 10 4 4 8 0 Z" />
+            <circle cx="8" cy="8" r="1.8" />
+            <path d="M2 11 L-1 14 L2 14 Z" />
+            <path d="M14 11 L17 14 L14 14 Z" />
+          </g>
+        </g>
+
+        {/* Middle doodles (opacity ~0.48) */}
+        <g opacity="0.48">
+          {/* Chat bubble (mid-left) */}
+          <g transform="translate(10, 42)">
+            <path d="M0 4 C0 1.8 1.8 0 4 0 L16 0 C18.2 0 20 1.8 20 4 L20 12 C20 14.2 18.2 16 16 16 L6 16 L1 19 L2 16 C0.8 16 0 14.8 0 13.5 Z" />
+            <circle cx="6" cy="8" r="0.9" fill="#383835" />
+            <circle cx="10" cy="8" r="0.9" fill="#383835" />
+            <circle cx="14" cy="8" r="0.9" fill="#383835" />
+          </g>
+
+          {/* Lightning bolt (mid-left) */}
+          <path d="M42 40 L36 50 L42 50 L38 60 L48 48 L42 48 Z" />
+
+          {/* Music single note (mid left-near cat) */}
+          <g transform="translate(62, 46)">
+            <circle cx="4" cy="11" r="3" />
+            <line x1="7" y1="11" x2="7" y2="2" />
+            <path d="M7 2 Q11 2 12 5" />
+          </g>
+
+          {/* Coffee cup with steam (mid right-near cat) */}
+          <g transform="translate(162, 44)">
+            <path d="M2 5 L14 5 L13 14 C13 15.5 11.5 16.5 10 16.5 L6 16.5 C4.5 16.5 3 15.5 3 14 Z" />
+            <path d="M14 7 C16 7 17 8 17 9.5 C17 11 16 12 14 12" />
+            <path d="M5 2 Q6 0 7 2 Q8 4 9 2" strokeWidth="1" />
+            <path d="M9 2 Q10 0 11 2 Q12 4 13 2" strokeWidth="1" />
+          </g>
+
+          {/* Diamond gem (mid-right) */}
+          <g transform="translate(192, 46)">
+            <polygon points="5,0 13,0 18,5 9,15 0,5" />
+            <line x1="0" y1="5" x2="18" y2="5" />
+            <line x1="5" y1="0" x2="9" y2="15" />
+            <line x1="13" y1="0" x2="9" y2="15" />
+          </g>
+
+          {/* Star & dots (mid-right) */}
+          <polygon points="224,44 226,49 231,50 227,53 228,58 224,55 220,58 221,53 217,50 222,49" />
+          <circle cx="218" cy="40" r="1" fill="#383835" />
+        </g>
+
+        {/* Lower doodles - behind / around name area (soft opacity ~0.22) */}
+        <g opacity="0.22">
+          {/* Camera (bottom-left) */}
+          <g transform="translate(18, 76)">
+            <rect x="0" y="4" width="18" height="13" rx="3" />
+            <circle cx="9" cy="10.5" r="3.5" />
+            <path d="M5 4 L7 1 L11 1 L13 4" />
+          </g>
+
+          {/* Heart (bottom-left) */}
+          <path d="M54 78 C54 74 58 74 60 76 C62 74 66 74 66 78 C66 83 60 87 60 87 C60 87 54 83 54 78 Z" />
+
+          {/* Cloud (bottom left-mid) */}
+          <path d="M88 88 A4 4 0 0 1 92 84 A6 6 0 0 1 103 84 A4 4 0 0 1 106 88 L88 88 Z" />
+
+          {/* Lightbulb (bottom right-mid) */}
+          <g transform="translate(136, 75)">
+            <path d="M4 8 C4 3.5 12 3.5 12 8 C12 10.5 10 11.5 10 13 L6 13 C6 11.5 4 10.5 4 8 Z" />
+            <line x1="6" y1="15" x2="10" y2="15" />
+          </g>
+
+          {/* Double music notes (bottom-right) */}
+          <g transform="translate(168, 76)">
+            <circle cx="3" cy="11" r="2.5" />
+            <circle cx="13" cy="9" r="2.5" />
+            <line x1="5.5" y1="11" x2="5.5" y2="2" />
+            <line x1="15.5" y1="9" x2="15.5" y2="0" />
+            <line x1="5.5" y1="2" x2="15.5" y2="0" strokeWidth="2" />
+          </g>
+
+          {/* Compass / target star (bottom-right) */}
+          <g transform="translate(204, 76)">
+            <circle cx="8" cy="8" r="7" />
+            <polygon points="8,3 10,7 14,8 10,9 8,13 6,9 2,8 6,7" fill="#383835" />
+          </g>
+
+          {/* Scattered dots and crosses in voids */}
+          <circle cx="38" cy="74" r="0.9" fill="#383835" />
+          <circle cx="78" cy="80" r="0.9" fill="#383835" />
+          <circle cx="120" cy="86" r="0.9" fill="#383835" />
+          <circle cx="158" cy="80" r="0.9" fill="#383835" />
+          <circle cx="196" cy="75" r="0.9" fill="#383835" />
+        </g>
+      </g>
+    </svg>
+  )
+}
+
 function ReelmsCommunityGlyph({ size = 26, className = 'reelm-community-glyph', style }) {
   return (
     <ReelmsLogoOutlineIcon
@@ -6724,6 +6863,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     return (
       <FriendProfilePopup
         friend={f}
+        status={getUserStatus(f?.id || f?.userId || f?.uid)}
         anchorRect={friendProfileTarget.anchorRect}
         serverContext={friendProfileTarget.serverContext}
         onClose={() => setFriendProfileTarget(null)}
@@ -8980,7 +9120,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                       }}
                     >
                       {isDefaultCommunity(selectedReelm)
-                        ? <div className="reelm-cover-community-art"><ReelmsCommunityGlyph size={52} /></div>
+                        ? <div className="reelm-cover-community-art"><CommunityDoodlePattern /><ReelmsCommunityGlyph size={52} /></div>
                         : selectedReelm.image
                           ? <img src={selectedReelm.image} alt="cover" className="reelm-cover-img" />
                           : <div className="reelm-cover-placeholder"></div>
@@ -9011,7 +9151,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                           document.body
                         )}
                         {showReelmMenu && ReactDOM.createPortal(
-                          <div className="reelm-name-menu" style={{ top: showReelmMenu.y, left: showReelmMenu.x, minWidth: 260 }} onClick={e => e.stopPropagation()}>
+                          <div className="reelm-name-menu" style={{ top: showReelmMenu.y, left: showReelmMenu.x, minWidth: 208 }} onClick={e => e.stopPropagation()}>
                             {((!isDefaultCommunity(selectedReelm) && hasReelmPermissionClient(selectedReelm, uid, 'manageOverview')) || canManageReelmClient(selectedReelm, uid)) && (
                               <button
                                 type="button"
@@ -9721,7 +9861,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                         }}
                       >
                         {isDefaultCommunity(selectedReelm)
-                          ? <div className="reelm-cover-community-art"><ReelmsCommunityGlyph size={44} /></div>
+                          ? <div className="reelm-cover-community-art"><CommunityDoodlePattern /><ReelmsCommunityGlyph size={44} /></div>
                           : selectedReelm.image
                             ? <img src={selectedReelm.image} alt="cover" className="reelm-cover-img" />
                             : <div className="reelm-cover-placeholder"><span>+</span></div>
@@ -9752,7 +9892,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             document.body
                           )}
                           {showReelmMenu && ReactDOM.createPortal(
-                            <div className="reelm-name-menu" style={{ top: showReelmMenu.y, left: showReelmMenu.x, minWidth: 260 }} onClick={e => e.stopPropagation()}>
+                            <div className="reelm-name-menu" style={{ top: showReelmMenu.y, left: showReelmMenu.x, minWidth: 208 }} onClick={e => e.stopPropagation()}>
                               {((!isDefaultCommunity(selectedReelm) && hasReelmPermissionClient(selectedReelm, uid, 'manageOverview')) || canManageReelmClient(selectedReelm, uid)) && (
                                 <button
                                   type="button"
@@ -9948,8 +10088,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                       const myMember = selectedReelm.members?.find(m => m.userId === uid)
                                       const myRoles = (selectedReelm.roles || []).filter(r => (myMember?.roleIds || []).includes(r.id))
                                       const isAuthorized = canManageReelmClient(selectedReelm, uid) || myRoles.some(isManagerRoleClient)
-                                      if (!isAuthorized) return
-                                      setChannelCtxMenu({ x: e.clientX, y: e.clientY, catId: cat.id, chId: ch.id, chType: ch.type, catChannelCount: cat.channels.length })
+                                      setChannelCtxMenu({ x: e.clientX, y: e.clientY, catId: cat.id, chId: ch.id, chType: ch.type, catChannelCount: cat.channels.length, isAuthorized })
                                     }}
                                   >
                                     <span className={"reelm-channel-label" + (selectedChannel?.id === ch.id ? " reelm-channel-label-active" : "")}>
@@ -10055,8 +10194,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                               const myMember = selectedReelm.members?.find(m => m.userId === uid)
                                               const myRoles = (selectedReelm.roles || []).filter(r => (myMember?.roleIds || []).includes(r.id))
                                               const isAuthorized = canManageReelmClient(selectedReelm, uid) || myRoles.some(isManagerRoleClient)
-                                              if (!isAuthorized) return
-                                              setChannelCtxMenu({ x: e.clientX, y: e.clientY, catId: cat.id, chId: sub.id, parentChId: ch.id, isSubchannel: true, chType: sub.type })
+                                              setChannelCtxMenu({ x: e.clientX, y: e.clientY, catId: cat.id, chId: sub.id, parentChId: ch.id, isSubchannel: true, chType: sub.type, isAuthorized })
                                             }}
                                           >
                                             <span className="reelm-subchannel-branch" />
@@ -13101,93 +13239,198 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         document.body
       )}
       {channelCtxMenu && ReactDOM.createPortal(
-        <div className="reelm-name-menu reelm-channel-ctx-menu" style={{ top: channelCtxMenu.y, left: channelCtxMenu.x }}
-          onMouseDown={e => e.stopPropagation()}>
-          {channelCtxMenu.isSubchannel ? (
-            <>
-              <button className="reelm-name-menu-item" onClick={() => {
-                setEditingChannelId(channelCtxMenu.chId)
-                const sub = (selectedReelm?.categories || [])
-                  .flatMap(c => c.channels || [])
-                  .flatMap(ch => ch.subchannels || [])
-                  .find(s => s.id === channelCtxMenu.chId)
-                setEditingChannelName(sub?.name || '')
-                setChannelCtxMenu(null)
-              }}>✏️ {t('edit_name') || 'Edit Name'}</button>
-              <button
-                className="reelm-name-menu-item reelm-name-menu-item--danger"
-                onClick={() => {
-                  deleteSubchannel(selectedReelm.id, channelCtxMenu.catId, channelCtxMenu.parentChId, channelCtxMenu.chId)
-                  setChannelCtxMenu(null)
-                }}>🗑️ {t('delete_channel') || 'Delete Subchannel'}</button>
-            </>
+        <div
+          className="reelm-name-menu reelm-channel-ctx-menu"
+          style={{
+            top: Math.max(8, Math.min(channelCtxMenu.y, window.innerHeight - (channelCtxMenu.isAuthorized ? 280 : 100))),
+            left: Math.max(8, Math.min(channelCtxMenu.x, window.innerWidth - 200)),
+            minWidth: 168
+          }}
+          onClick={e => e.stopPropagation()}
+          onMouseDown={e => e.stopPropagation()}
+        >
+          {channelCtxMenu.isAuthorized ? (
+            channelCtxMenu.isSubchannel ? (
+              <>
+                <button
+                  type="button"
+                  className="reelm-name-menu-item"
+                  onClick={() => {
+                    setEditingChannelId(channelCtxMenu.chId)
+                    const sub = (selectedReelm?.categories || [])
+                      .flatMap(c => c.channels || [])
+                      .flatMap(ch => ch.subchannels || [])
+                      .find(s => s.id === channelCtxMenu.chId)
+                    setEditingChannelName(sub?.name || '')
+                    setChannelCtxMenu(null)
+                  }}
+                >
+                  <span className="ctx-item-icon">✏️</span>
+                  <span className="ctx-item-label">{t('edit_name') || 'Edit name'}</span>
+                </button>
+
+                {(channelCtxMenu.chType === 'text' || channelCtxMenu.chType === 'announcement' || !channelCtxMenu.chType) && (
+                  <button
+                    type="button"
+                    className="reelm-name-menu-item"
+                    onClick={() => {
+                      const sub = (selectedReelm?.categories || [])
+                        .flatMap(c => c.channels || [])
+                        .flatMap(ch => ch.subchannels || [])
+                        .find(s => s.id === channelCtxMenu.chId)
+                      setShowMediaGallery({
+                        kind: 'channel',
+                        key: `${selectedReelm.id}_${channelCtxMenu.chId}`,
+                        name: `#${sub?.name || 'channel'}`
+                      })
+                      setChannelCtxMenu(null)
+                    }}
+                  >
+                    <span className="ctx-item-icon">🖼️</span>
+                    <span className="ctx-item-label">{t('channel_media') || 'Channel media'}</span>
+                  </button>
+                )}
+
+                <div className="ctx-menu-divider" />
+                <button
+                  type="button"
+                  className="reelm-name-menu-item reelm-name-menu-item--danger"
+                  onClick={() => {
+                    deleteSubchannel(selectedReelm.id, channelCtxMenu.catId, channelCtxMenu.parentChId, channelCtxMenu.chId)
+                    setChannelCtxMenu(null)
+                  }}
+                >
+                  <span className="ctx-item-icon">🗑️</span>
+                  <span className="ctx-item-label">{t('delete_channel') || 'Delete channel'}</span>
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  className="reelm-name-menu-item"
+                  onClick={() => {
+                    setEditingChannelId(channelCtxMenu.chId)
+                    setEditingChannelName(selectedReelm.categories.flatMap(c => c.channels).find(ch => ch.id === channelCtxMenu.chId)?.name || '')
+                    setChannelCtxMenu(null)
+                  }}
+                >
+                  <span className="ctx-item-icon">✏️</span>
+                  <span className="ctx-item-label">{t('edit_name') || 'Edit name'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="reelm-name-menu-item"
+                  onClick={() => {
+                    const ch = selectedReelm?.categories?.flatMap(c => c.channels || []).find(c => c.id === channelCtxMenu.chId)
+                    setChannelPermissionsTarget({
+                      reelmId: selectedReelm.id,
+                      catId: channelCtxMenu.catId,
+                      chId: channelCtxMenu.chId,
+                      targetName: ch?.name || 'channel',
+                      isCategory: false
+                    })
+                    setChannelCtxMenu(null)
+                  }}
+                >
+                  <span className="ctx-item-icon">🛡️</span>
+                  <span className="ctx-item-label">{t('edit_permissions') || 'Edit permissions'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  className="reelm-name-menu-item"
+                  onClick={() => {
+                    createSubchannel(selectedReelm.id, channelCtxMenu.catId, channelCtxMenu.chId)
+                    setChannelCtxMenu(null)
+                  }}
+                >
+                  <span className="ctx-item-icon">➕</span>
+                  <span className="ctx-item-label">{t('create_subchannel') || 'Create subchannel'}</span>
+                </button>
+
+                {(channelCtxMenu.chType === 'text' || channelCtxMenu.chType === 'announcement' || !channelCtxMenu.chType) && (
+                  <button
+                    type="button"
+                    className="reelm-name-menu-item"
+                    onClick={() => {
+                      const ch = selectedReelm?.categories?.flatMap(c => c.channels || []).find(c => c.id === channelCtxMenu.chId)
+                      setShowMediaGallery({
+                        kind: 'channel',
+                        key: `${selectedReelm.id}_${channelCtxMenu.chId}`,
+                        name: `#${ch?.name || 'channel'}`
+                      })
+                      setChannelCtxMenu(null)
+                    }}
+                  >
+                    <span className="ctx-item-icon">🖼️</span>
+                    <span className="ctx-item-label">{t('channel_media') || 'Channel media'}</span>
+                  </button>
+                )}
+
+                {channelCtxMenu.chType === 'voice' && (() => {
+                  const ctxCh = selectedReelm?.categories.flatMap(c => c.channels).find(c => c.id === channelCtxMenu.chId)
+                  const currentCap = ctxCh?.capacity ?? 8
+                  return (
+                    <div className="reelm-channel-ctx-capacity">
+                      <div className="reelm-channel-ctx-capacity-label">{t('capacity') || 'Capacity'}</div>
+                      <div className="reelm-channel-ctx-capacity-grid">
+                        {[2, 4, 8, 16].map(cap => (
+                          <button
+                            key={cap}
+                            type="button"
+                            className={`reelm-channel-ctx-cap-btn${currentCap === cap ? ' active' : ''}`}
+                            onClick={() => saveChannelCapacity(selectedReelm.id, channelCtxMenu.catId, channelCtxMenu.chId, cap)}
+                          >{cap}</button>
+                        ))}
+                        <button
+                          type="button"
+                          className={`reelm-channel-ctx-cap-btn reelm-channel-ctx-cap-unlimited${currentCap === 0 ? ' active' : ''}`}
+                          onClick={() => saveChannelCapacity(selectedReelm.id, channelCtxMenu.catId, channelCtxMenu.chId, 0)}
+                        >{t('unlimited') || 'Unlimited'}</button>
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                <div className="ctx-menu-divider" />
+                <button
+                  type="button"
+                  className={`reelm-name-menu-item reelm-name-menu-item--danger${channelCtxMenu.catChannelCount <= 1 ? ' reelm-channel-ctx-disabled' : ''}`}
+                  disabled={channelCtxMenu.catChannelCount <= 1}
+                  onClick={() => {
+                    if (channelCtxMenu.catChannelCount <= 1) return
+                    deleteChannel(selectedReelm.id, channelCtxMenu.catId, channelCtxMenu.chId)
+                    setChannelCtxMenu(null)
+                  }}
+                >
+                  <span className="ctx-item-icon">🗑️</span>
+                  <span className="ctx-item-label">{t('delete_channel') || 'Delete channel'}</span>
+                </button>
+              </>
+            )
           ) : (
             <>
-              <button className="reelm-name-menu-item" onClick={() => {
-                setEditingChannelId(channelCtxMenu.chId)
-                setEditingChannelName(selectedReelm.categories.flatMap(c => c.channels).find(ch => ch.id === channelCtxMenu.chId)?.name || '')
-                setChannelCtxMenu(null)
-              }}>✏️ {t('edit_name') || 'Edit Name'}</button>
-              <button className="reelm-name-menu-item" onClick={() => {
-                createSubchannel(selectedReelm.id, channelCtxMenu.catId, channelCtxMenu.chId)
-                setChannelCtxMenu(null)
-              }}>+ {t('create_subchannel') || 'Create Subchannel'}</button>
-              <button className="reelm-name-menu-item" onClick={() => {
-                const ch = selectedReelm?.categories?.flatMap(c => c.channels || []).find(c => c.id === channelCtxMenu.chId)
-                setChannelPermissionsTarget({
-                  reelmId: selectedReelm.id,
-                  catId: channelCtxMenu.catId,
-                  chId: channelCtxMenu.chId,
-                  targetName: ch?.name || 'channel',
-                  isCategory: false
-                })
-                setChannelCtxMenu(null)
-              }}>🛡️ {t('edit_permissions') || 'Permissions'}</button>
-              {(channelCtxMenu.chType === 'text' || channelCtxMenu.chType === 'announcement') && (
-                <button className="reelm-name-menu-item" onClick={() => {
-                  const ch = selectedReelm?.categories?.flatMap(c => c.channels || []).find(c => c.id === channelCtxMenu.chId)
-                  setShowMediaGallery({
-                    kind: 'channel',
-                    key: `${selectedReelm.id}_${channelCtxMenu.chId}`,
-                    name: `#${ch?.name || 'channel'}`
-                  })
-                  setChannelCtxMenu(null)
-                }}>
-                  <span>🖼️</span>
-                  <span>{t('channel_media') || 'Channel Media'}</span>
+              {(channelCtxMenu.chType === 'text' || channelCtxMenu.chType === 'announcement' || !channelCtxMenu.chType) && (
+                <button
+                  type="button"
+                  className="reelm-name-menu-item"
+                  onClick={() => {
+                    const ch = (selectedReelm?.categories || []).flatMap(c => c.channels || []).find(c => c.id === channelCtxMenu.chId) ||
+                               (selectedReelm?.categories || []).flatMap(c => c.channels || []).flatMap(c => c.subchannels || []).find(s => s.id === channelCtxMenu.chId)
+                    setShowMediaGallery({
+                      kind: 'channel',
+                      key: `${selectedReelm.id}_${channelCtxMenu.chId}`,
+                      name: `#${ch?.name || 'channel'}`
+                    })
+                    setChannelCtxMenu(null)
+                  }}
+                >
+                  <span className="ctx-item-icon">🖼️</span>
+                  <span className="ctx-item-label">{t('channel_media') || 'Channel media'}</span>
                 </button>
               )}
-              {channelCtxMenu.chType === 'voice' && (() => {
-                const ctxCh = selectedReelm?.categories.flatMap(c => c.channels).find(c => c.id === channelCtxMenu.chId)
-                const currentCap = ctxCh?.capacity ?? 8
-                return (
-                  <div className="reelm-channel-ctx-capacity">
-                    <div className="reelm-channel-ctx-capacity-label">{t('capacity')}</div>
-                    <div className="reelm-channel-ctx-capacity-grid">
-                      {[2, 4, 8, 16].map(cap => (
-                        <button
-                          key={cap}
-                          className={`reelm-channel-ctx-cap-btn${currentCap === cap ? ' active' : ''}`}
-                          onClick={() => saveChannelCapacity(selectedReelm.id, channelCtxMenu.catId, channelCtxMenu.chId, cap)}
-                        >{cap}</button>
-                      ))}
-                      <button
-                        className={`reelm-channel-ctx-cap-btn reelm-channel-ctx-cap-unlimited${currentCap === 0 ? ' active' : ''}`}
-                        onClick={() => saveChannelCapacity(selectedReelm.id, channelCtxMenu.catId, channelCtxMenu.chId, 0)}
-                      >{t('unlimited')}</button>
-                    </div>
-                  </div>
-                )
-              })()}
-              <div className="ctx-menu-divider" />
-              <button
-                className={`reelm-name-menu-item reelm-name-menu-item--danger${channelCtxMenu.catChannelCount <= 1 ? ' reelm-channel-ctx-disabled' : ''}`}
-                disabled={channelCtxMenu.catChannelCount <= 1}
-                onClick={() => {
-                  if (channelCtxMenu.catChannelCount <= 1) return
-                  deleteChannel(selectedReelm.id, channelCtxMenu.catId, channelCtxMenu.chId)
-                  setChannelCtxMenu(null)
-                }}>🗑️ {t('delete_channel') || 'Delete Channel'}</button>
             </>
           )}
         </div>,
@@ -13195,11 +13438,11 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       )}
       {chatCtxMenu && ReactDOM.createPortal(
         <div
-          className="reelm-name-menu chat-ctx-menu"
+          className="reelm-name-menu reelm-channel-ctx-menu chat-ctx-menu"
           style={{
             top: Math.max(8, Math.min(chatCtxMenu.y, window.innerHeight - 260)),
-            left: Math.max(8, Math.min(chatCtxMenu.x, window.innerWidth - 220)),
-            minWidth: 200
+            left: Math.max(8, Math.min(chatCtxMenu.x, window.innerWidth - 190)),
+            minWidth: 168
           }}
           onClick={e => e.stopPropagation()}
           onMouseDown={e => e.stopPropagation()}
@@ -13216,8 +13459,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               setChatCtxMenu(null)
             }}
           >
-            <span>{getChatUnreadCount(chatCtxMenu.chat) > 0 ? '✓' : '●'}</span>
-            <span>{getChatUnreadCount(chatCtxMenu.chat) > 0 ? (t('mark_as_read') || 'Mark as Read') : (t('mark_as_unread') || 'Mark as Unread')}</span>
+            <span className="ctx-item-icon">{getChatUnreadCount(chatCtxMenu.chat) > 0 ? '✓' : '●'}</span>
+            <span className="ctx-item-label">{getChatUnreadCount(chatCtxMenu.chat) > 0 ? (t('mark_as_read') || 'Mark as read') : (t('mark_as_unread') || 'Mark as unread')}</span>
           </button>
 
           <button
@@ -13228,8 +13471,12 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               setChatCtxMenu(null)
             }}
           >
-            <span>🔔</span>
-            <span>{t('mute_chat') || 'Mute Notifications'}</span>
+            <span className="ctx-item-icon">🔔</span>
+            <span className="ctx-item-label">
+              {mutedChatIds.map(String).includes(String(chatCtxMenu.chat.id))
+                ? (t('unmute_chat') || 'Unmute chat')
+                : (t('mute_chat') || 'Mute chat')}
+            </span>
           </button>
 
           {chatCtxMenu.chat.type === 'dm' && chatCtxMenu.chat.friendId && (
@@ -13242,8 +13489,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                 setChatCtxMenu(null)
               }}
             >
-              <span>👤</span>
-              <span>{t('see_full_profile') || 'View Profile'}</span>
+              <span className="ctx-item-icon">👤</span>
+              <span className="ctx-item-label">{t('see_full_profile') || 'View profile'}</span>
             </button>
           )}
 
@@ -13259,8 +13506,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               setChatCtxMenu(null)
             }}
           >
-            <span>🖼️</span>
-            <span>{t('media') || 'Media'}</span>
+            <span className="ctx-item-icon">🖼️</span>
+            <span className="ctx-item-label">{t('media') || 'Media'}</span>
           </button>
 
           <div className="ctx-menu-divider" />
@@ -13274,8 +13521,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                 setChatCtxMenu(null)
               }}
             >
-              <span>🚫</span>
-              <span>{t('block') || 'Block User'}</span>
+              <span className="ctx-item-icon">🚫</span>
+              <span className="ctx-item-label">{t('block') || 'Block'}</span>
             </button>
           )}
 
@@ -13287,8 +13534,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               setChatCtxMenu(null)
             }}
           >
-            <span>🗑️</span>
-            <span>{t('delete_conversation') || 'Delete Conversation'}</span>
+            <span className="ctx-item-icon">🗑️</span>
+            <span className="ctx-item-label">{t('delete_conversation') || 'Delete conversation'}</span>
           </button>
         </div>,
         document.body
@@ -13303,29 +13550,38 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       )}
       {eventCtxMenu && ReactDOM.createPortal(
         <div
-          className="reelm-channel-ctx-menu"
-          style={{ top: eventCtxMenu.y, left: eventCtxMenu.x }}
+          className="reelm-name-menu reelm-channel-ctx-menu event-ctx-menu"
+          style={{
+            top: Math.max(8, Math.min(eventCtxMenu.y, window.innerHeight - 160)),
+            left: Math.max(8, Math.min(eventCtxMenu.x, window.innerWidth - 190)),
+            minWidth: 168
+          }}
+          onClick={e => e.stopPropagation()}
           onMouseDown={e => e.stopPropagation()}
         >
           {eventCtxMenu.isAuthorized && (
             <button
-              className="reelm-channel-ctx-item"
+              type="button"
+              className="reelm-name-menu-item"
               onClick={() => {
                 setShowCreateEventModal(eventCtxMenu.reelmId)
                 setEventCtxMenu(null)
               }}
             >
-              + {t('create_event') || 'Create Event'}
+              <span className="ctx-item-icon">➕</span>
+              <span className="ctx-item-label">{t('create_event') || 'Create event'}</span>
             </button>
           )}
           <button
-            className="reelm-channel-ctx-item"
+            type="button"
+            className="reelm-name-menu-item"
             onClick={() => {
               setShowAllEventsModal(eventCtxMenu.reelmId)
               setEventCtxMenu(null)
             }}
           >
-            {t('view_all_events') || 'View All Events'}
+            <span className="ctx-item-icon">📅</span>
+            <span className="ctx-item-label">{t('view_all_events') || 'View all events'}</span>
           </button>
         </div>,
         document.body

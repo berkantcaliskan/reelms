@@ -12,6 +12,7 @@ import { ActivityBadge } from './ActivityModal'
 
 export function FriendProfilePopup({
   friend,
+  status = null,
   anchorRect = null,
   serverContext = null,
   onClose,
@@ -71,8 +72,10 @@ export function FriendProfilePopup({
   const isFromChat = !serverContext && !embedded
 
   const friendCover = safeFriend.cover || safeFriend.coverImage || safeFriend.coverUrl || null
-  const friendStatusKey = safeFriend.status || friend?.status || 'online'
-  const friendStatus = STATUS_OPTIONS_LIST.find(s => s.key === friendStatusKey) || STATUS_OPTIONS_LIST[0]
+  const isBot = safeFriend.isBot || ['reelmradio', 'reelms-intelligence'].includes(safeFriend.username)
+  const rawStatusKey = isBot ? 'online' : (status !== null && status !== undefined ? status : (safeFriend.status || friend?.status || 'offline'))
+  const friendStatusKey = ['online', 'idle', 'busy', 'dnd', 'invisible', 'offline'].includes(rawStatusKey) ? rawStatusKey : 'offline'
+  const friendStatus = STATUS_OPTIONS_LIST.find(s => s.key === friendStatusKey) || { key: friendStatusKey, label: friendStatusKey, color: '#71717a' }
   const safeFriendBio = safeFriend.isBot ? t(BOT_BIO_KEY[safeFriend.username] || 'bot_radio_bio') : (safeFriend.bio || friend?.bio || '')
   const safeFriendSpotify = safeFriend.spotifyNowPlaying || safeFriend.spotify || friend?.spotifyNowPlaying || friend?.spotify || null
   const safeRect = anchorRect || { top: 96, bottom: 112, left: Math.max(8, window.innerWidth - popupW - 18), right: window.innerWidth - 18 }
@@ -126,7 +129,7 @@ export function FriendProfilePopup({
   }
 
   const profileNode = (
-    <div className={`friend-profile-popup${embedded ? ' friend-profile-popup--embedded' : ''}${friendCover ? ' friend-profile-popup--has-cover' : ''}`} style={{ ...(buildProfileThemeStyle(safeFriend) || {}), ...stylePos }} ref={popupRef}>
+    <div className={`profile-popup friend-profile-popup${embedded ? ' friend-profile-popup--embedded' : ''}${friendCover ? ' friend-profile-popup--has-cover profile-popup--has-cover' : ''}`} style={{ ...(buildProfileThemeStyle(safeFriend) || {}), ...stylePos }} ref={popupRef}>
       {friendCover && (
         <div className="profile-popup-ambient">
           <div className="profile-popup-ambient-bg" style={{ backgroundImage: `url(${normalizeMediaUrl(friendCover)})` }} />
@@ -134,28 +137,30 @@ export function FriendProfilePopup({
         </div>
       )}
       <div className="fpp-scroll-inner">
-        <CachedProfileCover src={friendCover} className={`fpp-cover${friendCover ? ' fpp-cover--has-image' : ''}`} />
+        <CachedProfileCover src={friendCover} className={`pp-cover fpp-cover${friendCover ? ' pp-cover--has-image fpp-cover--has-image' : ''}`} />
         {embedded && <button type="button" className="fpp-embedded-close" onClick={onClose} aria-label="Close profile">×</button>}
 
-        {/* 1. Identity: Avatar + Names + Status */}
-        <div className="fpp-identity">
-          <div className="fpp-avatar">
+        {/* 1. Identity: Avatar + Names + Status Dot */}
+        <div className="pp-identity fpp-identity">
+          <div className="pp-avatar-wrap fpp-avatar-wrap">
             <CachedProfileImage
               src={getPersonPhoto(safeFriend)}
               alt="Avatar"
-              className="fpp-avatar-img"
-              style={{ width: 66, height: 66, objectFit: 'cover', borderRadius: '50%' }}
-              fallback={<img src={avatarUIcon} alt="Avatar" className="fpp-avatar-img" style={{ width: 66, height: 66, objectFit: 'cover', borderRadius: '50%' }} />}
+              className="pp-avatar fpp-avatar-img"
+              fallback={<img src={avatarUIcon} alt="Avatar" className="pp-avatar fpp-avatar-img" />}
             />
           </div>
-          <div className="fpp-names-col">
-            <span className="fpp-name">{nickname || safeFriend.name}</span>
-            <div className="fpp-username-row">
-              {safeFriend.username && <span className="fpp-username">{'@' + (safeFriend.username.startsWith('@') ? safeFriend.username.slice(1) : safeFriend.username)}</span>}
-              <div className="fpp-status-pill">
-                <span className="pp-status-dot" style={{ background: friendStatus.color }} />
-                <span>{friendStatus.label || 'Online'}</span>
-              </div>
+          <div className="pp-names-col fpp-names-col">
+            <div className="fpp-name-row">
+              <span className="pp-name fpp-name">{nickname || safeFriend.name || safeFriend.displayName || 'Member'}</span>
+              <span
+                className="fpp-status-dot"
+                style={{ background: friendStatus.color }}
+                title={friendStatus.label || friendStatusKey}
+              />
+            </div>
+            <div className="pp-username-row fpp-username-row">
+              <span className="pp-username fpp-username">{'@' + (safeFriend.username ? safeFriend.username.replace(/^@/, '') : (safeFriend.name || 'user').toLowerCase().replace(/\s+/g, ''))}</span>
             </div>
           </div>
         </div>
