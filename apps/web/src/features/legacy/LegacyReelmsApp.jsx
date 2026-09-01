@@ -439,11 +439,11 @@ function CommunityDoodlePattern() {
           </g>
 
           {/* Sparkle (top left-mid) */}
-          <path d="M48 10 Q48 16 42 16 Q48 16 48 22 Q48 16 54 16 Q48 16 48 10Z" fill="none" />
-          <circle cx="58" cy="8" r="1" fill="#383835" />
+          <path d="M40 10 Q40 16 34 16 Q40 16 40 22 Q40 16 46 16 Q40 16 40 10Z" fill="none" />
+          <circle cx="50" cy="8" r="1" fill="#383835" />
 
-          {/* Headphones (top left-near cat) */}
-          <g transform="translate(74, 10)">
+          {/* Headphones (top left-away from cat) */}
+          <g transform="translate(62, 10)">
             <path d="M2 12 A8 8 0 0 1 18 12" />
             <rect x="0" y="10" width="3.5" height="6" rx="1.5" />
             <rect x="16.5" y="10" width="3.5" height="6" rx="1.5" />
