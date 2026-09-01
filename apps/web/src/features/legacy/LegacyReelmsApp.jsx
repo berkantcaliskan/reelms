@@ -427,8 +427,8 @@ function CommunityDoodlePattern() {
       aria-hidden="true"
     >
       <g stroke="#383835" strokeWidth="1.35" strokeLinecap="round" strokeLinejoin="round" fill="none">
-        {/* Upper doodles (opacity ~0.52) */}
-        <g opacity="0.52">
+        {/* Upper doodles (opacity ~0.50) */}
+        <g opacity="0.50">
           {/* Game controller (top-left) */}
           <g transform="translate(14, 12)">
             <rect x="0" y="2" width="20" height="12" rx="4" />
@@ -439,118 +439,125 @@ function CommunityDoodlePattern() {
           </g>
 
           {/* Sparkle (top left-mid) */}
-          <path d="M40 10 Q40 16 34 16 Q40 16 40 22 Q40 16 46 16 Q40 16 40 10Z" fill="none" />
-          <circle cx="50" cy="8" r="1" fill="#383835" />
-
-          {/* Headphones (top left-away from cat) */}
-          <g transform="translate(62, 10)">
-            <path d="M2 12 A8 8 0 0 1 18 12" />
-            <rect x="0" y="10" width="3.5" height="6" rx="1.5" />
-            <rect x="16.5" y="10" width="3.5" height="6" rx="1.5" />
+          <g transform="translate(46, 10)">
+            <path d="M4 0 Q4 5 0 5 Q4 5 4 10 Q4 5 8 5 Q4 5 4 0Z" />
+            <circle cx="10" cy="1" r="0.8" fill="#383835" />
           </g>
 
-          {/* Planet with ring (top right-near cat) */}
-          <g transform="translate(154, 8)">
-            <circle cx="8" cy="8" r="6" />
-            <ellipse cx="8" cy="8" rx="11" ry="3.5" transform="rotate(-20 8 8)" />
+          {/* Headphones (top left-balanced from cat) */}
+          <g transform="translate(68, 12)">
+            <path d="M2 11 A7.5 7.5 0 0 1 17 11" />
+            <rect x="0" y="9.5" width="3.2" height="5.5" rx="1.5" />
+            <rect x="15.8" y="9.5" width="3.2" height="5.5" rx="1.5" />
+          </g>
+
+          {/* Planet with ring (top right-balanced from cat) */}
+          <g transform="translate(154, 10)">
+            <circle cx="8" cy="8" r="5.5" />
+            <ellipse cx="8" cy="8" rx="10" ry="3" transform="rotate(-20 8 8)" />
           </g>
 
           {/* Star sparkle (top right-mid) */}
-          <path d="M192 10 Q192 16 186 16 Q192 16 192 22 Q192 16 198 16 Q192 16 192 10Z" fill="none" />
-          <circle cx="182" cy="8" r="1" fill="#383835" />
+          <g transform="translate(186, 10)">
+            <path d="M4 0 Q4 5 0 5 Q4 5 4 10 Q4 5 8 5 Q4 5 4 0Z" />
+            <circle cx="-2" cy="1" r="0.8" fill="#383835" />
+          </g>
 
           {/* Rocket (top-right) */}
           <g transform="translate(208, 10) rotate(15)">
-            <path d="M8 0 C12 4 14 10 14 14 L2 14 C2 10 4 4 8 0 Z" />
-            <circle cx="8" cy="8" r="1.8" />
-            <path d="M2 11 L-1 14 L2 14 Z" />
-            <path d="M14 11 L17 14 L14 14 Z" />
+            <path d="M7 0 C11 3.5 13 9 13 13 L1 13 C1 9 3 3.5 7 0 Z" />
+            <circle cx="7" cy="7" r="1.6" />
+            <path d="M1 10 L-1.5 13 L1 13 Z" />
+            <path d="M13 10 L15.5 13 L13 13 Z" />
           </g>
         </g>
 
-        {/* Middle doodles (opacity ~0.48) */}
-        <g opacity="0.48">
+        {/* Middle doodles (opacity ~0.46) */}
+        <g opacity="0.46">
           {/* Chat bubble (mid-left) */}
-          <g transform="translate(10, 42)">
-            <path d="M0 4 C0 1.8 1.8 0 4 0 L16 0 C18.2 0 20 1.8 20 4 L20 12 C20 14.2 18.2 16 16 16 L6 16 L1 19 L2 16 C0.8 16 0 14.8 0 13.5 Z" />
-            <circle cx="6" cy="8" r="0.9" fill="#383835" />
-            <circle cx="10" cy="8" r="0.9" fill="#383835" />
-            <circle cx="14" cy="8" r="0.9" fill="#383835" />
+          <g transform="translate(12, 44)">
+            <path d="M0 3.5 C0 1.6 1.6 0 3.5 0 L14.5 0 C16.4 0 18 1.6 18 3.5 L18 10.5 C18 12.4 16.4 14 14.5 14 L5.5 14 L1 17 L1.8 14 C0.7 14 0 12.9 0 11.8 Z" />
+            <circle cx="5" cy="7" r="0.8" fill="#383835" />
+            <circle cx="9" cy="7" r="0.8" fill="#383835" />
+            <circle cx="13" cy="7" r="0.8" fill="#383835" />
           </g>
 
           {/* Lightning bolt (mid-left) */}
-          <path d="M42 40 L36 50 L42 50 L38 60 L48 48 L42 48 Z" />
-
-          {/* Music single note (mid left-near cat) */}
-          <g transform="translate(62, 46)">
-            <circle cx="4" cy="11" r="3" />
-            <line x1="7" y1="11" x2="7" y2="2" />
-            <path d="M7 2 Q11 2 12 5" />
+          <g transform="translate(42, 44)">
+            <path d="M6 0 L0 10 L6 10 L2 18 L12 7 L6 7 Z" />
           </g>
 
-          {/* Coffee cup with steam (mid right-near cat) */}
-          <g transform="translate(162, 44)">
-            <path d="M2 5 L14 5 L13 14 C13 15.5 11.5 16.5 10 16.5 L6 16.5 C4.5 16.5 3 15.5 3 14 Z" />
-            <path d="M14 7 C16 7 17 8 17 9.5 C17 11 16 12 14 12" />
-            <path d="M5 2 Q6 0 7 2 Q8 4 9 2" strokeWidth="1" />
-            <path d="M9 2 Q10 0 11 2 Q12 4 13 2" strokeWidth="1" />
+          {/* Music single note (mid left) */}
+          <g transform="translate(68, 46)">
+            <circle cx="3.5" cy="10" r="2.8" />
+            <line x1="6.3" y1="10" x2="6.3" y2="1.5" />
+            <path d="M6.3 1.5 Q10 1.5 11 4.5" />
+          </g>
+
+          {/* Coffee cup with steam (mid right) */}
+          <g transform="translate(154, 44)">
+            <path d="M2 4.5 L13 4.5 L12 12.5 C12 14 10.5 15 9 15 L5 15 C3.5 15 2 14 2 12.5 Z" />
+            <path d="M13 6.5 C15 6.5 16 7.5 16 9 C16 10.5 15 11.5 13 11.5" />
+            <path d="M4.5 1.5 Q5.5 0 6.5 1.5" strokeWidth="1" />
+            <path d="M8.5 1.5 Q9.5 0 10.5 1.5" strokeWidth="1" />
           </g>
 
           {/* Diamond gem (mid-right) */}
-          <g transform="translate(192, 46)">
-            <polygon points="5,0 13,0 18,5 9,15 0,5" />
-            <line x1="0" y1="5" x2="18" y2="5" />
-            <line x1="5" y1="0" x2="9" y2="15" />
-            <line x1="13" y1="0" x2="9" y2="15" />
+          <g transform="translate(186, 46)">
+            <polygon points="4,0 12,0 16,4.5 8,14 0,4.5" />
+            <line x1="0" y1="4.5" x2="16" y2="4.5" />
+            <line x1="4" y1="0" x2="8" y2="14" />
+            <line x1="12" y1="0" x2="8" y2="14" />
           </g>
 
-          {/* Star & dots (mid-right) */}
-          <polygon points="224,44 226,49 231,50 227,53 228,58 224,55 220,58 221,53 217,50 222,49" />
-          <circle cx="218" cy="40" r="1" fill="#383835" />
+          {/* Star & dot (mid-right) */}
+          <g transform="translate(216, 44)">
+            <polygon points="6,0 7.8,4.2 12,4.8 8.8,7.6 9.6,12 6,9.8 2.4,12 3.2,7.6 0,4.8 4.2,4.2" />
+          </g>
         </g>
 
         {/* Lower doodles - behind / around name area (soft opacity ~0.22) */}
         <g opacity="0.22">
           {/* Camera (bottom-left) */}
           <g transform="translate(18, 76)">
-            <rect x="0" y="4" width="18" height="13" rx="3" />
-            <circle cx="9" cy="10.5" r="3.5" />
-            <path d="M5 4 L7 1 L11 1 L13 4" />
+            <rect x="0" y="3.5" width="16" height="11.5" rx="2.5" />
+            <circle cx="8" cy="9.2" r="3" />
+            <path d="M4.5 3.5 L6.2 1 L9.8 1 L11.5 3.5" />
           </g>
 
           {/* Heart (bottom-left) */}
-          <path d="M54 78 C54 74 58 74 60 76 C62 74 66 74 66 78 C66 83 60 87 60 87 C60 87 54 83 54 78 Z" />
+          <path d="M50 78 C50 74.5 53.5 74.5 55.5 76.5 C57.5 74.5 61 74.5 61 78 C61 82.5 55.5 86.5 55.5 86.5 C55.5 86.5 50 82.5 50 78 Z" />
 
           {/* Cloud (bottom left-mid) */}
-          <path d="M88 88 A4 4 0 0 1 92 84 A6 6 0 0 1 103 84 A4 4 0 0 1 106 88 L88 88 Z" />
+          <path d="M84 88 A3.5 3.5 0 0 1 87.5 84.5 A5.5 5.5 0 0 1 97.5 84.5 A3.5 3.5 0 0 1 100 88 L84 88 Z" />
 
           {/* Lightbulb (bottom right-mid) */}
-          <g transform="translate(136, 75)">
-            <path d="M4 8 C4 3.5 12 3.5 12 8 C12 10.5 10 11.5 10 13 L6 13 C6 11.5 4 10.5 4 8 Z" />
-            <line x1="6" y1="15" x2="10" y2="15" />
+          <g transform="translate(138, 75)">
+            <path d="M3.5 7 C3.5 3 10.5 3 10.5 7 C10.5 9.2 8.8 10 8.8 11.5 L5.2 11.5 C5.2 10 3.5 9.2 3.5 7 Z" />
+            <line x1="5.2" y1="13.5" x2="8.8" y2="13.5" />
           </g>
 
           {/* Double music notes (bottom-right) */}
-          <g transform="translate(168, 76)">
-            <circle cx="3" cy="11" r="2.5" />
-            <circle cx="13" cy="9" r="2.5" />
-            <line x1="5.5" y1="11" x2="5.5" y2="2" />
-            <line x1="15.5" y1="9" x2="15.5" y2="0" />
-            <line x1="5.5" y1="2" x2="15.5" y2="0" strokeWidth="2" />
+          <g transform="translate(172, 76)">
+            <circle cx="2.5" cy="9.5" r="2.2" />
+            <circle cx="11.5" cy="7.5" r="2.2" />
+            <line x1="4.7" y1="9.5" x2="4.7" y2="1.5" />
+            <line x1="13.7" y1="7.5" x2="13.7" y2="0" />
+            <line x1="4.7" y1="1.5" x2="13.7" y2="0" strokeWidth="1.8" />
           </g>
 
-          {/* Compass / target star (bottom-right) */}
-          <g transform="translate(204, 76)">
-            <circle cx="8" cy="8" r="7" />
-            <polygon points="8,3 10,7 14,8 10,9 8,13 6,9 2,8 6,7" fill="#383835" />
+          {/* Target star (bottom-right) */}
+          <g transform="translate(208, 76)">
+            <circle cx="7" cy="7" r="6" />
+            <polygon points="7,2.5 8.8,6 12,7 8.8,8 7,11.5 5.2,8 2,7 5.2,6" fill="#383835" />
           </g>
 
-          {/* Scattered dots and crosses in voids */}
-          <circle cx="38" cy="74" r="0.9" fill="#383835" />
-          <circle cx="78" cy="80" r="0.9" fill="#383835" />
-          <circle cx="120" cy="86" r="0.9" fill="#383835" />
-          <circle cx="158" cy="80" r="0.9" fill="#383835" />
-          <circle cx="196" cy="75" r="0.9" fill="#383835" />
+          {/* Scattered dots in voids */}
+          <circle cx="36" cy="74" r="0.8" fill="#383835" />
+          <circle cx="74" cy="80" r="0.8" fill="#383835" />
+          <circle cx="120" cy="86" r="0.8" fill="#383835" />
+          <circle cx="160" cy="80" r="0.8" fill="#383835" />
+          <circle cx="198" cy="75" r="0.8" fill="#383835" />
         </g>
       </g>
     </svg>
