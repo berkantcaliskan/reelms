@@ -357,19 +357,19 @@ export function FriendProfilePopup({
                 {moderationContext.canTimeout && (
                   <button type="button" className="fpp-list-action" onClick={() => { moderationContext.onTimeout?.(); onClose?.() }}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><polyline points="12 6 12 12 16 14" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-                    Timeout…
+                    Timeout
                   </button>
                 )}
                 {moderationContext.canRemove && (
                   <button type="button" className="fpp-list-action fpp-list-action--danger" onClick={() => { moderationContext.onRemove?.(); onClose?.() }}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/><circle cx="9" cy="7" r="4" stroke="currentColor" strokeWidth="1.8"/><line x1="22" y1="11" x2="16" y2="11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-                    Kick from Reelm…
+                    Kick from reelm
                   </button>
                 )}
                 {moderationContext.canBan && (
                   <button type="button" className="fpp-list-action fpp-list-action--danger" onClick={() => { moderationContext.onBan?.(); onClose?.() }}>
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.8"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"/></svg>
-                    Ban from Reelm…
+                    Ban from reelm
                   </button>
                 )}
               </div>

@@ -19890,28 +19890,43 @@ button, input, select, textarea,
 .fpp-mod-list {
   display: flex;
   flex-direction: row;
-  flex-wrap: wrap;
+  align-items: center;
+  flex-wrap: nowrap;
   gap: 2px;
-  margin-top: 5px;
+  margin-top: 3px;
+  width: 100%;
 }
 .fpp-list-action {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   text-align: left;
   border: 0;
-  border-radius: 9px;
-  padding: 5px 9px;
+  border-radius: 8px;
+  padding: 4px 6px;
   background: transparent;
   color: rgba(var(--ta-rgb), 0.78);
   font-family: var(--body-font);
   font-size: 0.72rem;
+  white-space: nowrap;
   cursor: pointer;
-  transition: background 0.12s, border-radius 0.15s;
+  transition: background 0.12s, color 0.12s;
 }
-.fpp-list-action:hover { background: rgba(var(--ta-rgb), 0.08); color: var(--ta); border-radius: 20px; }
-.fpp-list-action svg { flex-shrink: 0; opacity: 0.75; }
-.fpp-list-action--danger { color: #fca5a5; }
+.fpp-list-action:hover {
+  background: rgba(var(--ta-rgb), 0.08);
+  color: var(--ta);
+}
+.fpp-list-action svg {
+  flex-shrink: 0;
+  opacity: 0.75;
+}
+.fpp-list-action--danger {
+  color: #fca5a5;
+}
+.fpp-list-action--danger:hover {
+  background: rgba(248, 113, 113, 0.12);
+  color: #fecaca;
+}
 .reelm-channel-voice-meta .reelm-channel-capacity {
   position: absolute;
   right: 10px;
