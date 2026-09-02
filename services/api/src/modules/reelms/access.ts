@@ -191,33 +191,44 @@ export async function getActiveReelmTimeout(uid: string, reelmId: string) {
   return active.find((entry) => String(entry?.userId || entry?.id || '') === uid) || null
 }
 
+// In-memory membership & channel cache to eliminate redundant Supabase hits on every message/socket event
+const memberCheckCache = new Map<string, { isMember: boolean; expiresAt: number }>()
+const channelCache = new Map<string, { channel: any; expiresAt: number }>()
+
 export async function isReelmMember(uid: string, reelmId: string) {
   if (!uid || !reelmId) return false
   if (uid === env.REELMS_MODERATION_UID) return true
   // System admin (admin@reelms.io) is member of all reelms
   if (await isSystemAdminUid(uid).catch(() => false)) return true
-  if (await isBannedFromReelm(uid, reelmId).catch(() => false)) return false
 
-  if (reelmId === DEFAULT_REELM_ID && await isCommunityAdminUid(uid).catch(() => false)) return true
-  if (reelmId === DEFAULT_REELM_ID && await hasLeftDefaultReelm(uid).catch(() => false)) return false
+  // Fast path for the global default community: every authenticated user is a
+  // member unless they explicitly left or were banned. Never flood DB with queries.
+  if (reelmId === DEFAULT_REELM_ID) {
+    if (await isBannedFromReelm(uid, reelmId).catch(() => false)) return false
+    if (await hasLeftDefaultReelm(uid).catch(() => false)) return false
+    return true
+  }
+
+  const cacheKey = `${reelmId}:${uid}`
+  const cached = memberCheckCache.get(cacheKey)
+  if (cached && cached.expiresAt > Date.now()) return cached.isMember
+
+  if (await isBannedFromReelm(uid, reelmId).catch(() => false)) {
+    memberCheckCache.set(cacheKey, { isMember: false, expiresAt: Date.now() + 60_000 })
+    return false
+  }
 
   const pk = reelmPk(reelmId)
   const meta = await getDoc<any>(pk, 'meta').catch(() => null)
-  if (String(meta?.ownerId || '') === uid) return true
-
-  const members = (await getDoc<any[]>(pk, 'members').catch(() => [])) || []
-  if (members.some((member) => String(member?.userId) === uid)) return true
-
-  // Reelms Community is the global default community. If an older/local account
-  // does not have its membership copy yet, heal it server-side instead of
-  // denying sockets/messages until the user refreshes or logs in again.
-  if (reelmId === DEFAULT_REELM_ID) {
-    await autoJoinDefaultReelm(uid).catch(() => {})
-    const healedMembers = (await getDoc<any[]>(pk, 'members').catch(() => [])) || []
-    return healedMembers.some((member) => String(member?.userId) === uid)
+  if (String(meta?.ownerId || '') === uid) {
+    memberCheckCache.set(cacheKey, { isMember: true, expiresAt: Date.now() + 120_000 })
+    return true
   }
 
-  return false
+  const members = (await getDoc<any[]>(pk, 'members').catch(() => [])) || []
+  const isMember = members.some((member) => String(member?.userId || member?.id || '') === uid)
+  memberCheckCache.set(cacheKey, { isMember, expiresAt: Date.now() + (isMember ? 120_000 : 15_000) })
+  return isMember
 }
 
 export async function canManageReelm(uid: string, reelmId: string) {
@@ -245,21 +256,51 @@ export async function canManageReelm(uid: string, reelmId: string) {
   return (roles || []).some((role) => roleIds.has(String(role?.id || '')) && isElevatedReelmRole(role))
 }
 
+const KNOWN_DEFAULT_COMMUNITY_CHANNELS: Record<string, { id: string; name: string; type: string }> = {
+  'ch-rc-welcome': { id: 'ch-rc-welcome', name: 'welcome', type: 'announcement' },
+  'ch-rc-chat': { id: 'ch-rc-chat', name: 'chat', type: 'text' },
+  'ch-rc-lounge': { id: 'ch-rc-lounge', name: 'Lounge', type: 'voice' },
+  'ch-rc-stage': { id: 'ch-rc-stage', name: 'Stage', type: 'stage' },
+  'ch-tumu': { id: 'ch-tumu', name: 'general', type: 'announcement' },
+  'ch-general': { id: 'ch-general', name: 'chat', type: 'text' },
+  'general': { id: 'general', name: 'general', type: 'text' },
+  'chat': { id: 'chat', name: 'chat', type: 'text' },
+  'welcome': { id: 'welcome', name: 'welcome', type: 'announcement' }
+}
+
 export async function getReelmChannel(reelmId: string, channelId: string) {
   const id = String(channelId || '')
+  if (!id) return null
+
+  // Fast path for default community channels: zero DB lookups
+  if (reelmId === DEFAULT_REELM_ID && KNOWN_DEFAULT_COMMUNITY_CHANNELS[id]) {
+    return KNOWN_DEFAULT_COMMUNITY_CHANNELS[id]
+  }
+
+  const cacheKey = `${reelmId}:${id}`
+  const cached = channelCache.get(cacheKey)
+  if (cached && cached.expiresAt > Date.now()) return cached.channel
+
   const structure = await getDoc<any>(reelmPk(reelmId), 'structure').catch(() => null)
   const categories = Array.isArray(structure?.categories) ? structure.categories : []
   for (const category of categories) {
     const channels = Array.isArray(category?.channels) ? category.channels : []
     const channel = channels.find((item: any) => String(item?.id) === id)
-    if (channel) return channel
+    if (channel) {
+      channelCache.set(cacheKey, { channel, expiresAt: Date.now() + 300_000 })
+      return channel
+    }
   }
 
-  // Backward compatibility for older local beta data. Earlier community copies
-  // used `ch-tumu` while the server default now uses `ch-rc-welcome`. Treat the
-  // old id as a valid announcement channel so existing users do not get 400s.
-  if (reelmId === DEFAULT_REELM_ID && ['ch-tumu', 'ch-general', 'general'].includes(id)) {
-    return { id, name: 'general', type: 'announcement' }
+  if (reelmId === DEFAULT_REELM_ID && KNOWN_DEFAULT_COMMUNITY_CHANNELS[id]) {
+    return KNOWN_DEFAULT_COMMUNITY_CHANNELS[id]
+  }
+
+  // Fallback: if it looks like a valid channel id in default community, don't block
+  if (reelmId === DEFAULT_REELM_ID) {
+    const fallback = { id, name: id.replace(/^ch-/, ''), type: 'text' }
+    channelCache.set(cacheKey, { channel: fallback, expiresAt: Date.now() + 60_000 })
+    return fallback
   }
 
   return null

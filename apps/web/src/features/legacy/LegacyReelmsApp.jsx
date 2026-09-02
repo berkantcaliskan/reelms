@@ -3835,10 +3835,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (!selectedReelm) { setSelectedChannel(prev => prev == null ? prev : null); return }
     const allChannels = getReelmChannels(selectedReelm)
     const currentStillValid = selectedChannel?.id && allChannels.some(ch => String(ch.id) === String(selectedChannel.id))
-    if (currentStillValid) return
     const lastChId = lastChannels?.[selectedReelm.id]
     const lastCh = lastChId ? allChannels.find(ch => String(ch.id) === String(lastChId)) : null
-    const defaultCh = (selectedReelm.categories || []).find(c => c.type === 'announcement')?.channels?.[0] || allChannels[0] || null
+    const defaultCh = allChannels.find(c => c.type === 'text') || (selectedReelm.categories || []).find(c => c.type === 'announcement')?.channels?.[0] || allChannels[0] || null
     const pick = lastCh || defaultCh || null
     setSelectedChannel((prev) => (String(prev?.id || '') === String(pick?.id || '') ? prev : pick))
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -11135,8 +11134,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                               contentEditable={canPost}
                               suppressContentEditableWarning
                               role="textbox"
-                              aria-multiline="true"
-                              data-placeholder={selectedChatSystemLocked ? 'Reelms System is read-only.' : (selectedChatBlockedEntry ? 'You blocked this user. Unblock to send messages.' : (isAnnouncement ? 'Post an announcement' : 'Message'))}
+                              data-placeholder={selectedChatSystemLocked ? 'Reelms System is read-only.' : (selectedChatBlockedEntry ? 'You blocked this user. Unblock to send messages.' : (isAnnouncement ? (language === 'tr' ? '🔒 Bu kanal duyurular içindir (Sohbet için #chat kanalına geçebilirsiniz)' : '🔒 Announcement channel (Switch to #chat to chat)') : (language === 'tr' ? 'Mesaj yaz...' : 'Message...')))}
                               onInput={handleEditorInput}
                               onContextMenu={handleEditorContextMenu}
                               onPaste={e => {
@@ -11631,7 +11629,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                             const updated = msgRequests.filter(r => r.id !== req.id)
                             setMsgRequests(updated)
                             saveMsgRequests(updated)
-                            const convId = [uid, req.fromId].sort().join('_dm_')
+                            const convId = dmConvId(uid, req.fromId)
                             const newChat = { id: convId, convId, name: req.fromName, friendId: req.fromId, type: 'dm', photo: req.fromPhoto || null, updatedAt: Date.now() }
                             setChats(prev => prev.some(c => c.id === convId) ? prev : [newChat, ...prev])
                             setSelectedChat(newChat); setShowMsgRequests(false)

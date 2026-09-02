@@ -609,9 +609,15 @@ export function createReelmsDataRouter(io: Server) {
     return { ok: true as const, profile: next, username: usernameReservation.value, email: emailReservation.value }
   }
 
+  const senderProfileCache = new Map<string, { value: any, expiresAt: number }>()
+
   const getSenderProfile = async (uid: string) => {
-    const profile = await getUserPublicProfile(uid)
-    return { id: uid, name: profile.name || profile.displayName || profile.username || 'Member', username: profile.username || '', photo: getProfilePhoto(profile) }
+    const cached = senderProfileCache.get(uid)
+    if (cached && cached.expiresAt > Date.now()) return cached.value
+    const profile: any = await getUserPublicProfile(uid).catch(() => ({ name: 'Member' }))
+    const value = { id: uid, name: profile?.name || profile?.displayName || profile?.username || 'Member', username: profile?.username || '', photo: getProfilePhoto(profile) }
+    senderProfileCache.set(uid, { value, expiresAt: Date.now() + 300_000 })
+    return value
   }
 
   const compactPublicProfile = (uid: string, profile: any = {}) => {
@@ -3165,7 +3171,10 @@ export function createReelmsDataRouter(io: Server) {
         io.to(`chan:${msgKey}`).emit('reelms:message', payload)
       }
       res.json({ ok: true, data: message })
-    } catch { res.status(500).json({ error: 'send_failed' }) }
+    } catch (err: any) {
+      console.error('/api/v1/messages/:msgKey send error:', err)
+      res.status(500).json({ error: 'send_failed', message: err?.message || 'send_failed' })
+    }
   })
 
 
