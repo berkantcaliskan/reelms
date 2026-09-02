@@ -1039,7 +1039,7 @@ export function createReelmsDataRouter(io: Server) {
     if (isDefaultCommunity) {
       const adminSource = rawRoles.find((role: any) => String(role?.id || '') === DEFAULT_ADMIN_ROLE_ID)
         || rawRoles.find(isAdminLikeRole)
-        || { id: DEFAULT_ADMIN_ROLE_ID, name: 'Community Admin', color: '#a3e635', position: 0, permissions: { ...FULL_MANAGER_PERMISSIONS } }
+        || { id: DEFAULT_ADMIN_ROLE_ID, name: 'Admin', color: '#a3e635', position: 0, permissions: { ...FULL_MANAGER_PERMISSIONS } }
       const citizenSource = rawRoles.find((role: any) => String(role?.id || '') === DEFAULT_CITIZEN_ROLE_ID)
         || rawRoles.find((role: any) => !isAdminLikeRole(role) && isDefaultMemberLikeRole(role))
         || rawRoles.find((role: any) => !isAdminLikeRole(role))
@@ -1055,7 +1055,7 @@ export function createReelmsDataRouter(io: Server) {
       const adminRole = sanitizeRole({
         ...adminSource,
         id: DEFAULT_ADMIN_ROLE_ID,
-        name: String(adminSource?.name || '').trim() || 'Community Admin',
+        name: /admin/i.test(String(adminSource?.name || '')) ? 'Admin' : (String(adminSource?.name || '').trim() || 'Admin'),
         color: /^#[0-9a-fA-F]{6}$/.test(String(adminSource?.color || '')) ? adminSource.color : '#a3e635',
         position: 0,
         permissions: { ...FULL_MANAGER_PERMISSIONS }
@@ -1193,7 +1193,7 @@ export function createReelmsDataRouter(io: Server) {
     const actorCanManageFullRoles = options.actorCanManageFullRoles === true
     const isDefaultCommunityRoles = String(options.reelmId || '') === DEFAULT_REELM_ID
     const fallbackAdminRoleId = isDefaultCommunityRoles ? DEFAULT_ADMIN_ROLE_ID : CUSTOM_ADMIN_ROLE_ID
-    const fallbackAdminRoleName = isDefaultCommunityRoles ? 'Community Admin' : 'Admin'
+    const fallbackAdminRoleName = 'Admin'
     const fallbackMemberRoleId = isDefaultCommunityRoles ? DEFAULT_CITIZEN_ROLE_ID : CUSTOM_MEMBERS_ROLE_ID
     const fallbackMemberRoleName = isDefaultCommunityRoles ? 'Citizen' : 'Members'
     const existingById = new Map((Array.isArray(existingRoles) ? existingRoles : []).map((role: any) => [String(role?.id || ''), sanitizeRole(role, '', { allowManageReelm: true })]))

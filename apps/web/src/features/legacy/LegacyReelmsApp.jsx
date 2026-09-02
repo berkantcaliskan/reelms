@@ -6445,7 +6445,13 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   }
 
   const sendMessage = async () => {
-    const text = messageInputRef.current.trim()
+    if (editorRef.current) {
+      const live = (editorRef.current.innerText || editorRef.current.textContent || '').replace(/\n$/, '')
+      if (live.trim()) {
+        messageInputRef.current = live
+      }
+    }
+    const text = (messageInputRef.current || (editorRef.current ? editorRef.current.innerText : '') || '').replace(/\n$/, '').trim()
     const richMarkup = editorHasFormatting(editorRef.current) ? serializeRichEditor(editorRef.current).trim() : ''
     const richText = richMarkup && richMarkup !== text ? richMarkup : null
     const attach = pendingAttachment
@@ -6533,6 +6539,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
     // Then send text
     if (text) {
+      let outgoingText = text
+      let isPollCommand = false
       const isAIMention = /@(?:reelms\s*intelligence|reelmsintelligence|reelms-intelligence|reelmsai|intelligence|ai)\b/i.test(outgoingText) || (replySnap && (String(replySnap.senderId) === 'reelms-ai-bot' || String(replySnap.senderName || '').toLowerCase().includes('intelligence')))
       const isAICommand = outgoingText.startsWith('/ai ') || outgoingText === '/ai' || outgoingText.startsWith('/summarize') || outgoingText.startsWith('/ai-help') || isAIMention
 
@@ -6953,9 +6961,20 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       members = [{ userId: uid, userName: currentUser.name || 'User', userPhoto: currentUser.photo || null }]
     }
 
-    const showCitizenNotice = false
+    const isCommunity = isDefaultCommunity(activeReelm)
+    const myMember = (activeReelm.members || []).find(m => String(m.userId || m.id || '') === String(uid))
+    const myRoleIds = new Set((myMember?.roleIds || []).map(String))
+    const isCommunityAdmin = !isCommunity || (
+      String(activeReelm.ownerId || '') === String(uid) ||
+      canManageReelmClient(activeReelm, uid) ||
+      (activeReelm.roles || []).some(r => myRoleIds.has(String(r.id)) && (isManagerRoleClient(r) || /admin|founder|kurucu|yönetici/i.test(r.name || '')))
+    )
+    const showCitizenNotice = isCommunity && !isCommunityAdmin
+    const visibleGroups = (isCommunity && !isCommunityAdmin)
+      ? groups.filter(g => g.isBotsGroup || isManagerRoleClient(g.role) || /admin|founder|kurucu|yönetici/i.test(g.role?.name || ''))
+      : groups
     const presence = reelmPresence[activeReelm.id] || {}
-    const { groups, getMemberPresence, getMemberStatus } = buildReelmMemberGroupsClient({
+    const { groups: _allGroups, getMemberPresence, getMemberStatus } = buildReelmMemberGroupsClient({
       reelm: activeReelm,
       members,
       presence,
@@ -7015,17 +7034,18 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
       <div className="rp-members-panel-wrap">
         <div className="rp-members-panel">
           <span className="rp-members-header">In this Reelm</span>
-          {groups.map(group => {
+          {visibleGroups.map(group => {
             let list = group.members.filter(matchesGlobal)
             if (group.noRole && group.members.length > 18 && rightPanelNoRoleSearch.trim()) {
               const nq = rightPanelNoRoleSearch.trim().toLowerCase()
               list = list.filter(m => String((getMemberPresence(m).userName || m.userName || '')).toLowerCase().includes(nq))
             }
             if (globalQuery && list.length === 0) return null
+            const displayRoleName = (isCommunity && /admin/i.test(group.role?.name || '')) ? 'Admin' : (group.isBotsGroup ? t('bots_group_label') : group.role.name)
             return (
               <div key={`${panelKey}-${group.role.id}`} className={`rp-role-section${group.noRole ? ' rp-role-section--no-role' : ''}`}>
                 <div className="rp-role-section-header" style={{ color: group.role.color }}>
-                  <span>{group.isBotsGroup ? t('bots_group_label') : group.role.name}</span>
+                  <span>{displayRoleName}</span>
                   <span className="rp-role-section-count">{globalQuery ? list.length : group.members.length}</span>
                 </div>
                 {!globalQuery && group.noRole && group.members.length > 18 && (
@@ -7048,35 +7068,37 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           )}
           <div className="rp-members-bottom-spacer" />
         </div>
-        <div className={`rp-member-search${reelmMemberSearchOpen ? ' rp-member-search--open' : ''}`}>
-          <input
-            ref={reelmSearchInputRef}
-            className="rp-member-search-input"
-            value={reelmMemberSearch}
-            onChange={e => setReelmMemberSearch(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Escape') { setReelmMemberSearch(''); setReelmMemberSearchOpen(false) } }}
-            placeholder={t('search')}
-            aria-label={t('search')}
-            tabIndex={reelmMemberSearchOpen ? 0 : -1}
-          />
-          <button
-            type="button"
-            className="rp-member-search-btn"
-            title={t('search')}
-            onClick={() => {
-              setReelmMemberSearchOpen(open => {
-                const next = !open
-                if (!next) setReelmMemberSearch('')
-                else setTimeout(() => reelmSearchInputRef.current?.focus(), 60)
-                return next
-              })
-            }}
-          >
-            {reelmMemberSearchOpen && reelmMemberSearch
-              ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/></svg>
-              : <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2"/><line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>}
-          </button>
-        </div>
+        {(!isCommunity || isCommunityAdmin) && (
+          <div className={`rp-member-search${reelmMemberSearchOpen ? ' rp-member-search--open' : ''}`}>
+            <input
+              ref={reelmSearchInputRef}
+              className="rp-member-search-input"
+              value={reelmMemberSearch}
+              onChange={e => setReelmMemberSearch(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Escape') { setReelmMemberSearch(''); setReelmMemberSearchOpen(false) } }}
+              placeholder={t('search')}
+              aria-label={t('search')}
+              tabIndex={reelmMemberSearchOpen ? 0 : -1}
+            />
+            <button
+              type="button"
+              className="rp-member-search-btn"
+              title={t('search')}
+              onClick={() => {
+                setReelmMemberSearchOpen(open => {
+                  const next = !open
+                  if (!next) setReelmMemberSearch('')
+                  else setTimeout(() => reelmSearchInputRef.current?.focus(), 60)
+                  return next
+                })
+              }}
+            >
+              {reelmMemberSearchOpen && reelmMemberSearch
+                ? <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><line x1="18" y1="6" x2="6" y2="18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/><line x1="6" y1="6" x2="18" y2="18" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"/></svg>
+                : <svg width="15" height="15" viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2"/><line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>}
+            </button>
+          </div>
+        )}
       </div>
     )
   }

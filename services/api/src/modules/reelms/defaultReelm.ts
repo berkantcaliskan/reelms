@@ -35,7 +35,7 @@ const fullManagerPermissions = () => ({
 })
 
 const defaultRoles = () => [
-  { id: DEFAULT_ADMIN_ROLE_ID, name: 'Community Admin', color: '#a3e635', position: 0, permissions: fullManagerPermissions() },
+  { id: DEFAULT_ADMIN_ROLE_ID, name: 'Admin', color: '#a3e635', position: 0, permissions: fullManagerPermissions() },
   { id: DEFAULT_CITIZEN_ROLE_ID, name: 'Citizen', color: '#b99887', position: 1, permissions: {} }
 ]
 
@@ -168,7 +168,7 @@ async function ensureDefaultRoles() {
     }))
 
   const normalizedRoles = [
-    { ...adminSource, id: DEFAULT_ADMIN_ROLE_ID, name: String(adminSource?.name || '').trim() || 'Community Admin', color: /^#[0-9a-fA-F]{6}$/.test(String(adminSource?.color || '')) ? adminSource.color : '#a3e635', position: 0, permissions: fullManagerPermissions() },
+    { ...adminSource, id: DEFAULT_ADMIN_ROLE_ID, name: /admin/i.test(String(adminSource?.name || '')) ? 'Admin' : (String(adminSource?.name || '').trim() || 'Admin'), color: /^#[0-9a-fA-F]{6}$/.test(String(adminSource?.color || '')) ? adminSource.color : '#a3e635', position: 0, permissions: fullManagerPermissions() },
     { ...citizenSource, id: DEFAULT_CITIZEN_ROLE_ID, name: String(citizenSource?.name || '').trim() || 'Citizen', color: /^#[0-9a-fA-F]{6}$/.test(String(citizenSource?.color || '')) ? citizenSource.color : '#b99887', position: 1, permissions: {} },
     ...customRoles
   ]
