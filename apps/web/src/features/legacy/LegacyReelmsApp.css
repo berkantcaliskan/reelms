@@ -8501,6 +8501,27 @@ h6 {
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
 }
 
+/* ── Dynamic Text Color Customization Rule ── */
+.dashboard-root .msg-text,
+.dashboard-root .bubble-text,
+.dashboard-root .msg-body,
+.dashboard-root .msg-rich-root,
+.dashboard-root .msg-rich-root span:not([style*="color"]),
+.dashboard-root .msg-rich-root p,
+.dashboard-root .feed-post-text,
+.dashboard-root .feed-post-text-only,
+.dashboard-root .feed-comment-text-row,
+.dashboard-root .feed-comment-text,
+.dashboard-root .feed-ctx-textarea,
+.dashboard-root .msg-input {
+  color: var(--text-fg) !important;
+}
+
+.dashboard-root .feed-post-caption {
+  color: var(--text-fg) !important;
+  opacity: 0.85;
+}
+
 .cust-greeting-sublabel {
   font-size: 0.72rem;
   letter-spacing: 0.06em;
@@ -9398,7 +9419,7 @@ h6 {
 
 .msg-text {
   font-size: 0.84rem;
-  color: rgba(224, 201, 188, 0.82);
+  color: var(--text-fg, rgba(224, 201, 188, 0.82));
   line-height: 1.09;
   word-break: break-word;
   overflow-wrap: break-word;
@@ -14957,7 +14978,7 @@ h6 {
 }
 .feed-post-text {
   font-size: 0.88rem;
-  color: rgba(var(--ta-rgb), 0.82);
+  color: var(--text-fg, rgba(var(--ta-rgb), 0.82));
   line-height: 1.55;
 }
 
@@ -15044,7 +15065,7 @@ h6 {
 /* Post content */
 .feed-post-text-only {
   font-size: 18px; line-height: 1.55;
-  color: rgba(255,255,255,0.92); margin: 0;
+  color: var(--text-fg, rgba(255,255,255,0.92)); margin: 0;
   font-family: var(--body-font);
   align-self: stretch;
   word-break: break-word;
@@ -15063,7 +15084,7 @@ h6 {
 }
 .feed-post-caption {
   font-size: 14px; line-height: 1.5;
-  color: rgba(255,255,255,0.65); margin: 0;
+  color: var(--text-fg, rgba(255,255,255,0.65)); opacity: 0.85; margin: 0;
 }
 
 /* Post actions */
@@ -15100,7 +15121,7 @@ h6 {
 }
 .feed-comment-avatar img { width: 100%; height: 100%; object-fit: cover; }
 .feed-comment-content { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; word-break: break-word; overflow-wrap: break-word; }
-.feed-comment-text-row { font-size: 13px; line-height: 1.5; color: rgba(255,255,255,0.85); word-break: break-word; overflow-wrap: break-word; }
+.feed-comment-text-row { font-size: 13px; line-height: 1.5; color: var(--text-fg, rgba(255,255,255,0.85)); word-break: break-word; overflow-wrap: break-word; }
 .feed-comment-name {
   font-family: 'Dela Gothic One', sans-serif;
   font-size: 12px; color: rgba(255,255,255,0.9);
@@ -16705,7 +16726,7 @@ h6 {
 }
 .bubble-text {
   font-size: 0.86rem;
-  color: rgba(224, 201, 188, 0.9);
+  color: var(--text-fg, rgba(224, 201, 188, 0.9));
   line-height: 1.13;
   white-space: pre-wrap;
   word-break: break-word;

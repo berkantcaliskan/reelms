@@ -851,8 +851,9 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     if (tc === 'white') return '#ffffff'
     if (tc === 'black') return '#000000'
     if (tc === 'match_theme' || tc === 'theme') {
-      return activeTheme.isLight ? activeTheme.accent : effectiveAccent
+      return activeTheme.isLight ? activeTheme.accent : (customization.customAccent || activeTheme.accent || '#e8d8cc')
     }
+    if (typeof tc === 'string' && tc.startsWith('#')) return tc
     return activeTheme.isLight ? '#1c1917' : 'rgba(232, 216, 204, 0.92)'
   })()
 
@@ -7140,6 +7141,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
         '--bg-blur-outside': `${customization.bgBlur ?? (customization.reduceBlur ? 8 : 16)}px`,
         '--bg-dim': `${(customization.bgDim ?? 30) / 100}`,
         '--bg-blur-panel-extra': customization.reduceBlur ? '10px' : '12px',
+        '--text-fg': effectiveTextColor,
+        '--text-color': effectiveTextColor,
       }}
     >
       {customization.bgImage && (
