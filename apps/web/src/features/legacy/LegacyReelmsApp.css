@@ -10648,6 +10648,12 @@ h6 {
 /* ── Friend Profile Popup ── */
 .friend-profile-popup {
   position: fixed;
+  top: auto;
+  bottom: auto;
+  left: auto;
+  right: auto;
+  height: auto !important;
+  height: fit-content !important;
   background: rgba(22, 18, 20, 0.78) !important;
   -webkit-backdrop-filter: blur(48px) saturate(1.8) brightness(0.95);
   backdrop-filter: blur(48px) saturate(1.8) brightness(0.95);

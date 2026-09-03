@@ -125,10 +125,10 @@ export function FriendProfilePopup({
 
     if (spaceBelow >= 300 || spaceBelow >= spaceAbove) {
       const top = Math.max(screenTop, safeRect.bottom + 6)
-      stylePos = { top, left, width: popupW }
+      stylePos = { top, bottom: 'auto', left, width: popupW, height: 'fit-content' }
     } else {
       const bottom = Math.max(8, window.innerHeight - safeRect.top + 6)
-      stylePos = { bottom, left, width: popupW }
+      stylePos = { top: 'auto', bottom, left, width: popupW, height: 'fit-content' }
     }
   } else {
     const membersPanelEl = !embedded ? document.querySelector('.rp-members-panel') : null
@@ -144,10 +144,10 @@ export function FriendProfilePopup({
 
     if (spaceBelow < 280 && spaceAbove > spaceBelow) {
       const bottom = Math.max(8, window.innerHeight - safeRect.bottom + 6)
-      stylePos = { bottom, left, width: popupW }
+      stylePos = { top: 'auto', bottom, left, width: popupW, height: 'fit-content' }
     } else {
       const top = Math.max(screenTop, Math.min(safeRect.top, window.innerHeight - 560))
-      stylePos = { top, left, width: popupW }
+      stylePos = { top, bottom: 'auto', left, width: popupW, height: 'fit-content' }
     }
   }
 
