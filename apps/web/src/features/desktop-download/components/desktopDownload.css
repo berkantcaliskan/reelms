@@ -324,6 +324,7 @@
   font-weight: 700;
   letter-spacing: -0.02em;
   color: rgba(var(--ta-rgb, 230, 210, 200), 0.9);
+  font-family: 'Karla', sans-serif !important;
 }
 
 .dmp-card__desc {
@@ -354,6 +355,27 @@
   border: 1px solid rgba(var(--ta-rgb, 230, 210, 200), 0.1);
   align-self: flex-start;
   margin-top: auto;
+}
+
+.dmp-card__installed {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: #4ade80;
+  background: rgba(74, 222, 128, 0.12);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+  align-self: flex-start;
+  margin-top: auto;
+  box-shadow: 0 2px 10px rgba(74, 222, 128, 0.12);
+  font-family: 'Karla', sans-serif !important;
+}
+
+.dmp-card__installed svg {
+  flex-shrink: 0;
 }
 
 .desktop-download-settings-panel__hero {

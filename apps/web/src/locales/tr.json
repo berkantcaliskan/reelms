@@ -46,6 +46,7 @@
   "platform_android_desc": "Anlık bildirimler ve kesintisiz performansla Android'de tam Reelms deneyimi.",
   "platform_coming_soon": "Yakında",
   "platform_download": "İndir",
+  "platform_already_have": "Şu anda buna sahipsin",
   "platform_preparing_desc": "{name} için Reelms şu anda hazırlanıyor. Hazır olduğunda buradan kontrol edebilir, yükledikten sonra aynı hesabınla kullanmaya devam edebilirsin.",
   "sign_out": "Çıkış yap",
   "sign_in": "Giriş yap",

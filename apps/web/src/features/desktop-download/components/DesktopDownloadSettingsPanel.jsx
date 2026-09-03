@@ -48,30 +48,50 @@ const PLATFORMS = [
 export function DesktopDownloadSettingsPanel({ language = 'en' }) {
   const info = getDesktopDownloadInfo()
   const t = getT(language)
+  const isDesktopApp = typeof window !== 'undefined' && Boolean(
+    window.electronAPI ||
+    window.reelms ||
+    window.electronAPI?.isDesktop ||
+    (typeof navigator !== 'undefined' && /electron/i.test(navigator.userAgent || ''))
+  )
 
   return (
-    <div className="dmp-grid">
-      {PLATFORMS.map(({ key, name, Icon, color, isDesktop }) => {
-        const available = key === 'windows' && info.hasPublicUrl
-        return (
-          <div key={key} className="dmp-card">
-            <div className="dmp-card__icon" style={{ background: color }}>
-              <Icon />
+    <div className="desktop-download-settings-panel">
+      <div className="dmp-grid">
+        {PLATFORMS.map(({ key, name, Icon, color }) => {
+          const isWindows = key === 'windows'
+          return (
+            <div key={key} className="dmp-card">
+              <div className="dmp-card__icon" style={{ background: color }}>
+                <Icon />
+              </div>
+              <div className="dmp-card__body">
+                <h3 className="dmp-card__title">{t(`platform_${key}`)}</h3>
+                <p className="dmp-card__desc">{t(`platform_${key}_desc`)}</p>
+                <p className="dmp-card__preparing">
+                  {t('platform_preparing_desc').replace('{name}', name)}
+                </p>
+                {isWindows ? (
+                  isDesktopApp ? (
+                    <div className="dmp-card__installed">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                        <path d="M20 6L9 17l-5-5" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                      <span>{t('platform_already_have') || (language === 'tr' ? 'Şu anda buna sahipsin' : 'You currently have this')}</span>
+                    </div>
+                  ) : (
+                    <DesktopDownloadButton size="sm" showUnavailableState={false}>
+                      {t('platform_download') || 'Download'}
+                    </DesktopDownloadButton>
+                  )
+                ) : (
+                  <span className="dmp-card__soon">{t('platform_coming_soon')}</span>
+                )}
+              </div>
             </div>
-            <div className="dmp-card__body">
-              <h3 className="dmp-card__title">{t(`platform_${key}`)}</h3>
-              <p className="dmp-card__desc">{t(`platform_${key}_desc`)}</p>
-              <p className="dmp-card__preparing">
-                {t('platform_preparing_desc').replace('{name}', name)}
-              </p>
-              {available
-                ? <DesktopDownloadButton size="sm">{t('platform_download')}</DesktopDownloadButton>
-                : <span className="dmp-card__soon">{t('platform_coming_soon')}</span>
-              }
-            </div>
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
     </div>
   )
 }
