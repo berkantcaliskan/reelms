@@ -1262,6 +1262,23 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
   const [reelmMemberSearch, setReelmMemberSearch] = useState('')
   const [reelmMemberSearchOpen, setReelmMemberSearchOpen] = useState(false)
   const reelmSearchInputRef = useRef(null)
+  const reelmSearchContainerRef = useRef(null)
+
+  useEffect(() => {
+    if (!reelmMemberSearchOpen) return
+    const handleOutsideClick = (e) => {
+      if (reelmSearchContainerRef.current && !reelmSearchContainerRef.current.contains(e.target)) {
+        setReelmMemberSearchOpen(false)
+        setReelmMemberSearch('')
+      }
+    }
+    document.addEventListener('mousedown', handleOutsideClick, true)
+    document.addEventListener('touchstart', handleOutsideClick, true)
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick, true)
+      document.removeEventListener('touchstart', handleOutsideClick, true)
+    }
+  }, [reelmMemberSearchOpen])
   const [changelog, setChangelog] = useState([])
   const [showPrevVersions, setShowPrevVersions] = useState(false)
   const [expandedReleaseVersions, setExpandedReleaseVersions] = useState([])
@@ -7109,7 +7126,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
           <div className="rp-members-bottom-spacer" />
         </div>
         {(!isCommunity || isCommunityAdmin) && (
-          <div className={`rp-member-search${reelmMemberSearchOpen ? ' rp-member-search--open' : ''}`}>
+          <div ref={reelmSearchContainerRef} className={`rp-member-search${reelmMemberSearchOpen ? ' rp-member-search--open' : ''}`}>
             <input
               ref={reelmSearchInputRef}
               className="rp-member-search-input"
