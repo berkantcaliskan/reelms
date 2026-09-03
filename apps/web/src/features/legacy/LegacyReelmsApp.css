@@ -20629,6 +20629,8 @@ button, input, select, textarea,
   justify-content: space-between;
   padding: 6px 14px;
   margin: 4px 16px 6px;
+  max-width: calc(100% - 32px);
+  box-sizing: border-box;
   background: rgba(var(--ta-rgb), 0.1);
   -webkit-backdrop-filter: blur(16px) saturate(140%);
   backdrop-filter: blur(16px) saturate(140%);
@@ -20647,6 +20649,7 @@ button, input, select, textarea,
   align-items: center;
   gap: 8px;
   min-width: 0;
+  flex: 1 1 auto;
   overflow: hidden;
 }
 .channel-pinned-icon {
@@ -20658,6 +20661,7 @@ button, input, select, textarea,
   align-items: center;
   gap: 6px;
   min-width: 0;
+  flex: 1 1 auto;
   overflow: hidden;
   font-size: 0.78rem;
 }
@@ -20666,12 +20670,17 @@ button, input, select, textarea,
   color: var(--ta);
   white-space: nowrap;
   flex-shrink: 0;
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .channel-pinned-snippet {
   color: rgba(var(--ta-rgb), 0.75);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1 1 auto;
 }
 .channel-pinned-unpin-btn {
   background: none;
@@ -20684,12 +20693,48 @@ button, input, select, textarea,
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  width: 26px;
+  height: 26px;
   margin-left: 8px;
   transition: color 0.15s, background 0.15s;
 }
 .channel-pinned-unpin-btn:hover {
   color: rgba(var(--ta-rgb), 0.95);
   background: rgba(var(--ta-rgb), 0.15);
+}
+
+@media (max-width: 767px) {
+  .channel-pinned-banner {
+    margin: 4px 8px 6px;
+    padding: 5px 10px;
+    border-radius: 10px;
+    max-width: calc(100% - 16px);
+  }
+  .channel-pinned-content {
+    gap: 6px;
+  }
+  .channel-pinned-text-wrap {
+    gap: 4px;
+    font-size: 0.75rem;
+  }
+  .channel-pinned-author {
+    max-width: 90px;
+  }
+}
+
+@media (max-width: 480px) {
+  .channel-pinned-banner {
+    margin: 3px 6px 4px;
+    padding: 4px 8px;
+    border-radius: 8px;
+    max-width: calc(100% - 12px);
+  }
+  .channel-pinned-author {
+    max-width: 75px;
+  }
+  .channel-pinned-text-wrap {
+    font-size: 0.72rem;
+  }
 }
 
 /* msg-outer-row: wraps msg-bar + spotify inline bar side by side */

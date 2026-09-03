@@ -8,7 +8,7 @@ import { isReelmMember } from '../../modules/reelms/access.js'
 import { isAIConfigured, generateAIChatResponse, summarizeChannelConversation, moderateChannelMessages } from '../../modules/ai/aiService.js'
 
 export const AI_BOT_UID = env.REELMS_AI_BOT_UID
-const AI_BOT_USERNAME = 'reelmsai'
+const AI_BOT_USERNAME = 'reelmsintelligence'
 const AI_BOT_NAME = 'Reelms Intelligence'
 
 async function ensureAIBotProfile() {

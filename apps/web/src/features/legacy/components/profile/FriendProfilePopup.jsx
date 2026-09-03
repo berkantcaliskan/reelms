@@ -94,7 +94,7 @@ export function FriendProfilePopup({
   const isFromChat = !serverContext && !embedded
 
   const friendCover = safeFriend.cover || safeFriend.coverImage || safeFriend.coverUrl || null
-  const isBot = safeFriend.isBot || ['reelmradio', 'reelms-intelligence'].includes(safeFriend.username)
+  const isBot = safeFriend.isBot || ['reelmradio', 'reelmsintelligence', 'reelms-intelligence', 'reelmsai'].includes(safeFriend.username)
   const rawStatusKey = isBot ? 'online' : (status !== null && status !== undefined ? status : (safeFriend.status || friend?.status || 'offline'))
   const friendStatusKey = ['online', 'idle', 'busy', 'dnd', 'invisible', 'offline'].includes(rawStatusKey) ? rawStatusKey : 'offline'
   const friendStatus = STATUS_OPTIONS_LIST.find(s => s.key === friendStatusKey) || { key: friendStatusKey, label: friendStatusKey, color: '#71717a' }
@@ -183,7 +183,9 @@ export function FriendProfilePopup({
               />
             </div>
             <div className="pp-username-row fpp-username-row">
-              <span className="pp-username fpp-username">{'@' + (safeFriend.username ? safeFriend.username.replace(/^@/, '') : (safeFriend.name || 'user').toLowerCase().replace(/\s+/g, ''))}</span>
+              <span className="pp-username fpp-username">
+                {'@' + (safeFriend.username ? safeFriend.username.replace(/^@/, '').replace('reelms-intelligence', 'reelmsintelligence') : (safeFriend.name || 'user').toLowerCase().replace(/\s+/g, '').replace('reelms-intelligence', 'reelmsintelligence'))}
+              </span>
             </div>
           </div>
         </div>

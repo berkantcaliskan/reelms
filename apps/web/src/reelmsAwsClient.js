@@ -1134,7 +1134,7 @@ export async function aiGetStatus() {
       configured: true,
       provider: 'openrouter',
       model: OPENROUTER_DEFAULT_MODEL,
-      botUsername: 'reelms-intelligence',
+      botUsername: 'reelmsintelligence',
       botName: 'Reelms Intelligence'
     }
   }

@@ -2,7 +2,7 @@ import { THEMES } from '../constants/themeConstants'
 import { rgbCssValue } from './colorUtils'
 import { getPersonPhoto, getPersonCover } from './mediaUtils'
 
-export const BOT_BIO_KEY = { 'reelmradio': 'bot_radio_bio', 'reelms-intelligence': 'bot_intelligence_bio' }
+export const BOT_BIO_KEY = { 'reelmradio': 'bot_radio_bio', 'reelmsintelligence': 'bot_intelligence_bio', 'reelms-intelligence': 'bot_intelligence_bio', 'reelmsai': 'bot_intelligence_bio' }
 
 export const STATUS_OPTIONS_LIST = [
   { key: 'online', label: 'Online', color: '#4ade80' },

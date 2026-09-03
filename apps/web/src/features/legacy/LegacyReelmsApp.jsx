@@ -8439,7 +8439,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
                                   const aiMsg = {
                                     id: createClientMessageId(),
                                     text: aiCopilotSummary,
-                                    sender: { id: 'reelms-ai-bot', name: 'Reelms Intelligence', username: 'reelmsai', photo: null, isBot: true },
+                                    sender: { id: 'reelms-ai-bot', name: 'Reelms Intelligence', username: 'reelmsintelligence', photo: null, isBot: true },
                                     time: Date.now()
                                   }
                                   setMessages(prev => appendUniqueMessage(prev, msgKey, aiMsg))
