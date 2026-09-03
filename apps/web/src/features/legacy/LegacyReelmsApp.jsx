@@ -7098,7 +7098,7 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
               list = list.filter(m => String((getMemberPresence(m).userName || m.userName || '')).toLowerCase().includes(nq))
             }
             if (globalQuery && list.length === 0) return null
-            const displayRoleName = (isCommunity && /admin/i.test(group.role?.name || '')) ? 'Admin' : (group.isBotsGroup ? t('bots_group_label') : group.role.name)
+            const displayRoleName = (isCommunity && /admin/i.test(String(group.role?.name || '').replace(/ı/g, 'i'))) ? 'Admin' : (group.isBotsGroup ? t('bots_group_label') : String(group.role?.name || '').replace(/Admın/g, 'Admin').replace(/admın/g, 'admin'))
             return (
               <div key={`${panelKey}-${group.role.id}`} className={`rp-role-section${group.noRole ? ' rp-role-section--no-role' : ''}`}>
                 <div className="rp-role-section-header" style={{ color: group.role.color }}>

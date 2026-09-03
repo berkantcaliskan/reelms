@@ -1055,7 +1055,7 @@ export function createReelmsDataRouter(io: Server) {
       const adminRole = sanitizeRole({
         ...adminSource,
         id: DEFAULT_ADMIN_ROLE_ID,
-        name: /admin/i.test(String(adminSource?.name || '')) ? 'Admin' : (String(adminSource?.name || '').trim() || 'Admin'),
+        name: 'Admin',
         color: /^#[0-9a-fA-F]{6}$/.test(String(adminSource?.color || '')) ? adminSource.color : '#a3e635',
         position: 0,
         permissions: { ...FULL_MANAGER_PERMISSIONS }
@@ -1175,7 +1175,7 @@ export function createReelmsDataRouter(io: Server) {
 
   const sanitizeRole = (role: any, fallbackId = '', options: { allowManageReelm?: boolean; forceManager?: boolean } = {}) => {
     const id = String(role?.id || fallbackId || `role-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`).replace(/[^a-zA-Z0-9._:-]/g, '').slice(0, 80)
-    const name = String(role?.name || 'Role').trim().replace(/\s+/g, ' ').slice(0, 32) || 'Role'
+    const name = String(role?.name || 'Role').trim().replace(/Admın/g, 'Admin').replace(/admın/g, 'admin').replace(/\s+/g, ' ').slice(0, 32) || 'Role'
     const color = ROLE_COLOR_RE.test(String(role?.color || '')) ? String(role.color) : '#60a5fa'
     const forceManager = options.forceManager === true || (options.allowManageReelm === true && role?.permissions?.manageReelm === true)
     const position = Number.isFinite(Number(role?.position ?? role?.order)) ? Number(role.position ?? role.order) : 0

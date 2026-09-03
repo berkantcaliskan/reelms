@@ -163,12 +163,13 @@ async function ensureDefaultRoles() {
     })
     .map((role, index) => ({
       ...role,
+      name: String(role?.name || '').replace(/Admın/g, 'Admin').replace(/admın/g, 'admin'),
       position: Number.isFinite(Number(role?.position ?? role?.order)) ? Number(role.position ?? role.order) : index + 2,
       permissions: role?.permissions && typeof role.permissions === 'object' ? role.permissions : {}
     }))
 
   const normalizedRoles = [
-    { ...adminSource, id: DEFAULT_ADMIN_ROLE_ID, name: /admin/i.test(String(adminSource?.name || '')) ? 'Admin' : (String(adminSource?.name || '').trim() || 'Admin'), color: /^#[0-9a-fA-F]{6}$/.test(String(adminSource?.color || '')) ? adminSource.color : '#a3e635', position: 0, permissions: fullManagerPermissions() },
+    { ...adminSource, id: DEFAULT_ADMIN_ROLE_ID, name: 'Admin', color: /^#[0-9a-fA-F]{6}$/.test(String(adminSource?.color || '')) ? adminSource.color : '#a3e635', position: 0, permissions: fullManagerPermissions() },
     { ...citizenSource, id: DEFAULT_CITIZEN_ROLE_ID, name: String(citizenSource?.name || '').trim() || 'Citizen', color: /^#[0-9a-fA-F]{6}$/.test(String(citizenSource?.color || '')) ? citizenSource.color : '#b99887', position: 1, permissions: {} },
     ...customRoles
   ]

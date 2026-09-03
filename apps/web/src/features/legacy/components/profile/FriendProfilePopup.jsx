@@ -236,6 +236,7 @@ export function FriendProfilePopup({
                 <div className="fpp-role-badges fpp-role-badges--interactive">
                   {roleContext.allRoles.map(role => {
                     const hasRole = (roleContext.memberRoleIds || []).map(String).includes(String(role.id))
+                    const roleName = String(role?.name || '').replace(/Admın/g, 'Admin').replace(/admın/g, 'admin')
                     return (
                       <button
                         key={role.id}
@@ -243,19 +244,22 @@ export function FriendProfilePopup({
                         className={`fpp-role-chip${hasRole ? ' fpp-role-chip--assigned' : ''}`}
                         style={{ '--chip-color': role.color || '#94a3b8' }}
                         onClick={() => roleContext.onToggleRole?.(role.id)}
-                        title={hasRole ? `Remove ${role.name}` : `Assign ${role.name}`}
+                        title={hasRole ? `Remove ${roleName}` : `Assign ${roleName}`}
                       >
                         <span className="fpp-role-chip-indicator">{hasRole ? '✓' : '+'}</span>
-                        <span className="fpp-role-chip-name">{role.name}</span>
+                        <span className="fpp-role-chip-name">{roleName}</span>
                       </button>
                     )
                   })}
                 </div>
               ) : (
                 <div className="fpp-role-badges">
-                  {roleContext.roles.slice(0, roleContext.expanded ? 12 : 3).map(role => (
-                    <span key={role.id} className="rp-role-badge" style={{ color: role.color, borderColor: role.color + '55', background: role.color + '18' }}>{role.name}</span>
-                  ))}
+                  {roleContext.roles.slice(0, roleContext.expanded ? 12 : 3).map(role => {
+                    const roleName = String(role?.name || '').replace(/Admın/g, 'Admin').replace(/admın/g, 'admin')
+                    return (
+                      <span key={role.id} className="rp-role-badge" style={{ color: role.color, borderColor: role.color + '55', background: role.color + '18' }}>{roleName}</span>
+                    )
+                  })}
                   {roleContext.roles.length > 3 && (
                     <button type="button" className="fpp-mini-link" onClick={roleContext.onToggleExpanded}>
                       {roleContext.expanded ? 'Show less' : `+${roleContext.roles.length - 3} more`}
