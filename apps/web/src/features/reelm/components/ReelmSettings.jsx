@@ -607,9 +607,9 @@ export function ReelmSettings({ reelm, currentUser, friends, onUpdate, onClose, 
                     </div>
                     <button
                       type="button"
-                      className={`cust-toggle${(reelm.isPublic ?? (reelm.showInDiscover || joinMode === 'open')) ? ' cust-toggle-on' : ''}`}
+                      className={`cust-toggle${reelm.isPublic === true ? ' cust-toggle-on' : ''}`}
                       onClick={() => {
-                        const next = !(reelm.isPublic ?? (reelm.showInDiscover || joinMode === 'open'))
+                        const next = reelm.isPublic !== true
                         onUpdate({ ...reelm, roles, members, isPublic: next, showInDiscover: next, joinMode: next ? 'open' : 'request' })
                       }}
                     ><span className="cust-toggle-knob" /></button>

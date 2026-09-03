@@ -5187,7 +5187,8 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
 
     return {
       id: reelmId, code, name, updatedAt: Date.now(), ownerId: uid,
-      showInDiscover: true,
+      isPublic: false,
+      showInDiscover: false,
       joinMode: 'request',
       autoJoinOnInvite: false,
       memberInvitesEnabled: true,
