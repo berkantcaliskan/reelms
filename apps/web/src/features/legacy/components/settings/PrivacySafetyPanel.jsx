@@ -150,7 +150,14 @@ export function PrivacySafetyPanel({
     <div className="accs-panel">
 
       <div className="accs-section">
-        <div className="accs-section-title">{t('change_password')}</div>
+        <div className="accs-section-title">
+          {user.hasPassword ? t('change_password') : (t('set_password') || 'Set a password')}
+        </div>
+        {!user.hasPassword && (
+          <p className="accs-note" style={{ marginBottom: '10px' }}>
+            {t('set_password_desc') || 'Google ile giriş yapan kullanıcılar bir şifre belirledikten sonra normal e-posta ve kullanıcı adı şeklinde de giriş yapabilir.'}
+          </p>
+        )}
         <div className="accs-field-col">
           {pwPhase === 'new' ? (
             <>
@@ -164,9 +171,9 @@ export function PrivacySafetyPanel({
             </>
           )}
           {pwError && <p className="accs-error">{pwError}</p>}
-          {pwSuccess && <p className="accs-success">{t('password_updated')}</p>}
+          {pwSuccess && <p className="accs-success">{user.hasPassword ? t('password_updated') : (t('password_set_success') || 'Password set successfully! You can now sign in with email/username as well.')}</p>}
           <button type="button" className="accs-btn" style={{ alignSelf: 'flex-end' }} onClick={handlePasswordUpdate} disabled={pwSaving}>
-            {pwSaving ? '…' : pwPhase === 'confirm' ? t('confirm') : t('update_password')}
+            {pwSaving ? '…' : pwPhase === 'confirm' ? t('confirm') : user.hasPassword ? t('update_password') : (t('set_password') || 'Set password')}
           </button>
         </div>
       </div>
