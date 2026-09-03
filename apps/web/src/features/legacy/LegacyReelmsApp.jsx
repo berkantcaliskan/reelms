@@ -3850,47 +3850,85 @@ function DashboardScreen({ onLogOut, onShake, language, onLanguageChange, update
     return () => clearInterval(id)
   }, [])
 
-  // Flying rooms: auto-expire
+  // Flying rooms: auto-expire (Announces ONLY ONCE at the exact moment of expiration)
   const reelmsRef = useRef([])
   useEffect(() => { reelmsRef.current = reelms }, [reelms])
+  const announcedVaporRoomsRef = useRef(new Set())
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('reelms:announced-vapor-rooms')
+      if (stored) {
+        const parsed = JSON.parse(stored)
+        if (Array.isArray(parsed)) announcedVaporRoomsRef.current = new Set(parsed)
+      }
+    } catch { /* ignore */ }
+  }, [])
+
   useEffect(() => {
     const id = setInterval(() => {
       const now = Date.now()
       const toAnnounce = []
+      const affectedReelms = []
+
       reelmsRef.current.forEach(r => {
+        let reelmHasExpired = false
         r.categories.forEach(c => {
           c.channels.forEach(ch => {
             if (ch.isFlyingRoom && ch.expiresAt <= now) {
-              const annChId = r.announcementChannelId || r.categories.find(cat => cat.type === 'announcement')?.channels?.[0]?.id
-              if (annChId) toAnnounce.push({ reelmId: r.id, channelName: ch.name, annChId })
+              reelmHasExpired = true
+              const expireKey = `${r.id}_${ch.id}_expired`
+              // Only announce if it expired within the last 15s (actively running) and hasn't been announced yet
+              const isRecent = (now - ch.expiresAt) <= 15000
+              if (isRecent && !announcedVaporRoomsRef.current.has(expireKey)) {
+                announcedVaporRoomsRef.current.add(expireKey)
+                const annChId = r.announcementChannelId || r.categories.find(cat => cat.type === 'announcement')?.channels?.[0]?.id
+                if (annChId) toAnnounce.push({ reelmId: r.id, channelName: ch.name, annChId })
+              } else {
+                announcedVaporRoomsRef.current.add(expireKey)
+              }
             }
           })
         })
+        if (reelmHasExpired) affectedReelms.push(r.id)
       })
-      setReelms(prev => {
-        let changed = false
-        const next = prev.map(r => ({
-          ...r,
-          categories: r.categories.map(c => {
-            const filtered = c.channels.filter(ch => !ch.isFlyingRoom || ch.expiresAt > now)
-            if (filtered.length !== c.channels.length) changed = true
-            return { ...c, channels: filtered }
+
+      if (affectedReelms.length > 0) {
+        try {
+          const arr = Array.from(announcedVaporRoomsRef.current).slice(-200)
+          localStorage.setItem('reelms:announced-vapor-rooms', JSON.stringify(arr))
+        } catch { /* ignore */ }
+
+        setReelms(prev => {
+          return prev.map(r => {
+            if (!affectedReelms.includes(r.id)) return r
+            const updated = {
+              ...r,
+              categories: r.categories.map(c => ({
+                ...c,
+                channels: c.channels.filter(ch => !ch.isFlyingRoom || ch.expiresAt > now)
+              }))
+            }
+            // Persist the cleaned categories so expired rooms aren't loaded again
+            persistReelmCore(updated)
+            return updated
           })
-        }))
-        if (!changed) return prev
-        return next
-      })
-      setSelectedReelm(prev => {
-        if (!prev) return prev
-        return {
-          ...prev,
-          categories: prev.categories.map(c => ({
-            ...c,
-            channels: c.channels.filter(ch => !ch.isFlyingRoom || ch.expiresAt > now)
-          }))
-        }
-      })
-      setSelectedChannel(prev => (prev?.isFlyingRoom && prev.expiresAt <= now) ? null : prev)
+        })
+
+        setSelectedReelm(prev => {
+          if (!prev || !affectedReelms.includes(prev.id)) return prev
+          return {
+            ...prev,
+            categories: prev.categories.map(c => ({
+              ...c,
+              channels: c.channels.filter(ch => !ch.isFlyingRoom || ch.expiresAt > now)
+            }))
+          }
+        })
+
+        setSelectedChannel(prev => (prev?.isFlyingRoom && prev.expiresAt <= now) ? null : prev)
+      }
+
       toAnnounce.forEach(({ reelmId, channelName, annChId }) => {
         postSystemMessage(reelmId, annChId, `✦ ${channelName} has flown away.`)
       })
